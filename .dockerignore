@@ -1,0 +1,32 @@
+# Dependencies and build
+node_modules
+dist
+npm-debug.log*
+.npm
+
+# Git and IDE
+.git
+.gitignore
+.cursor
+.idea
+.vscode
+*.swp
+*.swo
+
+# Env and secrets (do not bake into image)
+.env
+.env.*
+!.env.example
+
+# Tests and docs (not needed in runtime image)
+test
+coverage
+*.spec.ts
+*.e2e-spec.ts
+docs
+*.md
+!README.md
+
+# Misc
+.DS_Store
+Thumbs.db

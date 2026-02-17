@@ -1,0 +1,32 @@
+import {
+  Entity,
+  PrimaryColumn,
+  Column,
+  OneToMany,
+} from 'typeorm';
+import { uuidBinaryTransformer } from '../../../common/base.entity';
+import { BaseEntity } from '../../../common/base.entity';
+
+@Entity('users')
+export class UserEntity extends BaseEntity {
+  @PrimaryColumn({ type: 'binary', length: 16, transformer: uuidBinaryTransformer })
+  id!: string;
+
+  @Column({ name: 'full_name', type: 'varchar', length: 150 })
+  fullName!: string;
+
+  @Column({ type: 'varchar', length: 150, unique: true })
+  email!: string;
+
+  @Column({ name: 'password_hash', type: 'text', nullable: true })
+  passwordHash!: string | null;
+
+  @Column({ name: 'avatar_url', type: 'text', nullable: true })
+  avatarUrl!: string | null;
+
+  @Column({ name: 'is_email_verified', type: 'boolean', default: false })
+  isEmailVerified!: boolean;
+
+  @Column({ name: 'is_active', type: 'boolean', default: true })
+  isActive!: boolean;
+}
