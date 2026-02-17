@@ -1,0 +1,11 @@
+import { Repository } from 'typeorm';
+import { ProjectEntity } from '../entities/project.entity';
+export declare class ProjectsRepository {
+    private readonly repo;
+    constructor(repo: Repository<ProjectEntity>);
+    findById(id: string): Promise<ProjectEntity | null>;
+    findByIdAndOrganization(id: string, organizationId: string): Promise<ProjectEntity | null>;
+    findByOrganization(organizationId: string): Promise<ProjectEntity[]>;
+    create(data: Partial<ProjectEntity>): Promise<ProjectEntity>;
+    update(id: string, data: Partial<ProjectEntity>): Promise<void>;
+}
