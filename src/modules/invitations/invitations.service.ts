@@ -1,0 +1,264 @@
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { randomBytes } from 'crypto';
+import { InvitationsRepository } from './repositories/invitations.repository';
+import { EmailService } from './email.service';
+import { OrganizationsService } from '../organizations/organizations.service';
+import { UsersService } from '../users/users.service';
+import { OrganizationMembersRepository } from '../organizations/repositories/organization-members.repository';
+import { UserEntity } from '../users/entities/user.entity';
+import { OrganizationInvitationEntity } from './entities/organization-invitation.entity';
+import { generateUuid } from '../../common/utils/uuid.util';
+
+const INVITE_EXPIRY_DAYS = 7;
+
+function generateToken(): string {
+  return randomBytes(32).toString('hex');
+}
+
+function expiresAt(): Date {
+  const d = new Date();
+  d.setDate(d.getDate() + INVITE_EXPIRY_DAYS);
+  return d;
+}
+
+@Injectable()
+export class InvitationsService {
+  constructor(
+    private readonly invitationsRepo: InvitationsRepository,
+    private readonly emailService: EmailService,
+    private readonly orgsService: OrganizationsService,
+    private readonly usersService: UsersService,
+    private readonly orgMembersRepo: OrganizationMembersRepository,
+  ) {}
+
+  async createInvitation(
+    organizationId: string,
+    email: string,
+    role: string,
+    invitedByUserId: string,
+  ): Promise<OrganizationInvitationEntity> {
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const existingMember = await this.orgMembersRepo.findByOrganizationWithUser(organizationId);
+    const alreadyMember = existingMember.find(
+      (m) => m.user?.email?.toLowerCase() === normalizedEmail && m.status === 'ACTIVE',
+    );
+    if (alreadyMember) {
+      throw new ConflictException('User is already a member of this organization');
+    }
+
+    const existingInvite = await this.invitationsRepo.findPendingByOrgAndEmail(
+      organizationId,
+      normalizedEmail,
+    );
+    if (existingInvite) {
+      throw new ConflictException('A pending invitation already exists for this email');
+    }
+
+    const token = generateToken();
+    const invitation = await this.invitationsRepo.create({
+      organizationId,
+      email: normalizedEmail,
+      role,
+      token,
+      invitedBy: invitedByUserId,
+      status: 'PENDING',
+      expiresAt: expiresAt(),
+    });
+
+    const org = await this.orgsService.findById(organizationId);
+    const inviter = await this.usersService.findById(invitedByUserId);
+
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+    const acceptUrl = `${frontendUrl}/invite/${token}`;
+
+    await this.emailService.sendInvitation({
+      to: normalizedEmail,
+      organizationName: org?.name ?? 'Unknown Organization',
+      inviterName: inviter?.fullName ?? inviter?.email ?? 'A team member',
+      role,
+      acceptUrl,
+    });
+
+    return invitation;
+  }
+
+  async listByOrganization(organizationId: string): Promise<OrganizationInvitationEntity[]> {
+    return this.invitationsRepo.findByOrganization(organizationId);
+  }
+
+  async validateToken(token: string): Promise<{
+    valid: boolean;
+    invitation?: OrganizationInvitationEntity;
+    reason?: string;
+  }> {
+    const invitation = await this.invitationsRepo.findByToken(token);
+    if (!invitation) {
+      return { valid: false, reason: 'Invitation not found' };
+    }
+    if (invitation.status !== 'PENDING') {
+      return { valid: false, reason: `Invitation has been ${invitation.status.toLowerCase()}` };
+    }
+    if (new Date() > invitation.expiresAt) {
+      await this.invitationsRepo.updateStatus(invitation.id, 'EXPIRED');
+      return { valid: false, reason: 'Invitation has expired' };
+    }
+    return { valid: true, invitation };
+  }
+
+  async validateTokenEnriched(token: string): Promise<{
+    valid: boolean;
+    reason?: string;
+    organization?: { id: string; name: string };
+    project?: { id: string; name: string } | null;
+    role?: string;
+    email?: string;
+    expires_at?: string;
+    status?: string;
+  }> {
+    const invitation = await this.invitationsRepo.findByToken(token);
+    if (!invitation) {
+      return { valid: false, reason: 'Invitation not found' };
+    }
+    if (invitation.status !== 'PENDING') {
+      return {
+        valid: false,
+        reason: `Invitation has been ${invitation.status.toLowerCase()}`,
+        organization: invitation.organization
+          ? { id: invitation.organizationId, name: invitation.organization.name }
+          : undefined,
+        project: null,
+        role: invitation.role,
+        email: invitation.email,
+        expires_at: invitation.expiresAt?.toISOString(),
+        status: invitation.status,
+      };
+    }
+    if (new Date() > invitation.expiresAt) {
+      await this.invitationsRepo.updateStatus(invitation.id, 'EXPIRED');
+      return {
+        valid: false,
+        reason: 'Invitation has expired',
+        organization: invitation.organization
+          ? { id: invitation.organizationId, name: invitation.organization.name }
+          : undefined,
+        project: null,
+        role: invitation.role,
+        email: invitation.email,
+        expires_at: invitation.expiresAt?.toISOString(),
+        status: 'EXPIRED',
+      };
+    }
+    return {
+      valid: true,
+      organization: invitation.organization
+        ? { id: invitation.organizationId, name: invitation.organization.name }
+        : undefined,
+      project: null,
+      role: invitation.role,
+      email: invitation.email,
+      expires_at: invitation.expiresAt?.toISOString(),
+      status: invitation.status,
+    };
+  }
+
+  async acceptInvitation(
+    token: string,
+    userIdOrUser: string | UserEntity,
+  ): Promise<{ organizationId: string }> {
+    const { valid, invitation, reason } = await this.validateToken(token);
+    if (!valid || !invitation) {
+      throw new BadRequestException(reason ?? 'Invalid invitation');
+    }
+
+    const user =
+      typeof userIdOrUser === 'string'
+        ? await this.usersService.findById(userIdOrUser)
+        : userIdOrUser;
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.email.toLowerCase() !== invitation.email.toLowerCase()) {
+      throw new ForbiddenException('This invitation was sent to a different email address');
+    }
+
+    const existing = await this.orgMembersRepo.findByOrganizationAndUser(
+      invitation.organizationId,
+      user.id,
+    );
+    if (existing) {
+      await this.invitationsRepo.updateStatus(invitation.id, 'ACCEPTED');
+      return { organizationId: invitation.organizationId };
+    }
+
+    await this.orgMembersRepo.create({
+      id: generateUuid(),
+      organizationId: invitation.organizationId,
+      userId: user.id,
+      role: invitation.role,
+      status: 'ACTIVE',
+    });
+    await this.invitationsRepo.updateStatus(invitation.id, 'ACCEPTED');
+
+    return { organizationId: invitation.organizationId };
+  }
+
+  async cancelInvitation(invitationId: string, organizationId: string): Promise<void> {
+    const invitation = await this.invitationsRepo.findById(invitationId);
+    if (!invitation || invitation.organizationId !== organizationId) {
+      throw new NotFoundException('Invitation not found');
+    }
+    if (invitation.status !== 'PENDING') {
+      throw new BadRequestException('Only pending invitations can be cancelled');
+    }
+    await this.invitationsRepo.updateStatus(invitationId, 'CANCELLED');
+
+    const invitedUser = await this.usersService.findByEmail(invitation.email);
+    if (invitedUser) {
+      const memberships = await this.orgMembersRepo.findByUser(invitedUser.id);
+      if (memberships.length === 0) {
+        try {
+          await this.usersService.deleteById(invitedUser.id);
+        } catch {
+          // User may have other references; invite is still cancelled
+        }
+      }
+    }
+  }
+
+  async resendInvitation(invitationId: string, organizationId: string): Promise<OrganizationInvitationEntity> {
+    const invitation = await this.invitationsRepo.findById(invitationId);
+    if (!invitation || invitation.organizationId !== organizationId) {
+      throw new NotFoundException('Invitation not found');
+    }
+    if (invitation.status !== 'PENDING' && invitation.status !== 'EXPIRED') {
+      throw new BadRequestException('Cannot resend this invitation');
+    }
+
+    const newToken = generateToken();
+    await this.invitationsRepo.updateTokenAndExpiry(invitationId, newToken, expiresAt());
+
+    const org = await this.orgsService.findById(organizationId);
+    const inviter = await this.usersService.findById(invitation.invitedBy);
+
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+    const acceptUrl = `${frontendUrl}/invite/${newToken}`;
+
+    await this.emailService.sendInvitation({
+      to: invitation.email,
+      organizationName: org?.name ?? 'Unknown Organization',
+      inviterName: inviter?.fullName ?? inviter?.email ?? 'A team member',
+      role: invitation.role,
+      acceptUrl,
+    });
+
+    return (await this.invitationsRepo.findById(invitationId))!;
+  }
+}

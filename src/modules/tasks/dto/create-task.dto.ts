@@ -1,4 +1,41 @@
-import { IsString, IsOptional, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  IsArray,
+  IsBoolean,
+  IsDateString,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  ValidateNested,
+} from 'class-validator';
+
+class CreateTaskSubtaskDto {
+  @IsOptional()
+  @IsString()
+  id?: string;
+
+  @IsString()
+  @MaxLength(200)
+  title!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  completed?: boolean;
+
+  @IsOptional()
+  @IsUUID('4')
+  assigneeId?: string;
+
+  @IsOptional()
+  @IsDateString()
+  dueDate?: string;
+
+  @IsOptional()
+  @IsIn(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'])
+  priority?: string;
+}
 
 export class CreateTaskDto {
   @IsString()
@@ -25,8 +62,19 @@ export class CreateTaskDto {
   assigneeId?: string;
 
   @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  assigneeIds?: string[];
+
+  @IsOptional()
   parentTaskId?: string;
 
   @IsOptional()
   sprintId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateTaskSubtaskDto)
+  subtasks?: CreateTaskSubtaskDto[];
 }

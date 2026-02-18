@@ -5,7 +5,9 @@ import { TaskAttachmentsRepository } from './repositories/task-attachments.repos
 import { ProjectsService } from '../projects/projects.service';
 import { TaskEntity } from './entities/task.entity';
 import { CreateTaskDto } from './dto/create-task.dto';
+import { PatchTaskDto } from './dto/patch-task.dto';
 import { PaginationQueryDto, PaginatedResult, paginate } from '../../common/pagination';
+import { generateUuid } from '../../common/utils/uuid.util';
 
 @Injectable()
 export class TasksService {
@@ -47,6 +49,14 @@ export class TasksService {
     reporterId: string,
     dto: CreateTaskDto,
   ): Promise<TaskEntity> {
+    const assigneeIds = dto.assigneeIds?.length
+      ? Array.from(new Set(dto.assigneeIds))
+      : dto.assigneeId
+        ? [dto.assigneeId]
+        : [];
+
+    const normalizedSubtasks = this.normalizeSubtasks(dto.subtasks);
+
     return this.tasksRepository.create({
       projectId,
       organizationId,
@@ -55,10 +65,71 @@ export class TasksService {
       description: dto.description ?? null,
       statusId: dto.statusId ?? null,
       priority: dto.priority ?? 'MEDIUM',
-      assigneeId: dto.assigneeId ?? null,
+      assigneeId: assigneeIds[0] ?? dto.assigneeId ?? null,
+      assigneeIds: assigneeIds.length ? assigneeIds : null,
+      subtasks: normalizedSubtasks.length ? normalizedSubtasks : null,
       parentTaskId: dto.parentTaskId ?? null,
       sprintId: dto.sprintId ?? null,
     });
+  }
+
+  async update(
+    taskId: string,
+    organizationId: string,
+    dto: PatchTaskDto,
+  ): Promise<TaskEntity | null> {
+    const task = await this.tasksRepository.findByIdAndOrganization(taskId, organizationId);
+    if (!task) return null;
+    const patch: Partial<TaskEntity> = {};
+    if (dto.title !== undefined) {
+      const trimmedTitle = dto.title.trim();
+      if (trimmedTitle.length > 0) {
+        patch.title = trimmedTitle;
+      }
+    }
+    if (dto.description !== undefined) {
+      const trimmedDescription = dto.description.trim();
+      patch.description = trimmedDescription.length > 0 ? trimmedDescription : null;
+    }
+    if (dto.statusId !== undefined) patch.statusId = dto.statusId ?? null;
+    if (dto.subtasks !== undefined) {
+      const normalized = this.normalizeSubtasks(dto.subtasks);
+      patch.subtasks = normalized.length ? normalized : null;
+    }
+    if (Object.keys(patch).length > 0) {
+      await this.tasksRepository.update(taskId, patch);
+    }
+    return this.tasksRepository.findById(taskId);
+  }
+
+  private normalizeSubtasks(
+    subtasks?: Array<{
+      id?: string;
+      title: string;
+      completed?: boolean;
+      assigneeId?: string;
+      dueDate?: string;
+      priority?: string;
+    }>,
+  ): Array<{
+    id: string;
+    title: string;
+    completed: boolean;
+    assigneeId?: string;
+    dueDate?: string;
+    priority?: string;
+  }> {
+    if (!subtasks?.length) return [];
+    return subtasks
+      .map((s) => ({
+        id: s.id ?? generateUuid(),
+        title: s.title?.trim() ?? '',
+        completed: Boolean(s.completed),
+        assigneeId: s.assigneeId || undefined,
+        dueDate: s.dueDate || undefined,
+        priority: s.priority ?? 'MEDIUM',
+      }))
+      .filter((s) => s.title.length > 0);
   }
 
   async getComments(taskId: string) {

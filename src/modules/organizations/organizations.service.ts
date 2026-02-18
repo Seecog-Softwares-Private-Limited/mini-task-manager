@@ -1,16 +1,22 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
+import { QueryFailedError } from 'typeorm';
 import { OrganizationsRepository } from './repositories/organizations.repository';
 import { OrganizationMembersRepository } from './repositories/organization-members.repository';
 import { OrganizationEntity } from './entities/organization.entity';
 import { OrganizationMemberEntity } from './entities/organization-member.entity';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { OrganizationResponseDto } from './dto/organization-response.dto';
+import { generateUuid } from '../../common/utils/uuid.util';
 
 @Injectable()
 export class OrganizationsService {
   constructor(
     private readonly organizationsRepository: OrganizationsRepository,
     private readonly orgMembersRepository: OrganizationMembersRepository,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
 
   async findById(id: string): Promise<OrganizationEntity | null> {
@@ -21,23 +27,60 @@ export class OrganizationsService {
     return this.organizationsRepository.findBySlug(slug);
   }
 
+  /** Returns organizations the user is an active member of (for org selector). */
+  async findOrganizationsForUser(userId: string): Promise<OrganizationEntity[]> {
+    const memberships = await this.orgMembersRepository.findByUser(userId);
+    const orgs: OrganizationEntity[] = [];
+    for (const m of memberships) {
+      const org = await this.organizationsRepository.findById(m.organizationId);
+      if (org) orgs.push(org);
+    }
+    return orgs;
+  }
+
   async create(ownerId: string, dto: CreateOrganizationDto): Promise<OrganizationEntity> {
-    const org = await this.organizationsRepository.create({
-      name: dto.name,
-      slug: dto.slug,
-      ownerId,
-    });
-    await this.orgMembersRepository.create({
-      organizationId: org.id,
-      userId: ownerId,
-      role: 'OWNER',
-      status: 'ACTIVE',
-    });
-    return org;
+    const existing = await this.organizationsRepository.findBySlug(dto.slug);
+    if (existing) {
+      throw new ConflictException('An organization with this slug already exists. Please choose a different slug.');
+    }
+
+    const orgId = generateUuid();
+    try {
+      return await this.dataSource.transaction(async (manager) => {
+        const orgRepo = manager.getRepository(OrganizationEntity);
+        const memberRepo = manager.getRepository(OrganizationMemberEntity);
+        const orgEntity = orgRepo.create({
+          id: orgId,
+          name: dto.name,
+          slug: dto.slug,
+          ownerId,
+        });
+        await orgRepo.save(orgEntity);
+        const memberEntity = memberRepo.create({
+          id: generateUuid(),
+          organizationId: orgId,
+          userId: ownerId,
+          role: 'owner',
+          status: 'ACTIVE',
+        });
+        await memberRepo.save(memberEntity);
+        return orgEntity;
+      });
+    } catch (err) {
+      const driverError = err instanceof QueryFailedError ? (err as QueryFailedError).driverError : null;
+      const isDup =
+        (driverError && (driverError as { code?: string; errno?: number }).code === 'ER_DUP_ENTRY') ||
+        (driverError && (driverError as { errno?: number }).errno === 1062) ||
+        (err instanceof Error && err.message.includes('Duplicate entry'));
+      if (isDup) {
+        throw new ConflictException('An organization with this slug already exists. Please choose a different slug.');
+      }
+      throw err;
+    }
   }
 
   async getMembers(organizationId: string): Promise<OrganizationMemberEntity[]> {
-    return this.orgMembersRepository.findByOrganization(organizationId);
+    return this.orgMembersRepository.findByOrganizationWithUser(organizationId);
   }
 
   /** Returns true if the user is an active member of the organization. Used for tenant-scoped access without TenantGuard. */

@@ -28,4 +28,8 @@ export class UsersRepository {
   async update(id: string, data: Partial<UserEntity>): Promise<void> {
     await this.repo.update(id, data);
   }
+
+  async deleteById(id: string): Promise<void> {
+    await this.repo.delete(id);
+  }
 }

@@ -22,6 +22,21 @@ export class OrganizationMembersRepository implements IOrganizationMembersReposi
     return this.repo.find({ where: { organizationId }, order: { joinedAt: 'ASC' } });
   }
 
+  async findByOrganizationWithUser(organizationId: string): Promise<OrganizationMemberEntity[]> {
+    return this.repo.find({
+      where: { organizationId },
+      order: { joinedAt: 'ASC' },
+      relations: ['user'],
+    });
+  }
+
+  async findByUser(userId: string): Promise<OrganizationMemberEntity[]> {
+    return this.repo.find({
+      where: { userId, status: 'ACTIVE' },
+      order: { joinedAt: 'ASC' },
+    });
+  }
+
   async create(data: Partial<OrganizationMemberEntity>): Promise<OrganizationMemberEntity> {
     const id = data.id ?? generateUuid();
     const entity = this.repo.create({ ...data, id });
