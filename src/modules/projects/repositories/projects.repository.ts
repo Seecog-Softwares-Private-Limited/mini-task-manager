@@ -21,7 +21,7 @@ export class ProjectsRepository {
 
   async findByOrganization(organizationId: string): Promise<ProjectEntity[]> {
     return this.repo.find({
-      where: { organizationId, isArchived: false },
+      where: { organizationId },
       order: { createdAt: 'DESC' },
     });
   }

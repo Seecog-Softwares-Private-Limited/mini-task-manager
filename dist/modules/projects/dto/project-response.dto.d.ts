@@ -6,4 +6,6 @@ export declare class ProjectResponseDto {
     visibility: string;
     isArchived: boolean;
     createdBy: string;
+    createdAt: string;
+    updatedAt: string;
 }

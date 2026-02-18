@@ -36,6 +36,26 @@ let ProjectsService = class ProjectsService {
             visibility: dto.visibility ?? 'PRIVATE',
         });
     }
+    async update(id, organizationId, dto) {
+        const project = await this.projectsRepository.findByIdAndOrganization(id, organizationId);
+        if (!project) {
+            throw new common_1.NotFoundException('Project not found');
+        }
+        const payload = {};
+        if (dto.name !== undefined)
+            payload.name = dto.name;
+        if (dto.description !== undefined)
+            payload.description = dto.description ?? null;
+        if (dto.visibility !== undefined)
+            payload.visibility = dto.visibility;
+        if (dto.isArchived !== undefined)
+            payload.isArchived = dto.isArchived;
+        if (Object.keys(payload).length === 0)
+            return project;
+        await this.projectsRepository.update(id, payload);
+        const updated = await this.projectsRepository.findByIdAndOrganization(id, organizationId);
+        return updated;
+    }
     async getProjectMembers(projectId) {
         return this.projectMembersRepository.findByProjectWithUser(projectId);
     }
