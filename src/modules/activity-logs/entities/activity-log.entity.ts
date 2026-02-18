@@ -1,9 +1,10 @@
-import { Entity, PrimaryColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryColumn, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { uuidBinaryTransformer } from '../../../common/base.entity';
 import { OrganizationEntity } from '../../organizations/entities/organization.entity';
 import { UserEntity } from '../../users/entities/user.entity';
 
 @Entity('activity_logs')
+@Index('idx_activity_logs_org_created', ['organizationId', 'createdAt'])
 export class ActivityLogEntity {
   @PrimaryColumn({ type: 'binary', length: 16, transformer: uuidBinaryTransformer })
   id!: string;

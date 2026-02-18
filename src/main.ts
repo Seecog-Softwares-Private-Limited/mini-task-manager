@@ -15,6 +15,15 @@ async function bootstrap() {
   const apiPrefix = config.get('apiPrefix', { infer: true }) ?? 'api/v1';
 
   app.setGlobalPrefix(apiPrefix);
+
+  const corsOrigin = process.env.CORS_ORIGIN ?? (nodeEnv === 'production' ? undefined : 'http://localhost:3001');
+  app.enableCors({
+    origin: corsOrigin ?? true,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Organization-Id'],
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

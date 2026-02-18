@@ -1,4 +1,4 @@
-import { Entity, PrimaryColumn, Column, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
+import { Entity, PrimaryColumn, Column, ManyToOne, OneToMany, JoinColumn, Index } from 'typeorm';
 import { uuidBinaryTransformer } from '../../../common/base.entity';
 import { BaseEntity } from '../../../common/base.entity';
 import { ProjectEntity } from '../../projects/entities/project.entity';
@@ -7,6 +7,8 @@ import { WorkflowStatusEntity } from '../../workflows/entities/workflow-status.e
 import { SprintEntity } from '../../sprints/entities/sprint.entity';
 
 @Entity('tasks')
+@Index('idx_tasks_project_created', ['projectId', 'createdAt'])
+@Index('idx_tasks_org_id', ['organizationId', 'id'])
 export class TaskEntity extends BaseEntity {
   @PrimaryColumn({ type: 'binary', length: 16, transformer: uuidBinaryTransformer })
   id!: string;
@@ -31,6 +33,19 @@ export class TaskEntity extends BaseEntity {
 
   @Column({ name: 'assignee_id', type: 'binary', length: 16, transformer: uuidBinaryTransformer, nullable: true })
   assigneeId!: string | null;
+
+  @Column({ name: 'assignee_ids', type: 'simple-json', nullable: true })
+  assigneeIds!: string[] | null;
+
+  @Column({ type: 'simple-json', nullable: true })
+  subtasks!: Array<{
+    id: string;
+    title: string;
+    completed: boolean;
+    assigneeId?: string;
+    dueDate?: string;
+    priority?: string;
+  }> | null;
 
   @Column({ name: 'reporter_id', type: 'binary', length: 16, transformer: uuidBinaryTransformer })
   reporterId!: string;

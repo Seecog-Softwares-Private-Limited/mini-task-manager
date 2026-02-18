@@ -3,6 +3,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
+import { SignupWithInviteDto } from './dto/signup-with-invite.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from '../../common/decorators/public.decorator';
 
@@ -15,6 +16,13 @@ export class AuthController {
   @Post('login')
   async login(@Body() dto: LoginDto): Promise<LoginResponseDto> {
     return this.authService.login(dto);
+  }
+
+  @Public()
+  @SkipThrottle({ default: true })
+  @Post('signup-with-invite')
+  async signupWithInvite(@Body() dto: SignupWithInviteDto): Promise<LoginResponseDto> {
+    return this.authService.signupWithInvite(dto);
   }
 
   @UseGuards(JwtAuthGuard)

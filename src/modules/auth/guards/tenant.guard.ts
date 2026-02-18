@@ -1,4 +1,4 @@
-import { Injectable, CanActivate, ExecutionContext, Inject } from '@nestjs/common';
+import { ForbiddenException, Injectable, CanActivate, ExecutionContext, Inject } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
 import { IS_PUBLIC_KEY } from '../../../common/decorators/public.decorator';
@@ -29,11 +29,15 @@ export class TenantGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest<Request & { user?: { userId: string }; tenantId?: string }>();
     const userId = request.user?.userId;
-    const orgId = request.headers['x-organization-id'] as string | undefined;
+    const orgId = (request.headers['x-organization-id'] as string)?.trim?.();
 
-    if (!orgId) return false;
+    if (!orgId) {
+      throw new ForbiddenException('Organization context required. Select an organization in the app.');
+    }
     const membership = await this.orgMembersRepo.findByOrganizationAndUser(orgId, userId!);
-    if (!membership) return false;
+    if (!membership) {
+      throw new ForbiddenException('You are not a member of this organization.');
+    }
 
     request.tenantId = orgId;
     if (request.user) {
