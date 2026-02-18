@@ -1,0 +1,99 @@
+"use client";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { CalendarDays, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+interface SubtaskDueDatePickerProps {
+  value?: string;
+  onChange: (date?: string) => void;
+  disabled?: boolean;
+  completed?: boolean;
+}
+
+function isOverdue(value?: string, completed?: boolean): boolean {
+  if (!value || completed) return false;
+  const today = new Date();
+  const current = new Date(value);
+  today.setHours(0, 0, 0, 0);
+  current.setHours(0, 0, 0, 0);
+  return current < today;
+}
+
+function formatDateLabel(value?: string): string {
+  if (!value) return "Due";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Due";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+export function SubtaskDueDatePicker({
+  value,
+  onChange,
+  disabled,
+  completed,
+}: SubtaskDueDatePickerProps) {
+  const overdue = isOverdue(value, completed);
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={disabled}
+          className={cn(
+            "h-7 rounded-full border px-2.5 text-[11px] font-medium",
+            value
+              ? "border-border bg-background text-foreground"
+              : "border-dashed border-muted-foreground/40 bg-muted/30 text-muted-foreground",
+            overdue && "border-destructive/40 bg-destructive/10 text-destructive"
+          )}
+        >
+          <CalendarDays className="mr-1 h-3.5 w-3.5" />
+          {formatDateLabel(value)}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        className="w-64 p-3"
+        sideOffset={8}
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <DropdownMenuLabel className="px-0 pt-0 text-xs font-semibold">
+          Subtask Due Date
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <div className="space-y-3 pt-2">
+          <Input
+            type="date"
+            value={value ?? ""}
+            onChange={(e) => onChange(e.target.value || undefined)}
+            className="h-9 text-xs"
+          />
+          {value && (
+            <Button
+              type="button"
+              variant="outline"
+              className="h-8 w-full text-xs"
+              onClick={() => onChange(undefined)}
+            >
+              <X className="mr-1 h-3.5 w-3.5" />
+              Clear due date
+            </Button>
+          )}
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
