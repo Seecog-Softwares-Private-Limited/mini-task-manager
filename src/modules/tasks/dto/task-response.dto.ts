@@ -1,3 +1,12 @@
+export class TaskSubtaskResponseDto {
+  id!: string;
+  title!: string;
+  completed!: boolean;
+  assigneeId?: string;
+  dueDate?: string;
+  priority?: string;
+}
+
 export class TaskResponseDto {
   id!: string;
   projectId!: string;
@@ -7,6 +16,7 @@ export class TaskResponseDto {
   statusId?: string;
   priority!: string;
   assigneeId?: string;
+  assigneeIds?: string[];
   reporterId!: string;
   parentTaskId?: string;
   storyPoints?: number;
@@ -14,6 +24,7 @@ export class TaskResponseDto {
   estimatedMinutes?: number;
   loggedMinutes!: number;
   sprintId?: string;
+  subtasks?: TaskSubtaskResponseDto[];
   createdAt!: Date;
   updatedAt!: Date;
 }

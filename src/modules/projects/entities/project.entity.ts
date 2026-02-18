@@ -1,10 +1,11 @@
-import { Entity, PrimaryColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryColumn, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { uuidBinaryTransformer } from '../../../common/base.entity';
 import { BaseEntity } from '../../../common/base.entity';
 import { OrganizationEntity } from '../../organizations/entities/organization.entity';
 import { UserEntity } from '../../users/entities/user.entity';
 
 @Entity('projects')
+@Index('idx_projects_org_archived', ['organizationId', 'isArchived'])
 export class ProjectEntity extends BaseEntity {
   @PrimaryColumn({ type: 'binary', length: 16, transformer: uuidBinaryTransformer })
   id!: string;

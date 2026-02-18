@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, UseGuards } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { BillingService } from './billing.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -6,6 +6,7 @@ import { TenantGuard } from '../auth/guards/tenant.guard';
 import { TenantId } from '../../common/decorators/tenant.decorator';
 import { PlanResponseDto } from './dto/plan-response.dto';
 import { SubscriptionResponseDto } from './dto/subscription-response.dto';
+import { InvoiceResponseDto } from './dto/invoice-response.dto';
 
 @Controller('billing')
 @SkipThrottle({ auth: true })
@@ -41,5 +42,21 @@ export class BillingController {
       endDate: sub.endDate ?? undefined,
       trialEndsAt: sub.trialEndsAt ?? undefined,
     };
+  }
+
+  @UseGuards(TenantGuard)
+  @Get('invoices')
+  async getInvoices(@TenantId() tenantId?: string): Promise<InvoiceResponseDto[]> {
+    const sub = await this.billingService.getSubscriptionForOrganization(tenantId!);
+    if (!sub) return [];
+    const invoices = await this.billingService.getInvoicesForSubscription(sub.id);
+    return invoices.map((i) => ({
+      id: i.id,
+      subscriptionId: i.subscriptionId,
+      amount: i.amount,
+      status: i.status,
+      issuedAt: i.issuedAt,
+      paidAt: i.paidAt ?? undefined,
+    }));
   }
 }

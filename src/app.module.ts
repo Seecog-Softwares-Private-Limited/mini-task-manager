@@ -17,6 +17,7 @@ import { CustomFieldsModule } from './modules/custom-fields/custom-fields.module
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { ActivityLogsModule } from './modules/activity-logs/activity-logs.module';
+import { InvitationsModule } from './modules/invitations/invitations.module';
 
 @Module({
   providers: [
@@ -39,6 +40,7 @@ import { ActivityLogsModule } from './modules/activity-logs/activity-logs.module
     NotificationsModule,
     BillingModule,
     ActivityLogsModule,
+    InvitationsModule,
   ],
 })
 export class AppModule {}

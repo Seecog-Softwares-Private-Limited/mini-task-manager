@@ -1,9 +1,10 @@
-import { Entity, PrimaryColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryColumn, Column, ManyToOne, JoinColumn, Index } from 'typeorm';
 import { uuidBinaryTransformer } from '../../../common/base.entity';
 import { OrganizationEntity } from '../../organizations/entities/organization.entity';
 import { PlanEntity } from './plan.entity';
 
 @Entity('subscriptions')
+@Index('idx_subscriptions_organization_id', ['organizationId'])
 export class SubscriptionEntity {
   @PrimaryColumn({ type: 'binary', length: 16, transformer: uuidBinaryTransformer })
   id!: string;
