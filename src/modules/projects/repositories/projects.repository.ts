@@ -26,6 +26,10 @@ export class ProjectsRepository {
     });
   }
 
+  async countByOrganization(organizationId: string): Promise<number> {
+    return this.repo.count({ where: { organizationId } });
+  }
+
   async create(data: Partial<ProjectEntity>): Promise<ProjectEntity> {
     const id = data.id ?? generateUuid();
     const entity = this.repo.create({ ...data, id });

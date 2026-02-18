@@ -12,6 +12,9 @@ export declare class ProjectsController {
     constructor(projectsService: ProjectsService, workflowsService: WorkflowsService);
     create(dto: CreateProjectDto, tenantId?: string, createdBy?: string): Promise<ProjectResponseDto>;
     findAll(tenantId?: string): Promise<ProjectResponseDto[]>;
+    getCount(tenantId?: string): Promise<{
+        count: number;
+    }>;
     getMembers(projectId: string): Promise<{
         id: string;
         projectId: string;

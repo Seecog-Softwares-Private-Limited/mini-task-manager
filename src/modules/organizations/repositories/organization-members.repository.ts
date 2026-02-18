@@ -22,6 +22,10 @@ export class OrganizationMembersRepository implements IOrganizationMembersReposi
     return this.repo.find({ where: { organizationId }, order: { joinedAt: 'ASC' } });
   }
 
+  async countByOrganization(organizationId: string): Promise<number> {
+    return this.repo.count({ where: { organizationId } });
+  }
+
   async findByOrganizationWithUser(organizationId: string): Promise<OrganizationMemberEntity[]> {
     return this.repo.find({
       where: { organizationId },

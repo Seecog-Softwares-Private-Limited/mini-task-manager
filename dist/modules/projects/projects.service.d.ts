@@ -11,6 +11,7 @@ export declare class ProjectsService {
     findById(id: string): Promise<ProjectEntity | null>;
     findByIdInOrganization(id: string, organizationId: string): Promise<ProjectEntity | null>;
     findByOrganization(organizationId: string): Promise<ProjectEntity[]>;
+    countByOrganization(organizationId: string): Promise<number>;
     create(organizationId: string, createdBy: string, dto: CreateProjectDto): Promise<ProjectEntity>;
     update(id: string, organizationId: string, dto: UpdateProjectDto): Promise<ProjectEntity>;
     getProjectMembers(projectId: string): Promise<ProjectMemberEntity[]>;

@@ -8,6 +8,14 @@ export async function fetchOrgMembers(orgId: string): Promise<OrgMember[]> {
   return data;
 }
 
+/** Fetch organization member count (lightweight, for org cards). */
+export async function fetchOrgMemberCount(orgId: string): Promise<number> {
+  const { data } = await apiClient.get<{ count: number }>(`/organizations/${orgId}/members/count`, {
+    headers: { "X-Organization-Id": orgId },
+  });
+  return data.count;
+}
+
 export interface InviteOrgMemberPayload {
   email: string;
   role: string;

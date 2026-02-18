@@ -34,6 +34,9 @@ let ProjectsRepository = class ProjectsRepository {
             order: { createdAt: 'DESC' },
         });
     }
+    async countByOrganization(organizationId) {
+        return this.repo.count({ where: { organizationId } });
+    }
     async create(data) {
         const id = data.id ?? (0, uuid_util_1.generateUuid)();
         const entity = this.repo.create({ ...data, id });

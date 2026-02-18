@@ -4,6 +4,8 @@ export declare class OrganizationEntity extends BaseEntity {
     id: string;
     name: string;
     slug: string;
+    logoUrl: string | null;
     ownerId: string;
+    isArchived: boolean;
     owner?: UserEntity;
 }

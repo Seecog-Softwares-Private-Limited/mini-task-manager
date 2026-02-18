@@ -13,17 +13,19 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
+import { cn, getInitials } from "@/lib/utils";
 import { Building2, Check, ChevronDown } from "lucide-react";
 
 export interface OrgSwitcherProps {
   collapsed?: boolean;
+  /** Compact variant for navbar - always shows org name, no collapse behavior */
+  variant?: "sidebar" | "navbar";
   className?: string;
 }
 
-export function OrgSwitcher({ collapsed, className }: OrgSwitcherProps) {
+export function OrgSwitcher({ collapsed, variant = "sidebar", className }: OrgSwitcherProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { orgId, setOrgId } = useTenant();
@@ -45,11 +47,13 @@ export function OrgSwitcher({ collapsed, className }: OrgSwitcherProps) {
     router.refresh();
   };
 
+  const isNavbar = variant === "navbar";
+
   if (isLoading) {
     return (
-      <div className={cn("flex items-center gap-2 px-2 py-2", className)}>
+      <div className={cn("flex items-center gap-2", isNavbar ? "px-2" : "px-2 py-2", className)}>
         <Skeleton className="h-8 w-8 rounded-lg shrink-0" />
-        {!collapsed && <Skeleton className="h-4 flex-1 min-w-0 rounded" />}
+        {(isNavbar || !collapsed) && <Skeleton className="h-4 flex-1 min-w-[100px] rounded" />}
       </div>
     );
   }
@@ -60,29 +64,32 @@ export function OrgSwitcher({ collapsed, className }: OrgSwitcherProps) {
         <Button
           variant="ghost"
           className={cn(
-            "w-full justify-between gap-2 font-medium text-foreground hover:bg-accent/50",
-            collapsed ? "justify-center px-2" : "px-3",
+            "font-medium text-foreground hover:bg-accent/50",
+            isNavbar
+              ? "h-9 gap-2 px-3 rounded-lg"
+              : cn("w-full justify-between gap-2", collapsed ? "justify-center px-2" : "px-3"),
             className
           )}
           aria-label={currentOrg ? `Current organization: ${currentOrg.name}. Switch organization.` : "Switch organization"}
         >
           <div className="flex items-center gap-2 min-w-0">
             <Avatar className="h-8 w-8 shrink-0 rounded-lg">
-              <AvatarFallback className="rounded-lg bg-primary/20 text-primary">
-                <Building2 className="h-4 w-4" />
+              {currentOrg?.logoUrl && <AvatarImage src={currentOrg.logoUrl} alt="" />}
+              <AvatarFallback className="rounded-lg bg-primary/20 text-primary text-xs font-semibold">
+                {currentOrg ? getInitials(currentOrg.name) : <Building2 className="h-4 w-4" />}
               </AvatarFallback>
             </Avatar>
-            {!collapsed && (
-              <span className="truncate">
+            {(isNavbar || !collapsed) && (
+              <span className="truncate max-w-[160px] sm:max-w-[200px]">
                 {currentOrg?.name ?? "Select org"}
               </span>
             )}
           </div>
-          {!collapsed && <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />}
+          {(isNavbar || !collapsed) && <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[200px]">
-        <DropdownMenuLabel>Organization</DropdownMenuLabel>
+      <DropdownMenuContent align={isNavbar ? "end" : "start"} className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px] max-w-[320px]">
+        <DropdownMenuLabel>Switch workspace</DropdownMenuLabel>
         {organizations.length === 0 ? (
           <DropdownMenuItem disabled>No organizations</DropdownMenuItem>
         ) : (
@@ -97,6 +104,12 @@ export function OrgSwitcher({ collapsed, className }: OrgSwitcherProps) {
               ) : (
                 <span className="w-4" />
               )}
+              <Avatar className="h-6 w-6 shrink-0 rounded-md">
+                {org.logoUrl && <AvatarImage src={org.logoUrl} alt="" />}
+                <AvatarFallback className="rounded-md bg-muted text-[10px] font-medium">
+                  {getInitials(org.name)}
+                </AvatarFallback>
+              </Avatar>
               <span className="truncate">{org.name}</span>
             </DropdownMenuItem>
           ))

@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { QueryFailedError } from 'typeorm';
@@ -38,6 +38,18 @@ export class OrganizationsService {
     return orgs;
   }
 
+  /** Returns organizations with the current user's role (for org dashboard cards). */
+  async findOrganizationsWithRoleForUser(userId: string): Promise<{ org: OrganizationEntity; role: string }[]> {
+    const memberships = await this.orgMembersRepository.findByUser(userId);
+    const result: { org: OrganizationEntity; role: string }[] = [];
+    for (const m of memberships) {
+      if (m.status !== 'ACTIVE') continue;
+      const org = await this.organizationsRepository.findById(m.organizationId);
+      if (org) result.push({ org, role: m.role });
+    }
+    return result;
+  }
+
   async create(ownerId: string, dto: CreateOrganizationDto): Promise<OrganizationEntity> {
     const existing = await this.organizationsRepository.findBySlug(dto.slug);
     if (existing) {
@@ -54,6 +66,8 @@ export class OrganizationsService {
           name: dto.name,
           slug: dto.slug,
           ownerId,
+          logoUrl: dto.logoUrl ?? null,
+          isArchived: false,
         });
         await orgRepo.save(orgEntity);
         const memberEntity = memberRepo.create({
@@ -83,9 +97,41 @@ export class OrganizationsService {
     return this.orgMembersRepository.findByOrganizationWithUser(organizationId);
   }
 
+  async getMemberCount(organizationId: string): Promise<number> {
+    return this.orgMembersRepository.countByOrganization(organizationId);
+  }
+
   /** Returns true if the user is an active member of the organization. Used for tenant-scoped access without TenantGuard. */
   async canAccess(organizationId: string, userId: string): Promise<boolean> {
     const membership = await this.orgMembersRepository.findByOrganizationAndUser(organizationId, userId);
     return membership != null && membership.status === 'ACTIVE';
+  }
+
+  async update(id: string, dto: { isArchived?: boolean }): Promise<OrganizationEntity | null> {
+    const org = await this.organizationsRepository.findById(id);
+    if (!org) return null;
+    if (dto.isArchived !== undefined) {
+      await this.organizationsRepository.update(id, { isArchived: dto.isArchived });
+      return { ...org, isArchived: dto.isArchived } as OrganizationEntity;
+    }
+    return org;
+  }
+
+  /** Returns the user's membership in the organization (for role display). */
+  async getMembership(organizationId: string, userId: string): Promise<OrganizationMemberEntity | null> {
+    const m = await this.orgMembersRepository.findByOrganizationAndUser(organizationId, userId);
+    return m && m.status === 'ACTIVE' ? m : null;
+  }
+
+  /** Delete organization. Owner only. */
+  async delete(id: string, userId: string): Promise<void> {
+    const membership = await this.getMembership(id, userId);
+    if (!membership) {
+      throw new ForbiddenException('You do not have access to this organization');
+    }
+    if (membership.role?.toLowerCase() !== 'owner') {
+      throw new ForbiddenException('Only the organization owner can delete the organization');
+    }
+    await this.organizationsRepository.delete(id);
   }
 }

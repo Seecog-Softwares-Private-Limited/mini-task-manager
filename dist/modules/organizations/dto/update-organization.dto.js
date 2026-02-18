@@ -9,26 +9,14 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CreateOrganizationDto = void 0;
+exports.UpdateOrganizationDto = void 0;
 const class_validator_1 = require("class-validator");
-class CreateOrganizationDto {
+class UpdateOrganizationDto {
 }
-exports.CreateOrganizationDto = CreateOrganizationDto;
-__decorate([
-    (0, class_validator_1.IsString)(),
-    (0, class_validator_1.MaxLength)(150),
-    __metadata("design:type", String)
-], CreateOrganizationDto.prototype, "name", void 0);
-__decorate([
-    (0, class_validator_1.IsString)(),
-    (0, class_validator_1.MaxLength)(150),
-    (0, class_validator_1.Matches)(/^[a-z0-9-]+$/, { message: 'slug must be lowercase alphanumeric and hyphens only' }),
-    __metadata("design:type", String)
-], CreateOrganizationDto.prototype, "slug", void 0);
+exports.UpdateOrganizationDto = UpdateOrganizationDto;
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    (0, class_validator_1.MaxLength)(150_000),
-    __metadata("design:type", String)
-], CreateOrganizationDto.prototype, "logoUrl", void 0);
-//# sourceMappingURL=create-organization.dto.js.map
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], UpdateOrganizationDto.prototype, "isArchived", void 0);
+//# sourceMappingURL=update-organization.dto.js.map
