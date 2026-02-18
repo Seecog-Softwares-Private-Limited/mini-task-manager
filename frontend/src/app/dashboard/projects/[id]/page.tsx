@@ -1,0 +1,135 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
+import { fetchProject } from "@/services/api/projects.api";
+import { fetchWorkflowsByProject, fetchWorkflowStatuses } from "@/services/api/workflows.api";
+import { fetchTasksByProject } from "@/services/api/tasks.api";
+import { fetchProjectMembers } from "@/services/api/members.api";
+import { useTenant } from "@/context/tenant-context";
+import { Button } from "@/components/ui/button";
+import { ProjectDashboard } from "@/components/projects/project-dashboard";
+import { CreateTaskModal, type CreateTaskFormData } from "@/components/tasks/create-task-modal";
+import { useToast } from "@/components/ui/use-toast";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { createTask } from "@/services/api/tasks.api";
+import { parseApiError, isRateLimited } from "@/services/api/client";
+import { Plus, UserPlus } from "lucide-react";
+
+export default function ProjectOverviewPage({ params }: { params: { id: string } }) {
+  const { id } = params;
+  const { orgId } = useTenant();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+
+  const { data: project } = useQuery({
+    queryKey: ["project", id],
+    queryFn: () => fetchProject(id),
+    enabled: !!id && !!orgId,
+  });
+
+  const { data: workflows = [] } = useQuery({
+    queryKey: ["workflows", id],
+    queryFn: () => fetchWorkflowsByProject(id),
+    enabled: !!id && !!orgId,
+  });
+
+  const defaultWorkflow = workflows.find((w) => w.isDefault) ?? workflows[0];
+  const { data: statuses = [] } = useQuery({
+    queryKey: ["workflow-statuses", defaultWorkflow?.id],
+    queryFn: () => fetchWorkflowStatuses(defaultWorkflow!.id),
+    enabled: !!defaultWorkflow?.id,
+  });
+
+  const { data: tasksData } = useQuery({
+    queryKey: ["tasks", id],
+    queryFn: () => fetchTasksByProject(id, 1, 500),
+    enabled: !!id && !!orgId,
+  });
+
+  const { data: projectMembers = [] } = useQuery({
+    queryKey: ["project-members", id],
+    queryFn: () => fetchProjectMembers(id),
+    enabled: !!id,
+  });
+
+  const tasks = tasksData?.data ?? [];
+
+  const createMutation = useMutation({
+    mutationFn: (payload: Parameters<typeof createTask>[0]) => createTask(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks", id] });
+      setCreateModalOpen(false);
+      toast({ title: "Task created", variant: "success" });
+    },
+    onError: (err) => toast({ title: "Failed to create task", description: parseApiError(err), variant: "error" }),
+  });
+
+  const handleCreateTask = (data: CreateTaskFormData) => {
+    if (!orgId) return;
+    createMutation.mutate({
+      projectId: id,
+      organizationId: orgId,
+      title: data.title,
+      description: data.description,
+      statusId: data.statusId ?? statuses[0]?.id,
+      priority: data.priority ?? "MEDIUM",
+      assigneeIds: data.assigneeIds?.length ? data.assigneeIds : undefined,
+      assigneeId: data.assigneeIds?.[0] || undefined,
+      storyPoints: data.storyPoints,
+      dueDate: data.dueDate,
+      subtasks: data.subtasks
+        .map((s) => ({
+          title: s.title.trim(),
+          completed: s.completed,
+          assigneeId: s.assigneeId || undefined,
+          dueDate: s.dueDate || undefined,
+          priority: s.priority ?? "MEDIUM",
+        }))
+        .filter((s) => s.title.length > 0),
+    });
+  };
+
+  if (!project) return null;
+
+  return (
+    <div className="space-y-6">
+      {/* Quick actions */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          onClick={() => setCreateModalOpen(true)}
+          data-cy="overview-new-task"
+          aria-label="Create new task"
+        >
+          <Plus className="mr-1.5 h-4 w-4" /> New Task
+        </Button>
+        <Button variant="outline" asChild aria-label="Invite member to project">
+          <Link href={`/dashboard/projects/${id}/members`}>
+            <UserPlus className="mr-1.5 h-4 w-4" /> Invite Member
+          </Link>
+        </Button>
+      </div>
+
+      <ProjectDashboard
+        projectId={id}
+        projectName={project.name}
+        tasks={tasks}
+        statuses={statuses}
+        members={projectMembers}
+      />
+
+      <CreateTaskModal
+        open={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onSubmit={handleCreateTask}
+        isSubmitting={createMutation.isPending}
+        error={createMutation.error ? (isRateLimited(createMutation.error) ? "Too many requests." : parseApiError(createMutation.error)) : null}
+        projectId={id}
+        statuses={statuses}
+        defaultStatusId={statuses[0]?.id}
+      />
+    </div>
+  );
+}

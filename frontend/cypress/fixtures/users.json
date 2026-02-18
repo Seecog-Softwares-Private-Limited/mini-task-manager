@@ -1,0 +1,7 @@
+{
+  "comment": "Credentials come from env CYPRESS_TEST_USER_EMAIL / CYPRESS_TEST_USER_PASSWORD and optional CYPRESS_TEST_ADMIN_EMAIL / CYPRESS_TEST_ADMIN_PASSWORD, CYPRESS_TEST_MEMBER_EMAIL / CYPRESS_TEST_MEMBER_PASSWORD. Use same password for all if single seed user.",
+  "roles": {
+    "owner": "owner or admin; can see billing and audit",
+    "member": "member; cannot see billing or audit"
+  }
+}
