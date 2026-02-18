@@ -1,29 +1,107 @@
 # mini-task-manager
 
-## Development
+## First-time Setup (New Clone)
 
-Run both servers in separate terminals:
+Run these from repo root.
 
-1. **Backend** (port 3000):
-   ```bash
-   npm run start
-   # or for watch mode: npm run start:dev
-   ```
+### 1) Clone and install dependencies
 
-2. **Frontend** (port 3001):
-   ```bash
-   cd frontend && npm run dev
-   ```
-
-The frontend is configured to use port 3001 to avoid conflict with the backend on 3000. API requests go to `http://localhost:3000/api/v1`.
-
-## Email (invitations)
-
-By default, SMTP uses `localhost:1025` (MailHog). Emails are **captured locally** and do not reach real inboxes. View them at http://localhost:8025 if MailHog is running.
-
-To send invitations to real Gmail inboxes, add to `.env`:
-
+```bash
+git clone <repo-url>
+cd mini-task-manager
+npm install
+cd frontend && npm install && cd ..
 ```
+
+### 2) Configure environment
+
+```bash
+cp .env.example .env
+```
+
+Update `.env` with your MySQL and app values:
+
+```env
+DB_HOST=localhost
+DB_PORT=3306
+DB_USERNAME=your_mysql_user
+DB_PASSWORD=your_mysql_password
+DB_DATABASE=mini_task_manager
+JWT_SECRET=replace-with-your-secret
+```
+
+Optional seed overrides:
+
+```env
+SEED_USER_PASSWORD=YourStrongPassword123!
+SEED_INVITED_EMAIL=invitee@example.com
+```
+
+### 3) Run migrations
+
+```bash
+npm run migration:run
+```
+
+If database does not exist yet, create it first:
+
+```bash
+mysql -u <db_user> -p -e "CREATE DATABASE IF NOT EXISTS mini_task_manager CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+```
+
+### 4) Seed sample data
+
+```bash
+npm run seed
+```
+
+Seed creates these users:
+
+- `owner@example.com`
+- `admin@example.com`
+- `member@example.com`
+
+Password is:
+
+- `SEED_USER_PASSWORD` (if set), otherwise
+- `Password123!`
+
+### 5) Start the app
+
+Terminal 1 (backend, port `3000`):
+
+```bash
+npm run start:dev
+```
+
+Terminal 2 (frontend, port `3001`):
+
+```bash
+cd frontend
+npm run dev
+```
+
+Open:
+
+- Frontend: `http://localhost:3001`
+- Backend API: `http://localhost:3000/api/v1`
+
+---
+
+## Development Notes
+
+- Frontend uses `3001` to avoid conflict with backend `3000`.
+- If you change seed password after users already exist, reseed on a fresh DB (or update user hashes manually).
+
+## Email (Invitations)
+
+By default, SMTP uses `localhost:1025` (MailHog). Emails are captured locally and do not reach real inboxes.
+
+- MailHog inbox: `http://localhost:8025`
+
+To send real emails (e.g., Gmail), set:
+
+```env
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
 SMTP_USER=your-email@gmail.com
@@ -31,36 +109,4 @@ SMTP_PASS=your-app-password
 SMTP_FROM=your-email@gmail.com
 ```
 
-Create an [App Password](https://support.google.com/accounts/answer/185833) in your Google Account (Security → 2-Step Verification → App passwords).
-
-
-
-Steps to run project : 
-# 1) Clone
-git clone <repo-url>
-cd mini-task-manager
-
-# 2) Install backend dependencies
-npm install
-
-# 3) Install frontend dependencies
-cd frontend
-npm install
-cd ..
-
-# 4) Create backend env file (if not already)
-cp .env.example .env
-# then edit .env with your DB + JWT config
-
-# 5) Run DB migrations
-npm run migration:run
-
-# 6) Seed initial data (owner/admin/member users + sample org/project/tasks)
-npm run seed
-
-# 7) Start backend (Terminal 1)
-npm run start:dev
-
-# 8) Start frontend (Terminal 2)
-cd frontend
-npm run dev
+Create a Gmail App Password: Google Account -> Security -> 2-Step Verification -> App passwords.

@@ -5,8 +5,8 @@ const bcrypt = require("bcrypt");
 const configuration_1 = require("../../../config/configuration");
 const uuid_util_1 = require("../../../common/utils/uuid.util");
 const user_entity_1 = require("../../../modules/users/entities/user.entity");
-const EMAIL = 'pankaj.7613@gmail.com';
-const PASSWORD = 'Password123!';
+const EMAIL = process.env.SEED_INVITED_EMAIL || 'invitee@example.com';
+const PASSWORD = process.env.SEED_USER_PASSWORD || 'Password123!';
 async function addUser() {
     const dbConfig = (0, configuration_1.configuration)().database;
     const dataSource = new typeorm_1.DataSource({
