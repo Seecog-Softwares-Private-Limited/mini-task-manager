@@ -3,9 +3,9 @@
  * Run: npm run seed (from repo root)
  *
  * Login after seed:
- *   admin@example.com  / Password123!  (project ADMIN — can send invites)
- *   owner@example.com  / Password123!
- *   member@example.com / Password123!
+ *   admin@example.com  / <SEED_USER_PASSWORD or Password123!>  (project ADMIN — can send invites)
+ *   owner@example.com  / <SEED_USER_PASSWORD or Password123!>
+ *   member@example.com / <SEED_USER_PASSWORD or Password123!>
  * (Select the seeded organization "Seed Org" in the app to see projects/tasks.)
  */
 
@@ -27,7 +27,7 @@ import { NotificationEntity } from '../../../modules/notifications/entities/noti
 import { ActivityLogEntity } from '../../../modules/activity-logs/entities/activity-log.entity';
 import { ProjectMemberEntity } from '../../../modules/projects/entities/project-member.entity';
 
-const PASSWORD = 'Password123!';
+const PASSWORD = process.env.SEED_USER_PASSWORD || 'Password123!';
 const OWNER_EMAIL = 'owner@example.com';
 const MEMBER_EMAIL = 'member@example.com';
 const ADMIN_EMAIL = 'admin@example.com';
