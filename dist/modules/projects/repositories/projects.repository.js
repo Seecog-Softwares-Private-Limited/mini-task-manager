@@ -30,7 +30,7 @@ let ProjectsRepository = class ProjectsRepository {
     }
     async findByOrganization(organizationId) {
         return this.repo.find({
-            where: { organizationId, isArchived: false },
+            where: { organizationId },
             order: { createdAt: 'DESC' },
         });
     }

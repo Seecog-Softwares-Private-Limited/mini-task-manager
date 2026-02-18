@@ -52,6 +52,10 @@ export interface Project {
   visibility: string;
   isArchived: boolean;
   createdBy: string;
+  /** ISO date string */
+  createdAt?: string;
+  /** ISO date string; used for "last updated" and recent highlight */
+  updatedAt?: string;
 }
 
 export interface Task {

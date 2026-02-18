@@ -4,6 +4,7 @@ import { ProjectMembersRepository } from './repositories/project-members.reposit
 import { ProjectEntity } from './entities/project.entity';
 import { ProjectMemberEntity } from './entities/project-member.entity';
 import { CreateProjectDto } from './dto/create-project.dto';
+import { UpdateProjectDto } from './dto/update-project.dto';
 
 @Injectable()
 export class ProjectsService {
@@ -32,6 +33,26 @@ export class ProjectsService {
       description: dto.description ?? null,
       visibility: dto.visibility ?? 'PRIVATE',
     });
+  }
+
+  async update(
+    id: string,
+    organizationId: string,
+    dto: UpdateProjectDto,
+  ): Promise<ProjectEntity> {
+    const project = await this.projectsRepository.findByIdAndOrganization(id, organizationId);
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+    const payload: Partial<ProjectEntity> = {};
+    if (dto.name !== undefined) payload.name = dto.name;
+    if (dto.description !== undefined) payload.description = dto.description ?? null;
+    if (dto.visibility !== undefined) payload.visibility = dto.visibility;
+    if (dto.isArchived !== undefined) payload.isArchived = dto.isArchived;
+    if (Object.keys(payload).length === 0) return project;
+    await this.projectsRepository.update(id, payload);
+    const updated = await this.projectsRepository.findByIdAndOrganization(id, organizationId);
+    return updated!;
   }
 
   // ── Project Members ──

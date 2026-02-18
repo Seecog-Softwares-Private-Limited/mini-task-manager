@@ -9,6 +9,7 @@ import { TenantGuard } from '../auth/guards/tenant.guard';
 import { TenantId } from '../../common/decorators/tenant.decorator';
 import { CurrentUserId } from '../../common/decorators/current-user.decorator';
 import { CreateProjectDto } from './dto/create-project.dto';
+import { UpdateProjectDto } from './dto/update-project.dto';
 import { AddProjectMemberDto } from './dto/add-project-member.dto';
 import { UpdateProjectMemberRoleDto } from './dto/update-project-member-role.dto';
 import { ProjectResponseDto } from './dto/project-response.dto';
@@ -90,7 +91,18 @@ export class ProjectsController {
     return this.toResponse(project);
   }
 
+  @Patch(':id')
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateProjectDto,
+    @TenantId() tenantId?: string,
+  ): Promise<ProjectResponseDto> {
+    const project = await this.projectsService.update(id, tenantId!, dto);
+    return this.toResponse(project);
+  }
+
   private toResponse(p: ProjectEntity): ProjectResponseDto {
+    const entity = p as ProjectEntity & { createdAt?: Date; updatedAt?: Date };
     return {
       id: p.id,
       organizationId: p.organizationId,
@@ -99,6 +111,8 @@ export class ProjectsController {
       visibility: p.visibility,
       isArchived: p.isArchived,
       createdBy: p.createdBy,
+      createdAt: entity.createdAt?.toISOString?.() ?? new Date().toISOString(),
+      updatedAt: entity.updatedAt?.toISOString?.() ?? new Date().toISOString(),
     };
   }
 

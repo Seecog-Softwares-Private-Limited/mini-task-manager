@@ -23,6 +23,7 @@ const tenant_guard_1 = require("../auth/guards/tenant.guard");
 const tenant_decorator_1 = require("../../common/decorators/tenant.decorator");
 const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
 const create_project_dto_1 = require("./dto/create-project.dto");
+const update_project_dto_1 = require("./dto/update-project.dto");
 const add_project_member_dto_1 = require("./dto/add-project-member.dto");
 const update_project_member_role_dto_1 = require("./dto/update-project-member-role.dto");
 let ProjectsController = ProjectsController_1 = class ProjectsController {
@@ -67,7 +68,12 @@ let ProjectsController = ProjectsController_1 = class ProjectsController {
             return null;
         return this.toResponse(project);
     }
+    async update(id, dto, tenantId) {
+        const project = await this.projectsService.update(id, tenantId, dto);
+        return this.toResponse(project);
+    }
     toResponse(p) {
+        const entity = p;
         return {
             id: p.id,
             organizationId: p.organizationId,
@@ -76,6 +82,8 @@ let ProjectsController = ProjectsController_1 = class ProjectsController {
             visibility: p.visibility,
             isArchived: p.isArchived,
             createdBy: p.createdBy,
+            createdAt: entity.createdAt?.toISOString?.() ?? new Date().toISOString(),
+            updatedAt: entity.updatedAt?.toISOString?.() ?? new Date().toISOString(),
         };
     }
     toMemberResponse(m) {
@@ -150,6 +158,15 @@ __decorate([
     __metadata("design:paramtypes", [String, String]),
     __metadata("design:returntype", Promise)
 ], ProjectsController.prototype, "findOne", null);
+__decorate([
+    (0, common_1.Patch)(':id'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, tenant_decorator_1.TenantId)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, update_project_dto_1.UpdateProjectDto, String]),
+    __metadata("design:returntype", Promise)
+], ProjectsController.prototype, "update", null);
 exports.ProjectsController = ProjectsController = ProjectsController_1 = __decorate([
     (0, common_1.Controller)('projects'),
     (0, throttler_1.SkipThrottle)({ auth: true }),

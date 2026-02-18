@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { updateProject } from "@/services/api/projects.api";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -127,9 +128,9 @@ export function ProjectHeader({
             <Eye className="h-3 w-3" /> {project.visibility}
           </span>
           {project.isArchived && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 text-amber-600 px-2.5 py-1 text-xs font-medium">
+            <Badge variant="statusArchived" className="inline-flex items-center gap-1 px-2.5 py-1">
               <Archive className="h-3 w-3" /> Archived
-            </span>
+            </Badge>
           )}
           <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2.5 py-1 text-xs font-medium">
             <ListTodo className="h-3 w-3" /> {taskCount} tasks
