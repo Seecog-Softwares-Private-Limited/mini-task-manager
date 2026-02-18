@@ -44,6 +44,10 @@ __decorate([
     (0, typeorm_1.Column)({ name: 'is_active', type: 'boolean', default: true }),
     __metadata("design:type", Boolean)
 ], UserEntity.prototype, "isActive", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'last_seen_at', type: 'timestamp', nullable: true }),
+    __metadata("design:type", Object)
+], UserEntity.prototype, "lastSeenAt", void 0);
 exports.UserEntity = UserEntity = __decorate([
     (0, typeorm_1.Entity)('users')
 ], UserEntity);

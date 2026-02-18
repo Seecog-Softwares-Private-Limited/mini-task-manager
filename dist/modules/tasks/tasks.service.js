@@ -11,18 +11,36 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TasksService = void 0;
 const common_1 = require("@nestjs/common");
+const config_1 = require("@nestjs/config");
 const tasks_repository_1 = require("./repositories/tasks.repository");
 const task_comments_repository_1 = require("./repositories/task-comments.repository");
 const task_attachments_repository_1 = require("./repositories/task-attachments.repository");
 const projects_service_1 = require("../projects/projects.service");
 const pagination_1 = require("../../common/pagination");
 const uuid_util_1 = require("../../common/utils/uuid.util");
+const fs = require("fs/promises");
+const path = require("path");
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+function isAllowedMime(mimetype) {
+    if (!mimetype)
+        return false;
+    return (mimetype.startsWith('image/') ||
+        mimetype.startsWith('text/') ||
+        mimetype === 'application/pdf' ||
+        mimetype === 'application/json' ||
+        mimetype.startsWith('application/zip') ||
+        mimetype === 'application/x-zip-compressed');
+}
+function sanitizeFileName(name) {
+    return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 200) || 'file';
+}
 let TasksService = class TasksService {
-    constructor(tasksRepository, taskCommentsRepository, taskAttachmentsRepository, projectsService) {
+    constructor(tasksRepository, taskCommentsRepository, taskAttachmentsRepository, projectsService, configService) {
         this.tasksRepository = tasksRepository;
         this.taskCommentsRepository = taskCommentsRepository;
         this.taskAttachmentsRepository = taskAttachmentsRepository;
         this.projectsService = projectsService;
+        this.configService = configService;
     }
     async findById(id) {
         return this.tasksRepository.findById(id);
@@ -45,6 +63,7 @@ let TasksService = class TasksService {
                 ? [dto.assigneeId]
                 : [];
         const normalizedSubtasks = this.normalizeSubtasks(dto.subtasks);
+        const tags = this.normalizeTags(dto.tags);
         return this.tasksRepository.create({
             projectId,
             organizationId,
@@ -58,6 +77,7 @@ let TasksService = class TasksService {
             subtasks: normalizedSubtasks.length ? normalizedSubtasks : null,
             parentTaskId: dto.parentTaskId ?? null,
             sprintId: dto.sprintId ?? null,
+            tags: tags.length ? tags : null,
         });
     }
     async update(taskId, organizationId, dto) {
@@ -77,6 +97,16 @@ let TasksService = class TasksService {
         }
         if (dto.statusId !== undefined)
             patch.statusId = dto.statusId ?? null;
+        if (dto.assigneeId !== undefined) {
+            patch.assigneeId = dto.assigneeId ?? null;
+            patch.assigneeIds = patch.assigneeId ? [patch.assigneeId] : null;
+        }
+        if (dto.storyPoints !== undefined)
+            patch.storyPoints = dto.storyPoints ?? null;
+        if (dto.tags !== undefined) {
+            const normalized = this.normalizeTags(dto.tags);
+            patch.tags = normalized.length ? normalized : null;
+        }
         if (dto.subtasks !== undefined) {
             const normalized = this.normalizeSubtasks(dto.subtasks);
             patch.subtasks = normalized.length ? normalized : null;
@@ -85,6 +115,24 @@ let TasksService = class TasksService {
             await this.tasksRepository.update(taskId, patch);
         }
         return this.tasksRepository.findById(taskId);
+    }
+    normalizeTags(tags) {
+        if (!tags?.length)
+            return [];
+        const seen = new Set();
+        return tags
+            .filter((t) => t?.name != null && String(t.name).trim().length > 0)
+            .map((t) => ({
+            name: String(t.name).trim().slice(0, 80),
+            color: String(t.color ?? '#6B7280').trim().slice(0, 20),
+        }))
+            .filter((t) => {
+            const key = t.name.toLowerCase();
+            if (seen.has(key))
+                return false;
+            seen.add(key);
+            return true;
+        });
     }
     normalizeSubtasks(subtasks) {
         if (!subtasks?.length)
@@ -103,8 +151,78 @@ let TasksService = class TasksService {
     async getComments(taskId) {
         return this.taskCommentsRepository.findByTask(taskId);
     }
+    async addComment(taskId, organizationId, userId, body) {
+        const task = await this.tasksRepository.findByIdAndOrganization(taskId, organizationId);
+        if (!task)
+            throw new common_1.NotFoundException('Task not found');
+        const trimmed = body.trim();
+        if (!trimmed.length)
+            throw new common_1.BadRequestException('Comment cannot be empty');
+        const comment = await this.taskCommentsRepository.create({
+            taskId,
+            userId,
+            comment: trimmed,
+        });
+        return this.taskCommentsRepository.findById(comment.id);
+    }
+    async deleteComment(taskId, commentId, organizationId) {
+        const task = await this.tasksRepository.findByIdAndOrganization(taskId, organizationId);
+        if (!task)
+            throw new common_1.NotFoundException('Task not found');
+        const comment = await this.taskCommentsRepository.findById(commentId);
+        if (!comment || comment.taskId !== taskId)
+            throw new common_1.NotFoundException('Comment not found');
+        await this.taskCommentsRepository.delete(commentId);
+    }
     async getAttachments(taskId) {
         return this.taskAttachmentsRepository.findByTask(taskId);
+    }
+    async addAttachment(taskId, organizationId, userId, file) {
+        const task = await this.tasksRepository.findByIdAndOrganization(taskId, organizationId);
+        if (!task)
+            throw new common_1.NotFoundException('Task not found');
+        if (file.size > MAX_FILE_SIZE)
+            throw new common_1.ForbiddenException('File too large (max 10MB)');
+        if (!isAllowedMime(file.mimetype || ''))
+            throw new common_1.ForbiddenException('File type not allowed');
+        const uploadsPath = this.configService.get('uploadsPath', { infer: true });
+        const dir = path.join(uploadsPath, 'task-attachments', taskId);
+        await fs.mkdir(dir, { recursive: true });
+        const ext = path.extname(file.originalname || '') || '';
+        const base = sanitizeFileName(path.basename(file.originalname || 'file', ext));
+        const relativePath = path.join('task-attachments', taskId, `${(0, uuid_util_1.generateUuid)()}-${base}${ext}`);
+        const fullPath = path.join(uploadsPath, relativePath);
+        await fs.writeFile(fullPath, file.buffer);
+        const attachment = await this.taskAttachmentsRepository.create({
+            taskId,
+            fileUrl: relativePath.replace(/\\/g, '/'),
+            fileName: file.originalname || null,
+            uploadedBy: userId,
+        });
+        return attachment;
+    }
+    async getAttachmentFile(attachmentId, organizationId) {
+        const attachment = await this.taskAttachmentsRepository.findById(attachmentId);
+        if (!attachment)
+            throw new common_1.NotFoundException('Attachment not found');
+        const task = await this.tasksRepository.findByIdAndOrganization(attachment.taskId, organizationId);
+        if (!task)
+            throw new common_1.NotFoundException('Task not found');
+        const uploadsPath = this.configService.get('uploadsPath', { infer: true });
+        const fullPath = path.join(uploadsPath, attachment.fileUrl);
+        return { path: fullPath, fileName: attachment.fileName };
+    }
+    async deleteAttachment(taskId, attachmentId, organizationId) {
+        const task = await this.tasksRepository.findByIdAndOrganization(taskId, organizationId);
+        if (!task)
+            throw new common_1.NotFoundException('Task not found');
+        const attachment = await this.taskAttachmentsRepository.findById(attachmentId);
+        if (!attachment || attachment.taskId !== taskId)
+            throw new common_1.NotFoundException('Attachment not found');
+        const uploadsPath = this.configService.get('uploadsPath', { infer: true });
+        const fullPath = path.join(uploadsPath, attachment.fileUrl);
+        await fs.unlink(fullPath).catch(() => { });
+        await this.taskAttachmentsRepository.delete(attachmentId);
     }
 };
 exports.TasksService = TasksService;
@@ -113,6 +231,7 @@ exports.TasksService = TasksService = __decorate([
     __metadata("design:paramtypes", [tasks_repository_1.TasksRepository,
         task_comments_repository_1.TaskCommentsRepository,
         task_attachments_repository_1.TaskAttachmentsRepository,
-        projects_service_1.ProjectsService])
+        projects_service_1.ProjectsService,
+        config_1.ConfigService])
 ], TasksService);
 //# sourceMappingURL=tasks.service.js.map

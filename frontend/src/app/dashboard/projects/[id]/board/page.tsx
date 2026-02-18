@@ -244,6 +244,8 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
         loggedMinutes: 0,
         storyPoints: payload.storyPoints,
         dueDate: payload.dueDate,
+        tags: payload.tags ?? [],
+        subtasks: payload.subtasks ?? [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -300,6 +302,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
         assigneeId: data.assigneeIds?.[0] || undefined,
         storyPoints: data.storyPoints,
         dueDate: data.dueDate,
+        tags: data.labels?.length ? data.labels.map((l) => ({ name: l.name, color: l.color })) : undefined,
         subtasks: data.subtasks
           .map((s) => ({
             title: s.title.trim(),

@@ -11,6 +11,7 @@ const common_1 = require("@nestjs/common");
 const core_1 = require("@nestjs/core");
 const throttler_1 = require("@nestjs/throttler");
 const jwt_auth_guard_1 = require("./modules/auth/guards/jwt-auth.guard");
+const last_seen_interceptor_1 = require("./modules/users/last-seen.interceptor");
 const config_module_1 = require("./config/config.module");
 const database_module_1 = require("./infrastructure/database/database.module");
 const health_module_1 = require("./infrastructure/health/health.module");
@@ -35,6 +36,7 @@ exports.AppModule = AppModule = __decorate([
         providers: [
             { provide: core_1.APP_GUARD, useClass: jwt_auth_guard_1.JwtAuthGuard },
             { provide: core_1.APP_GUARD, useClass: throttler_1.ThrottlerGuard },
+            { provide: core_1.APP_INTERCEPTOR, useClass: last_seen_interceptor_1.LastSeenInterceptor },
         ],
         imports: [
             config_module_1.ConfigModule,

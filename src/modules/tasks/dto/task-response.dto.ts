@@ -24,6 +24,7 @@ export class TaskResponseDto {
   estimatedMinutes?: number;
   loggedMinutes!: number;
   sprintId?: string;
+  tags?: Array<{ name: string; color: string }>;
   subtasks?: TaskSubtaskResponseDto[];
   createdAt!: Date;
   updatedAt!: Date;

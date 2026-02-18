@@ -29,6 +29,11 @@ export class UsersRepository {
     await this.repo.update(id, data);
   }
 
+  /** Updates last_seen_at for presence. Call on each authenticated request. */
+  async updateLastSeen(userId: string): Promise<void> {
+    await this.repo.update(userId, { lastSeenAt: new Date() });
+  }
+
   async deleteById(id: string): Promise<void> {
     await this.repo.delete(id);
   }
