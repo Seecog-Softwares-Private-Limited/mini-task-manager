@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
@@ -15,7 +15,7 @@ import { WorkflowsController } from './workflows.controller';
     TypeOrmModule.forFeature([WorkflowEntity, WorkflowStatusEntity]),
     AuthModule,
     OrganizationsModule,
-    ProjectsModule,
+    forwardRef(() => ProjectsModule),
   ],
   controllers: [WorkflowsController],
   providers: [WorkflowsRepository, WorkflowStatusesRepository, WorkflowsService],

@@ -12,7 +12,10 @@
     "migration:run": "npm run typeorm -- migration:run -d src/infrastructure/database/data-source.ts",
     "test": "jest",
     "test:security": "jest --testPathPattern=security-integration",
-    "test:throttle": "jest --testPathPattern=throttle-integration --runInBand"
+    "test:throttle": "jest --testPathPattern=throttle-integration --runInBand",
+    "seed": "npx ts-node -r tsconfig-paths/register src/infrastructure/database/seed/run-seed.ts",
+    "seed:add-admin": "npx ts-node -r tsconfig-paths/register src/infrastructure/database/seed/add-admin.ts",
+    "seed:add-invited-user": "npx ts-node -r tsconfig-paths/register src/infrastructure/database/seed/add-invited-user.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
@@ -28,6 +31,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",
     "mysql2": "^3.6.0",
+    "nodemailer": "^8.0.1",
     "passport": "^0.6.0",
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.1.13",
@@ -42,12 +46,14 @@
     "@types/bcrypt": "^5.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^20.0.0",
+    "@types/nodemailer": "^7.0.10",
     "@types/passport-jwt": "^3.0.13",
     "@types/supertest": "^6.0.3",
     "@types/uuid": "^9.0.0",
     "jest": "^30.2.0",
     "supertest": "^7.2.2",
     "ts-jest": "^29.4.6",
+    "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.0.0"
   }

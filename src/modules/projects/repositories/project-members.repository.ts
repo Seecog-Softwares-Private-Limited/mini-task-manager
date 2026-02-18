@@ -15,6 +15,14 @@ export class ProjectMembersRepository {
     return this.repo.find({ where: { projectId } });
   }
 
+  async findByProjectWithUser(projectId: string): Promise<ProjectMemberEntity[]> {
+    return this.repo.find({
+      where: { projectId },
+      relations: ['user'],
+      order: { id: 'ASC' },
+    });
+  }
+
   async findByProjectAndUser(projectId: string, userId: string): Promise<ProjectMemberEntity | null> {
     return this.repo.findOne({ where: { projectId, userId } });
   }
@@ -23,5 +31,17 @@ export class ProjectMembersRepository {
     const id = data.id ?? generateUuid();
     const entity = this.repo.create({ ...data, id });
     return this.repo.save(entity);
+  }
+
+  async updateRole(id: string, role: string): Promise<void> {
+    await this.repo.update(id, { role });
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.repo.delete(id);
+  }
+
+  async findById(id: string): Promise<ProjectMemberEntity | null> {
+    return this.repo.findOne({ where: { id }, relations: ['user'] });
   }
 }

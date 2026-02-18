@@ -1,7 +1,8 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
+import { WorkflowsModule } from '../workflows/workflows.module';
 import { ProjectEntity } from './entities/project.entity';
 import { ProjectMemberEntity } from './entities/project-member.entity';
 import { ProjectsRepository } from './repositories/projects.repository';
@@ -14,6 +15,7 @@ import { ProjectsController } from './projects.controller';
     TypeOrmModule.forFeature([ProjectEntity, ProjectMemberEntity]),
     AuthModule,
     OrganizationsModule,
+    forwardRef(() => WorkflowsModule),
   ],
   controllers: [ProjectsController],
   providers: [ProjectsRepository, ProjectMembersRepository, ProjectsService],

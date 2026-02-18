@@ -35,4 +35,8 @@ export class UsersService {
       passwordHash: hash,
     });
   }
+
+  async deleteById(id: string): Promise<void> {
+    await this.usersRepository.deleteById(id);
+  }
 }
