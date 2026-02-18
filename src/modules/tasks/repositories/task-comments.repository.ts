@@ -12,7 +12,19 @@ export class TaskCommentsRepository {
   ) {}
 
   async findByTask(taskId: string): Promise<TaskCommentEntity[]> {
-    return this.repo.find({ where: { taskId }, order: { createdAt: 'ASC' } });
+    return this.repo.find({
+      where: { taskId },
+      order: { createdAt: 'ASC' },
+      relations: ['user'],
+    });
+  }
+
+  async findById(id: string): Promise<TaskCommentEntity | null> {
+    return this.repo.findOne({ where: { id }, relations: ['user'] });
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.repo.delete(id);
   }
 
   async create(data: Partial<TaskCommentEntity>): Promise<TaskCommentEntity> {

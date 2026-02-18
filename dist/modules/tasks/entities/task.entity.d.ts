@@ -28,6 +28,10 @@ export declare class TaskEntity extends BaseEntity {
     estimatedMinutes: number | null;
     loggedMinutes: number;
     sprintId: string | null;
+    tags: Array<{
+        name: string;
+        color: string;
+    }> | null;
     project?: ProjectEntity;
     status?: WorkflowStatusEntity;
     assignee?: UserEntity;

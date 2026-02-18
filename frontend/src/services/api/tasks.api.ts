@@ -28,6 +28,7 @@ export interface CreateTaskPayload {
       id?: string;
     }
   >;
+  tags?: Array<{ name: string; color: string }>;
   /** Not supported by backend yet — kept for UI, stripped before send */
   storyPoints?: number;
   /** Not supported by backend yet — kept for UI, stripped before send */
@@ -58,10 +59,7 @@ export async function fetchTasksByProject(
 }
 
 /**
- * Backend PatchTaskDto accepts: title, statusId, subtasks
- *
- * All other fields (title, description, priority, assigneeId, dueDate,
- * storyPoints) are kept for forward-compatibility but silently stripped.
+ * Backend PatchTaskDto accepts: title, description, statusId, assigneeId, storyPoints, tags, subtasks.
  */
 export interface UpdateTaskPayload {
   title?: string;
@@ -71,6 +69,7 @@ export interface UpdateTaskPayload {
   assigneeId?: string | null;
   dueDate?: string | null;
   storyPoints?: number | null;
+  tags?: Array<{ name: string; color: string }>;
   subtasks?: TaskSubtask[];
 }
 
@@ -82,6 +81,9 @@ export async function updateTask(
   if (payload.title !== undefined) body.title = payload.title;
   if (payload.description !== undefined) body.description = payload.description;
   if (payload.statusId !== undefined) body.statusId = payload.statusId;
+  if (payload.assigneeId !== undefined) body.assigneeId = payload.assigneeId;
+  if (payload.storyPoints !== undefined) body.storyPoints = payload.storyPoints;
+  if (payload.tags !== undefined) body.tags = payload.tags;
   if (payload.subtasks !== undefined) body.subtasks = payload.subtasks;
   const { data } = await apiClient.patch<Task>(`/tasks/${taskId}`, body);
   return data;

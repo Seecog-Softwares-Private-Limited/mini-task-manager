@@ -84,6 +84,7 @@ export class OrganizationsController {
             fullName: m.user.fullName,
             email: m.user.email,
             avatarUrl: m.user.avatarUrl ?? undefined,
+            lastSeenAt: m.user.lastSeenAt ? (m.user.lastSeenAt as Date).toISOString() : undefined,
           }
         : undefined,
     };

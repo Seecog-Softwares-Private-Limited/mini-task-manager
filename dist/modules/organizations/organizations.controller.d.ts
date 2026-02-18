@@ -18,6 +18,7 @@ export declare class OrganizationsController {
             fullName: string;
             email: string;
             avatarUrl: string | undefined;
+            lastSeenAt: string | undefined;
         } | undefined;
     }[]>;
     findOne(id: string, userId: string, orgIdHeader?: string): Promise<OrganizationResponseDto | null>;

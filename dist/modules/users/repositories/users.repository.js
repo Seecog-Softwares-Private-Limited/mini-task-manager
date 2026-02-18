@@ -36,6 +36,9 @@ let UsersRepository = class UsersRepository {
     async update(id, data) {
         await this.repo.update(id, data);
     }
+    async updateLastSeen(userId) {
+        await this.repo.update(userId, { lastSeenAt: new Date() });
+    }
     async deleteById(id) {
         await this.repo.delete(id);
     }
