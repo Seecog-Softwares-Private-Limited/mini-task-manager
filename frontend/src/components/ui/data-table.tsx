@@ -43,7 +43,7 @@ export interface DataTableProps<T> {
 
 const defaultPageSizeOptions = [10, 25, 50];
 
-export function DataTable<T>({
+export function DataTable<T,>({
   columns,
   data,
   keyExtractor,
@@ -93,7 +93,7 @@ export function DataTable<T>({
           <thead>
             <tr className="border-b bg-muted/30">
               {columns.map((col) => (
-                <th key={String(col.key)} className="h-11 px-4 text-left align-middle">
+                <th key={String(col.key)} className="h-10 px-4 text-left align-middle">
                   <Skeleton className="h-4 w-20 rounded" />
                 </th>
               ))}
@@ -103,7 +103,7 @@ export function DataTable<T>({
             {Array.from({ length: 5 }).map((_, i) => (
               <tr key={i} className="border-b">
                 {columns.map((col) => (
-                  <td key={String(col.key)} className="p-4">
+                  <td key={String(col.key)} className="px-4 py-2.5">
                     <Skeleton className="h-4 w-full max-w-[120px] rounded" />
                   </td>
                 ))}
@@ -116,17 +116,6 @@ export function DataTable<T>({
   }
 
   const isReallyEmpty = !data.length && (totalCount == null || totalCount === 0);
-  if (isReallyEmpty && !isLoading) {
-    return (
-      <div className={cn("w-full", className)}>
-        <EmptyState
-          title={emptyTitle}
-          description={emptyDescription}
-          action={emptyAction}
-        />
-      </div>
-    );
-  }
 
   return (
     <div className={cn("w-full space-y-4", className)}>
@@ -137,7 +126,7 @@ export function DataTable<T>({
               {columns.map((col) => (
                 <th
                   key={String(col.key)}
-                  className={cn("h-11 px-4 text-left align-middle text-xs font-semibold uppercase tracking-wider text-muted-foreground", col.className)}
+                  className={cn("h-10 px-4 text-left align-middle text-xs font-semibold uppercase tracking-wider text-muted-foreground", col.className)}
                 >
                   <div className="flex flex-col gap-1.5">
                     <div className="flex items-center gap-1">
@@ -185,25 +174,41 @@ export function DataTable<T>({
             </tr>
           </thead>
           <tbody>
-            {data.map((row) => (
-              <tr
-                key={keyExtractor(row)}
-                className="border-b transition-colors hover:bg-muted/20"
-              >
-                {columns.map((col) => {
-                  const value = (row as Record<string, unknown>)[String(col.key)];
-                  const cell = col.render ? col.render(row) : (value as React.ReactNode);
-                  return (
-                    <td
-                      key={String(col.key)}
-                      className={cn("px-4 py-3.5 align-middle", col.className)}
-                    >
-                      {cell ?? "—"}
-                    </td>
-                  );
-                })}
+            {isReallyEmpty ? (
+              <tr>
+                <td colSpan={columns.length} className="h-24 p-8 text-center text-muted-foreground">
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <p className="font-medium text-foreground">{emptyTitle}</p>
+                    {emptyDescription && <p className="text-sm">{emptyDescription}</p>}
+                    {emptyAction && (
+                      <Button variant="outline" size="sm" onClick={emptyAction.onClick}>
+                        {emptyAction.label}
+                      </Button>
+                    )}
+                  </div>
+                </td>
               </tr>
-            ))}
+            ) : (
+              data.map((row) => (
+                <tr
+                  key={keyExtractor(row)}
+                  className="group border-b transition-colors hover:bg-muted/20"
+                >
+                  {columns.map((col) => {
+                    const value = (row as Record<string, unknown>)[String(col.key)];
+                    const cell = col.render ? col.render(row) : (value as React.ReactNode);
+                    return (
+                      <td
+                        key={String(col.key)}
+                        className={cn("px-4 py-2.5 align-middle", col.className)}
+                      >
+                        {cell ?? "—"}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

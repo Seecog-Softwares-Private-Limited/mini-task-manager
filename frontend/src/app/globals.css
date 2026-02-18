@@ -35,6 +35,12 @@
     --info: 199 89% 48%;
     --gradient-start: 239 84% 67%;
     --gradient-end: 280 72% 60%;
+
+    /* Status badges – WCAG AA contrast (4.5:1+ for normal text) */
+    --status-active-bg: 142 71% 45% / 0.14;
+    --status-active-fg: 142 72% 26%;
+    --status-archived-bg: 38 92% 50% / 0.14;
+    --status-archived-fg: 38 92% 30%;
   }
 
   .dark {
@@ -60,6 +66,10 @@
     --info: 199 89% 48%;
     --gradient-start: 239 84% 67%;
     --gradient-end: 280 72% 60%;
+    --status-active-bg: 142 55% 35% / 0.35;
+    --status-active-fg: 142 55% 62%;
+    --status-archived-bg: 38 85% 40% / 0.35;
+    --status-archived-fg: 38 92% 68%;
   }
 }
 
@@ -120,6 +130,16 @@
   }
   .animate-scale-in {
     animation: scaleIn 0.3s ease-out both;
+  }
+
+  /* Project status badges – distinct, standardized, accessible contrast */
+  .badge-status-active {
+    background: hsl(var(--status-active-bg));
+    color: hsl(var(--status-active-fg));
+  }
+  .badge-status-archived {
+    background: hsl(var(--status-archived-bg));
+    color: hsl(var(--status-archived-fg));
   }
 }
 
