@@ -15,7 +15,7 @@ import { OrganizationEntity } from '../../../modules/organizations/entities/orga
 import { ProjectEntity } from '../../../modules/projects/entities/project.entity';
 
 const ADMIN_EMAIL = 'admin@example.com';
-const PASSWORD = 'Password123!';
+const PASSWORD = process.env.SEED_USER_PASSWORD || 'Password123!';
 
 async function addAdmin() {
   const dbConfig = configuration().database;

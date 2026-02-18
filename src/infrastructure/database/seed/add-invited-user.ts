@@ -2,7 +2,7 @@
  * Adds an invited user so they can login and accept their invitation.
  * Usage: npx ts-node -r tsconfig-paths/register src/infrastructure/database/seed/add-invited-user.ts
  *
- * Edit EMAIL and PASSWORD below, then run: npm run seed:add-invited-user
+ * Configure SEED_INVITED_EMAIL / SEED_USER_PASSWORD in env, then run: npm run seed:add-invited-user
  */
 
 import { DataSource } from 'typeorm';
@@ -11,8 +11,8 @@ import { configuration } from '../../../config/configuration';
 import { generateUuid } from '../../../common/utils/uuid.util';
 import { UserEntity } from '../../../modules/users/entities/user.entity';
 
-const EMAIL = 'pankaj.7613@gmail.com';
-const PASSWORD = 'Password123!';
+const EMAIL = process.env.SEED_INVITED_EMAIL || 'invitee@example.com';
+const PASSWORD = process.env.SEED_USER_PASSWORD || 'Password123!';
 
 async function addUser() {
   const dbConfig = configuration().database;
