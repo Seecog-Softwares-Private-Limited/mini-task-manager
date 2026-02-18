@@ -42,6 +42,10 @@ export interface Organization {
   name: string;
   slug: string;
   ownerId: string;
+  logoUrl?: string | null;
+  /** Current user's role (Owner/Admin/Member). Only present in list response. */
+  myRole?: string;
+  isArchived?: boolean;
 }
 
 export interface Project {

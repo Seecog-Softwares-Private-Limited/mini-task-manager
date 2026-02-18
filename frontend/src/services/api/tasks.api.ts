@@ -41,10 +41,16 @@ export async function createTask(payload: CreateTaskPayload): Promise<Task> {
   return data;
 }
 
+export interface FetchTasksByProjectOptions {
+  /** Pass when fetching tasks for a project in a different org (e.g. org dashboard). */
+  organizationId?: string;
+}
+
 export async function fetchTasksByProject(
   projectId: string,
   page = 1,
-  limit = 100
+  limit = 100,
+  options?: FetchTasksByProjectOptions
 ): Promise<PaginatedResult<Task>> {
   // Backend paginated DTO enforces numeric bounds; keep requests in safe range.
   const safePage = Number.isFinite(page) ? Math.max(1, Math.trunc(page)) : 1;
@@ -52,8 +58,13 @@ export async function fetchTasksByProject(
     ? Math.min(100, Math.max(1, Math.trunc(limit)))
     : 100;
 
+  const headers = options?.organizationId
+    ? { "X-Organization-Id": options.organizationId }
+    : undefined;
+
   const { data } = await apiClient.get<PaginatedResult<Task>>(`/tasks/project/${projectId}`, {
     params: { page: safePage, limit: safeLimit },
+    ...(headers && { headers }),
   });
   return data;
 }

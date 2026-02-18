@@ -27,6 +27,9 @@ let ProjectsService = class ProjectsService {
     async findByOrganization(organizationId) {
         return this.projectsRepository.findByOrganization(organizationId);
     }
+    async countByOrganization(organizationId) {
+        return this.projectsRepository.countByOrganization(organizationId);
+    }
     async create(organizationId, createdBy, dto) {
         return this.projectsRepository.create({
             organizationId,

@@ -12,6 +12,22 @@ export async function fetchProjects(): Promise<Project[]> {
   return data;
 }
 
+/** Fetch projects for a specific organization (for org switcher / org list). */
+export async function fetchProjectsByOrg(orgId: string): Promise<Project[]> {
+  const { data } = await apiClient.get<Project[]>("/projects", {
+    headers: { "X-Organization-Id": orgId },
+  });
+  return data;
+}
+
+/** Fetch project count for an organization (lightweight, for org cards). */
+export async function fetchProjectsCountByOrg(orgId: string): Promise<number> {
+  const { data } = await apiClient.get<{ count: number }>("/projects/count", {
+    headers: { "X-Organization-Id": orgId },
+  });
+  return data.count;
+}
+
 export async function fetchProject(id: string): Promise<Project | null> {
   const { data } = await apiClient.get<Project | null>(`/projects/${id}`);
   return data;

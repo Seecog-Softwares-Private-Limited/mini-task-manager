@@ -10,6 +10,7 @@ import { logout } from "@/services/api/auth.api";
 import { clearAuth } from "@/services/api/client";
 import { TenantGuard } from "@/components/tenant-guard";
 import { Sidebar } from "@/components/dashboard/sidebar";
+import { OrgSwitcher } from "@/components/dashboard/org-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { CommandPalette } from "@/components/command-palette";
 import { NotificationCenter } from "@/components/notifications/notification-center";
@@ -113,6 +114,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               <PanelLeftClose className="h-5 w-5" />
             )}
           </Button>
+
+          <div className="hidden sm:block border-l border-border/60 pl-3 ml-1">
+            <OrgSwitcher variant="navbar" />
+          </div>
 
           <div className="flex-1" />
 

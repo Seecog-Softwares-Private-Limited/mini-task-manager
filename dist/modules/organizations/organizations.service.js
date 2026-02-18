@@ -44,6 +44,18 @@ let OrganizationsService = class OrganizationsService {
         }
         return orgs;
     }
+    async findOrganizationsWithRoleForUser(userId) {
+        const memberships = await this.orgMembersRepository.findByUser(userId);
+        const result = [];
+        for (const m of memberships) {
+            if (m.status !== 'ACTIVE')
+                continue;
+            const org = await this.organizationsRepository.findById(m.organizationId);
+            if (org)
+                result.push({ org, role: m.role });
+        }
+        return result;
+    }
     async create(ownerId, dto) {
         const existing = await this.organizationsRepository.findBySlug(dto.slug);
         if (existing) {
@@ -59,6 +71,8 @@ let OrganizationsService = class OrganizationsService {
                     name: dto.name,
                     slug: dto.slug,
                     ownerId,
+                    logoUrl: dto.logoUrl ?? null,
+                    isArchived: false,
                 });
                 await orgRepo.save(orgEntity);
                 const memberEntity = memberRepo.create({
@@ -86,9 +100,36 @@ let OrganizationsService = class OrganizationsService {
     async getMembers(organizationId) {
         return this.orgMembersRepository.findByOrganizationWithUser(organizationId);
     }
+    async getMemberCount(organizationId) {
+        return this.orgMembersRepository.countByOrganization(organizationId);
+    }
     async canAccess(organizationId, userId) {
         const membership = await this.orgMembersRepository.findByOrganizationAndUser(organizationId, userId);
         return membership != null && membership.status === 'ACTIVE';
+    }
+    async update(id, dto) {
+        const org = await this.organizationsRepository.findById(id);
+        if (!org)
+            return null;
+        if (dto.isArchived !== undefined) {
+            await this.organizationsRepository.update(id, { isArchived: dto.isArchived });
+            return { ...org, isArchived: dto.isArchived };
+        }
+        return org;
+    }
+    async getMembership(organizationId, userId) {
+        const m = await this.orgMembersRepository.findByOrganizationAndUser(organizationId, userId);
+        return m && m.status === 'ACTIVE' ? m : null;
+    }
+    async delete(id, userId) {
+        const membership = await this.getMembership(id, userId);
+        if (!membership) {
+            throw new common_1.ForbiddenException('You do not have access to this organization');
+        }
+        if (membership.role?.toLowerCase() !== 'owner') {
+            throw new common_1.ForbiddenException('Only the organization owner can delete the organization');
+        }
+        await this.organizationsRepository.delete(id);
     }
 };
 exports.OrganizationsService = OrganizationsService;

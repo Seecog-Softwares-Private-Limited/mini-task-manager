@@ -30,6 +30,9 @@ let OrganizationMembersRepository = class OrganizationMembersRepository {
     async findByOrganization(organizationId) {
         return this.repo.find({ where: { organizationId }, order: { joinedAt: 'ASC' } });
     }
+    async countByOrganization(organizationId) {
+        return this.repo.count({ where: { organizationId } });
+    }
     async findByOrganizationWithUser(organizationId) {
         return this.repo.find({
             where: { organizationId },

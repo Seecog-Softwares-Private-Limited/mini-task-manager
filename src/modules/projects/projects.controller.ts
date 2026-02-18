@@ -49,6 +49,12 @@ export class ProjectsController {
     return list.map((p) => this.toResponse(p));
   }
 
+  @Get('count')
+  async getCount(@TenantId() tenantId?: string): Promise<{ count: number }> {
+    const count = await this.projectsService.countByOrganization(tenantId!);
+    return { count };
+  }
+
   // ── Project Members (must come before :id catch-all) ──
 
   @Get(':id/members')

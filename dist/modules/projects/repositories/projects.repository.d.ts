@@ -6,6 +6,7 @@ export declare class ProjectsRepository {
     findById(id: string): Promise<ProjectEntity | null>;
     findByIdAndOrganization(id: string, organizationId: string): Promise<ProjectEntity | null>;
     findByOrganization(organizationId: string): Promise<ProjectEntity[]>;
+    countByOrganization(organizationId: string): Promise<number>;
     create(data: Partial<ProjectEntity>): Promise<ProjectEntity>;
     update(id: string, data: Partial<ProjectEntity>): Promise<void>;
 }

@@ -46,6 +46,10 @@ let ProjectsController = ProjectsController_1 = class ProjectsController {
         const list = await this.projectsService.findByOrganization(tenantId);
         return list.map((p) => this.toResponse(p));
     }
+    async getCount(tenantId) {
+        const count = await this.projectsService.countByOrganization(tenantId);
+        return { count };
+    }
     async getMembers(projectId) {
         const members = await this.projectsService.getProjectMembers(projectId);
         return members.map((m) => this.toMemberResponse(m));
@@ -120,6 +124,13 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], ProjectsController.prototype, "findAll", null);
+__decorate([
+    (0, common_1.Get)('count'),
+    __param(0, (0, tenant_decorator_1.TenantId)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], ProjectsController.prototype, "getCount", null);
 __decorate([
     (0, common_1.Get)(':id/members'),
     __param(0, (0, common_1.Param)('id')),

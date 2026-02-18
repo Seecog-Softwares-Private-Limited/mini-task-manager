@@ -55,7 +55,7 @@ export const apiClient = axios.create({
 
 apiClient.interceptors.request.use((req) => {
   const token = getStoredToken();
-  const orgId = getStoredOrgId();
+  const orgId = req.headers["X-Organization-Id"] ?? getStoredOrgId();
   if (token) req.headers.Authorization = `Bearer ${token}`;
   if (orgId) req.headers["X-Organization-Id"] = orgId;
   // Let the browser set Content-Type with boundary for FormData (file uploads)

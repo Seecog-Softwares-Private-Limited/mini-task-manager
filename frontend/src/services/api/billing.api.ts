@@ -12,6 +12,14 @@ export async function fetchSubscription(): Promise<Subscription | null> {
   return data;
 }
 
+/** Fetch subscription for a specific organization. */
+export async function fetchSubscriptionByOrg(orgId: string): Promise<Subscription | null> {
+  const { data } = await apiClient.get<Subscription | null>("/billing/subscription", {
+    headers: { "X-Organization-Id": orgId },
+  });
+  return data;
+}
+
 /** Requires X-Organization-Id header. */
 export async function fetchInvoices(): Promise<Invoice[]> {
   const { data } = await apiClient.get<Invoice[]>("/billing/invoices");

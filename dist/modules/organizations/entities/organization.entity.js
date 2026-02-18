@@ -30,9 +30,17 @@ __decorate([
     __metadata("design:type", String)
 ], OrganizationEntity.prototype, "slug", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: 'logo_url', type: 'mediumtext', nullable: true }),
+    __metadata("design:type", Object)
+], OrganizationEntity.prototype, "logoUrl", void 0);
+__decorate([
     (0, typeorm_1.Column)({ name: 'owner_id', type: 'binary', length: 16, transformer: base_entity_1.uuidBinaryTransformer }),
     __metadata("design:type", String)
 ], OrganizationEntity.prototype, "ownerId", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'is_archived', type: 'boolean', default: false }),
+    __metadata("design:type", Boolean)
+], OrganizationEntity.prototype, "isArchived", void 0);
 __decorate([
     (0, typeorm_1.ManyToOne)(() => user_entity_1.UserEntity, { onDelete: 'RESTRICT' }),
     (0, typeorm_1.JoinColumn)({ name: 'owner_id' }),

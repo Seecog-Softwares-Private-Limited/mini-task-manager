@@ -25,6 +25,10 @@ export class ProjectsService {
     return this.projectsRepository.findByOrganization(organizationId);
   }
 
+  async countByOrganization(organizationId: string): Promise<number> {
+    return this.projectsRepository.countByOrganization(organizationId);
+  }
+
   async create(organizationId: string, createdBy: string, dto: CreateProjectDto): Promise<ProjectEntity> {
     return this.projectsRepository.create({
       organizationId,

@@ -1,5 +1,8 @@
 {
-  "/dashboard/page": "app/dashboard/page.js",
-  "/dashboard/projects/page": "app/dashboard/projects/page.js",
-  "/dashboard/projects/[id]/page": "app/dashboard/projects/[id]/page.js"
+  "/dashboard/organizations/page": "app/dashboard/organizations/page.js",
+  "/dashboard/settings/page": "app/dashboard/settings/page.js",
+  "/dashboard/tasks/page": "app/dashboard/tasks/page.js",
+  "/dashboard/notifications/page": "app/dashboard/notifications/page.js",
+  "/dashboard/settings/organization/page": "app/dashboard/settings/organization/page.js",
+  "/dashboard/billing/page": "app/dashboard/billing/page.js"
 }
