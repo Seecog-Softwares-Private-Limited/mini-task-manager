@@ -1,6 +1,7 @@
 import { ProjectsService } from './projects.service';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { CreateProjectDto } from './dto/create-project.dto';
+import { UpdateProjectDto } from './dto/update-project.dto';
 import { AddProjectMemberDto } from './dto/add-project-member.dto';
 import { UpdateProjectMemberRoleDto } from './dto/update-project-member-role.dto';
 import { ProjectResponseDto } from './dto/project-response.dto';
@@ -51,6 +52,7 @@ export declare class ProjectsController {
         success: boolean;
     }>;
     findOne(id: string, tenantId?: string): Promise<ProjectResponseDto | null>;
+    update(id: string, dto: UpdateProjectDto, tenantId?: string): Promise<ProjectResponseDto>;
     private toResponse;
     private toMemberResponse;
 }
