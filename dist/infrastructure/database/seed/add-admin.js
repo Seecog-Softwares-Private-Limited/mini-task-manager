@@ -10,7 +10,7 @@ const project_member_entity_1 = require("../../../modules/projects/entities/proj
 const organization_entity_1 = require("../../../modules/organizations/entities/organization.entity");
 const project_entity_1 = require("../../../modules/projects/entities/project.entity");
 const ADMIN_EMAIL = 'admin@example.com';
-const PASSWORD = 'Password123!';
+const PASSWORD = process.env.SEED_USER_PASSWORD || 'Password123!';
 async function addAdmin() {
     const dbConfig = (0, configuration_1.configuration)().database;
     const dataSource = new typeorm_1.DataSource({
