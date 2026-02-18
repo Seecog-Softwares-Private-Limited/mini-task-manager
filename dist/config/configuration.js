@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.configuration = void 0;
 const DEFAULT_JWT_SECRET = 'change-me-in-production';
+const path_1 = require("path");
 const configuration = () => {
     const nodeEnv = process.env.NODE_ENV || 'development';
     const jwtSecret = process.env.JWT_SECRET || DEFAULT_JWT_SECRET;
@@ -14,6 +15,7 @@ const configuration = () => {
         nodeEnv,
         port: parseInt(process.env.PORT || '3000', 10),
         apiPrefix: process.env.API_PREFIX || 'api/v1',
+        uploadsPath: process.env.UPLOADS_PATH || (0, path_1.join)(process.cwd(), 'uploads'),
         jwt: {
             secret: jwtSecret,
             expiresIn: process.env.JWT_EXPIRES_IN || '7d',
@@ -33,7 +35,7 @@ const configuration = () => {
             host: process.env.DB_HOST || 'localhost',
             port: parseInt(process.env.DB_PORT || '3306', 10),
             username: process.env.DB_USERNAME || 'root',
-            password: process.env.DB_PASSWORD || '',
+            password: process.env.DB_PASSWORD || 'Nikhil-700',
             database: process.env.DB_DATABASE || 'mini_task_manager',
             synchronize: process.env.DB_SYNCHRONIZE === 'true',
             logging: process.env.DB_LOGGING === 'true',

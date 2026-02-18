@@ -2,6 +2,7 @@ export declare const configuration: () => {
     nodeEnv: string;
     port: number;
     apiPrefix: string;
+    uploadsPath: string;
     jwt: {
         secret: string;
         expiresIn: string;

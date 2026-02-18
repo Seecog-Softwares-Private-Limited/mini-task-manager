@@ -23,7 +23,17 @@ let TaskCommentsRepository = class TaskCommentsRepository {
         this.repo = repo;
     }
     async findByTask(taskId) {
-        return this.repo.find({ where: { taskId }, order: { createdAt: 'ASC' } });
+        return this.repo.find({
+            where: { taskId },
+            order: { createdAt: 'ASC' },
+            relations: ['user'],
+        });
+    }
+    async findById(id) {
+        return this.repo.findOne({ where: { id }, relations: ['user'] });
+    }
+    async delete(id) {
+        await this.repo.delete(id);
     }
     async create(data) {
         const id = data.id ?? (0, uuid_util_1.generateUuid)();

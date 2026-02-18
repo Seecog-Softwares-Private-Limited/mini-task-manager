@@ -25,6 +25,12 @@ let TaskAttachmentsRepository = class TaskAttachmentsRepository {
     async findByTask(taskId) {
         return this.repo.find({ where: { taskId }, order: { uploadedAt: 'DESC' } });
     }
+    async findById(id) {
+        return this.repo.findOne({ where: { id } });
+    }
+    async delete(id) {
+        await this.repo.delete(id);
+    }
     async create(data) {
         const id = data.id ?? (0, uuid_util_1.generateUuid)();
         const entity = this.repo.create({ ...data, id });

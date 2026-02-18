@@ -1,13 +1,35 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { TasksRepository } from './repositories/tasks.repository';
 import { TaskCommentsRepository } from './repositories/task-comments.repository';
 import { TaskAttachmentsRepository } from './repositories/task-attachments.repository';
 import { ProjectsService } from '../projects/projects.service';
 import { TaskEntity } from './entities/task.entity';
+import { TaskAttachmentEntity } from './entities/task-attachment.entity';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { PatchTaskDto } from './dto/patch-task.dto';
 import { PaginationQueryDto, PaginatedResult, paginate } from '../../common/pagination';
 import { generateUuid } from '../../common/utils/uuid.util';
+import { Configuration } from '../../config/configuration';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+function isAllowedMime(mimetype: string): boolean {
+  if (!mimetype) return false;
+  return (
+    mimetype.startsWith('image/') ||
+    mimetype.startsWith('text/') ||
+    mimetype === 'application/pdf' ||
+    mimetype === 'application/json' ||
+    mimetype.startsWith('application/zip') ||
+    mimetype === 'application/x-zip-compressed'
+  );
+}
+
+function sanitizeFileName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 200) || 'file';
+}
 
 @Injectable()
 export class TasksService {
@@ -16,6 +38,7 @@ export class TasksService {
     private readonly taskCommentsRepository: TaskCommentsRepository,
     private readonly taskAttachmentsRepository: TaskAttachmentsRepository,
     private readonly projectsService: ProjectsService,
+    private readonly configService: ConfigService<Configuration>,
   ) {}
 
   async findById(id: string): Promise<TaskEntity | null> {
@@ -56,6 +79,7 @@ export class TasksService {
         : [];
 
     const normalizedSubtasks = this.normalizeSubtasks(dto.subtasks);
+    const tags = this.normalizeTags(dto.tags);
 
     return this.tasksRepository.create({
       projectId,
@@ -70,6 +94,7 @@ export class TasksService {
       subtasks: normalizedSubtasks.length ? normalizedSubtasks : null,
       parentTaskId: dto.parentTaskId ?? null,
       sprintId: dto.sprintId ?? null,
+      tags: tags.length ? tags : null,
     });
   }
 
@@ -92,6 +117,15 @@ export class TasksService {
       patch.description = trimmedDescription.length > 0 ? trimmedDescription : null;
     }
     if (dto.statusId !== undefined) patch.statusId = dto.statusId ?? null;
+    if (dto.assigneeId !== undefined) {
+      patch.assigneeId = dto.assigneeId ?? null;
+      patch.assigneeIds = patch.assigneeId ? [patch.assigneeId] : null;
+    }
+    if (dto.storyPoints !== undefined) patch.storyPoints = dto.storyPoints ?? null;
+    if (dto.tags !== undefined) {
+      const normalized = this.normalizeTags(dto.tags);
+      patch.tags = normalized.length ? normalized : null;
+    }
     if (dto.subtasks !== undefined) {
       const normalized = this.normalizeSubtasks(dto.subtasks);
       patch.subtasks = normalized.length ? normalized : null;
@@ -100,6 +134,25 @@ export class TasksService {
       await this.tasksRepository.update(taskId, patch);
     }
     return this.tasksRepository.findById(taskId);
+  }
+
+  private normalizeTags(
+    tags?: Array<{ name: string; color: string }>,
+  ): Array<{ name: string; color: string }> {
+    if (!tags?.length) return [];
+    const seen = new Set<string>();
+    return tags
+      .filter((t) => t?.name != null && String(t.name).trim().length > 0)
+      .map((t) => ({
+        name: String(t.name).trim().slice(0, 80),
+        color: String(t.color ?? '#6B7280').trim().slice(0, 20),
+      }))
+      .filter((t) => {
+        const key = t.name.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
   }
 
   private normalizeSubtasks(
@@ -136,7 +189,89 @@ export class TasksService {
     return this.taskCommentsRepository.findByTask(taskId);
   }
 
-  async getAttachments(taskId: string) {
+  async addComment(
+    taskId: string,
+    organizationId: string,
+    userId: string,
+    body: string,
+  ) {
+    const task = await this.tasksRepository.findByIdAndOrganization(taskId, organizationId);
+    if (!task) throw new NotFoundException('Task not found');
+    const trimmed = body.trim();
+    if (!trimmed.length) throw new BadRequestException('Comment cannot be empty');
+    const comment = await this.taskCommentsRepository.create({
+      taskId,
+      userId,
+      comment: trimmed,
+    });
+    return this.taskCommentsRepository.findById(comment.id);
+  }
+
+  async deleteComment(
+    taskId: string,
+    commentId: string,
+    organizationId: string,
+  ): Promise<void> {
+    const task = await this.tasksRepository.findByIdAndOrganization(taskId, organizationId);
+    if (!task) throw new NotFoundException('Task not found');
+    const comment = await this.taskCommentsRepository.findById(commentId);
+    if (!comment || comment.taskId !== taskId) throw new NotFoundException('Comment not found');
+    await this.taskCommentsRepository.delete(commentId);
+  }
+
+  async getAttachments(taskId: string): Promise<TaskAttachmentEntity[]> {
     return this.taskAttachmentsRepository.findByTask(taskId);
+  }
+
+  async addAttachment(
+    taskId: string,
+    organizationId: string,
+    userId: string,
+    file: { originalname?: string; mimetype?: string; size: number; buffer: Buffer },
+  ): Promise<TaskAttachmentEntity> {
+    const task = await this.tasksRepository.findByIdAndOrganization(taskId, organizationId);
+    if (!task) throw new NotFoundException('Task not found');
+    if (file.size > MAX_FILE_SIZE) throw new ForbiddenException('File too large (max 10MB)');
+    if (!isAllowedMime(file.mimetype || '')) throw new ForbiddenException('File type not allowed');
+    const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
+    const dir = path.join(uploadsPath, 'task-attachments', taskId);
+    await fs.mkdir(dir, { recursive: true });
+    const ext = path.extname(file.originalname || '') || '';
+    const base = sanitizeFileName(path.basename(file.originalname || 'file', ext));
+    const relativePath = path.join('task-attachments', taskId, `${generateUuid()}-${base}${ext}`);
+    const fullPath = path.join(uploadsPath, relativePath);
+    await fs.writeFile(fullPath, file.buffer);
+    const attachment = await this.taskAttachmentsRepository.create({
+      taskId,
+      fileUrl: relativePath.replace(/\\/g, '/'),
+      fileName: file.originalname || null,
+      uploadedBy: userId,
+    });
+    return attachment;
+  }
+
+  async getAttachmentFile(attachmentId: string, organizationId: string): Promise<{ path: string; fileName: string | null }> {
+    const attachment = await this.taskAttachmentsRepository.findById(attachmentId);
+    if (!attachment) throw new NotFoundException('Attachment not found');
+    const task = await this.tasksRepository.findByIdAndOrganization(attachment.taskId, organizationId);
+    if (!task) throw new NotFoundException('Task not found');
+    const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
+    const fullPath = path.join(uploadsPath, attachment.fileUrl);
+    return { path: fullPath, fileName: attachment.fileName };
+  }
+
+  async deleteAttachment(
+    taskId: string,
+    attachmentId: string,
+    organizationId: string,
+  ): Promise<void> {
+    const task = await this.tasksRepository.findByIdAndOrganization(taskId, organizationId);
+    if (!task) throw new NotFoundException('Task not found');
+    const attachment = await this.taskAttachmentsRepository.findById(attachmentId);
+    if (!attachment || attachment.taskId !== taskId) throw new NotFoundException('Attachment not found');
+    const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
+    const fullPath = path.join(uploadsPath, attachment.fileUrl);
+    await fs.unlink(fullPath).catch(() => {});
+    await this.taskAttachmentsRepository.delete(attachmentId);
   }
 }

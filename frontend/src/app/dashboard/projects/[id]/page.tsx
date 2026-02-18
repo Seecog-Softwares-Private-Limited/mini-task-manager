@@ -70,6 +70,7 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
   const handleCreateTask = (data: CreateTaskFormData) => {
     if (!orgId) return;
     createMutation.mutate({
+      tags: data.labels?.length ? data.labels.map((l: { name: string; color: string }) => ({ name: l.name, color: l.color })) : undefined,
       projectId: id,
       organizationId: orgId,
       title: data.title,
