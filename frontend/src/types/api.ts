@@ -33,6 +33,8 @@ export interface User {
   avatarUrl?: string;
   isEmailVerified: boolean;
   isActive: boolean;
+  /** ISO date string; used for presence (online if within last few minutes). */
+  lastSeenAt?: string;
 }
 
 export interface Organization {
@@ -69,6 +71,7 @@ export interface Task {
   estimatedMinutes?: number;
   loggedMinutes: number;
   sprintId?: string;
+  tags?: Array<{ name: string; color: string }>;
   subtasks?: TaskSubtask[];
   createdAt: string;
   updatedAt: string;
@@ -174,7 +177,7 @@ export interface OrgMember {
   status: string;
   invitedAt?: string;
   joinedAt?: string;
-  user?: Pick<User, "id" | "fullName" | "email" | "avatarUrl">;
+  user?: Pick<User, "id" | "fullName" | "email" | "avatarUrl" | "lastSeenAt">;
 }
 
 export interface ProjectMember {

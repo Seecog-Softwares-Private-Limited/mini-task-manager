@@ -14,13 +14,16 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TasksController = void 0;
 const common_1 = require("@nestjs/common");
+const platform_express_1 = require("@nestjs/platform-express");
 const throttler_1 = require("@nestjs/throttler");
+const fs_1 = require("fs");
 const tasks_service_1 = require("./tasks.service");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const tenant_guard_1 = require("../auth/guards/tenant.guard");
 const tenant_decorator_1 = require("../../common/decorators/tenant.decorator");
 const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
 const create_task_dto_1 = require("./dto/create-task.dto");
+const create_task_comment_dto_1 = require("./dto/create-task-comment.dto");
 const patch_task_dto_1 = require("./dto/patch-task.dto");
 const pagination_1 = require("../../common/pagination");
 let TasksController = class TasksController {
@@ -36,8 +39,51 @@ let TasksController = class TasksController {
     async findByProject(projectId, tenantId, query) {
         return this.tasksService.findByProject(projectId, tenantId, query);
     }
+    async getAttachmentFile(attachmentId, tenantId) {
+        const { path: filePath, fileName } = await this.tasksService.getAttachmentFile(attachmentId, tenantId);
+        const stream = (0, fs_1.createReadStream)(filePath);
+        return new common_1.StreamableFile(stream, {
+            disposition: fileName ? `attachment; filename="${fileName}"` : undefined,
+        });
+    }
+    async getAttachments(taskId, tenantId) {
+        const task = await this.tasksService.findByIdInOrganization(taskId, tenantId);
+        if (!task)
+            return [];
+        return this.tasksService.getAttachments(taskId);
+    }
+    async uploadAttachment(taskId, tenantId, userId, file) {
+        if (!file)
+            throw new common_1.BadRequestException('File is required');
+        return this.tasksService.addAttachment(taskId, tenantId, userId, file);
+    }
+    async deleteAttachment(taskId, attachmentId, tenantId) {
+        await this.tasksService.deleteAttachment(taskId, attachmentId, tenantId);
+        return { success: true };
+    }
+    async getComments(taskId, tenantId) {
+        const task = await this.tasksService.findByIdInOrganization(taskId, tenantId);
+        if (!task)
+            return [];
+        const comments = await this.tasksService.getComments(taskId);
+        return comments.map((c) => this.toCommentResponse(c));
+    }
+    async addComment(taskId, tenantId, userId, dto) {
+        const comment = await this.tasksService.addComment(taskId, tenantId, userId, dto.body);
+        return comment ? this.toCommentResponse(comment) : null;
+    }
+    async deleteComment(taskId, commentId, tenantId) {
+        await this.tasksService.deleteComment(taskId, commentId, tenantId);
+        return { success: true };
+    }
     async findOne(id, tenantId) {
         const task = await this.tasksService.findByIdInOrganization(id, tenantId);
+        if (!task)
+            return null;
+        return this.toResponse(task);
+    }
+    async updateAssignee(id, tenantId, body) {
+        const task = await this.tasksService.update(id, tenantId, { assigneeId: body.assigneeId ?? null });
         if (!task)
             return null;
         return this.toResponse(task);
@@ -47,6 +93,24 @@ let TasksController = class TasksController {
         if (!task)
             return null;
         return this.toResponse(task);
+    }
+    toCommentResponse(c) {
+        return {
+            id: c.id,
+            taskId: c.taskId,
+            userId: c.userId,
+            body: c.comment,
+            createdAt: c.createdAt,
+            updatedAt: c.createdAt,
+            user: c.user
+                ? {
+                    id: c.user.id,
+                    fullName: c.user.fullName,
+                    email: c.user.email,
+                    avatarUrl: c.user.avatarUrl ?? undefined,
+                }
+                : undefined,
+        };
     }
     toResponse(t) {
         return {
@@ -66,6 +130,7 @@ let TasksController = class TasksController {
             estimatedMinutes: t.estimatedMinutes ?? undefined,
             loggedMinutes: t.loggedMinutes,
             sprintId: t.sprintId ?? undefined,
+            tags: t.tags ?? undefined,
             subtasks: t.subtasks ?? undefined,
             createdAt: t.createdAt,
             updatedAt: t.updatedAt,
@@ -91,6 +156,69 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], TasksController.prototype, "findByProject", null);
 __decorate([
+    (0, common_1.Get)('attachments/:attachmentId/file'),
+    __param(0, (0, common_1.Param)('attachmentId')),
+    __param(1, (0, tenant_decorator_1.TenantId)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:returntype", Promise)
+], TasksController.prototype, "getAttachmentFile", null);
+__decorate([
+    (0, common_1.Get)(':id/attachments'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, tenant_decorator_1.TenantId)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:returntype", Promise)
+], TasksController.prototype, "getAttachments", null);
+__decorate([
+    (0, common_1.Post)(':id/attachments'),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file', { limits: { fileSize: 10 * 1024 * 1024 } })),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, tenant_decorator_1.TenantId)()),
+    __param(2, (0, current_user_decorator_1.CurrentUserId)()),
+    __param(3, (0, common_1.UploadedFile)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String, Object]),
+    __metadata("design:returntype", Promise)
+], TasksController.prototype, "uploadAttachment", null);
+__decorate([
+    (0, common_1.Delete)(':id/attachments/:attachmentId'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Param)('attachmentId')),
+    __param(2, (0, tenant_decorator_1.TenantId)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String]),
+    __metadata("design:returntype", Promise)
+], TasksController.prototype, "deleteAttachment", null);
+__decorate([
+    (0, common_1.Get)(':id/comments'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, tenant_decorator_1.TenantId)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:returntype", Promise)
+], TasksController.prototype, "getComments", null);
+__decorate([
+    (0, common_1.Post)(':id/comments'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, tenant_decorator_1.TenantId)()),
+    __param(2, (0, current_user_decorator_1.CurrentUserId)()),
+    __param(3, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String, create_task_comment_dto_1.CreateTaskCommentDto]),
+    __metadata("design:returntype", Promise)
+], TasksController.prototype, "addComment", null);
+__decorate([
+    (0, common_1.Delete)(':id/comments/:commentId'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Param)('commentId')),
+    __param(2, (0, tenant_decorator_1.TenantId)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String]),
+    __metadata("design:returntype", Promise)
+], TasksController.prototype, "deleteComment", null);
+__decorate([
     (0, common_1.Get)(':id'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, tenant_decorator_1.TenantId)()),
@@ -98,6 +226,15 @@ __decorate([
     __metadata("design:paramtypes", [String, String]),
     __metadata("design:returntype", Promise)
 ], TasksController.prototype, "findOne", null);
+__decorate([
+    (0, common_1.Patch)(':id/assignee'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, tenant_decorator_1.TenantId)()),
+    __param(2, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, Object]),
+    __metadata("design:returntype", Promise)
+], TasksController.prototype, "updateAssignee", null);
 __decorate([
     (0, common_1.Patch)(':id'),
     __param(0, (0, common_1.Param)('id')),

@@ -320,6 +320,7 @@ export default function TasksPage() {
       assigneeId: data.assigneeIds?.[0] || undefined,
       storyPoints: data.storyPoints,
       dueDate: data.dueDate || undefined,
+      tags: data.labels?.length ? data.labels.map((l) => ({ name: l.name, color: l.color })) : undefined,
       subtasks: data.subtasks
         .map((s) => ({
           title: s.title.trim(),

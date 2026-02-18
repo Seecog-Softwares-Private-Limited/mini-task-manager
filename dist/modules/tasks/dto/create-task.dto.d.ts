@@ -6,6 +6,10 @@ declare class CreateTaskSubtaskDto {
     dueDate?: string;
     priority?: string;
 }
+declare class CreateTaskTagDto {
+    name: string;
+    color: string;
+}
 export declare class CreateTaskDto {
     projectId: string;
     organizationId: string;
@@ -17,6 +21,7 @@ export declare class CreateTaskDto {
     assigneeIds?: string[];
     parentTaskId?: string;
     sprintId?: string;
+    tags?: CreateTaskTagDto[];
     subtasks?: CreateTaskSubtaskDto[];
 }
 export {};

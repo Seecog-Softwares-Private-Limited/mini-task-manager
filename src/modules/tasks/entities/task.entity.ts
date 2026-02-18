@@ -68,6 +68,9 @@ export class TaskEntity extends BaseEntity {
   @Column({ name: 'sprint_id', type: 'binary', length: 16, transformer: uuidBinaryTransformer, nullable: true })
   sprintId!: string | null;
 
+  @Column({ type: 'simple-json', nullable: true })
+  tags!: Array<{ name: string; color: string }> | null;
+
   @ManyToOne(() => ProjectEntity, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'project_id' })
   project?: ProjectEntity;

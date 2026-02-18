@@ -7,4 +7,5 @@ export declare class UserEntity extends BaseEntity {
     avatarUrl: string | null;
     isEmailVerified: boolean;
     isActive: boolean;
+    lastSeenAt: Date | null;
 }

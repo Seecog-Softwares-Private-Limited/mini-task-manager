@@ -18,12 +18,20 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { fetchTask, updateTask } from "@/services/api/tasks.api";
+import { fetchTask, updateTask, updateTaskAssignee } from "@/services/api/tasks.api";
 import { fetchComments, addComment, deleteComment } from "@/services/api/comments.api";
 import { fetchOrgMembers } from "@/services/api/members.api";
 import { fetchActivityLogs } from "@/services/api/activity-logs.api";
+import {
+  fetchAttachments,
+  uploadAttachment,
+  deleteAttachment,
+  downloadAttachment,
+} from "@/services/api/attachments.api";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-selector";
@@ -31,6 +39,7 @@ import { SubtaskDueDatePicker } from "@/components/tasks/subtask-due-date-picker
 import { SubtaskPrioritySelector } from "@/components/tasks/subtask-priority-selector";
 import type {
   Task,
+  TaskAttachment,
   WorkflowStatus,
   OrgMember,
   TaskComment,
@@ -40,10 +49,14 @@ import type {
 } from "@/types/api";
 import {
   Calendar,
+  Check,
   Flag,
   MessageSquare,
   Paperclip,
   Hash,
+  Search,
+  UserRoundPlus,
+  UserRoundX,
   User,
   Activity,
   Loader2,
@@ -51,9 +64,25 @@ import {
   Trash2,
   CheckSquare,
   Pencil,
-  Check,
   ChevronDown,
+  ChevronRight,
+  Plus,
+  Tag,
+  X,
+  Upload,
+  FileText,
 } from "lucide-react";
+
+const TAG_COLORS = [
+  "#2563EB",
+  "#16A34A",
+  "#DC2626",
+  "#7C3AED",
+  "#EA580C",
+  "#0891B2",
+  "#E11D48",
+  "#4B5563",
+];
 
 const PRIORITIES = [
   { value: "LOW", label: "Low", color: "bg-emerald-500", border: "border-l-emerald-400/50" },
@@ -135,6 +164,23 @@ export function TaskDetailModal({
   const [editingDescription, setEditingDescription] = React.useState("");
   const [isDescriptionExpanded, setIsDescriptionExpanded] = React.useState(false);
   const descriptionInputRef = React.useRef<HTMLTextAreaElement | null>(null);
+  const [isEditingStoryPoints, setIsEditingStoryPoints] = React.useState(false);
+  const [editingStoryPointsValue, setEditingStoryPointsValue] = React.useState("");
+  const storyPointsInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [addTagOpen, setAddTagOpen] = React.useState(false);
+  const [newTagName, setNewTagName] = React.useState("");
+  const [newTagColor, setNewTagColor] = React.useState(TAG_COLORS[0]);
+  const [dragOver, setDragOver] = React.useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+  const commentTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
+  const [activityExpanded, setActivityExpanded] = React.useState(true);
+  const [assigneeDropdownOpen, setAssigneeDropdownOpen] = React.useState(false);
+  const [assigneeSearch, setAssigneeSearch] = React.useState("");
+
+  const isOnline = React.useCallback((lastSeenAt: string | undefined) => {
+    if (!lastSeenAt) return false;
+    return Date.now() - new Date(lastSeenAt).getTime() < 2 * 60 * 1000;
+  }, []);
 
   const { data: task, isLoading: taskLoading } = useQuery({
     queryKey: ["task", taskId],
@@ -149,6 +195,11 @@ export function TaskDetailModal({
     setEditingDescription(task.description ?? "");
     setIsEditingDescription(false);
     setIsDescriptionExpanded(false);
+    setIsEditingStoryPoints(false);
+    setAddTagOpen(false);
+    setNewTagName("");
+    setNewTagColor(TAG_COLORS[0]);
+    setActivityExpanded((prev) => prev);
   }, [task?.id, task?.title, task?.description]);
 
   // task data is rendered directly — no local editing state needed for read-only fields
@@ -157,7 +208,18 @@ export function TaskDetailModal({
     queryKey: ["org-members", organizationId],
     queryFn: () => fetchOrgMembers(organizationId),
     enabled: open && !!organizationId,
+    refetchInterval: 30_000,
   });
+
+  const assigneeFilteredMembers = React.useMemo(() => {
+    const q = assigneeSearch.trim().toLowerCase();
+    if (!q) return orgMembers;
+    return orgMembers.filter(
+      (m) =>
+        (m.user?.fullName ?? "").toLowerCase().includes(q) ||
+        (m.user?.email ?? "").toLowerCase().includes(q)
+    );
+  }, [orgMembers, assigneeSearch]);
 
   const { data: comments = [], isLoading: commentsLoading } = useQuery({
     queryKey: ["task-comments", taskId],
@@ -165,9 +227,23 @@ export function TaskDetailModal({
     enabled: open && !!taskId,
   });
 
+  // Auto-expand comment textarea while typing
+  React.useEffect(() => {
+    const ta = commentTextareaRef.current;
+    if (!ta) return;
+    ta.style.height = "auto";
+    ta.style.height = `${Math.min(Math.max(ta.scrollHeight, 80), 240)}px`;
+  }, [commentText]);
+
   const { data: activityData } = useQuery({
     queryKey: ["activity-logs"],
     queryFn: () => fetchActivityLogs(1, 50),
+    enabled: open && !!taskId,
+  });
+
+  const { data: attachments = [], isLoading: attachmentsLoading } = useQuery({
+    queryKey: ["task-attachments", taskId],
+    queryFn: () => fetchAttachments(taskId!),
     enabled: open && !!taskId,
   });
 
@@ -237,6 +313,20 @@ export function TaskDetailModal({
     },
   });
 
+  const assigneeMutation = useMutation({
+    mutationFn: (assigneeId: string | null) =>
+      updateTaskAssignee(taskId!, assigneeId),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["task", taskId], updated);
+      syncTaskIntoListCache(updated);
+      onTaskUpdated?.(updated);
+      toast({ title: "Assignee updated", variant: "success" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update assignee", variant: "error" });
+    },
+  });
+
   const addCommentMutation = useMutation({
     mutationFn: (text: string) => addComment(taskId!, text),
     onSuccess: () => {
@@ -287,6 +377,39 @@ export function TaskDetailModal({
       onTaskUpdated?.(updated);
     },
   });
+
+  const uploadAttachmentMutation = useMutation({
+    mutationFn: (file: File) => uploadAttachment(taskId!, file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["task-attachments", taskId] });
+      toast({ title: "File uploaded", variant: "success" });
+    },
+    onError: () => {
+      toast({ title: "Failed to upload file", variant: "error" });
+    },
+  });
+
+  const deleteAttachmentMutation = useMutation({
+    mutationFn: (attachmentId: string) => deleteAttachment(taskId!, attachmentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["task-attachments", taskId] });
+      toast({ title: "Attachment removed", variant: "default" });
+    },
+    onError: () => {
+      toast({ title: "Failed to remove attachment", variant: "error" });
+    },
+  });
+
+  const handleFiles = React.useCallback(
+    (files: FileList | null) => {
+      if (!files?.length || !taskId) return;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (file?.size !== undefined) uploadAttachmentMutation.mutate(file);
+      }
+    },
+    [taskId, uploadAttachmentMutation]
+  );
 
   const handleFieldChange = (field: keyof Task, value: unknown) => {
     if (!task) return;
@@ -365,6 +488,60 @@ export function TaskDetailModal({
     });
   }, [isEditingDescription]);
 
+  React.useEffect(() => {
+    if (!isEditingStoryPoints) return;
+    requestAnimationFrame(() => {
+      storyPointsInputRef.current?.focus();
+      storyPointsInputRef.current?.select();
+    });
+  }, [isEditingStoryPoints]);
+
+  const startStoryPointsEdit = React.useCallback(() => {
+    setEditingStoryPointsValue(task?.storyPoints != null ? String(task.storyPoints) : "");
+    setIsEditingStoryPoints(true);
+  }, [task?.storyPoints]);
+
+  const commitStoryPointsEdit = React.useCallback(() => {
+    if (!task) return;
+    setIsEditingStoryPoints(false);
+    const raw = editingStoryPointsValue.trim();
+    if (raw === "") {
+      updateMutation.mutate({ storyPoints: null });
+      return;
+    }
+    const num = parseInt(raw, 10);
+    if (!Number.isNaN(num) && num >= 0 && num <= 100) {
+      updateMutation.mutate({ storyPoints: num });
+    } else {
+      setEditingStoryPointsValue(task.storyPoints != null ? String(task.storyPoints) : "");
+    }
+  }, [task, editingStoryPointsValue, updateMutation]);
+
+  const cancelStoryPointsEdit = React.useCallback(() => {
+    setIsEditingStoryPoints(false);
+    setEditingStoryPointsValue(task?.storyPoints != null ? String(task.storyPoints) : "");
+  }, [task?.storyPoints]);
+
+  const tagsList = task?.tags ?? [];
+  const addTag = React.useCallback(() => {
+    const name = newTagName.trim();
+    if (!name || !task) return;
+    if (tagsList.some((t) => t.name.toLowerCase() === name.toLowerCase())) return;
+    const next = [...tagsList, { name, color: newTagColor }];
+    updateMutation.mutate({ tags: next });
+    setNewTagName("");
+    setNewTagColor(TAG_COLORS[0]);
+    setAddTagOpen(false);
+  }, [task, newTagName, newTagColor, tagsList, updateMutation]);
+  const removeTag = React.useCallback(
+    (name: string) => {
+      if (!task) return;
+      const next = (task.tags ?? []).filter((t) => t.name !== name);
+      updateMutation.mutate({ tags: next });
+    },
+    [task, updateMutation]
+  );
+
   const commitDescriptionEdit = React.useCallback(() => {
     if (!task) return;
     const next = editingDescription.trim();
@@ -374,14 +551,14 @@ export function TaskDetailModal({
     updateMutation.mutate({ description: next || "" });
   }, [editingDescription, task, updateMutation]);
 
-  if (!open) return null;
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showClose={!updateMutation.isPending}
+        onEscapeKeyDown={() => onOpenChange(false)}
         className={cn(
           "max-w-5xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0 border-l-2",
+          "duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95",
           selectedPriority.border
         )}
         aria-labelledby="task-detail-title"
@@ -456,6 +633,10 @@ export function TaskDetailModal({
                         onChange={(e) => setEditingDescription(e.target.value)}
                         onBlur={commitDescriptionEdit}
                         onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            commitDescriptionEdit();
+                          }
                           if (e.key === "Escape") {
                             e.preventDefault();
                             setIsEditingDescription(false);
@@ -463,7 +644,7 @@ export function TaskDetailModal({
                           }
                         }}
                         className="mt-1.5 min-h-[96px] text-sm"
-                        placeholder="Add description..."
+                        placeholder="Add description... (Enter to save, Shift+Enter for new line)"
                         aria-label="Edit description"
                       />
                     ) : (
@@ -692,25 +873,34 @@ export function TaskDetailModal({
                     </Label>
                     <div className="mt-1.5 flex gap-2">
                       <Textarea
-                        placeholder="Write a comment... Use @ to mention a teammate"
+                        ref={commentTextareaRef}
+                        placeholder="Write a comment... Enter to send, Shift+Enter for new line"
                         value={commentText}
                         onChange={(e) => setCommentText(e.target.value)}
-                        className="min-h-[80px]"
+                        className="min-h-[80px] max-h-[240px] resize-none overflow-y-auto"
                         onKeyDown={(e) => {
                           if (e.key === "Enter" && !e.shiftKey) {
                             e.preventDefault();
-                            if (commentText.trim()) addCommentMutation.mutate(commentText.trim());
+                            if (commentText.trim()) {
+                              addCommentMutation.mutate(commentText.trim());
+                            }
                           }
                         }}
+                        rows={2}
+                        aria-label="Comment text"
                       />
                       <Button
                         size="icon"
-                        className="shrink-0 h-10 w-10"
+                        className="shrink-0 h-10 w-10 transition-transform duration-200 hover:scale-105 active:scale-95 disabled:pointer-events-none disabled:opacity-50 disabled:hover:scale-100"
                         onClick={() => commentText.trim() && addCommentMutation.mutate(commentText.trim())}
                         disabled={!commentText.trim() || addCommentMutation.isPending}
                         aria-label="Send comment"
                       >
-                        {addCommentMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                        {addCommentMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                        ) : (
+                          <Send className="h-4 w-4" />
+                        )}
                       </Button>
                     </div>
                     {commentsLoading ? (
@@ -723,16 +913,23 @@ export function TaskDetailModal({
                       <ul className="space-y-3 mt-2" role="list">
                         {comments.map((c: TaskComment) => (
                           <li key={c.id} className="flex gap-3 rounded-lg border bg-muted/30 p-3">
-                            <Avatar className="h-8 w-8 shrink-0">
-                              <AvatarImage src={c.user?.avatarUrl} />
-                              <AvatarFallback className="text-xs">
+                            <Avatar className="h-9 w-9 shrink-0 ring-2 ring-background">
+                              <AvatarImage src={c.user?.avatarUrl} alt="" />
+                              <AvatarFallback className="text-xs bg-primary/10 text-primary">
                                 {(c.user?.fullName ?? c.user?.email ?? "?").slice(0, 2).toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium">{c.user?.fullName ?? c.user?.email ?? "User"}</p>
-                              <p className="text-xs text-muted-foreground">{new Date(c.createdAt).toLocaleString()}</p>
-                              <p className="mt-1 text-sm whitespace-pre-wrap">{c.body}</p>
+                              <div className="flex flex-wrap items-baseline gap-2">
+                                <span className="text-sm font-medium">{c.user?.fullName ?? c.user?.email ?? "User"}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(c.createdAt).toLocaleString(undefined, {
+                                    dateStyle: "short",
+                                    timeStyle: "short",
+                                  })}
+                                </span>
+                              </div>
+                              <p className="mt-1 text-sm whitespace-pre-wrap text-foreground">{c.body}</p>
                             </div>
                             <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => deleteCommentMutation.mutate(c.id)} disabled={deleteCommentMutation.isPending} aria-label="Delete comment">
                               <Trash2 className="h-3.5 w-3.5" />
@@ -748,20 +945,106 @@ export function TaskDetailModal({
                 <div className="space-y-4 lg:border-l lg:pl-6">
                   <div>
                     <Label className="text-muted-foreground text-xs flex items-center gap-1.5"><User className="h-3.5 w-3.5" /> Assignee</Label>
-                    {(() => {
-                      const member = orgMembers.find((m) => m.userId === task.assigneeId);
-                      return (
-                        <div className="mt-1.5 flex items-center gap-2 text-sm">
-                          <Avatar className="h-5 w-5">
-                            <AvatarImage src={member?.user?.avatarUrl} />
-                            <AvatarFallback className="text-[10px]">
-                              {(member?.user?.fullName ?? member?.user?.email ?? "?").slice(0, 2).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          {member?.user?.fullName ?? member?.user?.email ?? (task.assigneeId ? "Assigned" : "Unassigned")}
+                    <DropdownMenu open={assigneeDropdownOpen} onOpenChange={(o) => { setAssigneeDropdownOpen(o); if (!o) setAssigneeSearch(""); }}>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className="mt-1.5 flex w-full items-center gap-2 rounded-md border border-transparent px-0 py-1 text-left text-sm outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
+                          aria-label="Change assignee"
+                        >
+                          {(() => {
+                            const member = orgMembers.find((m) => m.userId === task.assigneeId);
+                            const name = member?.user?.fullName ?? member?.user?.email ?? (task.assigneeId ? "Assigned" : "Unassigned");
+                            const online = member?.user?.lastSeenAt ? isOnline(member.user.lastSeenAt) : false;
+                            return (
+                              <>
+                                <div className="relative shrink-0">
+                                  <Avatar className="h-8 w-8">
+                                    <AvatarImage src={member?.user?.avatarUrl} />
+                                    <AvatarFallback className="text-xs">
+                                      {(member?.user?.fullName ?? member?.user?.email ?? "?").slice(0, 2).toUpperCase()}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <span
+                                    className={cn(
+                                      "absolute bottom-0 right-0 h-2 w-2 rounded-full border-2 border-background",
+                                      online ? "bg-emerald-500" : "bg-muted-foreground/50"
+                                    )}
+                                    title={online ? "Online" : "Offline"}
+                                    aria-hidden
+                                  />
+                                </div>
+                                <span className="min-w-0 truncate">{name}</span>
+                              </>
+                            );
+                          })()}
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-72 p-0" sideOffset={6} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+                        <div className="p-3">
+                          <DropdownMenuLabel className="px-0 pb-2 text-xs font-semibold">Reassign</DropdownMenuLabel>
+                          <div className="relative">
+                            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/70" />
+                            <Input
+                              placeholder="Search members..."
+                              value={assigneeSearch}
+                              onChange={(e) => setAssigneeSearch(e.target.value)}
+                              className="h-9 pl-8 text-xs"
+                              aria-label="Search members"
+                            />
+                          </div>
                         </div>
-                      );
-                    })()}
+                        <DropdownMenuSeparator />
+                        <div className="max-h-72 overflow-y-auto p-1">
+                          <DropdownMenuItem
+                            onSelect={(e) => { e.preventDefault(); assigneeMutation.mutate(null); setAssigneeDropdownOpen(false); }}
+                            className="rounded-md text-xs"
+                          >
+                            <UserRoundX className="mr-2 h-3.5 w-3.5" />
+                            Unassigned
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          {assigneeFilteredMembers.map((m) => {
+                            const checked = m.userId === task.assigneeId;
+                            const online = m.user?.lastSeenAt ? isOnline(m.user.lastSeenAt) : false;
+                            const displayName = m.user?.fullName ?? m.user?.email ?? "User";
+                            return (
+                              <DropdownMenuItem
+                                key={m.id}
+                                onSelect={(e) => { e.preventDefault(); assigneeMutation.mutate(m.userId); setAssigneeDropdownOpen(false); }}
+                                className="rounded-md py-2"
+                              >
+                                <div className="flex w-full items-center gap-2.5">
+                                  <div className="relative shrink-0">
+                                    <Avatar className="h-7 w-7">
+                                      <AvatarImage src={m.user?.avatarUrl} />
+                                      <AvatarFallback className="text-[10px]">{displayName.slice(0, 2).toUpperCase()}</AvatarFallback>
+                                    </Avatar>
+                                    <span
+                                      className={cn(
+                                        "absolute bottom-0 right-0 h-2 w-2 rounded-full border-2 border-background",
+                                        online ? "bg-emerald-500" : "bg-muted-foreground/50"
+                                      )}
+                                      aria-hidden
+                                    />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate text-xs font-medium">{displayName}</p>
+                                    <p className="truncate text-[11px] text-muted-foreground">{m.user?.email ?? ""}</p>
+                                  </div>
+                                  <span className={cn("flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors", checked ? "border-primary bg-primary text-white" : "border-border bg-background text-transparent")} aria-label={checked ? "Selected" : "Not selected"}>
+                                    <Check className="h-3 w-3" />
+                                  </span>
+                                </div>
+                              </DropdownMenuItem>
+                            );
+                          })}
+                          {assigneeFilteredMembers.length === 0 && (
+                            <div className="px-2 py-3 text-center text-xs text-muted-foreground">No matching members</div>
+                          )}
+                        </div>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                   <div>
                     <Label className="text-muted-foreground text-xs flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" /> Due date</Label>
@@ -829,46 +1112,297 @@ export function TaskDetailModal({
                   </div>
                   <div>
                     <Label className="text-muted-foreground text-xs flex items-center gap-1.5"><Hash className="h-3.5 w-3.5" /> Story points</Label>
-                    <p className="mt-1.5 text-sm">{task.storyPoints ?? "—"}</p>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground text-xs">Tags</Label>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      <Badge variant="outline" className="text-xs">+ Add tag</Badge>
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground text-xs flex items-center gap-1.5"><Paperclip className="h-3.5 w-3.5" /> Attachments</Label>
-                    <div className="mt-1.5 rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
-                      Drag files or click to upload. (Coming soon.)
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground text-xs flex items-center gap-1.5"><Activity className="h-3.5 w-3.5" /> Activity</Label>
-                    {activityLogs.length === 0 ? (
-                      <p className="text-sm text-muted-foreground mt-1.5">No recent activity.</p>
+                    {isEditingStoryPoints ? (
+                      <Input
+                        ref={storyPointsInputRef}
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={editingStoryPointsValue}
+                        onChange={(e) => setEditingStoryPointsValue(e.target.value)}
+                        onBlur={commitStoryPointsEdit}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            commitStoryPointsEdit();
+                          }
+                          if (e.key === "Escape") {
+                            e.preventDefault();
+                            cancelStoryPointsEdit();
+                          }
+                        }}
+                        className="mt-1.5 h-9 w-24 font-mono"
+                        aria-label="Edit story points"
+                      />
                     ) : (
-                      <ul className="space-y-2 mt-1.5" role="list">
-                        {activityLogs.slice(0, 8).map((log: ActivityLog) => (
-                          <li key={log.id} className="flex items-start gap-2 text-sm text-muted-foreground">
-                            <Activity className="h-4 w-4 shrink-0 mt-0.5" />
-                            <span className="flex-1 min-w-0">
-                              {log.action}
-                              {log.metadata && typeof log.metadata === "object" && "details" in log.metadata ? ` — ${String((log.metadata as { details?: string }).details ?? "")}` : ""}
-                            </span>
-                            <span className="shrink-0 text-xs">{new Date(log.createdAt).toLocaleString()}</span>
-                          </li>
-                        ))}
-                      </ul>
+                      <button
+                        type="button"
+                        onClick={startStoryPointsEdit}
+                        className="group mt-1.5 flex w-fit items-center gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-muted/40"
+                      >
+                        {task.storyPoints != null && task.storyPoints >= 0 ? (
+                          <Badge variant="secondary" className="font-mono text-sm tabular-nums">
+                            {task.storyPoints}
+                          </Badge>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">Not set</span>
+                        )}
+                        <Pencil className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-70" />
+                      </button>
                     )}
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-xs flex items-center gap-1.5">
+                      <Tag className="h-3.5 w-3.5" /> Tags
+                    </Label>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                      {tagsList.map((tag) => (
+                        <span
+                          key={tag.name}
+                          className="inline-flex items-center gap-1 rounded-full border pl-2.5 pr-1 py-1 text-xs font-medium text-foreground"
+                          style={{
+                            backgroundColor: `${tag.color}22`,
+                            borderColor: `${tag.color}66`,
+                          }}
+                        >
+                          <span className="min-w-0 truncate max-w-[120px]">{tag.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeTag(tag.name)}
+                            disabled={updateMutation.isPending}
+                            className="shrink-0 rounded-full p-0.5 hover:bg-black/10 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-transparent focus:ring-primary"
+                            aria-label={`Remove tag ${tag.name}`}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </span>
+                      ))}
+                      <DropdownMenu open={addTagOpen} onOpenChange={setAddTagOpen}>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={updateMutation.isPending}
+                            className="h-8 gap-1.5 text-xs"
+                          >
+                            <Plus className="h-3.5 w-3.5" /> Add tag
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                          align="start"
+                          className="w-72 p-3"
+                          sideOffset={6}
+                          onClick={(e) => e.stopPropagation()}
+                          onPointerDown={(e) => e.stopPropagation()}
+                        >
+                          <DropdownMenuLabel className="px-0 pt-0 text-xs font-semibold">
+                            New tag
+                          </DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <div className="space-y-3 pt-2">
+                            <Input
+                              value={newTagName}
+                              onChange={(e) => setNewTagName(e.target.value)}
+                              placeholder="Tag name"
+                              className="h-9 text-sm"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  addTag();
+                                }
+                              }}
+                              aria-label="Tag name"
+                            />
+                            <div className="flex flex-wrap gap-2" role="group" aria-label="Tag color">
+                              {TAG_COLORS.map((hex) => (
+                                <button
+                                  key={hex}
+                                  type="button"
+                                  onClick={() => setNewTagColor(hex)}
+                                  className="h-6 w-6 rounded-full border-2 transition-colors"
+                                  style={{
+                                    backgroundColor: hex,
+                                    borderColor: newTagColor === hex ? "hsl(var(--foreground))" : "transparent",
+                                  }}
+                                  aria-label={`Pick color ${hex}`}
+                                  aria-pressed={newTagColor === hex}
+                                />
+                              ))}
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="h-8 w-full text-xs"
+                              onClick={addTag}
+                              disabled={!newTagName.trim()}
+                            >
+                              Add tag
+                            </Button>
+                          </div>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-muted-foreground text-xs flex items-center gap-1.5">
+                      <Paperclip className="h-3.5 w-3.5" /> Attachments
+                    </Label>
+                    <div className="mt-1.5 space-y-2">
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setDragOver(true);
+                        }}
+                        onDragLeave={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setDragOver(false);
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setDragOver(false);
+                          handleFiles(e.dataTransfer.files);
+                        }}
+                        onClick={() => fileInputRef.current?.click()}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            fileInputRef.current?.click();
+                          }
+                        }}
+                        className={cn(
+                          "flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground transition-colors cursor-pointer",
+                          "border-[1px] hover:bg-muted/40 hover:border-muted-foreground/30",
+                          dragOver && "bg-primary/5 border-primary/40"
+                        )}
+                        aria-label="Upload files by drop or click"
+                      >
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          multiple
+                          className="hidden"
+                          onChange={(e) => {
+                            handleFiles(e.target.files);
+                            e.target.value = "";
+                          }}
+                          aria-hidden
+                        />
+                        <Upload className="h-8 w-8 text-muted-foreground/70" />
+                        <span>Drag files here or click to upload</span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full gap-2"
+                        disabled={uploadAttachmentMutation.isPending}
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        {uploadAttachmentMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Upload className="h-4 w-4" />
+                        )}
+                        Upload
+                      </Button>
+                      {attachmentsLoading ? (
+                        <p className="text-xs text-muted-foreground">Loading attachments…</p>
+                      ) : attachments.length > 0 ? (
+                        <ul className="space-y-1.5" role="list">
+                          {attachments.map((att: TaskAttachment) => (
+                            <li
+                              key={att.id}
+                              className="flex items-center gap-2 rounded-md border bg-muted/30 px-2.5 py-2 text-sm"
+                            >
+                              <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                              <button
+                                type="button"
+                                onClick={() => downloadAttachment(att.id, att.fileName)}
+                                className="min-w-0 flex-1 truncate text-left text-primary hover:underline"
+                              >
+                                {att.fileName}
+                              </button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 shrink-0"
+                                onClick={() => deleteAttachmentMutation.mutate(att.id)}
+                                disabled={deleteAttachmentMutation.isPending}
+                                aria-label={`Remove ${att.fileName}`}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className={cn(activityLogs.length === 0 && "space-y-0")}>
+                    <button
+                      type="button"
+                      onClick={() => setActivityExpanded((e) => !e)}
+                      className="flex w-full items-center gap-1.5 rounded-md py-0.5 pr-1 text-left text-muted-foreground text-xs transition-colors hover:text-foreground hover:bg-muted/40"
+                      aria-expanded={activityExpanded}
+                      aria-controls="task-activity-content"
+                    >
+                      {activityExpanded ? (
+                        <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+                      ) : (
+                        <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+                      )}
+                      <Activity className="h-3.5 w-3.5 shrink-0" />
+                      <span className="font-medium">Activity</span>
+                      {activityLogs.length > 0 && (
+                        <span className="text-muted-foreground/70">({activityLogs.length})</span>
+                      )}
+                    </button>
+                    <div
+                      id="task-activity-content"
+                      className={cn(
+                        !activityExpanded && "hidden",
+                        activityLogs.length === 0 ? "mt-1 py-1" : "mt-1.5"
+                      )}
+                    >
+                      {activityLogs.length === 0 ? (
+                        <div className="flex items-center gap-2 py-1 text-sm text-muted-foreground/80">
+                          <Activity className="h-5 w-5 shrink-0 opacity-40" aria-hidden />
+                          <span>No recent activity.</span>
+                        </div>
+                      ) : (
+                        <ul className="space-y-2" role="list">
+                          {activityLogs.slice(0, 8).map((log: ActivityLog) => (
+                            <li key={log.id} className="flex items-start gap-2 text-sm text-muted-foreground">
+                              <Activity className="h-4 w-4 shrink-0 mt-0.5" />
+                              <span className="flex-1 min-w-0">
+                                {log.action}
+                                {log.metadata && typeof log.metadata === "object" && "details" in log.metadata ? ` — ${String((log.metadata as { details?: string }).details ?? "")}` : ""}
+                              </span>
+                              <span className="shrink-0 text-xs">{new Date(log.createdAt).toLocaleString()}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="shrink-0 border-t px-6 py-3 text-xs text-muted-foreground flex flex-wrap gap-x-4 gap-y-1">
-              <span>Created {task.createdAt && new Date(task.createdAt).toLocaleString()}</span>
-              <span>Updated {task.updatedAt && new Date(task.updatedAt).toLocaleString()}</span>
+            <div className="shrink-0 border-t px-6 py-2 flex flex-wrap justify-end gap-x-4 gap-y-0.5 text-[11px] text-muted-foreground/70">
+              {task.createdAt && (
+                <span>Created {formatRelativeTime(task.createdAt) || new Date(task.createdAt).toLocaleString()}</span>
+              )}
+              {task.updatedAt && (
+                <span>Updated {formatRelativeTime(task.updatedAt) || new Date(task.updatedAt).toLocaleString()}</span>
+              )}
             </div>
           </>
         )}

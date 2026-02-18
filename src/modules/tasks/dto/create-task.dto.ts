@@ -37,6 +37,16 @@ class CreateTaskSubtaskDto {
   priority?: string;
 }
 
+class CreateTaskTagDto {
+  @IsString()
+  @MaxLength(80)
+  name!: string;
+
+  @IsString()
+  @MaxLength(20)
+  color!: string;
+}
+
 export class CreateTaskDto {
   @IsString()
   projectId!: string;
@@ -71,6 +81,12 @@ export class CreateTaskDto {
 
   @IsOptional()
   sprintId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateTaskTagDto)
+  tags?: CreateTaskTagDto[];
 
   @IsOptional()
   @IsArray()

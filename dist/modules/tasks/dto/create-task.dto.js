@@ -44,6 +44,18 @@ __decorate([
     (0, class_validator_1.IsIn)(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
     __metadata("design:type", String)
 ], CreateTaskSubtaskDto.prototype, "priority", void 0);
+class CreateTaskTagDto {
+}
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(80),
+    __metadata("design:type", String)
+], CreateTaskTagDto.prototype, "name", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(20),
+    __metadata("design:type", String)
+], CreateTaskTagDto.prototype, "color", void 0);
 class CreateTaskDto {
 }
 exports.CreateTaskDto = CreateTaskDto;
@@ -91,6 +103,13 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", String)
 ], CreateTaskDto.prototype, "sprintId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.ValidateNested)({ each: true }),
+    (0, class_transformer_1.Type)(() => CreateTaskTagDto),
+    __metadata("design:type", Array)
+], CreateTaskDto.prototype, "tags", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsArray)(),

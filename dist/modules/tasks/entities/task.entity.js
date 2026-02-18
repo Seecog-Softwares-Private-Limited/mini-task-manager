@@ -89,6 +89,10 @@ __decorate([
     __metadata("design:type", Object)
 ], TaskEntity.prototype, "sprintId", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ type: 'simple-json', nullable: true }),
+    __metadata("design:type", Object)
+], TaskEntity.prototype, "tags", void 0);
+__decorate([
     (0, typeorm_1.ManyToOne)(() => project_entity_1.ProjectEntity, { onDelete: 'CASCADE' }),
     (0, typeorm_1.JoinColumn)({ name: 'project_id' }),
     __metadata("design:type", project_entity_1.ProjectEntity)

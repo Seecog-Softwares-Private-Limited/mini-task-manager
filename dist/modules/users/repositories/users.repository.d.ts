@@ -7,5 +7,6 @@ export declare class UsersRepository {
     findByEmail(email: string): Promise<UserEntity | null>;
     create(data: Partial<UserEntity>): Promise<UserEntity>;
     update(id: string, data: Partial<UserEntity>): Promise<void>;
+    updateLastSeen(userId: string): Promise<void>;
     deleteById(id: string): Promise<void>;
 }

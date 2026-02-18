@@ -58,6 +58,10 @@ apiClient.interceptors.request.use((req) => {
   const orgId = getStoredOrgId();
   if (token) req.headers.Authorization = `Bearer ${token}`;
   if (orgId) req.headers["X-Organization-Id"] = orgId;
+  // Let the browser set Content-Type with boundary for FormData (file uploads)
+  if (req.data instanceof FormData) {
+    delete req.headers["Content-Type"];
+  }
   return req;
 });
 

@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
+import { LastSeenInterceptor } from './modules/users/last-seen.interceptor';
 import { ConfigModule } from './config/config.module';
 import { DatabaseModule } from './infrastructure/database/database.module';
 import { HealthModule } from './infrastructure/health/health.module';
@@ -23,6 +24,7 @@ import { InvitationsModule } from './modules/invitations/invitations.module';
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_INTERCEPTOR, useClass: LastSeenInterceptor },
   ],
   imports: [
     ConfigModule,
