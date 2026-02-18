@@ -220,6 +220,10 @@ async function runSeed() {
             type: 'DONE',
         }));
         console.log('  Workflow + statuses: To Do, In Progress, Done');
+        const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+        const inThreeDays = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .slice(0, 10);
         await taskRepo.save(taskRepo.create({
             id: (0, uuid_util_1.generateUuid)(),
             projectId,
@@ -229,6 +233,25 @@ async function runSeed() {
             description: 'First task from seed',
             statusId: statusTodoId,
             priority: 'MEDIUM',
+            assigneeIds: [ownerId],
+            subtasks: [
+                {
+                    id: (0, uuid_util_1.generateUuid)(),
+                    title: 'Review onboarding checklist',
+                    completed: true,
+                    assigneeId: ownerId,
+                    priority: 'LOW',
+                    dueDate: tomorrow,
+                },
+                {
+                    id: (0, uuid_util_1.generateUuid)(),
+                    title: 'Set initial priorities',
+                    completed: false,
+                    assigneeId: memberId,
+                    priority: 'MEDIUM',
+                    dueDate: inThreeDays,
+                },
+            ],
         }));
         await taskRepo.save(taskRepo.create({
             id: (0, uuid_util_1.generateUuid)(),
@@ -236,9 +259,28 @@ async function runSeed() {
             organizationId: orgId,
             reporterId: ownerId,
             assigneeId: ownerId,
+            assigneeIds: [ownerId, adminId],
             title: 'Second task',
             statusId: statusProgressId,
             priority: 'HIGH',
+            subtasks: [
+                {
+                    id: (0, uuid_util_1.generateUuid)(),
+                    title: 'Confirm API contracts',
+                    completed: false,
+                    assigneeId: adminId,
+                    priority: 'HIGH',
+                    dueDate: tomorrow,
+                },
+                {
+                    id: (0, uuid_util_1.generateUuid)(),
+                    title: 'Ship first board polish',
+                    completed: false,
+                    assigneeId: ownerId,
+                    priority: 'CRITICAL',
+                    dueDate: inThreeDays,
+                },
+            ],
         }));
         console.log('  Tasks: 2 tasks in To Do / In Progress');
         const sprintId = (0, uuid_util_1.generateUuid)();
