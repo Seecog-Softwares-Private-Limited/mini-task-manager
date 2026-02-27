@@ -16,6 +16,8 @@ const tasks_repository_1 = require("./repositories/tasks.repository");
 const task_comments_repository_1 = require("./repositories/task-comments.repository");
 const task_attachments_repository_1 = require("./repositories/task-attachments.repository");
 const projects_service_1 = require("../projects/projects.service");
+const usage_service_1 = require("../billing/usage.service");
+const activity_logs_service_1 = require("../activity-logs/activity-logs.service");
 const pagination_1 = require("../../common/pagination");
 const uuid_util_1 = require("../../common/utils/uuid.util");
 const fs = require("fs/promises");
@@ -35,11 +37,13 @@ function sanitizeFileName(name) {
     return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 200) || 'file';
 }
 let TasksService = class TasksService {
-    constructor(tasksRepository, taskCommentsRepository, taskAttachmentsRepository, projectsService, configService) {
+    constructor(tasksRepository, taskCommentsRepository, taskAttachmentsRepository, projectsService, usageService, activityLogsService, configService) {
         this.tasksRepository = tasksRepository;
         this.taskCommentsRepository = taskCommentsRepository;
         this.taskAttachmentsRepository = taskAttachmentsRepository;
         this.projectsService = projectsService;
+        this.usageService = usageService;
+        this.activityLogsService = activityLogsService;
         this.configService = configService;
     }
     async findById(id) {
@@ -64,13 +68,13 @@ let TasksService = class TasksService {
                 : [];
         const normalizedSubtasks = this.normalizeSubtasks(dto.subtasks);
         const tags = this.normalizeTags(dto.tags);
-        return this.tasksRepository.create({
+        const task = await this.tasksRepository.create({
             projectId,
             organizationId,
             reporterId,
             title: dto.title,
             description: dto.description ?? null,
-            statusId: dto.statusId ?? null,
+            statusId: null,
             priority: dto.priority ?? 'MEDIUM',
             assigneeId: assigneeIds[0] ?? dto.assigneeId ?? null,
             assigneeIds: assigneeIds.length ? assigneeIds : null,
@@ -79,8 +83,12 @@ let TasksService = class TasksService {
             sprintId: dto.sprintId ?? null,
             tags: tags.length ? tags : null,
         });
+        this.activityLogsService
+            .log({ organizationId, userId: reporterId, entityType: 'task', entityId: task.id, action: 'create', metadata: { name: task.title } })
+            .catch(() => { });
+        return task;
     }
-    async update(taskId, organizationId, dto) {
+    async update(taskId, organizationId, dto, userId) {
         const task = await this.tasksRepository.findByIdAndOrganization(taskId, organizationId);
         if (!task)
             return null;
@@ -97,6 +105,8 @@ let TasksService = class TasksService {
         }
         if (dto.statusId !== undefined)
             patch.statusId = dto.statusId ?? null;
+        if (dto.sprintId !== undefined)
+            patch.sprintId = dto.sprintId ?? null;
         if (dto.assigneeId !== undefined) {
             patch.assigneeId = dto.assigneeId ?? null;
             patch.assigneeIds = patch.assigneeId ? [patch.assigneeId] : null;
@@ -113,6 +123,10 @@ let TasksService = class TasksService {
         }
         if (Object.keys(patch).length > 0) {
             await this.tasksRepository.update(taskId, patch);
+            const action = dto.statusId !== undefined ? 'move' : 'update';
+            this.activityLogsService
+                .log({ organizationId, userId: userId ?? undefined, entityType: 'task', entityId: taskId, action, metadata: { name: task.title } })
+                .catch(() => { });
         }
         return this.tasksRepository.findById(taskId);
     }
@@ -185,6 +199,20 @@ let TasksService = class TasksService {
             throw new common_1.ForbiddenException('File too large (max 10MB)');
         if (!isAllowedMime(file.mimetype || ''))
             throw new common_1.ForbiddenException('File type not allowed');
+        const storageMbIncrement = Math.ceil(file.size / (1024 * 1024));
+        const limitCheck = await this.usageService.checkLimit(organizationId, 'storageGb', storageMbIncrement);
+        if (!limitCheck.allowed) {
+            throw new common_1.HttpException({
+                statusCode: common_1.HttpStatus.FORBIDDEN,
+                error: 'LIMIT_EXCEEDED',
+                code: 'SUBSCRIPTION_LIMIT_EXCEEDED',
+                resource: limitCheck.resource,
+                current: limitCheck.current,
+                limit: limitCheck.limit,
+                message: limitCheck.message,
+                upgradeUrl: '/dashboard/billing',
+            }, common_1.HttpStatus.FORBIDDEN);
+        }
         const uploadsPath = this.configService.get('uploadsPath', { infer: true });
         const dir = path.join(uploadsPath, 'task-attachments', taskId);
         await fs.mkdir(dir, { recursive: true });
@@ -197,6 +225,7 @@ let TasksService = class TasksService {
             taskId,
             fileUrl: relativePath.replace(/\\/g, '/'),
             fileName: file.originalname || null,
+            fileSizeBytes: file.size,
             uploadedBy: userId,
         });
         return attachment;
@@ -232,6 +261,8 @@ exports.TasksService = TasksService = __decorate([
         task_comments_repository_1.TaskCommentsRepository,
         task_attachments_repository_1.TaskAttachmentsRepository,
         projects_service_1.ProjectsService,
+        usage_service_1.UsageService,
+        activity_logs_service_1.ActivityLogsService,
         config_1.ConfigService])
 ], TasksService);
 //# sourceMappingURL=tasks.service.js.map

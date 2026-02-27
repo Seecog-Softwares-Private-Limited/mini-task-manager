@@ -22,6 +22,7 @@ export class ActivityLogsRepository {
       order: { createdAt: 'DESC' },
       skip: getSkip(page, limit),
       take: limit,
+      relations: ['user'],
     });
   }
 

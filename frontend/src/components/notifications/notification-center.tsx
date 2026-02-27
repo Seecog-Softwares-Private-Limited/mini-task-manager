@@ -22,7 +22,7 @@ export function NotificationCenter() {
 
   if (!ctx) return null;
 
-  const { notifications, unreadCount, markRead, markAllRead } = ctx;
+  const { notifications, unreadCount, markRead, markAllRead, isLoading } = ctx;
 
   return (
     <div className="relative" ref={ref}>
@@ -51,7 +51,12 @@ export function NotificationCenter() {
             )}
           </div>
           <div className="max-h-80 overflow-y-auto">
-            {notifications.length === 0 ? (
+            {ctx.isLoading ? (
+              <div className="flex flex-col items-center justify-center py-10">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                <p className="mt-2 text-sm text-muted-foreground">Loading...</p>
+              </div>
+            ) : notifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10">
                 <Bell className="h-8 w-8 text-muted-foreground/30" />
                 <p className="mt-2 text-sm text-muted-foreground">No notifications yet.</p>
@@ -63,7 +68,7 @@ export function NotificationCenter() {
                   type="button"
                   className={cn(
                     "w-full border-b px-4 py-3 text-left text-sm transition-colors last:border-b-0 hover:bg-muted/30",
-                    !n.read && "bg-primary/5 border-l-2 border-l-primary"
+                    !n.isRead && "bg-primary/5 border-l-2 border-l-primary"
                   )}
                   onClick={() => ctx.markRead(n.id)}
                 >

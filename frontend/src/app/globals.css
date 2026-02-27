@@ -41,6 +41,14 @@
     --status-active-fg: 142 72% 26%;
     --status-archived-bg: 38 92% 50% / 0.14;
     --status-archived-fg: 38 92% 30%;
+
+    /* Plan badges */
+    --plan-free-bg: 220 14% 96%;
+    --plan-free-fg: 220 9% 46%;
+    --plan-pro-bg: 239 84% 67% / 0.15;
+    --plan-pro-fg: 239 84% 45%;
+    --plan-enterprise-bg: 280 72% 60% / 0.15;
+    --plan-enterprise-fg: 280 72% 45%;
   }
 
   .dark {
@@ -70,6 +78,12 @@
     --status-active-fg: 142 55% 62%;
     --status-archived-bg: 38 85% 40% / 0.35;
     --status-archived-fg: 38 92% 68%;
+    --plan-free-bg: 224 30% 14%;
+    --plan-free-fg: 218 11% 55%;
+    --plan-pro-bg: 239 84% 67% / 0.25;
+    --plan-pro-fg: 239 84% 75%;
+    --plan-enterprise-bg: 280 72% 60% / 0.25;
+    --plan-enterprise-fg: 280 72% 70%;
   }
 }
 
@@ -140,6 +154,31 @@
   .badge-status-archived {
     background: hsl(var(--status-archived-bg));
     color: hsl(var(--status-archived-fg));
+  }
+
+  /* Plan badges – Free / Pro / Enterprise */
+  .badge-plan-free {
+    background: hsl(var(--plan-free-bg));
+    color: hsl(var(--plan-free-fg));
+  }
+  .badge-plan-pro {
+    background: hsl(var(--plan-pro-bg));
+    color: hsl(var(--plan-pro-fg));
+  }
+  .badge-plan-enterprise {
+    background: hsl(var(--plan-enterprise-bg));
+    color: hsl(var(--plan-enterprise-fg));
+  }
+
+  /* Org role badges – Owner / Admin / Member */
+  .badge-role-owner {
+    @apply bg-amber-500/15 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400;
+  }
+  .badge-role-admin {
+    @apply bg-primary/15 text-primary dark:bg-primary/25 dark:text-primary-foreground;
+  }
+  .badge-role-member {
+    @apply bg-muted text-muted-foreground;
   }
 }
 

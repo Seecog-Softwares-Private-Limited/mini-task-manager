@@ -15,17 +15,36 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ActivityLogsController = void 0;
 const common_1 = require("@nestjs/common");
 const throttler_1 = require("@nestjs/throttler");
+const roles_decorator_1 = require("../../common/decorators/roles.decorator");
+const roles_guard_1 = require("../auth/guards/roles.guard");
 const activity_logs_service_1 = require("./activity-logs.service");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const tenant_guard_1 = require("../auth/guards/tenant.guard");
 const tenant_decorator_1 = require("../../common/decorators/tenant.decorator");
 const pagination_1 = require("../../common/pagination");
+function toResponseItem(entity) {
+    return {
+        id: entity.id,
+        organizationId: entity.organizationId,
+        userId: entity.userId,
+        entityType: entity.entityType,
+        entityId: entity.entityId,
+        action: entity.action,
+        metadata: entity.metadata,
+        createdAt: entity.createdAt,
+        user: entity.user ? { fullName: entity.user.fullName, email: entity.user.email } : null,
+    };
+}
 let ActivityLogsController = class ActivityLogsController {
     constructor(activityLogsService) {
         this.activityLogsService = activityLogsService;
     }
     async findAll(tenantId, query) {
-        return this.activityLogsService.findByOrganization(tenantId, query);
+        const result = await this.activityLogsService.findByOrganization(tenantId, query);
+        return {
+            ...result,
+            data: result.data.map((e) => toResponseItem(e)),
+        };
     }
 };
 exports.ActivityLogsController = ActivityLogsController;
@@ -40,7 +59,8 @@ __decorate([
 exports.ActivityLogsController = ActivityLogsController = __decorate([
     (0, common_1.Controller)('activity-logs'),
     (0, throttler_1.SkipThrottle)({ auth: true }),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, tenant_guard_1.TenantGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, tenant_guard_1.TenantGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('owner', 'admin'),
     __metadata("design:paramtypes", [activity_logs_service_1.ActivityLogsService])
 ], ActivityLogsController);
 //# sourceMappingURL=activity-logs.controller.js.map

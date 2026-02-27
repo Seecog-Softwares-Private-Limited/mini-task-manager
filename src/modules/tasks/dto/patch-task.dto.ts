@@ -67,6 +67,11 @@ export class PatchTaskDto {
 
   @IsOptional()
   @ValidateIf((_o, v) => v != null)
+  @IsUUID('4', { message: 'sprintId must be a valid UUID' })
+  sprintId?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_o, v) => v != null)
   @IsUUID('4', { message: 'assigneeId must be a valid UUID' })
   assigneeId?: string | null;
 

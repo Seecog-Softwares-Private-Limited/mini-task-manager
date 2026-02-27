@@ -3,7 +3,7 @@
  * Use with usePlan() + current usage (e.g. project count, member count).
  */
 
-export type LimitKey = "projects" | "members";
+export type LimitKey = "users" | "projects" | "storageGb" | "automations" | "integrations";
 
 export type FeatureGateResult = {
   allowed: boolean;

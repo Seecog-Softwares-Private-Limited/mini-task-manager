@@ -20,4 +20,10 @@ __decorate([
     (0, class_validator_1.MaxLength)(10000),
     __metadata("design:type", String)
 ], CreateTaskCommentDto.prototype, "body", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsUUID)('4', { each: true }),
+    __metadata("design:type", Array)
+], CreateTaskCommentDto.prototype, "mentionedUserIds", void 0);
 //# sourceMappingURL=create-task-comment.dto.js.map

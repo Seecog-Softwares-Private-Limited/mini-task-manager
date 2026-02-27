@@ -4,7 +4,15 @@ import { useMemo } from "react";
 import { usePlanOptional } from "@/context/plan-context";
 import { type LimitKey, type FeatureGateResult, getFeatureGateResult } from "@/lib/feature-gate";
 
-type Usage = { projects?: number; members?: number };
+type Usage = { users?: number; projects?: number; storageGb?: number; automations?: number; integrations?: number };
+
+const LIMIT_MAP: Record<LimitKey, keyof import("@/context/plan-context").PlanLimits> = {
+  users: "maxUsers",
+  projects: "maxProjects",
+  storageGb: "storageLimitGb",
+  automations: "automationLimit",
+  integrations: "integrationLimit",
+};
 
 /**
  * Returns gate result for a given limit key (e.g. "projects") and current usage.
@@ -17,10 +25,8 @@ export function useFeatureGate(
 ): FeatureGateResult {
   const plan = usePlanOptional();
   const showUpgrade = options?.showUpgradeWhenAtLimit ?? true;
-  const limit =
-    limitKey === "projects"
-      ? plan?.limits.maxProjects ?? null
-      : plan?.limits.maxMembers ?? null;
+  const limitProp = LIMIT_MAP[limitKey];
+  const limit = plan?.limits[limitProp] ?? null;
   return useMemo(
     () => getFeatureGateResult(limit, current, showUpgrade),
     [limit, current, showUpgrade]
@@ -28,18 +34,27 @@ export function useFeatureGate(
 }
 
 /**
- * Returns { canCreateProject, canAddMember, projectGate, memberGate } from plan limits and usage.
+ * Returns feature gates for all resource types from plan limits and usage.
  */
 export function useFeatureGates(usage: Usage) {
+  const usersGate = useFeatureGate("users", usage.users ?? 0);
   const projectGate = useFeatureGate("projects", usage.projects ?? 0);
-  const memberGate = useFeatureGate("members", usage.members ?? 0);
+  const storageGate = useFeatureGate("storageGb", usage.storageGb ?? 0);
+  const automationsGate = useFeatureGate("automations", usage.automations ?? 0);
+  const integrationsGate = useFeatureGate("integrations", usage.integrations ?? 0);
   return useMemo(
     () => ({
+      canAddUser: usersGate.allowed,
       canCreateProject: projectGate.allowed,
-      canAddMember: memberGate.allowed,
+      canUseStorage: storageGate.allowed,
+      canUseAutomation: automationsGate.allowed,
+      canUseIntegration: integrationsGate.allowed,
+      usersGate,
       projectGate,
-      memberGate,
+      storageGate,
+      automationsGate,
+      integrationsGate,
     }),
-    [projectGate, memberGate]
+    [usersGate, projectGate, storageGate, automationsGate, integrationsGate]
   );
 }

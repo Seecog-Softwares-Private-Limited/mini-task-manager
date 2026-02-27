@@ -2,31 +2,63 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/use-auth";
+import { useRouter } from "next/navigation";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { usePermissions } from "@/hooks/use-permissions";
 import { useTenant } from "@/context/tenant-context";
 import { usePlanOptional } from "@/context/plan-context";
-import { fetchOrganization } from "@/services/api/organizations.api";
+import { fetchOrganization, fetchOrganizations, updateOrganization, deleteOrganization } from "@/services/api/organizations.api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Building2, CreditCard, AlertTriangle, ArrowLeft, ArrowRight } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Building2, CreditCard, AlertTriangle, ArrowLeft, ArrowRight, Archive, ArchiveRestore, Trash2, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OrgSettingsTabs } from "@/components/settings/org-settings-tabs";
 
 export default function OrganizationSettingsPage() {
-  const { canManageBilling } = useAuth();
-  const { orgId } = useTenant();
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { canEditOrgSettings, isLoading: permsLoading } = usePermissions();
+  const { orgId, setOrgId } = useTenant();
   const planContext = usePlanOptional();
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const { data: org, isLoading } = useQuery({
     queryKey: ["organization", orgId ?? ""],
     queryFn: () => fetchOrganization(orgId!),
     enabled: !!orgId,
+  });
+
+  const isOwner = org?.myRole?.toLowerCase() === "owner";
+
+  const archiveMutation = useMutation({
+    mutationFn: (isArchived: boolean) => updateOrganization(orgId!, { isArchived }),
+    onSuccess: async (_data, isArchived) => {
+      queryClient.invalidateQueries({ queryKey: ["organization", orgId!] });
+      queryClient.invalidateQueries({ queryKey: ["organizations"] });
+      if (isArchived && orgId) {
+        const orgs = await queryClient.fetchQuery({ queryKey: ["organizations"], queryFn: fetchOrganizations });
+        const others = (orgs as { id: string; isArchived?: boolean }[]).filter((o) => o.id !== orgId && !o.isArchived);
+        if (others.length > 0) setOrgId(others[0].id);
+        else setOrgId(null);
+        router.refresh();
+      }
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteOrganization(orgId!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["organizations"] });
+      setOrgId(null);
+      router.push("/dashboard/organizations");
+      router.refresh();
+    },
   });
 
   if (!orgId) {
@@ -43,6 +75,29 @@ export default function OrganizationSettingsPage() {
               <p className="mt-0.5 text-sm text-muted-foreground">Choose an organization to manage settings.</p>
               <Button asChild size="sm" className="mt-3">
                 <Link href="/dashboard/organizations">Organizations</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!permsLoading && !canEditOrgSettings) {
+    return (
+      <div className="space-y-4 animate-slide-up">
+        <OrgSettingsTabs />
+        <h1 className="text-2xl font-bold tracking-tight">Organization Settings</h1>
+        <Card className="max-w-md border-dashed border-2">
+          <CardContent className="flex items-center gap-4 py-8 px-6">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 shrink-0">
+              <Shield className="h-6 w-6 text-amber-500" />
+            </div>
+            <div>
+              <p className="font-semibold">Access Restricted</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">Only owners and admins can edit organization settings.</p>
+              <Button asChild size="sm" variant="outline" className="mt-3">
+                <Link href="/dashboard/settings">Back to Settings</Link>
               </Button>
             </div>
           </CardContent>
@@ -83,7 +138,7 @@ export default function OrganizationSettingsPage() {
                   id="org-name"
                   value={name ?? org?.name ?? ""}
                   onChange={(e) => setName(e.target.value)}
-                  disabled={!canManageBilling}
+                  disabled={!canEditOrgSettings}
                   placeholder="Organization name"
                 />
               </div>
@@ -93,11 +148,11 @@ export default function OrganizationSettingsPage() {
                   id="org-slug"
                   value={slug ?? org?.slug ?? ""}
                   onChange={(e) => setSlug(e.target.value)}
-                  disabled={!canManageBilling}
+                  disabled={!canEditOrgSettings}
                   placeholder="url-slug"
                 />
               </div>
-              {canManageBilling && (
+              {canEditOrgSettings && (
                 <Button disabled>Save Changes (API not implemented)</Button>
               )}
             </>
@@ -134,23 +189,78 @@ export default function OrganizationSettingsPage() {
         </CardContent>
       </Card>
 
-      {canManageBilling && (
-        <Card className="border-destructive/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg text-destructive">
-              <AlertTriangle className="h-5 w-5" />
-              Danger Zone
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Deleting the organization will remove all projects, tasks, and data. This cannot be undone.
-            </p>
-            <Button variant="destructive" size="sm" className="mt-3" disabled>
-              Delete Organization (contact support)
-            </Button>
-          </CardContent>
-        </Card>
+      {isOwner && (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                {org?.isArchived ? <ArchiveRestore className="h-5 w-5 text-primary" /> : <Archive className="h-5 w-5 text-primary" />}
+                Archive
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                {org?.isArchived
+                  ? "Restore this organization to make it active again. It will reappear in your organization list."
+                  : "Archive this organization to hide it from your active list. You can restore it later."}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => archiveMutation.mutate(!org?.isArchived)}
+                disabled={archiveMutation.isPending}
+              >
+                {org?.isArchived ? (
+                  <>
+                    <ArchiveRestore className="mr-2 h-4 w-4" />
+                    Restore Organization
+                  </>
+                ) : (
+                  <>
+                    <Archive className="mr-2 h-4 w-4" />
+                    Archive Organization
+                  </>
+                )}
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-destructive/20">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg text-destructive">
+                <AlertTriangle className="h-5 w-5" />
+                Danger Zone
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Deleting the organization will permanently remove all projects, tasks, members, and data. This action cannot be undone.
+              </p>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="mt-3"
+                onClick={() => setDeleteConfirmOpen(true)}
+                disabled={deleteMutation.isPending}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Organization
+              </Button>
+            </CardContent>
+          </Card>
+
+          <ConfirmDialog
+            open={deleteConfirmOpen}
+            onOpenChange={setDeleteConfirmOpen}
+            title="Delete organization?"
+            description={`Are you sure you want to permanently delete "${org?.name}"? All projects, tasks, members, and data will be removed. This cannot be undone.`}
+            confirmLabel="Delete permanently"
+            variant="destructive"
+            onConfirm={() => { deleteMutation.mutateAsync(); }}
+            loading={deleteMutation.isPending}
+          />
+        </>
       )}
 
       <Button variant="ghost" size="sm" asChild className="text-muted-foreground">

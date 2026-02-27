@@ -41,10 +41,16 @@ export async function createTask(payload: CreateTaskPayload): Promise<Task> {
   return data;
 }
 
+export interface FetchTasksByProjectOptions {
+  /** Pass when fetching tasks for a project in a different org (e.g. org dashboard). */
+  organizationId?: string;
+}
+
 export async function fetchTasksByProject(
   projectId: string,
   page = 1,
-  limit = 100
+  limit = 100,
+  options?: FetchTasksByProjectOptions
 ): Promise<PaginatedResult<Task>> {
   // Backend paginated DTO enforces numeric bounds; keep requests in safe range.
   const safePage = Number.isFinite(page) ? Math.max(1, Math.trunc(page)) : 1;
@@ -52,8 +58,13 @@ export async function fetchTasksByProject(
     ? Math.min(100, Math.max(1, Math.trunc(limit)))
     : 100;
 
+  const headers = options?.organizationId
+    ? { "X-Organization-Id": options.organizationId }
+    : undefined;
+
   const { data } = await apiClient.get<PaginatedResult<Task>>(`/tasks/project/${projectId}`, {
     params: { page: safePage, limit: safeLimit },
+    ...(headers && { headers }),
   });
   return data;
 }
@@ -65,6 +76,7 @@ export interface UpdateTaskPayload {
   title?: string;
   description?: string;
   statusId?: string | null;
+  sprintId?: string | null;
   priority?: string;
   assigneeId?: string | null;
   dueDate?: string | null;
@@ -81,6 +93,7 @@ export async function updateTask(
   if (payload.title !== undefined) body.title = payload.title;
   if (payload.description !== undefined) body.description = payload.description;
   if (payload.statusId !== undefined) body.statusId = payload.statusId;
+  if (payload.sprintId !== undefined) body.sprintId = payload.sprintId;
   if (payload.assigneeId !== undefined) body.assigneeId = payload.assigneeId;
   if (payload.storyPoints !== undefined) body.storyPoints = payload.storyPoints;
   if (payload.tags !== undefined) body.tags = payload.tags;
@@ -94,6 +107,19 @@ export async function updateTaskStatus(
   statusId: string | null
 ): Promise<Task | null> {
   const { data } = await apiClient.patch<Task | null>(`/tasks/${taskId}`, { statusId });
+  return data;
+}
+
+/** Update task status and/or sprint (for Scrum board moves). */
+export async function updateTaskStatusAndSprint(
+  taskId: string,
+  statusId: string,
+  sprintId: string | null
+): Promise<Task | null> {
+  const { data } = await apiClient.patch<Task | null>(`/tasks/${taskId}`, {
+    statusId,
+    sprintId,
+  });
   return data;
 }
 

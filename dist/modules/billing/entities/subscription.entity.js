@@ -30,25 +30,45 @@ __decorate([
     __metadata("design:type", String)
 ], SubscriptionEntity.prototype, "planId", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: 'billing_cycle', type: 'varchar', length: 20, default: 'monthly' }),
+    __metadata("design:type", String)
+], SubscriptionEntity.prototype, "billingCycle", void 0);
+__decorate([
     (0, typeorm_1.Column)({ type: 'varchar', length: 50, default: 'TRIAL' }),
     __metadata("design:type", String)
 ], SubscriptionEntity.prototype, "status", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'start_date', type: 'date', nullable: true }),
+    (0, typeorm_1.Column)({ name: 'start_date', type: 'timestamp', nullable: true }),
     __metadata("design:type", Object)
 ], SubscriptionEntity.prototype, "startDate", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'end_date', type: 'date', nullable: true }),
+    (0, typeorm_1.Column)({ name: 'end_date', type: 'timestamp', nullable: true }),
     __metadata("design:type", Object)
 ], SubscriptionEntity.prototype, "endDate", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'trial_ends_at', type: 'date', nullable: true }),
+    (0, typeorm_1.Column)({ name: 'trial_ends_at', type: 'timestamp', nullable: true }),
     __metadata("design:type", Object)
 ], SubscriptionEntity.prototype, "trialEndsAt", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'razorpay_subscription_id', type: 'varchar', length: 255, nullable: true }),
+    __metadata("design:type", Object)
+], SubscriptionEntity.prototype, "razorpaySubscriptionId", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'razorpay_customer_id', type: 'varchar', length: 255, nullable: true }),
+    __metadata("design:type", Object)
+], SubscriptionEntity.prototype, "razorpayCustomerId", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'cancelled_at', type: 'timestamp', nullable: true }),
+    __metadata("design:type", Object)
+], SubscriptionEntity.prototype, "cancelledAt", void 0);
 __decorate([
     (0, typeorm_1.Column)({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' }),
     __metadata("design:type", Date)
 ], SubscriptionEntity.prototype, "createdAt", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'updated_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP', onUpdate: 'CURRENT_TIMESTAMP' }),
+    __metadata("design:type", Date)
+], SubscriptionEntity.prototype, "updatedAt", void 0);
 __decorate([
     (0, typeorm_1.ManyToOne)(() => organization_entity_1.OrganizationEntity, { onDelete: 'CASCADE' }),
     (0, typeorm_1.JoinColumn)({ name: 'organization_id' }),

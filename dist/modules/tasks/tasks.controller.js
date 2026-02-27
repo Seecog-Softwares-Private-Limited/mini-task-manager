@@ -11,6 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
+var TasksController_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TasksController = void 0;
 const common_1 = require("@nestjs/common");
@@ -18,6 +19,10 @@ const platform_express_1 = require("@nestjs/platform-express");
 const throttler_1 = require("@nestjs/throttler");
 const fs_1 = require("fs");
 const tasks_service_1 = require("./tasks.service");
+const email_service_1 = require("../invitations/email.service");
+const users_service_1 = require("../users/users.service");
+const projects_service_1 = require("../projects/projects.service");
+const notifications_service_1 = require("../notifications/notifications.service");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const tenant_guard_1 = require("../auth/guards/tenant.guard");
 const tenant_decorator_1 = require("../../common/decorators/tenant.decorator");
@@ -26,14 +31,23 @@ const create_task_dto_1 = require("./dto/create-task.dto");
 const create_task_comment_dto_1 = require("./dto/create-task-comment.dto");
 const patch_task_dto_1 = require("./dto/patch-task.dto");
 const pagination_1 = require("../../common/pagination");
-let TasksController = class TasksController {
-    constructor(tasksService) {
+let TasksController = TasksController_1 = class TasksController {
+    constructor(tasksService, emailService, usersService, projectsService, notificationsService) {
         this.tasksService = tasksService;
+        this.emailService = emailService;
+        this.usersService = usersService;
+        this.projectsService = projectsService;
+        this.notificationsService = notificationsService;
+        this.logger = new common_1.Logger(TasksController_1.name);
     }
     async create(dto, reporterId) {
         const projectId = dto.projectId;
         const organizationId = dto.organizationId;
         const task = await this.tasksService.create(projectId, organizationId, reporterId, dto);
+        const assigneeIds = task.assigneeIds ?? (task.assigneeId ? [task.assigneeId] : []);
+        if (assigneeIds.length > 0) {
+            this.notifyAssignees(assigneeIds, reporterId, task.title, task.id, projectId).catch((err) => this.logger.warn(`Failed to send assignment notifications: ${err}`));
+        }
         return this.toResponse(task);
     }
     async findByProject(projectId, tenantId, query) {
@@ -70,7 +84,14 @@ let TasksController = class TasksController {
     }
     async addComment(taskId, tenantId, userId, dto) {
         const comment = await this.tasksService.addComment(taskId, tenantId, userId, dto.body);
-        return comment ? this.toCommentResponse(comment) : null;
+        if (comment) {
+            const task = await this.tasksService.findByIdInOrganization(taskId, tenantId);
+            if (task) {
+                this.notifyCommentObservers(task, userId, dto.mentionedUserIds ?? []).catch((err) => this.logger.warn(`Comment notification failed: ${err}`));
+            }
+            return this.toCommentResponse(comment);
+        }
+        return null;
     }
     async deleteComment(taskId, commentId, tenantId) {
         await this.tasksService.deleteComment(taskId, commentId, tenantId);
@@ -82,17 +103,72 @@ let TasksController = class TasksController {
             return null;
         return this.toResponse(task);
     }
-    async updateAssignee(id, tenantId, body) {
-        const task = await this.tasksService.update(id, tenantId, { assigneeId: body.assigneeId ?? null });
+    async updateAssignee(id, tenantId, currentUserId, body) {
+        const task = await this.tasksService.update(id, tenantId, { assigneeId: body.assigneeId ?? null }, currentUserId);
+        if (!task)
+            return null;
+        if (body.assigneeId) {
+            this.notifyAssignees([body.assigneeId], currentUserId, task.title, task.id, task.projectId).catch((err) => this.logger.warn(`Failed to send assignment notifications: ${err}`));
+        }
+        return this.toResponse(task);
+    }
+    async update(id, tenantId, userId, dto) {
+        const task = await this.tasksService.update(id, tenantId, dto, userId);
         if (!task)
             return null;
         return this.toResponse(task);
     }
-    async update(id, tenantId, dto) {
-        const task = await this.tasksService.update(id, tenantId, dto);
-        if (!task)
-            return null;
-        return this.toResponse(task);
+    async notifyCommentObservers(task, commenterUserId, mentionedUserIds = []) {
+        const [commenter, project] = await Promise.all([
+            this.usersService.findById(commenterUserId),
+            this.projectsService.findById(task.projectId),
+        ]);
+        const commenterName = commenter?.fullName || commenter?.email || 'Someone';
+        const projectName = project?.name;
+        const assigneeIds = task.assigneeIds ?? (task.assigneeId ? [task.assigneeId] : []);
+        const toNotify = new Set([
+            ...assigneeIds,
+            task.reporterId,
+            ...mentionedUserIds,
+        ].filter(Boolean));
+        toNotify.delete(commenterUserId);
+        for (const targetId of toNotify) {
+            const isMention = mentionedUserIds.includes(targetId);
+            const title = isMention
+                ? `${commenterName} mentioned you in "${task.title}"`
+                : `New comment on "${task.title}"`;
+            const message = isMention
+                ? `${commenterName} mentioned you in "${task.title}"${projectName ? ` in ${projectName}` : ''}.`
+                : `${commenterName} commented on "${task.title}"${projectName ? ` in ${projectName}` : ''}.`;
+            await this.notificationsService.createNotification(targetId, title, message);
+        }
+    }
+    async notifyAssignees(assigneeIds, assignerUserId, taskTitle, taskId, projectId) {
+        const [assigner, project] = await Promise.all([
+            this.usersService.findById(assignerUserId),
+            this.projectsService.findById(projectId),
+        ]);
+        const assignerName = assigner?.fullName || assigner?.email || 'Someone';
+        const projectName = project?.name;
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+        const taskUrl = `${frontendUrl}/dashboard/projects/${projectId}/board?task=${taskId}`;
+        for (const assigneeId of assigneeIds) {
+            if (assigneeId === assignerUserId)
+                continue;
+            const assignee = await this.usersService.findById(assigneeId);
+            if (!assignee?.email)
+                continue;
+            const assigneeName = assignee.fullName || assignee.email;
+            await this.notificationsService.createNotification(assigneeId, `Task assigned: ${taskTitle}`, `${assignerName} assigned you to "${taskTitle}"${projectName ? ` in ${projectName}` : ''}.`).catch((err) => this.logger.warn(`In-app notification failed: ${err}`));
+            await this.emailService.sendTaskAssignment({
+                to: assignee.email,
+                assigneeName,
+                taskTitle,
+                projectName,
+                assignerName,
+                taskUrl,
+            }).catch((err) => this.logger.warn(`Task assignment email failed for ${assignee.email}: ${err}`));
+        }
     }
     toCommentResponse(c) {
         return {
@@ -230,24 +306,30 @@ __decorate([
     (0, common_1.Patch)(':id/assignee'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, tenant_decorator_1.TenantId)()),
-    __param(2, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUserId)()),
+    __param(3, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, Object]),
+    __metadata("design:paramtypes", [String, String, String, Object]),
     __metadata("design:returntype", Promise)
 ], TasksController.prototype, "updateAssignee", null);
 __decorate([
     (0, common_1.Patch)(':id'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, tenant_decorator_1.TenantId)()),
-    __param(2, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUserId)()),
+    __param(3, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, patch_task_dto_1.PatchTaskDto]),
+    __metadata("design:paramtypes", [String, String, String, patch_task_dto_1.PatchTaskDto]),
     __metadata("design:returntype", Promise)
 ], TasksController.prototype, "update", null);
-exports.TasksController = TasksController = __decorate([
+exports.TasksController = TasksController = TasksController_1 = __decorate([
     (0, common_1.Controller)('tasks'),
     (0, throttler_1.SkipThrottle)({ auth: true }),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, tenant_guard_1.TenantGuard),
-    __metadata("design:paramtypes", [tasks_service_1.TasksService])
+    __metadata("design:paramtypes", [tasks_service_1.TasksService,
+        email_service_1.EmailService,
+        users_service_1.UsersService,
+        projects_service_1.ProjectsService,
+        notifications_service_1.NotificationsService])
 ], TasksController);
 //# sourceMappingURL=tasks.controller.js.map

@@ -34,4 +34,9 @@ export class NotificationsRepository {
   async markAsRead(id: string): Promise<void> {
     await this.repo.update(id, { isRead: true });
   }
+
+  async markAllAsReadByUser(userId: string): Promise<number> {
+    const result = await this.repo.update({ userId, isRead: false }, { isRead: true });
+    return result.affected ?? 0;
+  }
 }

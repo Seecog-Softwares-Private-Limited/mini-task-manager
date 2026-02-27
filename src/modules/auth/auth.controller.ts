@@ -1,10 +1,19 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Req, Res } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
+import { AuthGuard } from '@nestjs/passport';
+import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { SignupWithInviteDto } from './dto/signup-with-invite.dto';
+import { PublicSignupDto } from './dto/public-signup.dto';
+import { VerifyEmailDto } from './dto/verify-email.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+import { SendOtpDto } from './dto/send-otp.dto';
+import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { GoogleConfigGuard } from './guards/google-config.guard';
 import { Public } from '../../common/decorators/public.decorator';
 
 @Controller('auth')
@@ -20,6 +29,41 @@ export class AuthController {
 
   @Public()
   @SkipThrottle({ default: true })
+  @Post('signup')
+  async signup(@Body() dto: PublicSignupDto): Promise<{ message: string }> {
+    return this.authService.signup(dto);
+  }
+
+  @Public()
+  @SkipThrottle({ default: true })
+  @Post('verify-email')
+  async verifyEmail(@Body() dto: VerifyEmailDto): Promise<{ message: string }> {
+    return this.authService.verifyEmail(dto.token);
+  }
+
+  @Public()
+  @SkipThrottle({ default: true })
+  @Post('resend-verification')
+  async resendVerification(@Body() dto: ForgotPasswordDto): Promise<{ message: string }> {
+    return this.authService.resendVerificationEmail(dto.email);
+  }
+
+  @Public()
+  @SkipThrottle({ default: true })
+  @Post('forgot-password')
+  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<{ message: string }> {
+    return this.authService.requestPasswordReset(dto.email);
+  }
+
+  @Public()
+  @SkipThrottle({ default: true })
+  @Post('reset-password')
+  async resetPassword(@Body() dto: ResetPasswordDto): Promise<{ message: string }> {
+    return this.authService.resetPassword(dto.token, dto.password);
+  }
+
+  @Public()
+  @SkipThrottle({ default: true })
   @Post('signup-with-invite')
   async signupWithInvite(@Body() dto: SignupWithInviteDto): Promise<LoginResponseDto> {
     return this.authService.signupWithInvite(dto);
@@ -30,5 +74,37 @@ export class AuthController {
   @Post('logout')
   async logout(): Promise<{ message: string }> {
     return { message: 'Logged out' };
+  }
+
+  @Public()
+  @SkipThrottle({ default: true })
+  @Post('send-otp')
+  async sendOtp(@Body() dto: SendOtpDto): Promise<{ message: string }> {
+    return this.authService.sendOtp(dto.phone);
+  }
+
+  @Public()
+  @SkipThrottle({ default: true })
+  @Post('verify-otp')
+  async verifyOtp(@Body() dto: VerifyOtpDto): Promise<LoginResponseDto> {
+    return this.authService.verifyOtp(dto.phone, dto.code);
+  }
+
+  @Public()
+  @SkipThrottle({ default: true })
+  @Get('google')
+  @UseGuards(GoogleConfigGuard, AuthGuard('google'))
+  async googleAuth() {
+    // Guard redirects to Google
+  }
+
+  @Public()
+  @SkipThrottle({ default: true })
+  @Get('google/callback')
+  @UseGuards(GoogleConfigGuard, AuthGuard('google'))
+  async googleAuthCallback(@Req() req: { user: { id: string; email: string; fullName: string } }, @Res() res: Response) {
+    const token = await this.authService.loginWithGoogleUser(req.user);
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+    res.redirect(`${frontendUrl}/auth/callback?token=${encodeURIComponent(token)}`);
   }
 }

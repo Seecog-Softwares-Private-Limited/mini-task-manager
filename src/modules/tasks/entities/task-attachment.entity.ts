@@ -17,6 +17,9 @@ export class TaskAttachmentEntity {
   @Column({ name: 'file_name', type: 'varchar', length: 255, nullable: true })
   fileName!: string | null;
 
+  @Column({ name: 'file_size_bytes', type: 'bigint', nullable: true, default: 0 })
+  fileSizeBytes!: number | null;
+
   @Column({ name: 'uploaded_by', type: 'binary', length: 16, transformer: uuidBinaryTransformer })
   uploadedBy!: string;
 

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/invite"];
+const PUBLIC_PATHS = ["/", "/login", "/signup", "/invite", "/forgot-password", "/reset-password", "/verify-email", "/auth/callback"];
 function isPublic(pathname: string) {
-  return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
+  if (pathname === "/") return true;
+  return PUBLIC_PATHS.some((p) => p !== "/" && (pathname === p || pathname.startsWith(p + "/")));
 }
 
 export function middleware(request: NextRequest) {

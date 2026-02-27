@@ -6,8 +6,10 @@ export declare class OrganizationMembersRepository implements IOrganizationMembe
     constructor(repo: Repository<OrganizationMemberEntity>);
     findByOrganizationAndUser(organizationId: string, userId: string): Promise<OrganizationMemberEntity | null>;
     findByOrganization(organizationId: string): Promise<OrganizationMemberEntity[]>;
+    countByOrganization(organizationId: string): Promise<number>;
     findByOrganizationWithUser(organizationId: string): Promise<OrganizationMemberEntity[]>;
     findByUser(userId: string): Promise<OrganizationMemberEntity[]>;
+    findById(id: string): Promise<OrganizationMemberEntity | null>;
     create(data: Partial<OrganizationMemberEntity>): Promise<OrganizationMemberEntity>;
     update(id: string, data: Partial<OrganizationMemberEntity>): Promise<void>;
 }

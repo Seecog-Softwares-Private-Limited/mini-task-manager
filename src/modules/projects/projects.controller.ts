@@ -2,10 +2,14 @@ import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, Logger } 
 import { SkipThrottle } from '@nestjs/throttler';
 import { ProjectsService } from './projects.service';
 import { WorkflowsService } from '../workflows/workflows.service';
+import { OrganizationsService } from '../organizations/organizations.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { ProjectEntity } from './entities/project.entity';
 import { ProjectMemberEntity } from './entities/project-member.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
+import { SubscriptionGuard } from '../billing/guards/subscription.guard';
+import { CheckSubscriptionLimit } from '../billing/decorators/check-limit.decorator';
 import { TenantId } from '../../common/decorators/tenant.decorator';
 import { CurrentUserId } from '../../common/decorators/current-user.decorator';
 import { CreateProjectDto } from './dto/create-project.dto';
@@ -23,9 +27,13 @@ export class ProjectsController {
   constructor(
     private readonly projectsService: ProjectsService,
     private readonly workflowsService: WorkflowsService,
+    private readonly organizationsService: OrganizationsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   @Post()
+  @UseGuards(SubscriptionGuard)
+  @CheckSubscriptionLimit('projects')
   async create(
     @Body() dto: CreateProjectDto,
     @TenantId() tenantId?: string,
@@ -49,20 +57,75 @@ export class ProjectsController {
     return list.map((p) => this.toResponse(p));
   }
 
+  @Get('count')
+  async getCount(@TenantId() tenantId?: string): Promise<{ count: number }> {
+    const count = await this.projectsService.countByOrganization(tenantId!);
+    return { count };
+  }
+
+  @Get('templates')
+  async getTemplates(): Promise<{ id: string; name: string; description: string }[]> {
+    return [
+      { id: 'blank', name: 'Blank', description: 'Start with an empty project' },
+      { id: 'kanban', name: 'Kanban', description: 'To Do, In Progress, Done workflow' },
+      { id: 'product', name: 'Product Development', description: 'Ideas, Backlog, In Progress, Review, Done' },
+    ];
+  }
+
   // ── Project Members (must come before :id catch-all) ──
 
   @Get(':id/members')
-  async getMembers(@Param('id') projectId: string) {
-    const members = await this.projectsService.getProjectMembers(projectId);
-    return members.map((m) => this.toMemberResponse(m));
+  async getMembers(
+    @Param('id') projectId: string,
+    @TenantId() tenantId?: string,
+  ) {
+    // First try explicit project members
+    const projectMembers = await this.projectsService.getProjectMembers(projectId);
+    if (projectMembers.length > 0) {
+      return projectMembers.map((m) => this.toMemberResponse(m));
+    }
+
+    // Fall back to all ACTIVE organization members so any org member can be assigned
+    if (tenantId) {
+      const orgMembers = await this.organizationsService.getMembers(tenantId);
+      return orgMembers
+        .filter((om) => om.status === 'ACTIVE')
+        .map((om) => ({
+          id: om.id,
+          projectId,
+          userId: om.userId,
+          role: om.role,
+          user: om.user
+            ? {
+                id: om.user.id,
+                fullName: om.user.fullName,
+                email: om.user.email,
+                avatarUrl: om.user.avatarUrl ?? undefined,
+              }
+            : undefined,
+        }));
+    }
+
+    return [];
   }
 
   @Post(':id/members')
   async addMember(
     @Param('id') projectId: string,
     @Body() dto: AddProjectMemberDto,
+    @CurrentUserId() addedByUserId: string,
   ) {
     const member = await this.projectsService.addProjectMember(projectId, dto.userId, dto.role);
+    const project = await this.projectsService.findById(projectId);
+    if (project && dto.userId !== addedByUserId) {
+      this.notificationsService
+        .createNotification(
+          dto.userId,
+          'Added to project',
+          `You were added to "${project.name}".`,
+        )
+        .catch((err) => this.logger.warn(`Notification failed: ${err}`));
+    }
     return this.toMemberResponse(member);
   }
 
@@ -81,6 +144,15 @@ export class ProjectsController {
     return { success: true };
   }
 
+  @Post(':id/seed-demo-tasks')
+  async seedDemoTasks(
+    @Param('id') projectId: string,
+    @TenantId() tenantId?: string,
+    @CurrentUserId() userId?: string,
+  ) {
+    return this.projectsService.seedDemoTasks(projectId, tenantId!, userId!);
+  }
+
   @Get(':id')
   async findOne(
     @Param('id') id: string,
@@ -96,8 +168,9 @@ export class ProjectsController {
     @Param('id') id: string,
     @Body() dto: UpdateProjectDto,
     @TenantId() tenantId?: string,
+    @CurrentUserId() userId?: string,
   ): Promise<ProjectResponseDto> {
-    const project = await this.projectsService.update(id, tenantId!, dto);
+    const project = await this.projectsService.update(id, tenantId!, dto, userId);
     return this.toResponse(project);
   }
 

@@ -4,12 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
+import { usePermissions } from "@/hooks/use-permissions";
 import { useTenant } from "@/context/tenant-context";
 import { usePlanOptional } from "@/context/plan-context";
 import { logout } from "@/services/api/auth.api";
 import { clearAuth } from "@/services/api/client";
 import { TenantGuard } from "@/components/tenant-guard";
 import { Sidebar } from "@/components/dashboard/sidebar";
+import { OrgSwitcher } from "@/components/dashboard/org-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { CommandPalette } from "@/components/command-palette";
 import { NotificationCenter } from "@/components/notifications/notification-center";
@@ -23,7 +25,7 @@ import type { AppRole } from "@/hooks/use-auth";
 import {
   LayoutDashboard, Building2, FolderKanban, ListTodo, Bell,
   CreditCard, Activity, BarChart3, ClipboardList, Settings,
-  Menu, PanelLeftClose, PanelLeft, LogOut, User,
+  Menu, PanelLeftClose, PanelLeft, LogOut, User, Sparkles,
 } from "lucide-react";
 
 const nav: {
@@ -33,34 +35,39 @@ const nav: {
   requiredRole?: AppRole;
   billingOnly?: boolean;
   adminOnly?: boolean;
+  section?: string;
 }[] = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/organizations", label: "Organizations", icon: Building2 },
   { href: "/dashboard/projects", label: "Projects", icon: FolderKanban },
   { href: "/dashboard/tasks", label: "Tasks", icon: ListTodo },
   { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
-  { href: "/dashboard/billing", label: "Billing", icon: CreditCard, billingOnly: true },
   { href: "/dashboard/activity", label: "Activity", icon: Activity },
   { href: "/dashboard/audit", label: "Audit log", icon: ClipboardList, adminOnly: true },
   { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3, adminOnly: true },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
+  // Billing section
+  { href: "/dashboard/plans", label: "Plans & Pricing", icon: Sparkles, section: "billing" },
+  { href: "/dashboard/billing", label: "Billing", icon: CreditCard, section: "billing", billingOnly: true },
 ];
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { user, hasRole, canManageBilling } = useAuth();
+  const { user, hasRole } = useAuth();
   const { orgId } = useTenant();
+  const { canManageBilling, canViewAudit } = usePermissions();
   const planContext = usePlanOptional();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const visibleNav = nav
     .filter((item) => {
-      if (item.billingOnly || item.adminOnly) return canManageBilling;
+      if (item.billingOnly) return canManageBilling;
+      if (item.adminOnly) return canViewAudit; // audit + analytics: owner/admin only
       if (item.requiredRole) return hasRole(item.requiredRole);
       return true;
     })
-    .map(({ href, label, icon }) => ({ href, label, icon }));
+    .map(({ href, label, icon, section }) => ({ href, label, icon, section }));
 
   async function handleLogout() {
     try {
@@ -114,6 +121,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             )}
           </Button>
 
+          <div className="hidden sm:block border-l border-border/60 pl-3 ml-1">
+            <OrgSwitcher variant="navbar" />
+          </div>
+
           <div className="flex-1" />
 
           <div className="flex items-center gap-2">
@@ -121,13 +132,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <StreakBadge className="hidden sm:inline-flex" />
             <CommandPalette />
             <NotificationCenter />
-            {planContext?.plan && (
+            {(planContext?.plan || planContext?.subscription?.planName) && (
               <Link
                 href="/dashboard/billing"
                 className="rounded-full gradient-bg px-3 py-1 text-[11px] font-semibold text-white shadow-sm hover:shadow-md transition-shadow"
                 title="Current plan"
               >
-                {planContext.plan.name}
+                {planContext.plan?.name ?? planContext.subscription?.planName ?? "Free"}
               </Link>
             )}
             {user?.email && (

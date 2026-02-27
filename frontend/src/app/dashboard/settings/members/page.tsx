@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTenant } from "@/context/tenant-context";
+import { usePermissions } from "@/hooks/use-permissions";
 import { fetchOrganization } from "@/services/api/organizations.api";
 import { transferOrganizationOwnership } from "@/services/api/organizations.api";
 import {
@@ -43,6 +44,7 @@ import {
   Crown,
   Send,
   Loader2,
+  Shield,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -59,6 +61,7 @@ const ROLE_OPTIONS = [
 
 export default function SettingsMembersPage() {
   const { orgId } = useTenant();
+  const { canInviteMembers, isLoading: permsLoading } = usePermissions();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [search, setSearch] = React.useState("");
@@ -146,6 +149,32 @@ export default function SettingsMembersPage() {
   });
 
   const isOwner = (m: OrgMember) => org?.ownerId === m.userId;
+
+  if (!permsLoading && !canInviteMembers) {
+    return (
+      <div className="space-y-6 animate-slide-up">
+        <OrgSettingsTabs />
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Members</h1>
+          <p className="mt-1 text-muted-foreground">Invite members, manage roles, transfer ownership.</p>
+        </div>
+        <Card className="max-w-md border-dashed border-2">
+          <CardContent className="flex items-center gap-4 py-8 px-6">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 shrink-0">
+              <Shield className="h-6 w-6 text-amber-500" />
+            </div>
+            <div>
+              <p className="font-semibold">Access Restricted</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">Only owners and admins can manage members.</p>
+              <Button asChild size="sm" variant="outline" className="mt-3">
+                <Link href="/dashboard/settings">Back to Settings</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (!orgId) {
     return (

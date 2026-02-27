@@ -29,6 +29,7 @@ let ActivityLogsRepository = class ActivityLogsRepository {
             order: { createdAt: 'DESC' },
             skip: (0, pagination_1.getSkip)(page, limit),
             take: limit,
+            relations: ['user'],
         });
     }
     async create(data) {

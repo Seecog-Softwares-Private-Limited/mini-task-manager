@@ -14,10 +14,16 @@ export class OrganizationEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 150, unique: true })
   slug!: string;
 
+  @Column({ name: 'logo_url', type: 'mediumtext', nullable: true })
+  logoUrl!: string | null;
+
   @Column({ name: 'owner_id', type: 'binary', length: 16, transformer: uuidBinaryTransformer })
   ownerId!: string;
 
-  @ManyToOne(() => UserEntity, { onDelete: 'RESTRICT' })
+  @Column({ name: 'is_archived', type: 'boolean', default: false })
+  isArchived!: boolean;
+
+  @ManyToOne(() => UserEntity, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'owner_id' })
   owner?: UserEntity;
 }

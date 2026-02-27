@@ -33,6 +33,14 @@ __decorate([
     __metadata("design:type", Object)
 ], UserEntity.prototype, "passwordHash", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: 'google_id', type: 'varchar', length: 64, unique: true, nullable: true }),
+    __metadata("design:type", Object)
+], UserEntity.prototype, "googleId", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'varchar', length: 20, unique: true, nullable: true }),
+    __metadata("design:type", Object)
+], UserEntity.prototype, "phone", void 0);
+__decorate([
     (0, typeorm_1.Column)({ name: 'avatar_url', type: 'text', nullable: true }),
     __metadata("design:type", Object)
 ], UserEntity.prototype, "avatarUrl", void 0);
@@ -48,6 +56,10 @@ __decorate([
     (0, typeorm_1.Column)({ name: 'last_seen_at', type: 'timestamp', nullable: true }),
     __metadata("design:type", Object)
 ], UserEntity.prototype, "lastSeenAt", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'onboarding_completed_at', type: 'timestamp', nullable: true }),
+    __metadata("design:type", Object)
+], UserEntity.prototype, "onboardingCompletedAt", void 0);
 exports.UserEntity = UserEntity = __decorate([
     (0, typeorm_1.Entity)('users')
 ], UserEntity);

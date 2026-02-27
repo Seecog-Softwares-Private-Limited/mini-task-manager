@@ -15,6 +15,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createTask } from "@/services/api/tasks.api";
 import { parseApiError, isRateLimited } from "@/services/api/client";
+import { useRetentionTracking } from "@/hooks/use-retention-tracking";
 import { Plus, UserPlus } from "lucide-react";
 
 export default function ProjectOverviewPage({ params }: { params: { id: string } }) {
@@ -22,6 +23,7 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
   const { orgId } = useTenant();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { trackFirstTaskCreated } = useRetentionTracking();
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
   const { data: project } = useQuery({
@@ -63,6 +65,7 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
       queryClient.invalidateQueries({ queryKey: ["tasks", id] });
       setCreateModalOpen(false);
       toast({ title: "Task created", variant: "success" });
+      trackFirstTaskCreated();
     },
     onError: (err) => toast({ title: "Failed to create task", description: parseApiError(err), variant: "error" }),
   });

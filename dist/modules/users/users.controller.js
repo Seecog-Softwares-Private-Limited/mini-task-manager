@@ -22,6 +22,13 @@ let UsersController = class UsersController {
     constructor(usersService) {
         this.usersService = usersService;
     }
+    async getOnboardingStatus(userId) {
+        return this.usersService.getOnboardingStatus(userId);
+    }
+    async markOnboardingComplete(userId) {
+        await this.usersService.markOnboardingComplete(userId);
+        return { success: true };
+    }
     async findOne(id, currentUserId) {
         if (id !== currentUserId) {
             throw new common_1.ForbiddenException('You may only access your own profile');
@@ -40,6 +47,20 @@ let UsersController = class UsersController {
     }
 };
 exports.UsersController = UsersController;
+__decorate([
+    (0, common_1.Get)('me/onboarding-status'),
+    __param(0, (0, current_user_decorator_1.CurrentUserId)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "getOnboardingStatus", null);
+__decorate([
+    (0, common_1.Post)('me/onboarding-complete'),
+    __param(0, (0, current_user_decorator_1.CurrentUserId)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], UsersController.prototype, "markOnboardingComplete", null);
 __decorate([
     (0, common_1.Get)(':id'),
     __param(0, (0, common_1.Param)('id')),

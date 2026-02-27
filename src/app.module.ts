@@ -19,6 +19,8 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { BillingModule } from './modules/billing/billing.module';
 import { ActivityLogsModule } from './modules/activity-logs/activity-logs.module';
 import { InvitationsModule } from './modules/invitations/invitations.module';
+import { ApiKeysModule } from './modules/api-keys/api-keys.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 @Module({
   providers: [
@@ -43,6 +45,8 @@ import { InvitationsModule } from './modules/invitations/invitations.module';
     BillingModule,
     ActivityLogsModule,
     InvitationsModule,
+    ApiKeysModule,
+    AnalyticsModule,
   ],
 })
 export class AppModule {}

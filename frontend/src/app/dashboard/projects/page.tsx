@@ -6,6 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { fetchProjects, createProject, updateProject, type CreateProjectPayload } from "@/services/api/projects.api";
 import { fetchTasksByProject } from "@/services/api/tasks.api";
 import { fetchProjectMembers, fetchOrgMembers } from "@/services/api/members.api";
@@ -528,6 +529,7 @@ const ACTIVITY_FILTER_OPTIONS = [
 
 export default function ProjectsPage() {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const { orgId } = useTenant();
   const { toast } = useToast();
   const upgradeModal = useUpgradeModalOptional();
@@ -635,6 +637,7 @@ export default function ProjectsPage() {
       if (wasFirstProject) {
         onboarding?.markStepCompleted("project");
         analytics.track("first_project_created", {});
+        router.push("/dashboard");
       }
     },
   });
@@ -781,7 +784,7 @@ export default function ProjectsPage() {
     [workflowsQueries]
   );
   const uniqueDefaultWorkflowIds = useMemo(
-    () => [...new Set(defaultWorkflowIds.filter((id): id is string => !!id))],
+    () => Array.from(new Set(defaultWorkflowIds.filter((id): id is string => !!id))),
     [defaultWorkflowIds]
   );
   const statusesQueries = useQueries({
@@ -816,7 +819,7 @@ export default function ProjectsPage() {
   }, [filterStatus, filterVisibility, filterOwner, filterActivity, filterOverdue]);
 
   const uniqueOwnerIds = useMemo(
-    () => [...new Set((projects ?? []).map((p) => p.createdBy).filter(Boolean))],
+    () => Array.from(new Set((projects ?? []).map((p) => p.createdBy).filter(Boolean))),
     [projects]
   );
 
