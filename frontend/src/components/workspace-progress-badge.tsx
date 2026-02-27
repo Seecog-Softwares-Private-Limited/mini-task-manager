@@ -10,7 +10,7 @@ export function WorkspaceProgressBadge({ className }: { className?: string }) {
 
   return (
     <Link
-      href="/dashboard/projects"
+      href="/dashboard"
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full border bg-muted/50 px-2.5 py-0.5 text-xs font-medium text-muted-foreground hover:bg-muted",
         className

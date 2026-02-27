@@ -149,6 +149,7 @@ export default function OrganizationsPage() {
     onSuccess: (org) => {
       setOrgId(org.id);
       queryClient.invalidateQueries({ queryKey: ["organizations"] });
+      queryClient.invalidateQueries({ queryKey: ["onboarding-status"] });
       reset();
       setLogoPreview(null);
       setCreateModalOpen(false);
@@ -160,6 +161,7 @@ export default function OrganizationsPage() {
       updateOrganization(id, { isArchived }),
     onSuccess: (_updated, { orgId: archivedOrgId, isArchived }) => {
       queryClient.invalidateQueries({ queryKey: ["organizations"] });
+      queryClient.invalidateQueries({ queryKey: ["onboarding-status"] });
       queryClient.invalidateQueries({ queryKey: ["org-health", archivedOrgId] });
       if (isArchived && archivedOrgId === orgId) {
         const others = organizations.filter((o) => o.id !== archivedOrgId && !o.isArchived);
@@ -218,7 +220,7 @@ export default function OrganizationsPage() {
     });
   }
 
-  const isSlugTaken = debouncedSlug && slugAvailability?.available === false;
+  const isSlugTaken = !!(debouncedSlug && slugAvailability?.available === false);
 
   const totalCount = organizations.length;
   const activeCount = organizations.filter((o) => !o.isArchived).length;

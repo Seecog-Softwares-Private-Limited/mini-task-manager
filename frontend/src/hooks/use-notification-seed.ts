@@ -24,8 +24,7 @@ export function useNotificationSeed(projectCount: number) {
       const days = Math.ceil((plan.trialEndsAt.getTime() - Date.now()) / MS_PER_DAY);
       if (days <= 7 && days > 0) {
         seeded.current.trial = true;
-        notifications.addNotification({
-          type: "trial_ending",
+        notifications.addNotification?.({
           title: "Trial ending soon",
           message: `Your trial ends in ${days} day${days === 1 ? "" : "s"}. Upgrade to keep access.`,
         });
@@ -36,8 +35,7 @@ export function useNotificationSeed(projectCount: number) {
       const pct = Math.round((projectCount / projectGate.limit) * 100);
       if (pct >= 80) {
         seeded.current.limit = true;
-        notifications.addNotification({
-          type: "limit_approaching",
+        notifications.addNotification?.({
           title: "Project limit approaching",
           message: `You've used ${projectCount} of ${projectGate.limit} projects. Upgrade for more.`,
         });

@@ -5,6 +5,7 @@ export interface IOrganizationMembersRepository {
     findByOrganization(organizationId: string): Promise<OrganizationMemberEntity[]>;
     findByOrganizationWithUser(organizationId: string): Promise<OrganizationMemberEntity[]>;
     findByUser(userId: string): Promise<OrganizationMemberEntity[]>;
+    findById(id: string): Promise<OrganizationMemberEntity | null>;
     create(data: Partial<OrganizationMemberEntity>): Promise<OrganizationMemberEntity>;
     update(id: string, data: Partial<OrganizationMemberEntity>): Promise<void>;
 }

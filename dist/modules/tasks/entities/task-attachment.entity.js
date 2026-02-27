@@ -34,6 +34,10 @@ __decorate([
     __metadata("design:type", Object)
 ], TaskAttachmentEntity.prototype, "fileName", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: 'file_size_bytes', type: 'bigint', nullable: true, default: 0 }),
+    __metadata("design:type", Object)
+], TaskAttachmentEntity.prototype, "fileSizeBytes", void 0);
+__decorate([
     (0, typeorm_1.Column)({ name: 'uploaded_by', type: 'binary', length: 16, transformer: base_entity_1.uuidBinaryTransformer }),
     __metadata("design:type", String)
 ], TaskAttachmentEntity.prototype, "uploadedBy", void 0);

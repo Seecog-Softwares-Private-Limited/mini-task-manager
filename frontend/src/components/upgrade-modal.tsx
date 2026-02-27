@@ -32,7 +32,7 @@ export function UpgradeModal() {
   if (!open) return null;
 
   const paidPlans = plans.filter(
-    (p) => p.pricePerUser != null && Number(p.pricePerUser) > 0
+    (p) => p.priceMonthly > 0
   );
   const currentPlanId = plan?.id;
 
@@ -88,21 +88,24 @@ export function UpgradeModal() {
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="font-semibold">{p.name}</p>
+                    {p.isPopular && (
+                      <span className="rounded-full bg-purple-100 dark:bg-purple-900/50 px-2 py-0.5 text-[10px] font-bold text-purple-700 dark:text-purple-300">Popular</span>
+                    )}
                     {currentPlanId === p.id && (
                       <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">Current</span>
                     )}
                   </div>
                   <p className="mt-0.5 text-sm text-muted-foreground">
-                    {p.pricePerUser != null ? `$${p.pricePerUser}/user · ${p.billingCycle}` : p.billingCycle}
+                    ₹{p.priceMonthly}/user/mo
+                    {p.maxUsers != null && ` · ${p.maxUsers} users`}
                     {p.maxProjects != null && ` · ${p.maxProjects} projects`}
-                    {p.maxMembers != null && ` · ${p.maxMembers} members`}
                   </p>
                 </div>
                 {currentPlanId === p.id ? (
                   <Check className="h-5 w-5 text-primary shrink-0" />
                 ) : (
                   <Button size="sm" asChild>
-                    <Link href="/dashboard/billing" onClick={closeUpgradeModal}>
+                    <Link href="/dashboard/plans" onClick={closeUpgradeModal}>
                       Select <ArrowRight className="ml-1 h-3.5 w-3.5" />
                     </Link>
                   </Button>
@@ -119,8 +122,8 @@ export function UpgradeModal() {
         <div className="border-t p-4 flex justify-end gap-2">
           <Button variant="outline" onClick={closeUpgradeModal}>Close</Button>
           <Button asChild>
-            <Link href="/dashboard/billing" onClick={closeUpgradeModal}>
-              Go to Billing <ArrowRight className="ml-1 h-4 w-4" />
+            <Link href="/dashboard/plans" onClick={closeUpgradeModal}>
+              View Plans <ArrowRight className="ml-1 h-4 w-4" />
             </Link>
           </Button>
         </div>

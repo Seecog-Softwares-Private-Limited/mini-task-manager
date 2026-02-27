@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/use-auth";
+import { usePermissions } from "@/hooks/use-permissions";
 import { useTenant } from "@/context/tenant-context";
 import { usePlanOptional } from "@/context/plan-context";
 import { fetchOrganization, fetchOrganizations, updateOrganization, deleteOrganization } from "@/services/api/organizations.api";
@@ -14,14 +14,14 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { Building2, CreditCard, AlertTriangle, ArrowLeft, ArrowRight, Archive, ArchiveRestore, Trash2 } from "lucide-react";
+import { Building2, CreditCard, AlertTriangle, ArrowLeft, ArrowRight, Archive, ArchiveRestore, Trash2, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { OrgSettingsTabs } from "@/components/settings/org-settings-tabs";
 
 export default function OrganizationSettingsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { canManageBilling } = useAuth();
+  const { canEditOrgSettings, isLoading: permsLoading } = usePermissions();
   const { orgId, setOrgId } = useTenant();
   const planContext = usePlanOptional();
   const [name, setName] = useState("");
@@ -83,6 +83,29 @@ export default function OrganizationSettingsPage() {
     );
   }
 
+  if (!permsLoading && !canEditOrgSettings) {
+    return (
+      <div className="space-y-4 animate-slide-up">
+        <OrgSettingsTabs />
+        <h1 className="text-2xl font-bold tracking-tight">Organization Settings</h1>
+        <Card className="max-w-md border-dashed border-2">
+          <CardContent className="flex items-center gap-4 py-8 px-6">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 shrink-0">
+              <Shield className="h-6 w-6 text-amber-500" />
+            </div>
+            <div>
+              <p className="font-semibold">Access Restricted</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">Only owners and admins can edit organization settings.</p>
+              <Button asChild size="sm" variant="outline" className="mt-3">
+                <Link href="/dashboard/settings">Back to Settings</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const subscriptionStatus = planContext?.subscription?.status ?? "—";
   const planName = planContext?.plan?.name ?? "—";
 
@@ -115,7 +138,7 @@ export default function OrganizationSettingsPage() {
                   id="org-name"
                   value={name ?? org?.name ?? ""}
                   onChange={(e) => setName(e.target.value)}
-                  disabled={!canManageBilling}
+                  disabled={!canEditOrgSettings}
                   placeholder="Organization name"
                 />
               </div>
@@ -125,11 +148,11 @@ export default function OrganizationSettingsPage() {
                   id="org-slug"
                   value={slug ?? org?.slug ?? ""}
                   onChange={(e) => setSlug(e.target.value)}
-                  disabled={!canManageBilling}
+                  disabled={!canEditOrgSettings}
                   placeholder="url-slug"
                 />
               </div>
-              {canManageBilling && (
+              {canEditOrgSettings && (
                 <Button disabled>Save Changes (API not implemented)</Button>
               )}
             </>
@@ -234,7 +257,7 @@ export default function OrganizationSettingsPage() {
             description={`Are you sure you want to permanently delete "${org?.name}"? All projects, tasks, members, and data will be removed. This cannot be undone.`}
             confirmLabel="Delete permanently"
             variant="destructive"
-            onConfirm={() => deleteMutation.mutateAsync()}
+            onConfirm={() => { deleteMutation.mutateAsync(); }}
             loading={deleteMutation.isPending}
           />
         </>

@@ -7,6 +7,17 @@ export interface CreateProjectPayload {
   visibility?: string;
 }
 
+export interface ProjectTemplate {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export async function fetchProjectTemplates(): Promise<ProjectTemplate[]> {
+  const { data } = await apiClient.get<ProjectTemplate[]>("/projects/templates");
+  return data;
+}
+
 export async function fetchProjects(): Promise<Project[]> {
   const { data } = await apiClient.get<Project[]>("/projects");
   return data;
@@ -50,5 +61,12 @@ export async function updateProject(
   payload: UpdateProjectPayload
 ): Promise<Project> {
   const { data } = await apiClient.patch<Project>(`/projects/${id}`, payload);
+  return data;
+}
+
+export async function seedDemoTasks(projectId: string): Promise<{ created: number }> {
+  const { data } = await apiClient.post<{ created: number }>(
+    `/projects/${projectId}/seed-demo-tasks`
+  );
   return data;
 }

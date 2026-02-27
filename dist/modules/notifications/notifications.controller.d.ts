@@ -7,4 +7,7 @@ export declare class NotificationsController {
     markAsRead(id: string, userId: string): Promise<{
         message: string;
     }>;
+    markAllAsRead(userId: string): Promise<{
+        count: number;
+    }>;
 }

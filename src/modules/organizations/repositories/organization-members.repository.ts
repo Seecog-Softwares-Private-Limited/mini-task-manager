@@ -23,12 +23,12 @@ export class OrganizationMembersRepository implements IOrganizationMembersReposi
   }
 
   async countByOrganization(organizationId: string): Promise<number> {
-    return this.repo.count({ where: { organizationId } });
+    return this.repo.count({ where: { organizationId, status: 'ACTIVE' } });
   }
 
   async findByOrganizationWithUser(organizationId: string): Promise<OrganizationMemberEntity[]> {
     return this.repo.find({
-      where: { organizationId },
+      where: { organizationId, status: 'ACTIVE' },
       order: { joinedAt: 'ASC' },
       relations: ['user'],
     });
@@ -38,6 +38,13 @@ export class OrganizationMembersRepository implements IOrganizationMembersReposi
     return this.repo.find({
       where: { userId, status: 'ACTIVE' },
       order: { joinedAt: 'ASC' },
+    });
+  }
+
+  async findById(id: string): Promise<OrganizationMemberEntity | null> {
+    return this.repo.findOne({
+      where: { id },
+      relations: ['user'],
     });
   }
 

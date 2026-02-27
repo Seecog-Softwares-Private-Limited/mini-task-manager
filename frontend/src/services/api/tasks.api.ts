@@ -76,6 +76,7 @@ export interface UpdateTaskPayload {
   title?: string;
   description?: string;
   statusId?: string | null;
+  sprintId?: string | null;
   priority?: string;
   assigneeId?: string | null;
   dueDate?: string | null;
@@ -92,6 +93,7 @@ export async function updateTask(
   if (payload.title !== undefined) body.title = payload.title;
   if (payload.description !== undefined) body.description = payload.description;
   if (payload.statusId !== undefined) body.statusId = payload.statusId;
+  if (payload.sprintId !== undefined) body.sprintId = payload.sprintId;
   if (payload.assigneeId !== undefined) body.assigneeId = payload.assigneeId;
   if (payload.storyPoints !== undefined) body.storyPoints = payload.storyPoints;
   if (payload.tags !== undefined) body.tags = payload.tags;
@@ -105,6 +107,19 @@ export async function updateTaskStatus(
   statusId: string | null
 ): Promise<Task | null> {
   const { data } = await apiClient.patch<Task | null>(`/tasks/${taskId}`, { statusId });
+  return data;
+}
+
+/** Update task status and/or sprint (for Scrum board moves). */
+export async function updateTaskStatusAndSprint(
+  taskId: string,
+  statusId: string,
+  sprintId: string | null
+): Promise<Task | null> {
+  const { data } = await apiClient.patch<Task | null>(`/tasks/${taskId}`, {
+    statusId,
+    sprintId,
+  });
   return data;
 }
 

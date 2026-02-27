@@ -74,16 +74,32 @@ apiClient.interceptors.response.use(
     const isPublicAuthRequest =
       url.includes("/auth/login") ||
       url.includes("/auth/logout") ||
+      url.includes("/auth/signup") ||
+      url.includes("/auth/verify-email") ||
+      url.includes("/auth/resend-verification") ||
+      url.includes("/auth/forgot-password") ||
+      url.includes("/auth/reset-password") ||
       url.includes("/auth/signup-with-invite") ||
+      url.includes("/auth/send-otp") ||
+      url.includes("/auth/verify-otp") ||
       url.includes("/invitations/validate");
     if (status === 401 && !isPublicAuthRequest) {
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("auth:sessionExpired"));
       }
     } else if (status === 403) {
-      const msg = (err.response?.data as { message?: string | string[] })?.message;
+      const body = err.response?.data as { message?: string | string[]; code?: string };
+      const msg = body?.message;
       const msgStr = Array.isArray(msg) ? msg[0] : msg;
-      if (
+      if (body?.code === "SUBSCRIPTION_LIMIT_EXCEEDED") {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("billing:limitExceeded", {
+              detail: body,
+            })
+          );
+        }
+      } else if (
         typeof msgStr === "string" &&
         (msgStr.includes("Organization context") || msgStr.includes("not a member of this organization"))
       ) {

@@ -5,6 +5,7 @@ export declare class TaskAttachmentEntity {
     taskId: string;
     fileUrl: string;
     fileName: string | null;
+    fileSizeBytes: number | null;
     uploadedBy: string;
     uploadedAt: Date;
     task?: TaskEntity;

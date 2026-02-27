@@ -25,9 +25,15 @@ let InvoicesRepository = class InvoicesRepository {
     async findBySubscription(subscriptionId) {
         return this.repo.find({ where: { subscriptionId }, order: { issuedAt: 'DESC' } });
     }
+    async findByOrganization(organizationId) {
+        return this.repo.find({ where: { organizationId }, order: { issuedAt: 'DESC' } });
+    }
     async create(data) {
         const id = data.id ?? (0, uuid_util_1.generateUuid)();
         const entity = this.repo.create({ ...data, id });
+        return this.repo.save(entity);
+    }
+    async save(entity) {
         return this.repo.save(entity);
     }
 };

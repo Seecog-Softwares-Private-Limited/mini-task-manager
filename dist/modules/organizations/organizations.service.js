@@ -121,6 +121,70 @@ let OrganizationsService = class OrganizationsService {
         const m = await this.orgMembersRepository.findByOrganizationAndUser(organizationId, userId);
         return m && m.status === 'ACTIVE' ? m : null;
     }
+    async getWorkspaceProgress(organizationId) {
+        const [projectCount] = await this.dataSource.query(`SELECT COUNT(*) as cnt FROM projects WHERE organization_id = ?`, [organizationId]);
+        const [memberCount] = await this.dataSource.query(`SELECT COUNT(*) as cnt FROM organization_members WHERE organization_id = ? AND status = 'ACTIVE'`, [organizationId]);
+        const [taskCount] = await this.dataSource.query(`SELECT COUNT(*) as cnt FROM tasks WHERE organization_id = ?`, [organizationId]);
+        return {
+            hasProjects: Number(projectCount?.cnt ?? 0) > 0,
+            hasMembers: Number(memberCount?.cnt ?? 0) > 1,
+            hasTasks: Number(taskCount?.cnt ?? 0) > 0,
+        };
+    }
+    async updateMemberRole(organizationId, memberId, role, actorUserId) {
+        const membership = await this.getMembership(organizationId, actorUserId);
+        if (!membership) {
+            throw new common_1.ForbiddenException('You do not have access to this organization');
+        }
+        const actorRole = membership.role?.toLowerCase();
+        if (actorRole !== 'owner' && actorRole !== 'admin') {
+            throw new common_1.ForbiddenException('Only owners and admins can update member roles');
+        }
+        const target = await this.orgMembersRepository.findById(memberId);
+        if (!target) {
+            throw new common_1.ForbiddenException('Member not found');
+        }
+        if (target.organizationId !== organizationId) {
+            throw new common_1.ForbiddenException('Member does not belong to this organization');
+        }
+        if (target.role?.toLowerCase() === 'owner') {
+            throw new common_1.ForbiddenException('Cannot change the owner role. Use transfer ownership instead.');
+        }
+        if (actorRole === 'admin' && target.role?.toLowerCase() === 'owner') {
+            throw new common_1.ForbiddenException('Admins cannot modify the owner');
+        }
+        const normalizedRole = role?.trim().toLowerCase() || 'member';
+        const allowedRoles = ['admin', 'member'];
+        if (!allowedRoles.includes(normalizedRole)) {
+            throw new common_1.ForbiddenException('Invalid role. Use admin or member.');
+        }
+        await this.orgMembersRepository.update(memberId, { role: normalizedRole });
+        const updated = await this.orgMembersRepository.findById(memberId);
+        if (!updated)
+            throw new common_1.ForbiddenException('Member not found');
+        return updated;
+    }
+    async removeMember(organizationId, memberId, actorUserId) {
+        const membership = await this.getMembership(organizationId, actorUserId);
+        if (!membership) {
+            throw new common_1.ForbiddenException('You do not have access to this organization');
+        }
+        const actorRole = membership.role?.toLowerCase();
+        if (actorRole !== 'owner' && actorRole !== 'admin') {
+            throw new common_1.ForbiddenException('Only owners and admins can remove members');
+        }
+        const target = await this.orgMembersRepository.findById(memberId);
+        if (!target) {
+            throw new common_1.ForbiddenException('Member not found');
+        }
+        if (target.organizationId !== organizationId) {
+            throw new common_1.ForbiddenException('Member does not belong to this organization');
+        }
+        if (target.role?.toLowerCase() === 'owner') {
+            throw new common_1.ForbiddenException('Cannot remove the owner. Use transfer ownership first.');
+        }
+        await this.orgMembersRepository.update(memberId, { status: 'REMOVED' });
+    }
     async delete(id, userId) {
         const membership = await this.getMembership(id, userId);
         if (!membership) {

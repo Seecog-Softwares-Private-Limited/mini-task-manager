@@ -1,4 +1,4 @@
-import { Controller, Get, Param, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Param, UseGuards, ForbiddenException } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -10,6 +10,17 @@ import { UserResponseDto } from './dto/user-response.dto';
 @UseGuards(JwtAuthGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
+
+  @Get('me/onboarding-status')
+  async getOnboardingStatus(@CurrentUserId() userId: string) {
+    return this.usersService.getOnboardingStatus(userId);
+  }
+
+  @Post('me/onboarding-complete')
+  async markOnboardingComplete(@CurrentUserId() userId: string) {
+    await this.usersService.markOnboardingComplete(userId);
+    return { success: true };
+  }
 
   @Get(':id')
   async findOne(

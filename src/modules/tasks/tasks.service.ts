@@ -1,9 +1,11 @@
-import { BadRequestException, Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TasksRepository } from './repositories/tasks.repository';
 import { TaskCommentsRepository } from './repositories/task-comments.repository';
 import { TaskAttachmentsRepository } from './repositories/task-attachments.repository';
 import { ProjectsService } from '../projects/projects.service';
+import { UsageService } from '../billing/usage.service';
+import { ActivityLogsService } from '../activity-logs/activity-logs.service';
 import { TaskEntity } from './entities/task.entity';
 import { TaskAttachmentEntity } from './entities/task-attachment.entity';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -38,6 +40,8 @@ export class TasksService {
     private readonly taskCommentsRepository: TaskCommentsRepository,
     private readonly taskAttachmentsRepository: TaskAttachmentsRepository,
     private readonly projectsService: ProjectsService,
+    private readonly usageService: UsageService,
+    private readonly activityLogsService: ActivityLogsService,
     private readonly configService: ConfigService<Configuration>,
   ) {}
 
@@ -81,13 +85,15 @@ export class TasksService {
     const normalizedSubtasks = this.normalizeSubtasks(dto.subtasks);
     const tags = this.normalizeTags(dto.tags);
 
-    return this.tasksRepository.create({
+    // Always use statusId: null on create to avoid FK constraint failure.
+    // Projects may lack workflows/statuses; status can be set via PATCH after creation.
+    const task = await this.tasksRepository.create({
       projectId,
       organizationId,
       reporterId,
       title: dto.title,
       description: dto.description ?? null,
-      statusId: dto.statusId ?? null,
+      statusId: null,
       priority: dto.priority ?? 'MEDIUM',
       assigneeId: assigneeIds[0] ?? dto.assigneeId ?? null,
       assigneeIds: assigneeIds.length ? assigneeIds : null,
@@ -96,12 +102,17 @@ export class TasksService {
       sprintId: dto.sprintId ?? null,
       tags: tags.length ? tags : null,
     });
+    this.activityLogsService
+      .log({ organizationId, userId: reporterId, entityType: 'task', entityId: task.id, action: 'create', metadata: { name: task.title } })
+      .catch(() => {});
+    return task;
   }
 
   async update(
     taskId: string,
     organizationId: string,
     dto: PatchTaskDto,
+    userId?: string,
   ): Promise<TaskEntity | null> {
     const task = await this.tasksRepository.findByIdAndOrganization(taskId, organizationId);
     if (!task) return null;
@@ -117,6 +128,7 @@ export class TasksService {
       patch.description = trimmedDescription.length > 0 ? trimmedDescription : null;
     }
     if (dto.statusId !== undefined) patch.statusId = dto.statusId ?? null;
+    if (dto.sprintId !== undefined) patch.sprintId = dto.sprintId ?? null;
     if (dto.assigneeId !== undefined) {
       patch.assigneeId = dto.assigneeId ?? null;
       patch.assigneeIds = patch.assigneeId ? [patch.assigneeId] : null;
@@ -132,6 +144,10 @@ export class TasksService {
     }
     if (Object.keys(patch).length > 0) {
       await this.tasksRepository.update(taskId, patch);
+      const action = dto.statusId !== undefined ? 'move' : 'update';
+      this.activityLogsService
+        .log({ organizationId, userId: userId ?? undefined, entityType: 'task', entityId: taskId, action, metadata: { name: task.title } })
+        .catch(() => {});
     }
     return this.tasksRepository.findById(taskId);
   }
@@ -233,6 +249,24 @@ export class TasksService {
     if (!task) throw new NotFoundException('Task not found');
     if (file.size > MAX_FILE_SIZE) throw new ForbiddenException('File too large (max 10MB)');
     if (!isAllowedMime(file.mimetype || '')) throw new ForbiddenException('File type not allowed');
+
+    const storageMbIncrement = Math.ceil(file.size / (1024 * 1024));
+    const limitCheck = await this.usageService.checkLimit(organizationId, 'storageGb', storageMbIncrement);
+    if (!limitCheck.allowed) {
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.FORBIDDEN,
+          error: 'LIMIT_EXCEEDED',
+          code: 'SUBSCRIPTION_LIMIT_EXCEEDED',
+          resource: limitCheck.resource,
+          current: limitCheck.current,
+          limit: limitCheck.limit,
+          message: limitCheck.message,
+          upgradeUrl: '/dashboard/billing',
+        },
+        HttpStatus.FORBIDDEN,
+      );
+    }
     const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
     const dir = path.join(uploadsPath, 'task-attachments', taskId);
     await fs.mkdir(dir, { recursive: true });
@@ -245,6 +279,7 @@ export class TasksService {
       taskId,
       fileUrl: relativePath.replace(/\\/g, '/'),
       fileName: file.originalname || null,
+      fileSizeBytes: file.size,
       uploadedBy: userId,
     });
     return attachment;

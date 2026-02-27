@@ -1,23 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { useAuth } from "@/hooks/use-auth";
+import { usePermissions } from "@/hooks/use-permissions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Building2, Shield, Key, Webhook, Download, Lock, ArrowLeft, ArrowRight, Users } from "lucide-react";
 
 const SECTIONS = [
-  { href: "/dashboard/settings/organization", title: "Organization", description: "Name, slug, subscription, danger zone", icon: Building2, color: "text-primary bg-primary/10" },
-  { href: "/dashboard/settings/members", title: "Members", description: "Invite members, manage roles, transfer ownership", icon: Users, color: "text-emerald-600 bg-emerald-500/10" },
-  { href: "/dashboard/settings/permissions", title: "Roles & Permissions", description: "Role matrix and feature access", icon: Shield, color: "text-purple-500 bg-purple-500/10" },
-  { href: "/dashboard/settings/api-keys", title: "API Keys", description: "Create and revoke API keys", icon: Key, color: "text-amber-500 bg-amber-500/10" },
-  { href: "/dashboard/settings/webhooks", title: "Webhooks", description: "Endpoint and event subscriptions", icon: Webhook, color: "text-blue-500 bg-blue-500/10" },
-  { href: "/dashboard/settings/export", title: "Data Export", description: "Export your data", icon: Download, color: "text-emerald-500 bg-emerald-500/10" },
-  { href: "/dashboard/settings/sso", title: "SSO", description: "Enterprise single sign-on (coming soon)", icon: Lock, color: "text-rose-500 bg-rose-500/10" },
+  { href: "/dashboard/settings/organization", title: "Organization", description: "Name, slug, subscription, danger zone", icon: Building2, color: "text-primary bg-primary/10", requiredCap: "canEditOrgSettings" as const },
+  { href: "/dashboard/settings/members", title: "Members", description: "Invite members, manage roles, transfer ownership", icon: Users, color: "text-emerald-600 bg-emerald-500/10", requiredCap: "canInviteMembers" as const },
+  { href: "/dashboard/settings/permissions", title: "Roles & Permissions", description: "Role matrix and feature access", icon: Shield, color: "text-purple-500 bg-purple-500/10", requiredCap: null },
+  { href: "/dashboard/settings/api-keys", title: "API Keys", description: "Create and revoke API keys", icon: Key, color: "text-amber-500 bg-amber-500/10", requiredCap: "canManageApiKeys" as const },
+  { href: "/dashboard/settings/webhooks", title: "Webhooks", description: "Endpoint and event subscriptions", icon: Webhook, color: "text-blue-500 bg-blue-500/10", requiredCap: "canManageWebhooks" as const },
+  { href: "/dashboard/settings/export", title: "Data Export", description: "Export your data", icon: Download, color: "text-emerald-500 bg-emerald-500/10", requiredCap: "canExportData" as const },
+  { href: "/dashboard/settings/sso", title: "SSO", description: "Enterprise single sign-on (coming soon)", icon: Lock, color: "text-rose-500 bg-rose-500/10", requiredCap: "canEditOrgSettings" as const },
 ];
 
 export default function SettingsPage() {
-  const { canManageBilling } = useAuth();
+  const perms = usePermissions();
+
+  const visibleSections = SECTIONS.filter(
+    (s) => s.requiredCap === null || perms[s.requiredCap]
+  );
 
   return (
     <div className="space-y-8 animate-slide-up">
@@ -27,7 +31,7 @@ export default function SettingsPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {SECTIONS.map((s) => {
+        {visibleSections.map((s) => {
           const Icon = s.icon;
           return (
             <Link key={s.href} href={s.href} className="group">

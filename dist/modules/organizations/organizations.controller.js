@@ -16,6 +16,9 @@ exports.OrganizationsController = void 0;
 const common_1 = require("@nestjs/common");
 const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
 const throttler_1 = require("@nestjs/throttler");
+const roles_decorator_1 = require("../../common/decorators/roles.decorator");
+const roles_guard_1 = require("../auth/guards/roles.guard");
+const tenant_guard_1 = require("../auth/guards/tenant.guard");
 const organizations_service_1 = require("./organizations.service");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const create_organization_dto_1 = require("./dto/create-organization.dto");
@@ -40,6 +43,17 @@ let OrganizationsController = class OrganizationsController {
         const org = await this.organizationsService.create(ownerId, dto);
         return this.toResponse(org, 'owner');
     }
+    async getWorkspaceProgress(id, userId, orgIdHeader) {
+        const headerOrgId = orgIdHeader?.trim();
+        if (!headerOrgId || headerOrgId !== id) {
+            throw new common_1.ForbiddenException('X-Organization-Id header is required and must match the requested organization id');
+        }
+        const canAccess = await this.organizationsService.canAccess(id, userId);
+        if (!canAccess) {
+            throw new common_1.ForbiddenException('You do not have access to this organization');
+        }
+        return this.organizationsService.getWorkspaceProgress(id);
+    }
     async getMemberCount(id, userId, orgIdHeader) {
         const headerOrgId = orgIdHeader?.trim();
         if (!headerOrgId || headerOrgId !== id) {
@@ -63,6 +77,22 @@ let OrganizationsController = class OrganizationsController {
         }
         const members = await this.organizationsService.getMembers(id);
         return members.map((m) => this.toMemberResponse(m));
+    }
+    async updateMemberRole(id, memberId, body, userId, orgIdHeader) {
+        const headerOrgId = orgIdHeader?.trim();
+        if (!headerOrgId || headerOrgId !== id) {
+            throw new common_1.ForbiddenException('X-Organization-Id header is required and must match the requested organization');
+        }
+        const updated = await this.organizationsService.updateMemberRole(id, memberId, body.role, userId);
+        return this.toMemberResponse(updated);
+    }
+    async removeMember(id, memberId, userId, orgIdHeader) {
+        const headerOrgId = orgIdHeader?.trim();
+        if (!headerOrgId || headerOrgId !== id) {
+            throw new common_1.ForbiddenException('X-Organization-Id header is required and must match the requested organization');
+        }
+        await this.organizationsService.removeMember(id, memberId, userId);
+        return { success: true };
     }
     async update(id, dto, userId, orgIdHeader) {
         const headerOrgId = orgIdHeader?.trim();
@@ -162,6 +192,15 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], OrganizationsController.prototype, "create", null);
 __decorate([
+    (0, common_1.Get)(':id/workspace-progress'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUserId)()),
+    __param(2, (0, common_1.Headers)('x-organization-id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String]),
+    __metadata("design:returntype", Promise)
+], OrganizationsController.prototype, "getWorkspaceProgress", null);
+__decorate([
     (0, common_1.Get)(':id/members/count'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_user_decorator_1.CurrentUserId)()),
@@ -171,6 +210,8 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], OrganizationsController.prototype, "getMemberCount", null);
 __decorate([
+    (0, common_1.UseGuards)(tenant_guard_1.TenantGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('owner', 'admin'),
     (0, common_1.Get)(':id/members'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_user_decorator_1.CurrentUserId)()),
@@ -180,6 +221,33 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], OrganizationsController.prototype, "getMembers", null);
 __decorate([
+    (0, common_1.UseGuards)(tenant_guard_1.TenantGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('owner', 'admin'),
+    (0, common_1.Patch)(':id/members/:memberId'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Param)('memberId')),
+    __param(2, (0, common_1.Body)()),
+    __param(3, (0, current_user_decorator_1.CurrentUserId)()),
+    __param(4, (0, common_1.Headers)('x-organization-id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, Object, String, String]),
+    __metadata("design:returntype", Promise)
+], OrganizationsController.prototype, "updateMemberRole", null);
+__decorate([
+    (0, common_1.UseGuards)(tenant_guard_1.TenantGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('owner', 'admin'),
+    (0, common_1.Delete)(':id/members/:memberId'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Param)('memberId')),
+    __param(2, (0, current_user_decorator_1.CurrentUserId)()),
+    __param(3, (0, common_1.Headers)('x-organization-id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String, String]),
+    __metadata("design:returntype", Promise)
+], OrganizationsController.prototype, "removeMember", null);
+__decorate([
+    (0, common_1.UseGuards)(tenant_guard_1.TenantGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('owner', 'admin'),
     (0, common_1.Patch)(':id'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),

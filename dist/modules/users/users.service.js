@@ -12,16 +12,24 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.UsersService = void 0;
 const common_1 = require("@nestjs/common");
 const users_repository_1 = require("./repositories/users.repository");
+const organizations_service_1 = require("../organizations/organizations.service");
 const bcrypt = require("bcrypt");
 let UsersService = class UsersService {
-    constructor(usersRepository) {
+    constructor(usersRepository, organizationsService) {
         this.usersRepository = usersRepository;
+        this.organizationsService = organizationsService;
     }
     async findById(id) {
         return this.usersRepository.findById(id);
     }
     async findByEmail(email) {
         return this.usersRepository.findByEmail(email);
+    }
+    async findByGoogleId(googleId) {
+        return this.usersRepository.findByGoogleId(googleId);
+    }
+    async findByPhone(phone) {
+        return this.usersRepository.findByPhone(phone);
     }
     async findByIdForAuth(id) {
         const user = await this.usersRepository.findById(id);
@@ -46,10 +54,35 @@ let UsersService = class UsersService {
     async deleteById(id) {
         await this.usersRepository.deleteById(id);
     }
+    async getOnboardingStatus(userId) {
+        const user = await this.usersRepository.findById(userId);
+        if (!user) {
+            return { hasOrganizations: false, onboardingCompletedAt: null };
+        }
+        const orgs = await this.organizationsService.findOrganizationsForUser(userId);
+        const hasOrganizations = orgs.length > 0;
+        const onboardingCompletedAt = user.onboardingCompletedAt
+            ? user.onboardingCompletedAt.toISOString()
+            : null;
+        return { hasOrganizations, onboardingCompletedAt };
+    }
+    async markOnboardingComplete(userId) {
+        await this.usersRepository.update(userId, { onboardingCompletedAt: new Date() });
+    }
+    async updateEmailVerified(userId, verified) {
+        await this.usersRepository.update(userId, { isEmailVerified: verified });
+    }
+    async updatePassword(userId, passwordHash) {
+        await this.usersRepository.update(userId, { passwordHash });
+    }
+    async linkGoogleId(userId, googleId) {
+        await this.usersRepository.update(userId, { googleId, isEmailVerified: true });
+    }
 };
 exports.UsersService = UsersService;
 exports.UsersService = UsersService = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [users_repository_1.UsersRepository])
+    __metadata("design:paramtypes", [users_repository_1.UsersRepository,
+        organizations_service_1.OrganizationsService])
 ], UsersService);
 //# sourceMappingURL=users.service.js.map

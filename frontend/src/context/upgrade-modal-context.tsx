@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useState,
   type ReactNode,
 } from "react";
@@ -20,6 +21,12 @@ export function UpgradeModalProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const openUpgradeModal = useCallback((_reason?: "limit" | "trial" | "general") => {
     setOpen(true);
+  }, []);
+
+  useEffect(() => {
+    const handler = () => setOpen(true);
+    window.addEventListener("billing:limitExceeded", handler);
+    return () => window.removeEventListener("billing:limitExceeded", handler);
   }, []);
   const closeUpgradeModal = useCallback(() => setOpen(false), []);
   const value: UpgradeModalContextValue = {

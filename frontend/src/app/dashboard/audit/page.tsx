@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/use-auth";
+import { usePermissions } from "@/hooks/use-permissions";
 import { useTenant } from "@/context/tenant-context";
 import { fetchActivityLogs } from "@/services/api/activity-logs.api";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import { Shield, Filter, ClipboardList, Building2, ChevronLeft, ChevronRight } f
 const PAGE_SIZE = 20;
 
 export default function AuditLogPage() {
-  const { canManageBilling } = useAuth();
+  const { canViewAudit } = usePermissions();
   const { orgId } = useTenant();
   const [page, setPage] = useState(1);
   const [entityTypeFilter, setEntityTypeFilter] = useState("");
@@ -28,7 +28,7 @@ export default function AuditLogPage() {
   const { data, isLoading } = useQuery({
     queryKey: ["activity-logs", orgId ?? "", page],
     queryFn: () => fetchActivityLogs(page, PAGE_SIZE),
-    enabled: !!orgId && canManageBilling,
+    enabled: !!orgId && canViewAudit,
   });
 
   const logs = data?.data ?? [];
@@ -58,7 +58,7 @@ export default function AuditLogPage() {
     return list;
   }, [logs, entityTypeFilter, actionFilter, userFilter, dateFrom, dateTo]);
 
-  if (!canManageBilling) {
+  if (!canViewAudit) {
     return (
       <div className="space-y-4 animate-slide-up">
         <h1 className="text-2xl font-bold tracking-tight">Audit Log</h1>

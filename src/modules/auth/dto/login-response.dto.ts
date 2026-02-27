@@ -5,4 +5,5 @@ export class LoginResponseDto {
     email: string;
     fullName: string;
   };
+  organizationId?: string;
 }

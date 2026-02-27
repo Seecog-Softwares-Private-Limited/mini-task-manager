@@ -19,6 +19,14 @@ export class UsersRepository {
     return this.repo.findOne({ where: { email: email.toLowerCase() } });
   }
 
+  async findByGoogleId(googleId: string): Promise<UserEntity | null> {
+    return this.repo.findOne({ where: { googleId } });
+  }
+
+  async findByPhone(phone: string): Promise<UserEntity | null> {
+    return this.repo.findOne({ where: { phone } });
+  }
+
   async create(data: Partial<UserEntity>): Promise<UserEntity> {
     const id = data.id ?? generateUuid();
     const entity = this.repo.create({ ...data, id });

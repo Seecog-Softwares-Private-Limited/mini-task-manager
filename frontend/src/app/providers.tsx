@@ -8,6 +8,7 @@ import { TenantProvider } from "@/context/tenant-context";
 import { PlanProvider } from "@/context/plan-context";
 import { UpgradeModalProvider } from "@/context/upgrade-modal-context";
 import { OnboardingProvider } from "@/context/onboarding-context";
+import { FirstTimeOnboardingProvider } from "@/context/first-time-onboarding-context";
 import { NotificationsProvider } from "@/context/notifications-context";
 import { ThemeProvider } from "@/components/theme-provider";
 import { GlobalErrorToast } from "@/components/global-error-toast";
@@ -16,6 +17,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { SessionExpiredModal } from "@/components/session-expired-modal";
 import { UpgradeModal } from "@/components/upgrade-modal";
 import { OnboardingFlow } from "@/components/onboarding/onboarding-flow";
+import { FirstTimeOnboardingGate } from "@/components/onboarding/first-time-onboarding-gate";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -25,12 +27,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
           queries: {
             staleTime: 60 * 1000,
             retry: (failureCount, error) => {
-              const status = (error as { response?: { status?: number } })?.response?.status;
+              const axiosErr = error as { response?: { status?: number }; code?: string };
+              const status = axiosErr?.response?.status;
               if (status === 401 || status === 403 || status === 429) return false;
+              if (!axiosErr?.response && (axiosErr?.code === "ERR_NETWORK" || axiosErr?.code === "ECONNREFUSED")) return false;
               return failureCount < 2;
             },
             retryDelay: (attemptIndex) =>
               Math.min(1000 * 2 ** attemptIndex, 10000),
+            refetchOnWindowFocus: false,
           },
         },
       })
@@ -43,13 +48,16 @@ export function Providers({ children }: { children: React.ReactNode }) {
             <TenantProvider>
               <PlanProvider>
                 <UpgradeModalProvider>
-                  <OnboardingProvider>
-                    <NotificationsProvider>
-                      {children}
-                      <UpgradeModal />
-                      <OnboardingFlow />
-                    </NotificationsProvider>
-                  </OnboardingProvider>
+                  <FirstTimeOnboardingProvider>
+                    <OnboardingProvider>
+                      <NotificationsProvider>
+                        {children}
+                        <UpgradeModal />
+                        <FirstTimeOnboardingGate />
+                        <OnboardingFlow />
+                      </NotificationsProvider>
+                    </OnboardingProvider>
+                  </FirstTimeOnboardingProvider>
                   <ErrorBanner5xx />
                   <GlobalErrorToast />
                   <Toaster />

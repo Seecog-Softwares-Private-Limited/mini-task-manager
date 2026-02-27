@@ -1,35 +1,16 @@
 "use client";
 
-import { useAuth } from "@/hooks/use-auth";
+import { useQuery } from "@tanstack/react-query";
+import { usePermissions } from "@/hooks/use-permissions";
+import { useTenant } from "@/context/tenant-context";
 import Link from "next/link";
+import { fetchOrganizationAnalytics } from "@/services/api/analytics.api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ACTIVATION_FUNNEL_STEPS } from "@/lib/analytics/events";
-import { TrendingUp, Users, Zap, PieChart, BarChart3, Shield, ArrowDown } from "lucide-react";
+import { TrendingUp, Users, Zap, PieChart, BarChart3, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const STUB = {
-  activationRate: 42,
-  trialConversionPct: 18,
-  activeOrgsDaily: 24,
-  activeOrgsWeekly: 89,
-  churnRate: 4.2,
-  conversionRate: 12,
-  retention7d: 68,
-  planDistribution: [
-    { plan: "Free", count: 120, color: "bg-muted" },
-    { plan: "Pro", count: 45, color: "bg-primary" },
-    { plan: "Team", count: 12, color: "bg-purple-500" },
-  ],
-  revenuePlaceholder: "—",
-  funnelCounts: {
-    signup: 500,
-    first_project_created: 280,
-    invited_member: 150,
-    first_task_created: 95,
-    workspace_completed: 210,
-  },
-};
 
 const KPI_DEFINITIONS: { id: string; title: string; description: string }[] = [
   { id: "activation", title: "Activation Rate", description: "Share of signups who complete workspace setup. Indicates onboarding effectiveness." },
@@ -39,9 +20,17 @@ const KPI_DEFINITIONS: { id: string; title: string; description: string }[] = [
 ];
 
 export default function AnalyticsPage() {
-  const { canManageBilling } = useAuth();
+  const { canViewAnalytics } = usePermissions();
+  const { orgId } = useTenant();
 
-  if (!canManageBilling) {
+  const { data: analytics, isLoading, error } = useQuery({
+    queryKey: ["analytics", orgId ?? ""],
+    queryFn: fetchOrganizationAnalytics,
+    enabled: !!orgId && canViewAnalytics,
+    staleTime: 60 * 1000,
+  });
+
+  if (!canViewAnalytics) {
     return (
       <div className="space-y-4 animate-slide-up">
         <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
@@ -63,6 +52,58 @@ export default function AnalyticsPage() {
     );
   }
 
+  if (!orgId) {
+    return (
+      <div className="space-y-4 animate-slide-up">
+        <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
+        <Card className="max-w-md border-dashed border-2">
+          <CardContent className="flex items-center gap-4 py-8 px-6">
+            <p className="text-sm text-muted-foreground">Select an organization to view analytics.</p>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/dashboard/organizations">Organizations</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isLoading || !analytics) {
+    return (
+      <div className="space-y-8 animate-slide-up">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Growth &amp; Analytics</h1>
+          <p className="mt-1 text-muted-foreground">Product intelligence and health indicators.</p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-32 rounded-xl" />
+          ))}
+        </div>
+        <Skeleton className="h-64 rounded-xl" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-4 animate-slide-up">
+        <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
+        <Card className="max-w-md border-dashed border-2 border-destructive/30">
+          <CardContent className="flex flex-col gap-4 py-8 px-6">
+            <p className="text-sm text-muted-foreground">Failed to load analytics. Please try again.</p>
+            <Button asChild size="sm" variant="outline">
+              <Link href="/dashboard">Back to Dashboard</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const trialLabel = analytics.trialConversionPct !== null ? `${analytics.trialConversionPct}%` : "—";
+  const totalFromPlans = analytics.planDistribution.reduce((a, p) => a + p.count, 0);
+
   return (
     <div className="space-y-8 animate-slide-up">
       <div>
@@ -73,10 +114,10 @@ export default function AnalyticsPage() {
       {/* KPI cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: "Activation Rate", value: `${STUB.activationRate}%`, sub: "Signups to completion", icon: Zap, color: "text-primary bg-primary/10" },
-          { label: "Trial to Paid", value: `${STUB.trialConversionPct}%`, sub: "Conversion rate", icon: TrendingUp, color: "text-emerald-500 bg-emerald-500/10" },
-          { label: "Active Orgs (7d)", value: String(STUB.activeOrgsWeekly), sub: "Weekly active", icon: Users, color: "text-blue-500 bg-blue-500/10" },
-          { label: "Total Orgs", value: String(STUB.planDistribution.reduce((a, p) => a + p.count, 0)), sub: "Across all plans", icon: PieChart, color: "text-purple-500 bg-purple-500/10" },
+          { label: "Activation Rate", value: `${analytics.activationRate}%`, sub: "Members who created a project", icon: Zap, color: "text-primary bg-primary/10" },
+          { label: "Trial to Paid", value: trialLabel, sub: "Conversion status", icon: TrendingUp, color: "text-emerald-500 bg-emerald-500/10" },
+          { label: "Active Members (7d)", value: String(analytics.activeMembers7d), sub: "Weekly active", icon: Users, color: "text-blue-500 bg-blue-500/10" },
+          { label: "Total Members", value: String(analytics.totalMembers), sub: "In this organization", icon: PieChart, color: "text-purple-500 bg-purple-500/10" },
         ].map((kpi) => {
           const Icon = kpi.icon;
           return (
@@ -107,8 +148,8 @@ export default function AnalyticsPage() {
         <CardContent>
           <div className="space-y-2">
             {ACTIVATION_FUNNEL_STEPS.map((step, i) => {
-              const count = (STUB.funnelCounts as Record<string, number>)[step] ?? 0;
-              const maxCount = STUB.funnelCounts.signup;
+              const count = analytics.funnelCounts[step] ?? 0;
+              const maxCount = Math.max(analytics.funnelCounts.signup, 1);
               const pct = maxCount > 0 ? Math.round((count / maxCount) * 100) : 0;
               return (
                 <div key={step} className="flex items-center gap-4 rounded-xl border p-4 hover:bg-muted/20 transition-colors">
@@ -131,15 +172,36 @@ export default function AnalyticsPage() {
         </CardContent>
       </Card>
 
-      {/* Plan distribution */}
+      {/* Workspace summary */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Plan Distribution</CardTitle>
+          <CardTitle className="text-lg">Workspace Summary</CardTitle>
+          <p className="text-sm text-muted-foreground">Projects and tasks in this organization.</p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-xl border bg-muted/20 p-4">
+              <p className="text-2xl font-bold">{analytics.totalProjects}</p>
+              <p className="text-sm text-muted-foreground">Projects</p>
+            </div>
+            <div className="rounded-xl border bg-muted/20 p-4">
+              <p className="text-2xl font-bold">{analytics.totalTasks}</p>
+              <p className="text-sm text-muted-foreground">Tasks</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Current plan */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Current Plan</CardTitle>
+          <p className="text-sm text-muted-foreground">Subscription status: {analytics.subscriptionStatus}</p>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {STUB.planDistribution.map((p) => {
-              const total = STUB.planDistribution.reduce((a, x) => a + x.count, 0);
+            {analytics.planDistribution.map((p) => {
+              const total = totalFromPlans;
               const pct = total > 0 ? Math.round((p.count / total) * 100) : 0;
               return (
                 <div key={p.plan} className="flex items-center gap-3">

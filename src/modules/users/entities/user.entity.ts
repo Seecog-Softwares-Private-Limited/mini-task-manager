@@ -21,6 +21,12 @@ export class UserEntity extends BaseEntity {
   @Column({ name: 'password_hash', type: 'text', nullable: true })
   passwordHash!: string | null;
 
+  @Column({ name: 'google_id', type: 'varchar', length: 64, unique: true, nullable: true })
+  googleId!: string | null;
+
+  @Column({ type: 'varchar', length: 20, unique: true, nullable: true })
+  phone!: string | null;
+
   @Column({ name: 'avatar_url', type: 'text', nullable: true })
   avatarUrl!: string | null;
 
@@ -32,4 +38,7 @@ export class UserEntity extends BaseEntity {
 
   @Column({ name: 'last_seen_at', type: 'timestamp', nullable: true })
   lastSeenAt!: Date | null;
+
+  @Column({ name: 'onboarding_completed_at', type: 'timestamp', nullable: true })
+  onboardingCompletedAt!: Date | null;
 }

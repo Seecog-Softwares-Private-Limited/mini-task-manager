@@ -16,6 +16,11 @@ exports.InvitationsController = void 0;
 const common_1 = require("@nestjs/common");
 const throttler_1 = require("@nestjs/throttler");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
+const tenant_guard_1 = require("../auth/guards/tenant.guard");
+const roles_guard_1 = require("../auth/guards/roles.guard");
+const roles_decorator_1 = require("../../common/decorators/roles.decorator");
+const subscription_guard_1 = require("../billing/guards/subscription.guard");
+const check_limit_decorator_1 = require("../billing/decorators/check-limit.decorator");
 const public_decorator_1 = require("../../common/decorators/public.decorator");
 const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
 const invitations_service_1 = require("./invitations.service");
@@ -126,7 +131,9 @@ let InvitationsController = class InvitationsController {
 };
 exports.InvitationsController = InvitationsController;
 __decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, tenant_guard_1.TenantGuard, roles_guard_1.RolesGuard, subscription_guard_1.SubscriptionGuard),
+    (0, roles_decorator_1.Roles)('owner', 'admin'),
+    (0, check_limit_decorator_1.CheckSubscriptionLimit)('users'),
     (0, common_1.Post)('organizations/:id/invitations'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
@@ -137,7 +144,8 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], InvitationsController.prototype, "create", null);
 __decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, tenant_guard_1.TenantGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('owner', 'admin'),
     (0, common_1.Get)('organizations/:id/invitations'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_user_decorator_1.CurrentUserId)()),
@@ -147,7 +155,8 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], InvitationsController.prototype, "list", null);
 __decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, tenant_guard_1.TenantGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('owner', 'admin'),
     (0, common_1.Post)('organizations/:id/invitations/:invId/resend'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Param)('invId')),
@@ -158,7 +167,8 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], InvitationsController.prototype, "resend", null);
 __decorate([
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, tenant_guard_1.TenantGuard, roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)('owner', 'admin'),
     (0, common_1.Patch)('organizations/:id/invitations/:invId/cancel'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Param)('invId')),

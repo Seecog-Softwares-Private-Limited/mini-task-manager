@@ -24,5 +24,12 @@ export declare class OrganizationsService {
         isArchived?: boolean;
     }): Promise<OrganizationEntity | null>;
     getMembership(organizationId: string, userId: string): Promise<OrganizationMemberEntity | null>;
+    getWorkspaceProgress(organizationId: string): Promise<{
+        hasProjects: boolean;
+        hasMembers: boolean;
+        hasTasks: boolean;
+    }>;
+    updateMemberRole(organizationId: string, memberId: string, role: string, actorUserId: string): Promise<OrganizationMemberEntity>;
+    removeMember(organizationId: string, memberId: string, actorUserId: string): Promise<void>;
     delete(id: string, userId: string): Promise<void>;
 }

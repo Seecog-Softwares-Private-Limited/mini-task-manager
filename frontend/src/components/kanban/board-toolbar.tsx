@@ -26,6 +26,7 @@ import {
   Bookmark,
   BookmarkPlus,
   CheckSquare2,
+  Rocket,
 } from "lucide-react";
 
 // ─── Constants ────────────────────────────────────────────────
@@ -44,7 +45,7 @@ const SORT_OPTIONS = [
   { value: "title", label: "Title" },
 ] as const;
 
-export type ViewMode = "kanban" | "table";
+export type ViewMode = "kanban" | "scrum" | "table";
 
 // ─── Saved View types ─────────────────────────────────────────
 
@@ -408,7 +409,7 @@ export function BoardToolbar({
         ) : null}
 
         {/* Bulk select toggle */}
-        {canBulkSelect && onToggleSelectionMode && viewMode === "kanban" && (
+        {canBulkSelect && onToggleSelectionMode && (viewMode === "kanban" || viewMode === "scrum") && (
           <Button
             variant={isSelectionMode ? "default" : "outline"}
             size="sm"
@@ -420,7 +421,7 @@ export function BoardToolbar({
           </Button>
         )}
 
-        {/* View toggle */}
+        {/* View toggle: Kanban | Scrum | Table */}
         <div className="flex items-center rounded-lg border bg-muted/30 p-0.5">
           <button
             onClick={() => onViewModeChange("kanban")}
@@ -433,7 +434,20 @@ export function BoardToolbar({
             aria-label="Kanban view"
           >
             <LayoutGrid className="h-3.5 w-3.5" />
-            Board
+            Kanban
+          </button>
+          <button
+            onClick={() => onViewModeChange("scrum")}
+            className={cn(
+              "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all",
+              viewMode === "scrum"
+                ? "bg-background shadow-sm text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            aria-label="Scrum view"
+          >
+            <Rocket className="h-3.5 w-3.5" />
+            Scrum
           </button>
           <button
             onClick={() => onViewModeChange("table")}

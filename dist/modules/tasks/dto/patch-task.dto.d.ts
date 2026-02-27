@@ -14,6 +14,7 @@ export declare class PatchTaskDto {
     title?: string;
     description?: string;
     statusId?: string | null;
+    sprintId?: string | null;
     assigneeId?: string | null;
     storyPoints?: number | null;
     tags?: PatchTaskTagDto[];

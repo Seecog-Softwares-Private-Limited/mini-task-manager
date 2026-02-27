@@ -1,5 +1,9 @@
 import { StreamableFile } from '@nestjs/common';
 import { TasksService } from './tasks.service';
+import { EmailService } from '../invitations/email.service';
+import { UsersService } from '../users/users.service';
+import { ProjectsService } from '../projects/projects.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { CreateTaskCommentDto } from './dto/create-task-comment.dto';
 import { PatchTaskDto } from './dto/patch-task.dto';
@@ -15,7 +19,12 @@ interface MulterFile {
 }
 export declare class TasksController {
     private readonly tasksService;
-    constructor(tasksService: TasksService);
+    private readonly emailService;
+    private readonly usersService;
+    private readonly projectsService;
+    private readonly notificationsService;
+    private readonly logger;
+    constructor(tasksService: TasksService, emailService: EmailService, usersService: UsersService, projectsService: ProjectsService, notificationsService: NotificationsService);
     create(dto: CreateTaskDto, reporterId: string): Promise<TaskResponseDto>;
     findByProject(projectId: string, tenantId: string, query: PaginationQueryDto): Promise<import("../../common/pagination").PaginatedResult<import("./entities/task.entity").TaskEntity>>;
     getAttachmentFile(attachmentId: string, tenantId: string): Promise<StreamableFile>;
@@ -56,10 +65,12 @@ export declare class TasksController {
         success: boolean;
     }>;
     findOne(id: string, tenantId?: string): Promise<TaskResponseDto | null>;
-    updateAssignee(id: string, tenantId: string, body: {
+    updateAssignee(id: string, tenantId: string, currentUserId: string, body: {
         assigneeId: string | null;
     }): Promise<TaskResponseDto | null>;
-    update(id: string, tenantId: string, dto: PatchTaskDto): Promise<TaskResponseDto | null>;
+    update(id: string, tenantId: string, userId: string, dto: PatchTaskDto): Promise<TaskResponseDto | null>;
+    private notifyCommentObservers;
+    private notifyAssignees;
     private toCommentResponse;
     private toResponse;
 }

@@ -7,4 +7,5 @@ export declare class NotificationsRepository {
     findByUser(userId: string, page: number, limit: number): Promise<[NotificationEntity[], number]>;
     create(data: Partial<NotificationEntity>): Promise<NotificationEntity>;
     markAsRead(id: string): Promise<void>;
+    markAllAsReadByUser(userId: string): Promise<number>;
 }

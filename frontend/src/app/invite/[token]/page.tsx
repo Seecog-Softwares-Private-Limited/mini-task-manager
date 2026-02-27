@@ -65,8 +65,15 @@ export default function InviteAcceptPage() {
     try {
       const result = await accept(token);
       setAcceptSuccess(true);
+      // Store the org so the dashboard picks up the right tenant context
+      if (result?.organizationId) {
+        try {
+          const { setStoredOrgId } = await import("@/services/api/client");
+          setStoredOrgId(result.organizationId);
+        } catch { /* best effort */ }
+      }
       setTimeout(() => {
-        router.push("/dashboard/organizations");
+        router.push("/dashboard/settings/members");
         router.refresh();
       }, 1500);
     } catch {
@@ -78,14 +85,21 @@ export default function InviteAcceptPage() {
     if (!token || !validation?.email) return;
     setSignupError(null);
     try {
-      await signupWithInvite({
+      const signupResult = await signupWithInvite({
         token,
         fullName: values.fullName,
         password: values.password,
       });
       setAcceptSuccess(true);
+      // Store the org so the dashboard picks up the right tenant context
+      if (signupResult?.organizationId) {
+        try {
+          const { setStoredOrgId } = await import("@/services/api/client");
+          setStoredOrgId(signupResult.organizationId);
+        } catch { /* best effort */ }
+      }
       setTimeout(() => {
-        router.push("/dashboard/organizations");
+        router.push("/dashboard/settings/members");
         router.refresh();
       }, 1500);
     } catch (err) {
@@ -116,8 +130,14 @@ export default function InviteAcceptPage() {
   };
 
   const handleSignOutAndLogin = async () => {
-    await logout();
-    router.push(`/login?from=/invite/${token}`);
+    try {
+      await logout();
+    } catch {
+      // Ignore 401 — token may already be expired; we still clear local state.
+    }
+    // Redirect back to this same invite page — once logged out the user
+    // will see the inline signup/login form for the invited email.
+    router.push(`/invite/${token}`);
     router.refresh();
   };
 
