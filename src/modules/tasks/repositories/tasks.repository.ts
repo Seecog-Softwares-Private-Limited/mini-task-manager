@@ -29,9 +29,22 @@ export class TasksRepository {
     });
   }
 
+  async countByProject(projectId: string): Promise<number> {
+    return this.repo.count({ where: { projectId } });
+  }
+
+  async countByOrganization(organizationId: string): Promise<number> {
+    return this.repo.count({ where: { organizationId } });
+  }
+
   async create(data: Partial<TaskEntity>): Promise<TaskEntity> {
     const id = data.id ?? generateUuid();
-    const entity = this.repo.create({ ...data, id });
+    const payload = { ...data, id };
+    // Ensure statusId is null (not invalid FK) when not a valid workflow status
+    if (payload.statusId === undefined || payload.statusId === '') {
+      payload.statusId = null;
+    }
+    const entity = this.repo.create(payload);
     return this.repo.save(entity);
   }
 

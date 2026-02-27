@@ -8,6 +8,7 @@ import { EmailService } from './email.service';
 import { AuthModule } from '../auth/auth.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { UsersModule } from '../users/users.module';
+import { BillingModule } from '../billing/billing.module';
 
 @Module({
   imports: [
@@ -15,9 +16,10 @@ import { UsersModule } from '../users/users.module';
     forwardRef(() => AuthModule),
     OrganizationsModule,
     UsersModule,
+    forwardRef(() => BillingModule),
   ],
   controllers: [InvitationsController],
   providers: [InvitationsRepository, InvitationsService, EmailService],
-  exports: [InvitationsService],
+  exports: [InvitationsService, EmailService],
 })
 export class InvitationsModule {}

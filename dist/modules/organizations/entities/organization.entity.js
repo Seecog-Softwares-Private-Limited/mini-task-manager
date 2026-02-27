@@ -42,7 +42,7 @@ __decorate([
     __metadata("design:type", Boolean)
 ], OrganizationEntity.prototype, "isArchived", void 0);
 __decorate([
-    (0, typeorm_1.ManyToOne)(() => user_entity_1.UserEntity, { onDelete: 'RESTRICT' }),
+    (0, typeorm_1.ManyToOne)(() => user_entity_1.UserEntity, { onDelete: 'CASCADE' }),
     (0, typeorm_1.JoinColumn)({ name: 'owner_id' }),
     __metadata("design:type", user_entity_1.UserEntity)
 ], OrganizationEntity.prototype, "owner", void 0);

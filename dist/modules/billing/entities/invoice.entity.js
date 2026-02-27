@@ -25,17 +25,45 @@ __decorate([
     __metadata("design:type", String)
 ], InvoiceEntity.prototype, "subscriptionId", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: 'decimal', precision: 10, scale: 2 }),
+    (0, typeorm_1.Column)({ name: 'organization_id', type: 'binary', length: 16, transformer: base_entity_1.uuidBinaryTransformer }),
     __metadata("design:type", String)
+], InvoiceEntity.prototype, "organizationId", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'decimal', precision: 10, scale: 2 }),
+    __metadata("design:type", Number)
 ], InvoiceEntity.prototype, "amount", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'varchar', length: 10, default: 'INR' }),
+    __metadata("design:type", String)
+], InvoiceEntity.prototype, "currency", void 0);
 __decorate([
     (0, typeorm_1.Column)({ type: 'varchar', length: 50, default: 'UNPAID' }),
     __metadata("design:type", String)
 ], InvoiceEntity.prototype, "status", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: 'billing_cycle', type: 'varchar', length: 20 }),
+    __metadata("design:type", String)
+], InvoiceEntity.prototype, "billingCycle", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'plan_name', type: 'varchar', length: 100 }),
+    __metadata("design:type", String)
+], InvoiceEntity.prototype, "planName", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'user_count', type: 'int', default: 1 }),
+    __metadata("design:type", Number)
+], InvoiceEntity.prototype, "userCount", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'razorpay_invoice_id', type: 'varchar', length: 255, nullable: true }),
+    __metadata("design:type", Object)
+], InvoiceEntity.prototype, "razorpayInvoiceId", void 0);
+__decorate([
     (0, typeorm_1.Column)({ name: 'issued_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' }),
     __metadata("design:type", Date)
 ], InvoiceEntity.prototype, "issuedAt", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'due_date', type: 'timestamp', nullable: true }),
+    __metadata("design:type", Object)
+], InvoiceEntity.prototype, "dueDate", void 0);
 __decorate([
     (0, typeorm_1.Column)({ name: 'paid_at', type: 'timestamp', nullable: true }),
     __metadata("design:type", Object)
@@ -46,6 +74,7 @@ __decorate([
     __metadata("design:type", subscription_entity_1.SubscriptionEntity)
 ], InvoiceEntity.prototype, "subscription", void 0);
 exports.InvoiceEntity = InvoiceEntity = __decorate([
-    (0, typeorm_1.Entity)('invoices')
+    (0, typeorm_1.Entity)('invoices'),
+    (0, typeorm_1.Index)('idx_invoices_subscription_id', ['subscriptionId'])
 ], InvoiceEntity);
 //# sourceMappingURL=invoice.entity.js.map

@@ -12,6 +12,11 @@ import {
 } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { TenantGuard } from '../auth/guards/tenant.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { SubscriptionGuard } from '../billing/guards/subscription.guard';
+import { CheckSubscriptionLimit } from '../billing/decorators/check-limit.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUserId } from '../../common/decorators/current-user.decorator';
 import { InvitationsService } from './invitations.service';
@@ -29,7 +34,9 @@ export class InvitationsController {
   ) {}
 
   /** POST /organizations/:id/invitations — create and send invite */
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, SubscriptionGuard)
+  @Roles('owner', 'admin')
+  @CheckSubscriptionLimit('users')
   @Post('organizations/:id/invitations')
   async create(
     @Param('id') orgId: string,
@@ -56,7 +63,8 @@ export class InvitationsController {
   }
 
   /** GET /organizations/:id/invitations — list invitations */
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles('owner', 'admin')
   @Get('organizations/:id/invitations')
   async list(
     @Param('id') orgId: string,
@@ -77,7 +85,8 @@ export class InvitationsController {
   }
 
   /** POST /organizations/:id/invitations/:invId/resend — resend invite email */
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles('owner', 'admin')
   @Post('organizations/:id/invitations/:invId/resend')
   async resend(
     @Param('id') orgId: string,
@@ -99,7 +108,8 @@ export class InvitationsController {
   }
 
   /** PATCH /organizations/:id/invitations/:invId/cancel — cancel invite */
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles('owner', 'admin')
   @Patch('organizations/:id/invitations/:invId/cancel')
   async cancel(
     @Param('id') orgId: string,

@@ -65,28 +65,52 @@ async function runSeed() {
         const sprintRepo = manager.getRepository(sprint_entity_1.SprintEntity);
         const notificationRepo = manager.getRepository(notification_entity_1.NotificationEntity);
         const activityLogRepo = manager.getRepository(activity_log_entity_1.ActivityLogEntity);
-        const ownerId = (0, uuid_util_1.generateUuid)();
-        const memberId = (0, uuid_util_1.generateUuid)();
-        const adminId = (0, uuid_util_1.generateUuid)();
-        await userRepo.save(userRepo.create({
-            id: ownerId,
-            email: OWNER_EMAIL,
-            fullName: 'Seed Owner',
-            passwordHash: hash,
-        }));
-        await userRepo.save(userRepo.create({
-            id: memberId,
-            email: MEMBER_EMAIL,
-            fullName: 'Seed Member',
-            passwordHash: hash,
-        }));
-        await userRepo.save(userRepo.create({
-            id: adminId,
-            email: ADMIN_EMAIL,
-            fullName: 'Seed Admin',
-            passwordHash: hash,
-        }));
-        console.log('  Users created (owner@example.com, member@example.com, admin@example.com)');
+        let owner = await userRepo.findOne({ where: { email: OWNER_EMAIL } });
+        let member = await userRepo.findOne({ where: { email: MEMBER_EMAIL } });
+        let admin = await userRepo.findOne({ where: { email: ADMIN_EMAIL } });
+        if (!owner) {
+            const ownerId = (0, uuid_util_1.generateUuid)();
+            owner = await userRepo.save(userRepo.create({
+                id: ownerId,
+                email: OWNER_EMAIL,
+                fullName: 'Seed Owner',
+                passwordHash: hash,
+                isEmailVerified: true,
+            }));
+        }
+        else {
+            await userRepo.update(owner.id, { passwordHash: hash, isEmailVerified: true });
+        }
+        if (!member) {
+            const memberId = (0, uuid_util_1.generateUuid)();
+            member = await userRepo.save(userRepo.create({
+                id: memberId,
+                email: MEMBER_EMAIL,
+                fullName: 'Seed Member',
+                passwordHash: hash,
+                isEmailVerified: true,
+            }));
+        }
+        else {
+            await userRepo.update(member.id, { passwordHash: hash, isEmailVerified: true });
+        }
+        if (!admin) {
+            const adminId = (0, uuid_util_1.generateUuid)();
+            admin = await userRepo.save(userRepo.create({
+                id: adminId,
+                email: ADMIN_EMAIL,
+                fullName: 'Seed Admin',
+                passwordHash: hash,
+                isEmailVerified: true,
+            }));
+        }
+        else {
+            await userRepo.update(admin.id, { passwordHash: hash, isEmailVerified: true });
+        }
+        const ownerId = owner.id;
+        const memberId = member.id;
+        const adminId = admin.id;
+        console.log('  Users ready (owner@example.com, member@example.com, admin@example.com)');
         const orgId = (0, uuid_util_1.generateUuid)();
         const slug = 'seed-org-' + Date.now();
         await orgRepo.save(orgRepo.create({
@@ -118,37 +142,131 @@ async function runSeed() {
             status: 'ACTIVE',
         }));
         console.log('  Organization members: owner + member + admin');
-        const planFreeId = (0, uuid_util_1.generateUuid)();
-        const planProId = (0, uuid_util_1.generateUuid)();
-        const planEntId = (0, uuid_util_1.generateUuid)();
-        await planRepo.save(planRepo.create({
-            id: planFreeId,
-            name: 'Free',
-            pricePerUser: null,
-            billingCycle: 'monthly',
-            maxProjects: 3,
-            maxMembers: 5,
-            isActive: true,
-        }));
-        await planRepo.save(planRepo.create({
-            id: planProId,
-            name: 'Pro',
-            pricePerUser: '10.00',
-            billingCycle: 'monthly',
-            maxProjects: 20,
-            maxMembers: 50,
-            isActive: true,
-        }));
-        await planRepo.save(planRepo.create({
-            id: planEntId,
-            name: 'Enterprise',
-            pricePerUser: '25.00',
-            billingCycle: 'monthly',
-            maxProjects: null,
-            maxMembers: null,
-            isActive: true,
-        }));
-        console.log('  Plans: Free, Pro, Enterprise');
+        let planFree = await planRepo.findOne({ where: { slug: 'free' } });
+        let planStarter = await planRepo.findOne({ where: { slug: 'starter' } });
+        let planPro = await planRepo.findOne({ where: { slug: 'pro' } });
+        let planEnt = await planRepo.findOne({ where: { slug: 'enterprise' } });
+        if (!planFree) {
+            const planFreeId = (0, uuid_util_1.generateUuid)();
+            planFree = await planRepo.save(planRepo.create({
+                id: planFreeId,
+                slug: 'free',
+                name: 'Free',
+                priceMonthly: 0,
+                priceYearly: 0,
+                currency: 'INR',
+                billingCycle: 'monthly',
+                maxProjects: 1,
+                maxUsers: 3,
+                storageLimitGb: 5,
+                automationLimit: 0,
+                integrationLimit: 0,
+                apiEnabled: false,
+                ssoEnabled: false,
+                auditLogsEnabled: false,
+                customWorkflows: false,
+                advancedReporting: false,
+                timeTracking: false,
+                prioritySupport: false,
+                slaUptime: null,
+                features: { customFields: false, sso: false },
+                isActive: true,
+                isPopular: false,
+                displayOrder: 1,
+            }));
+        }
+        if (!planStarter) {
+            const planStarterId = (0, uuid_util_1.generateUuid)();
+            planStarter = await planRepo.save(planRepo.create({
+                id: planStarterId,
+                slug: 'starter',
+                name: 'Starter',
+                priceMonthly: 5,
+                priceYearly: 50,
+                currency: 'INR',
+                billingCycle: 'monthly',
+                maxProjects: 10,
+                maxUsers: 10,
+                storageLimitGb: 5,
+                automationLimit: 50,
+                integrationLimit: 5,
+                apiEnabled: true,
+                ssoEnabled: false,
+                auditLogsEnabled: false,
+                customWorkflows: true,
+                advancedReporting: false,
+                timeTracking: false,
+                prioritySupport: false,
+                slaUptime: null,
+                features: { customFields: true, sso: false },
+                isActive: true,
+                isPopular: false,
+                displayOrder: 2,
+            }));
+        }
+        if (!planPro) {
+            const planProId = (0, uuid_util_1.generateUuid)();
+            planPro = await planRepo.save(planRepo.create({
+                id: planProId,
+                slug: 'pro',
+                name: 'Pro',
+                priceMonthly: 349,
+                priceYearly: 3499,
+                currency: 'INR',
+                billingCycle: 'monthly',
+                maxProjects: null,
+                maxUsers: null,
+                storageLimitGb: 100,
+                automationLimit: 500,
+                integrationLimit: 10,
+                apiEnabled: true,
+                ssoEnabled: true,
+                auditLogsEnabled: false,
+                customWorkflows: true,
+                advancedReporting: true,
+                timeTracking: true,
+                prioritySupport: false,
+                slaUptime: null,
+                features: { customFields: true, sso: true },
+                isActive: true,
+                isPopular: true,
+                displayOrder: 3,
+            }));
+        }
+        if (!planEnt) {
+            const planEntId = (0, uuid_util_1.generateUuid)();
+            planEnt = await planRepo.save(planRepo.create({
+                id: planEntId,
+                slug: 'enterprise',
+                name: 'Enterprise',
+                priceMonthly: 799,
+                priceYearly: 7999,
+                currency: 'INR',
+                billingCycle: 'monthly',
+                maxProjects: null,
+                maxUsers: null,
+                storageLimitGb: null,
+                automationLimit: null,
+                integrationLimit: null,
+                apiEnabled: true,
+                ssoEnabled: true,
+                auditLogsEnabled: true,
+                customWorkflows: true,
+                advancedReporting: true,
+                timeTracking: true,
+                prioritySupport: true,
+                slaUptime: '99.9%',
+                features: { customFields: true, sso: true, auditLog: true, prioritySupport: true },
+                isActive: true,
+                isPopular: false,
+                displayOrder: 4,
+            }));
+        }
+        const planFreeId = planFree.id;
+        const planStarterId = planStarter.id;
+        const planProId = planPro.id;
+        const planEntId = planEnt.id;
+        console.log('  Plans: Free, Starter, Pro, Enterprise');
         await subRepo.save(subRepo.create({
             id: (0, uuid_util_1.generateUuid)(),
             organizationId: orgId,

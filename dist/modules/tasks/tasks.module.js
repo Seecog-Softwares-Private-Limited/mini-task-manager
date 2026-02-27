@@ -10,8 +10,13 @@ exports.TasksModule = void 0;
 const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const auth_module_1 = require("../auth/auth.module");
+const billing_module_1 = require("../billing/billing.module");
 const organizations_module_1 = require("../organizations/organizations.module");
 const projects_module_1 = require("../projects/projects.module");
+const invitations_module_1 = require("../invitations/invitations.module");
+const users_module_1 = require("../users/users.module");
+const notifications_module_1 = require("../notifications/notifications.module");
+const activity_logs_module_1 = require("../activity-logs/activity-logs.module");
 const task_entity_1 = require("./entities/task.entity");
 const task_comment_entity_1 = require("./entities/task-comment.entity");
 const task_attachment_entity_1 = require("./entities/task-attachment.entity");
@@ -28,8 +33,13 @@ exports.TasksModule = TasksModule = __decorate([
         imports: [
             typeorm_1.TypeOrmModule.forFeature([task_entity_1.TaskEntity, task_comment_entity_1.TaskCommentEntity, task_attachment_entity_1.TaskAttachmentEntity]),
             auth_module_1.AuthModule,
+            billing_module_1.BillingModule,
             organizations_module_1.OrganizationsModule,
-            projects_module_1.ProjectsModule,
+            (0, common_1.forwardRef)(() => projects_module_1.ProjectsModule),
+            invitations_module_1.InvitationsModule,
+            users_module_1.UsersModule,
+            notifications_module_1.NotificationsModule,
+            activity_logs_module_1.ActivityLogsModule,
         ],
         controllers: [tasks_controller_1.TasksController],
         providers: [tasks_repository_1.TasksRepository, task_comments_repository_1.TaskCommentsRepository, task_attachments_repository_1.TaskAttachmentsRepository, tasks_service_1.TasksService],

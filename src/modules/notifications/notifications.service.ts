@@ -20,4 +20,13 @@ export class NotificationsService {
     }
     await this.notificationsRepository.markAsRead(id);
   }
+
+  async markAllAsRead(userId: string): Promise<{ count: number }> {
+    const count = await this.notificationsRepository.markAllAsReadByUser(userId);
+    return { count };
+  }
+
+  async createNotification(userId: string, title: string, message: string): Promise<void> {
+    await this.notificationsRepository.create({ userId, title, message });
+  }
 }

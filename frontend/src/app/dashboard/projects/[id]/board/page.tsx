@@ -4,7 +4,8 @@ import { useMemo, useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchProject } from "@/services/api/projects.api";
 import { fetchWorkflowsByProject, fetchWorkflowStatuses, createDefaultWorkflow } from "@/services/api/workflows.api";
-import { fetchTasksByProject, updateTaskStatus, createTask } from "@/services/api/tasks.api";
+import { fetchTasksByProject, updateTaskStatus, updateTaskStatusAndSprint, createTask } from "@/services/api/tasks.api";
+import { fetchSprintsByProject, createSprint } from "@/services/api/sprints.api";
 import { fetchOrgMembers } from "@/services/api/members.api";
 import { fetchCommentCounts } from "@/services/api/comments.api";
 import { fetchSubscription } from "@/services/api/billing.api";
@@ -18,6 +19,7 @@ import {
   type AssigneeMap,
   type BoardFilters,
 } from "@/components/kanban/kanban-board";
+import { ScrumBoard, type Swimlane } from "@/components/kanban/scrum-board";
 import { BoardToolbar, type ViewMode, type SavedView } from "@/components/kanban/board-toolbar";
 import { BoardStatsBar } from "@/components/kanban/board-stats";
 import { BoardTableView } from "@/components/kanban/board-table-view";
@@ -25,6 +27,7 @@ import { BoardSettingsModal, type BoardSettings } from "@/components/kanban/boar
 import { BoardSkeleton } from "@/components/kanban/board-skeleton";
 import { BulkActionBar } from "@/components/kanban/bulk-action-bar";
 import { CreateTaskModal, type CreateTaskFormData } from "@/components/tasks/create-task-modal";
+import { CreateSprintModal } from "@/components/sprints/create-sprint-modal";
 import { TaskDetailModal } from "@/components/tasks/task-detail-modal";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
@@ -32,8 +35,9 @@ import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useSavedViews } from "@/hooks/use-saved-views";
 import { useBulkSelection } from "@/hooks/use-bulk-selection";
 import { useBoardPermissions } from "@/hooks/use-board-permissions";
+import { useRetentionTracking } from "@/hooks/use-retention-tracking";
 import type { Task } from "@/types/api";
-import { Plus, Columns3, Settings, Sparkles, Keyboard, Shield, Crown } from "lucide-react";
+import { Plus, Columns3, Settings, Sparkles, Keyboard, Shield, Crown, Rocket } from "lucide-react";
 import Link from "next/link";
 import {
   Tooltip,
@@ -59,6 +63,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
   const { orgId } = useTenant();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { trackFirstTaskCreated } = useRetentionTracking();
   const currentUserId = useMemo(() => getCurrentUserId(), []);
 
   // ─── UI state ──────────────────────────────────────────────
@@ -71,7 +76,9 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [boardSettings, setBoardSettings] = useState<BoardSettings>({ wipLimits: {} });
   const [collapsedColumns, setCollapsedColumns] = useState<Record<string, boolean>>({});
+  const [collapsedSwimlanes, setCollapsedSwimlanes] = useState<Record<string, boolean>>({});
   const [movingTaskId, setMovingTaskId] = useState<string | null>(null);
+  const [createSprintModalOpen, setCreateSprintModalOpen] = useState(false);
   const [isBulkMoving, setIsBulkMoving] = useState(false);
 
   // ─── Hooks ─────────────────────────────────────────────────
@@ -111,6 +118,12 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
     queryKey: ["org-members", orgId ?? ""],
     queryFn: () => fetchOrgMembers(orgId!),
     enabled: !!orgId,
+  });
+
+  const { data: sprints = [] } = useQuery({
+    queryKey: ["sprints", id],
+    queryFn: () => fetchSprintsByProject(id),
+    enabled: !!id && !!orgId,
   });
 
   // Comment counts for all tasks — fetched once, refreshed when tasks change
@@ -198,6 +211,39 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
     return all;
   }, [statuses, tasksByStatus]);
 
+  const swimlanes: Swimlane[] = useMemo(() => {
+    const sorted = [...sprints].sort((a, b) => {
+      if (a.status === "ACTIVE" && b.status !== "ACTIVE") return -1;
+      if (a.status !== "ACTIVE" && b.status === "ACTIVE") return 1;
+      const aStart = a.startDate ? new Date(a.startDate).getTime() : 0;
+      const bStart = b.startDate ? new Date(b.startDate).getTime() : 0;
+      return aStart - bStart;
+    });
+    const lanes: Swimlane[] = sorted.map((s) => ({
+      id: s.id,
+      name: s.name,
+      sprint: s,
+      isBacklog: false,
+    }));
+    lanes.push({ id: "__backlog__", name: "Backlog", isBacklog: true });
+    return lanes;
+  }, [sprints]);
+
+  const tasksByCell = useMemo(() => {
+    const map: Record<string, Task[]> = {};
+    for (const lane of swimlanes) {
+      for (const s of statuses) {
+        const key = `${lane.id}::${s.id}`;
+        map[key] = tasks.filter((t) => {
+          const matchSprint = lane.isBacklog ? !t.sprintId : t.sprintId === lane.id;
+          const matchStatus = (t.statusId ?? statuses[0]?.id) === s.id;
+          return matchSprint && matchStatus;
+        });
+      }
+    }
+    return map;
+  }, [swimlanes, statuses, tasks]);
+
   // ─── Mutations ────────────────────────────────────────────
 
   const updateStatusMutation = useMutation({
@@ -245,7 +291,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
         storyPoints: payload.storyPoints,
         dueDate: payload.dueDate,
         tags: payload.tags ?? [],
-        subtasks: payload.subtasks ?? [],
+        subtasks: (payload.subtasks ?? []) as Task["subtasks"],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -262,6 +308,45 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
     onSuccess: () => {
       setCreateModalOpen(false);
       toast({ title: "Task created", variant: "success" });
+      trackFirstTaskCreated();
+    },
+  });
+
+  const scrumMoveMutation = useMutation({
+    mutationFn: ({ taskId, statusId, sprintId }: { taskId: string; statusId: string; sprintId: string | null }) =>
+      updateTaskStatusAndSprint(taskId, statusId, sprintId),
+    onMutate: async ({ taskId, statusId: toStatusId, sprintId: toSprintId }) => {
+      setMovingTaskId(taskId);
+      await queryClient.cancelQueries({ queryKey: ["tasks", id] });
+      const prev = queryClient.getQueryData<{ data: Task[] }>(["tasks", id]);
+      queryClient.setQueryData<{ data: Task[] }>(["tasks", id], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          data: old.data.map((t) =>
+            t.id === taskId ? { ...t, statusId: toStatusId, sprintId: toSprintId ?? undefined } : t
+          ),
+        };
+      });
+      return { previous: prev };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) queryClient.setQueryData(["tasks", id], context.previous);
+      toast({ title: "Failed to move task", description: "Returned to original position.", variant: "error" });
+    },
+    onSettled: () => {
+      setMovingTaskId(null);
+      queryClient.invalidateQueries({ queryKey: ["tasks", id] });
+    },
+  });
+
+  const createSprintMutation = useMutation({
+    mutationFn: (payload: { name: string; startDate?: string; endDate?: string }) =>
+      createSprint({ projectId: id, ...payload }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sprints", id] });
+      setCreateSprintModalOpen(false);
+      toast({ title: "Sprint created", variant: "success" });
     },
   });
 
@@ -279,6 +364,13 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
   const handleMoveTask = useCallback((taskId: string, _from: string | null, toStatusId: string) => {
     updateStatusMutation.mutate({ taskId, statusId: toStatusId });
   }, [updateStatusMutation]);
+
+  const handleScrumMoveTask = useCallback(
+    (taskId: string, toStatusId: string, toSprintId: string | null) => {
+      scrumMoveMutation.mutate({ taskId, statusId: toStatusId, sprintId: toSprintId });
+    },
+    [scrumMoveMutation]
+  );
 
   const handleQuickAdd = useCallback(
     (title: string, statusId: string) => {
@@ -411,8 +503,8 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
       },
       {
         key: "b",
-        handler: () => setViewMode((m) => m === "kanban" ? "table" : "kanban"),
-        description: "Toggle view",
+        handler: () => setViewMode((m) => (m === "kanban" ? "scrum" : m === "scrum" ? "table" : "kanban")),
+        description: "Cycle view (Kanban/Scrum/Table)",
       },
       {
         key: "Escape",
@@ -497,12 +589,18 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
               <TooltipContent side="bottom" className="text-xs space-y-1">
                 <p><kbd className="rounded border bg-muted px-1 py-0.5 text-[10px] font-mono">Ctrl+N</kbd> New task</p>
                 <p><kbd className="rounded border bg-muted px-1 py-0.5 text-[10px] font-mono">/</kbd> Search</p>
-                <p><kbd className="rounded border bg-muted px-1 py-0.5 text-[10px] font-mono">B</kbd> Toggle view</p>
+                <p><kbd className="rounded border bg-muted px-1 py-0.5 text-[10px] font-mono">B</kbd> Cycle Kanban/Scrum/Table</p>
                 <p><kbd className="rounded border bg-muted px-1 py-0.5 text-[10px] font-mono">Ctrl+Shift+S</kbd> Select mode</p>
                 <p><kbd className="rounded border bg-muted px-1 py-0.5 text-[10px] font-mono">Esc</kbd> Close / exit</p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
+          {viewMode === "scrum" && permissions.canManageBoard && (
+            <Button variant="outline" size="sm" onClick={() => setCreateSprintModalOpen(true)} className="h-9 gap-1.5">
+              <Rocket className="h-3.5 w-3.5" />
+              New Sprint
+            </Button>
+          )}
           {permissions.canManageBoard && (
             <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)} className="h-9 gap-1.5">
               <Settings className="h-3.5 w-3.5" />
@@ -584,6 +682,30 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
           onSetWipLimit={handleSetWipLimit}
           permissions={permissions}
           aria-label={`Tasks for ${project.name}`}
+        />
+      ) : viewMode === "scrum" ? (
+        <ScrumBoard
+          swimlanes={swimlanes}
+          statuses={statuses}
+          tasksByCell={tasksByCell}
+          onMoveTask={handleScrumMoveTask}
+          onTaskClick={(task) => setSelectedTaskId(task.id)}
+          assigneeMap={assigneeMap}
+          commentCountMap={commentCountMap}
+          subtaskMap={subtaskMap}
+          filters={filters}
+          quickActions={quickActions}
+          wipLimits={boardSettings.wipLimits}
+          movingTaskId={movingTaskId}
+          collapsedSwimlanes={collapsedSwimlanes}
+          onToggleSwimlaneCollapse={(swimlaneId) =>
+            setCollapsedSwimlanes((prev) => ({ ...prev, [swimlaneId]: !prev[swimlaneId] }))
+          }
+          isSelectionMode={bulk.state.isSelectionMode}
+          selectedIds={bulk.state.selectedIds}
+          onToggleSelect={bulk.toggle}
+          permissions={permissions}
+          aria-label={`Scrum board for ${project.name}`}
         />
       ) : (
         <BoardTableView
@@ -678,6 +800,16 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
         settings={boardSettings}
         onSettingsChange={setBoardSettings}
       />
+
+      {createSprintModalOpen && (
+        <CreateSprintModal
+          open={createSprintModalOpen}
+          onClose={() => setCreateSprintModalOpen(false)}
+          onSubmit={(data) => createSprintMutation.mutate({ projectId: id, ...data })}
+          isSubmitting={createSprintMutation.isPending}
+          error={createSprintMutation.error ? parseApiError(createSprintMutation.error) : null}
+        />
+      )}
     </div>
   );
 }

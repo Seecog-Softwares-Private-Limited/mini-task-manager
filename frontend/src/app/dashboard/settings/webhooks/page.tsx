@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useAuth } from "@/hooks/use-auth";
+import { usePermissions } from "@/hooks/use-permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Webhook, Plus, Trash2, ArrowLeft, Check } from "lucide-react";
+import { Webhook, Plus, Trash2, ArrowLeft, Check, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const EVENTS = ["project.created", "task.created", "task.updated", "member.invited"];
@@ -17,15 +17,40 @@ const STUB_WEBHOOKS = [
 ];
 
 export default function WebhooksPage() {
-  const { canManageBilling } = useAuth();
+  const { canManageWebhooks, isLoading: permsLoading } = usePermissions();
   const [url, setUrl] = useState("");
   const [selectedEvents, setSelectedEvents] = useState<string[]>([]);
 
-  const canManage = canManageBilling;
+  const canManage = canManageWebhooks;
 
   function toggleEvent(e: string) {
     setSelectedEvents((prev) =>
       prev.includes(e) ? prev.filter((x) => x !== e) : [...prev, e]
+    );
+  }
+
+  if (!permsLoading && !canManageWebhooks) {
+    return (
+      <div className="space-y-6 animate-slide-up">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Webhooks</h1>
+          <p className="mt-1 text-muted-foreground">Subscribe to events. Owner/admin only.</p>
+        </div>
+        <Card className="max-w-md border-dashed border-2">
+          <CardContent className="flex items-center gap-4 py-8 px-6">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 shrink-0">
+              <Shield className="h-6 w-6 text-amber-500" />
+            </div>
+            <div>
+              <p className="font-semibold">Access Restricted</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">Only owners and admins can manage webhooks.</p>
+              <Button asChild size="sm" variant="outline" className="mt-3">
+                <Link href="/dashboard/settings">Back to Settings</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 

@@ -31,11 +31,11 @@ let OrganizationMembersRepository = class OrganizationMembersRepository {
         return this.repo.find({ where: { organizationId }, order: { joinedAt: 'ASC' } });
     }
     async countByOrganization(organizationId) {
-        return this.repo.count({ where: { organizationId } });
+        return this.repo.count({ where: { organizationId, status: 'ACTIVE' } });
     }
     async findByOrganizationWithUser(organizationId) {
         return this.repo.find({
-            where: { organizationId },
+            where: { organizationId, status: 'ACTIVE' },
             order: { joinedAt: 'ASC' },
             relations: ['user'],
         });
@@ -44,6 +44,12 @@ let OrganizationMembersRepository = class OrganizationMembersRepository {
         return this.repo.find({
             where: { userId, status: 'ACTIVE' },
             order: { joinedAt: 'ASC' },
+        });
+    }
+    async findById(id) {
+        return this.repo.findOne({
+            where: { id },
+            relations: ['user'],
         });
     }
     async create(data) {

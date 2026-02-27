@@ -68,6 +68,16 @@ Password is:
 
 ### 5) Start the app
 
+**Option A — Single command (recommended):**
+
+```bash
+npm run dev
+```
+
+Runs backend (port `3000`) and frontend (port `3001`) together.
+
+**Option B — Separate terminals:**
+
 Terminal 1 (backend, port `3000`):
 
 ```bash
@@ -77,14 +87,19 @@ npm run start:dev
 Terminal 2 (frontend, port `3001`):
 
 ```bash
-cd frontend
-npm run dev
+npm run dev:frontend
 ```
 
 Open:
 
 - Frontend: `http://localhost:3001`
 - Backend API: `http://localhost:3000/api/v1`
+
+> **Note:** For sign-in and API calls to work reliably, create `frontend/.env.local` with:
+> ```
+> NEXT_PUBLIC_API_URL=http://localhost:3000
+> ```
+> Then restart the frontend dev server. Without this, the frontend proxies `/api/v1` to the backend; ensure the backend is running.
 
 ---
 

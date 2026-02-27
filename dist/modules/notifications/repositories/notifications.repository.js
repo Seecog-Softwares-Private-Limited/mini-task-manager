@@ -42,6 +42,10 @@ let NotificationsRepository = class NotificationsRepository {
     async markAsRead(id) {
         await this.repo.update(id, { isRead: true });
     }
+    async markAllAsReadByUser(userId) {
+        const result = await this.repo.update({ userId, isRead: false }, { isRead: true });
+        return result.affected ?? 0;
+    }
 };
 exports.NotificationsRepository = NotificationsRepository;
 exports.NotificationsRepository = NotificationsRepository = __decorate([

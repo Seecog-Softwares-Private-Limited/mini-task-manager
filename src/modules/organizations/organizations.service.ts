@@ -123,6 +123,103 @@ export class OrganizationsService {
     return m && m.status === 'ACTIVE' ? m : null;
   }
 
+  /** Returns workspace-progress flags for onboarding reconciliation. */
+  async getWorkspaceProgress(organizationId: string): Promise<{
+    hasProjects: boolean;
+    hasMembers: boolean;
+    hasTasks: boolean;
+  }> {
+    const [projectCount] = await this.dataSource.query(
+      `SELECT COUNT(*) as cnt FROM projects WHERE organization_id = ?`,
+      [organizationId],
+    );
+    // Count active members excluding the org owner (>1 means someone accepted an invite)
+    const [memberCount] = await this.dataSource.query(
+      `SELECT COUNT(*) as cnt FROM organization_members WHERE organization_id = ? AND status = 'ACTIVE'`,
+      [organizationId],
+    );
+    const [taskCount] = await this.dataSource.query(
+      `SELECT COUNT(*) as cnt FROM tasks WHERE organization_id = ?`,
+      [organizationId],
+    );
+    return {
+      hasProjects: Number(projectCount?.cnt ?? 0) > 0,
+      hasMembers: Number(memberCount?.cnt ?? 0) > 1,
+      hasTasks: Number(taskCount?.cnt ?? 0) > 0,
+    };
+  }
+
+  /** Update a member's role. Owner or admin only. Cannot change owner role. */
+  async updateMemberRole(
+    organizationId: string,
+    memberId: string,
+    role: string,
+    actorUserId: string,
+  ): Promise<OrganizationMemberEntity> {
+    const membership = await this.getMembership(organizationId, actorUserId);
+    if (!membership) {
+      throw new ForbiddenException('You do not have access to this organization');
+    }
+    const actorRole = membership.role?.toLowerCase();
+    if (actorRole !== 'owner' && actorRole !== 'admin') {
+      throw new ForbiddenException('Only owners and admins can update member roles');
+    }
+
+    const target = await this.orgMembersRepository.findById(memberId);
+    if (!target) {
+      throw new ForbiddenException('Member not found');
+    }
+    if (target.organizationId !== organizationId) {
+      throw new ForbiddenException('Member does not belong to this organization');
+    }
+    if (target.role?.toLowerCase() === 'owner') {
+      throw new ForbiddenException('Cannot change the owner role. Use transfer ownership instead.');
+    }
+    if (actorRole === 'admin' && target.role?.toLowerCase() === 'owner') {
+      throw new ForbiddenException('Admins cannot modify the owner');
+    }
+
+    const normalizedRole = role?.trim().toLowerCase() || 'member';
+    const allowedRoles = ['admin', 'member'];
+    if (!allowedRoles.includes(normalizedRole)) {
+      throw new ForbiddenException('Invalid role. Use admin or member.');
+    }
+
+    await this.orgMembersRepository.update(memberId, { role: normalizedRole });
+    const updated = await this.orgMembersRepository.findById(memberId);
+    if (!updated) throw new ForbiddenException('Member not found');
+    return updated;
+  }
+
+  /** Remove a member from the organization. Owner or admin only. Cannot remove owner. */
+  async removeMember(
+    organizationId: string,
+    memberId: string,
+    actorUserId: string,
+  ): Promise<void> {
+    const membership = await this.getMembership(organizationId, actorUserId);
+    if (!membership) {
+      throw new ForbiddenException('You do not have access to this organization');
+    }
+    const actorRole = membership.role?.toLowerCase();
+    if (actorRole !== 'owner' && actorRole !== 'admin') {
+      throw new ForbiddenException('Only owners and admins can remove members');
+    }
+
+    const target = await this.orgMembersRepository.findById(memberId);
+    if (!target) {
+      throw new ForbiddenException('Member not found');
+    }
+    if (target.organizationId !== organizationId) {
+      throw new ForbiddenException('Member does not belong to this organization');
+    }
+    if (target.role?.toLowerCase() === 'owner') {
+      throw new ForbiddenException('Cannot remove the owner. Use transfer ownership first.');
+    }
+
+    await this.orgMembersRepository.update(memberId, { status: 'REMOVED' });
+  }
+
   /** Delete organization. Owner only. */
   async delete(id: string, userId: string): Promise<void> {
     const membership = await this.getMembership(id, userId);

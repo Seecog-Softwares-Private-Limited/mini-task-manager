@@ -29,6 +29,8 @@ let GlobalExceptionFilter = GlobalExceptionFilter_1 = class GlobalExceptionFilte
         if (status >= 500) {
             this.logger.error(`${request.method} ${request.url} ${status}`, exception instanceof Error ? exception.stack : String(exception));
         }
+        if (response.headersSent)
+            return;
         response.status(status).json(body);
     }
 };

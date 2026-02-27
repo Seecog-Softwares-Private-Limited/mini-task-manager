@@ -30,6 +30,13 @@ let NotificationsService = class NotificationsService {
         }
         await this.notificationsRepository.markAsRead(id);
     }
+    async markAllAsRead(userId) {
+        const count = await this.notificationsRepository.markAllAsReadByUser(userId);
+        return { count };
+    }
+    async createNotification(userId, title, message) {
+        await this.notificationsRepository.create({ userId, title, message });
+    }
 };
 exports.NotificationsService = NotificationsService;
 exports.NotificationsService = NotificationsService = __decorate([

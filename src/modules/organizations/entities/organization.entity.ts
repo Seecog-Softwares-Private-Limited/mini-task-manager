@@ -23,7 +23,7 @@ export class OrganizationEntity extends BaseEntity {
   @Column({ name: 'is_archived', type: 'boolean', default: false })
   isArchived!: boolean;
 
-  @ManyToOne(() => UserEntity, { onDelete: 'RESTRICT' })
+  @ManyToOne(() => UserEntity, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'owner_id' })
   owner?: UserEntity;
 }

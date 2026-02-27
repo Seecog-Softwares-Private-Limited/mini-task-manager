@@ -10,6 +10,11 @@ export declare class OrganizationsController {
         available: boolean;
     }>;
     create(dto: CreateOrganizationDto, ownerId: string): Promise<OrganizationResponseDto>;
+    getWorkspaceProgress(id: string, userId: string, orgIdHeader?: string): Promise<{
+        hasProjects: boolean;
+        hasMembers: boolean;
+        hasTasks: boolean;
+    }>;
     getMemberCount(id: string, userId: string, orgIdHeader?: string): Promise<{
         count: number;
     }>;
@@ -28,6 +33,26 @@ export declare class OrganizationsController {
             lastSeenAt: string | undefined;
         } | undefined;
     }[]>;
+    updateMemberRole(id: string, memberId: string, body: {
+        role: string;
+    }, userId: string, orgIdHeader?: string): Promise<{
+        id: string;
+        organizationId: string;
+        userId: string;
+        role: string;
+        status: string;
+        joinedAt: Date;
+        user: {
+            id: string;
+            fullName: string;
+            email: string;
+            avatarUrl: string | undefined;
+            lastSeenAt: string | undefined;
+        } | undefined;
+    }>;
+    removeMember(id: string, memberId: string, userId: string, orgIdHeader?: string): Promise<{
+        success: boolean;
+    }>;
     update(id: string, dto: UpdateOrganizationDto, userId: string, orgIdHeader?: string): Promise<OrganizationResponseDto>;
     delete(id: string, userId: string, orgIdHeader?: string): Promise<{
         success: boolean;

@@ -1,6 +1,9 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, ForbiddenException, Headers, Query } from '@nestjs/common';
 import { CurrentUserId } from '../../common/decorators/current-user.decorator';
 import { SkipThrottle } from '@nestjs/throttler';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { TenantGuard } from '../auth/guards/tenant.guard';
 import { OrganizationsService } from './organizations.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
@@ -41,6 +44,23 @@ export class OrganizationsController {
     return this.toResponse(org, 'owner');
   }
 
+  @Get(':id/workspace-progress')
+  async getWorkspaceProgress(
+    @Param('id') id: string,
+    @CurrentUserId() userId: string,
+    @Headers('x-organization-id') orgIdHeader?: string,
+  ) {
+    const headerOrgId = orgIdHeader?.trim();
+    if (!headerOrgId || headerOrgId !== id) {
+      throw new ForbiddenException('X-Organization-Id header is required and must match the requested organization id');
+    }
+    const canAccess = await this.organizationsService.canAccess(id, userId);
+    if (!canAccess) {
+      throw new ForbiddenException('You do not have access to this organization');
+    }
+    return this.organizationsService.getWorkspaceProgress(id);
+  }
+
   @Get(':id/members/count')
   async getMemberCount(
     @Param('id') id: string,
@@ -61,6 +81,8 @@ export class OrganizationsController {
     return { count };
   }
 
+  @UseGuards(TenantGuard, RolesGuard)
+  @Roles('owner', 'admin')
   @Get(':id/members')
   async getMembers(
     @Param('id') id: string,
@@ -81,6 +103,52 @@ export class OrganizationsController {
     return members.map((m) => this.toMemberResponse(m));
   }
 
+  @UseGuards(TenantGuard, RolesGuard)
+  @Roles('owner', 'admin')
+  @Patch(':id/members/:memberId')
+  async updateMemberRole(
+    @Param('id') id: string,
+    @Param('memberId') memberId: string,
+    @Body() body: { role: string },
+    @CurrentUserId() userId: string,
+    @Headers('x-organization-id') orgIdHeader?: string,
+  ) {
+    const headerOrgId = orgIdHeader?.trim();
+    if (!headerOrgId || headerOrgId !== id) {
+      throw new ForbiddenException(
+        'X-Organization-Id header is required and must match the requested organization',
+      );
+    }
+    const updated = await this.organizationsService.updateMemberRole(
+      id,
+      memberId,
+      body.role,
+      userId,
+    );
+    return this.toMemberResponse(updated);
+  }
+
+  @UseGuards(TenantGuard, RolesGuard)
+  @Roles('owner', 'admin')
+  @Delete(':id/members/:memberId')
+  async removeMember(
+    @Param('id') id: string,
+    @Param('memberId') memberId: string,
+    @CurrentUserId() userId: string,
+    @Headers('x-organization-id') orgIdHeader?: string,
+  ): Promise<{ success: boolean }> {
+    const headerOrgId = orgIdHeader?.trim();
+    if (!headerOrgId || headerOrgId !== id) {
+      throw new ForbiddenException(
+        'X-Organization-Id header is required and must match the requested organization',
+      );
+    }
+    await this.organizationsService.removeMember(id, memberId, userId);
+    return { success: true };
+  }
+
+  @UseGuards(TenantGuard, RolesGuard)
+  @Roles('owner', 'admin')
   @Patch(':id')
   async update(
     @Param('id') id: string,

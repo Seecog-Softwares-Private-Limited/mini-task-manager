@@ -24,6 +24,7 @@ export interface ApiErrorBody {
 export interface LoginResponse {
   accessToken: string;
   user: { id: string; email: string; fullName: string };
+  organizationId?: string;
 }
 
 export interface User {
@@ -131,39 +132,100 @@ export interface CustomField {
 export interface Notification {
   id: string;
   userId: string;
-  title: string;
+  title: string | null;
   message?: string | null;
-  readAt?: string | null;
+  isRead: boolean;
   createdAt: string;
 }
 
 export interface Plan {
   id: string;
+  slug: string;
   name: string;
-  pricePerUser: string | null;
-  billingCycle: string;
-  maxProjects?: number;
-  maxMembers?: number;
+  priceMonthly: number;
+  priceYearly: number;
+  currency: string;
+  maxUsers: number | null;
+  maxProjects: number | null;
+  storageLimitGb: number | null;
+  automationLimit: number | null;
+  integrationLimit: number | null;
+  maxApiKeys: number | null;
+  apiEnabled: boolean;
+  ssoEnabled: boolean;
+  auditLogsEnabled: boolean;
+  customWorkflows: boolean;
+  advancedReporting: boolean;
+  timeTracking: boolean;
+  prioritySupport: boolean;
+  slaUptime: string | null;
   features?: Record<string, unknown>;
+  isPopular: boolean;
+  displayOrder: number;
 }
 
 export interface Subscription {
   id: string;
   organizationId: string;
   planId: string;
+  planSlug: string;
+  planName: string;
+  billingCycle: string;
   status: string;
   startDate?: string;
   endDate?: string;
   trialEndsAt?: string;
+  cancelledAt?: string;
+  razorpaySubscriptionId?: string;
+  daysRemaining?: number;
+  isTrialExpired?: boolean;
 }
 
 export interface Invoice {
   id: string;
   subscriptionId: string;
-  amount: string;
+  amount: number;
+  currency: string;
   status: string;
+  billingCycle: string;
+  planName: string;
+  userCount: number;
   issuedAt: string;
+  dueDate?: string;
   paidAt?: string;
+}
+
+export interface UsageBucket {
+  current: number;
+  limit: number | null;
+  percentage: number | null;
+}
+
+export interface UsageData {
+  users: UsageBucket;
+  projects: UsageBucket;
+  storageGb: UsageBucket;
+  automations: UsageBucket;
+  integrations: UsageBucket;
+  apiKeys: UsageBucket;
+  planName: string | null;
+  planSlug: string | null;
+  subscriptionStatus: string | null;
+  billingCycle: string | null;
+  isTrial: boolean;
+  trialEndsAt: string | null;
+  isTrialExpired: boolean;
+}
+
+export interface SubscriptionLimitError {
+  statusCode: number;
+  error: string;
+  code: 'SUBSCRIPTION_LIMIT_EXCEEDED';
+  resource: string;
+  current: number;
+  limit: number;
+  message: string;
+  upgradeUrl: string;
 }
 
 export interface ActivityLog {
@@ -175,6 +237,7 @@ export interface ActivityLog {
   action: string;
   metadata?: Record<string, unknown> | null;
   createdAt: string;
+  user?: { fullName?: string; email?: string } | null;
 }
 
 export interface OrgMember {

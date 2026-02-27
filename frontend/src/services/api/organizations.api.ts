@@ -88,3 +88,18 @@ export async function transferOrganizationOwnership(
   );
   return data;
 }
+
+/** Workspace progress flags for onboarding reconciliation. */
+export interface WorkspaceProgress {
+  hasProjects: boolean;
+  hasMembers: boolean;
+  hasTasks: boolean;
+}
+
+export async function fetchWorkspaceProgress(orgId: string): Promise<WorkspaceProgress> {
+  const { data } = await apiClient.get<WorkspaceProgress>(
+    `/organizations/${orgId}/workspace-progress`,
+    { headers: { "X-Organization-Id": orgId } }
+  );
+  return data;
+}

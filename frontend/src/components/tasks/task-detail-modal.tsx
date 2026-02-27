@@ -22,6 +22,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { getStoredToken } from "@/services/api/client";
 import { fetchTask, updateTask, updateTaskAssignee } from "@/services/api/tasks.api";
 import { fetchComments, addComment, deleteComment } from "@/services/api/comments.api";
 import { fetchOrgMembers } from "@/services/api/members.api";
@@ -37,6 +38,7 @@ import { cn } from "@/lib/utils";
 import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-selector";
 import { SubtaskDueDatePicker } from "@/components/tasks/subtask-due-date-picker";
 import { SubtaskPrioritySelector } from "@/components/tasks/subtask-priority-selector";
+import { CommentInputWithMentions } from "@/components/tasks/comment-input-with-mentions";
 import type {
   Task,
   TaskAttachment,
@@ -151,7 +153,18 @@ export function TaskDetailModal({
     [projectId, queryClient]
   );
   const { toast } = useToast();
+  const currentUserId = React.useMemo(() => {
+    const token = getStoredToken();
+    if (!token) return "";
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      return payload.sub ?? "";
+    } catch {
+      return "";
+    }
+  }, []);
   const [commentText, setCommentText] = React.useState("");
+  const [commentMentionedIds, setCommentMentionedIds] = React.useState<string[]>([]);
   const [newCheckItem, setNewCheckItem] = React.useState("");
   const [editingSubtaskId, setEditingSubtaskId] = React.useState<string | null>(null);
   const [editingSubtaskTitle, setEditingSubtaskTitle] = React.useState("");
@@ -328,10 +341,12 @@ export function TaskDetailModal({
   });
 
   const addCommentMutation = useMutation({
-    mutationFn: (text: string) => addComment(taskId!, text),
+    mutationFn: ({ text, mentionedUserIds }: { text: string; mentionedUserIds: string[] }) =>
+      addComment(taskId!, text, mentionedUserIds),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["task-comments", taskId] });
       setCommentText("");
+      setCommentMentionedIds([]);
       toast({ title: "Comment added", variant: "success" });
     },
     onError: () => {
@@ -869,30 +884,38 @@ export function TaskDetailModal({
                   <div>
                     <Label className="text-muted-foreground text-xs flex items-center gap-1.5">
                       <MessageSquare className="h-3.5 w-3.5" /> Comments
-                      <span className="text-muted-foreground/70 font-normal">(use @ to mention)</span>
+                      <span className="text-muted-foreground/70 font-normal">(type @ to mention members)</span>
                     </Label>
                     <div className="mt-1.5 flex gap-2">
-                      <Textarea
-                        ref={commentTextareaRef}
-                        placeholder="Write a comment... Enter to send, Shift+Enter for new line"
-                        value={commentText}
-                        onChange={(e) => setCommentText(e.target.value)}
-                        className="min-h-[80px] max-h-[240px] resize-none overflow-y-auto"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            if (commentText.trim()) {
-                              addCommentMutation.mutate(commentText.trim());
-                            }
+                      <div className="flex-1 min-w-0">
+                        <CommentInputWithMentions
+                          value={commentText}
+                          onChange={(v, ids) => {
+                            setCommentText(v);
+                            setCommentMentionedIds(ids);
+                          }}
+                          onSubmit={(text, ids) =>
+                            addCommentMutation.mutate({ text, mentionedUserIds: ids })
                           }
-                        }}
-                        rows={2}
-                        aria-label="Comment text"
-                      />
+                          placeholder="Write a comment... Enter to send, Shift+Enter for new line"
+                          disabled={!taskId}
+                          isSubmitting={addCommentMutation.isPending}
+                          orgMembers={orgMembers}
+                          currentUserId={currentUserId}
+                          textareaRef={commentTextareaRef}
+                          rows={2}
+                        />
+                      </div>
                       <Button
                         size="icon"
                         className="shrink-0 h-10 w-10 transition-transform duration-200 hover:scale-105 active:scale-95 disabled:pointer-events-none disabled:opacity-50 disabled:hover:scale-100"
-                        onClick={() => commentText.trim() && addCommentMutation.mutate(commentText.trim())}
+                        onClick={() =>
+                          commentText.trim() &&
+                          addCommentMutation.mutate({
+                            text: commentText.trim(),
+                            mentionedUserIds: commentMentionedIds,
+                          })
+                        }
                         disabled={!commentText.trim() || addCommentMutation.isPending}
                         aria-label="Send comment"
                       >

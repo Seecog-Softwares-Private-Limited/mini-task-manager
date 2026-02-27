@@ -8,106 +8,120 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
+import { isNetworkError } from "@/lib/error";
+import {
+  fetchNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+} from "@/services/api/notifications.api";
+import type { Notification } from "@/types/api";
 
-export type SystemNotificationType = "trial_ending" | "limit_approaching" | "feature";
+const REFETCH_INTERVAL_MS = 15_000; // Real-time polling every 15 seconds
 
-export type SystemNotification = {
-  id: string;
-  type: SystemNotificationType;
-  title: string;
-  message: string;
-  read: boolean;
-  createdAt: string;
-};
-
-const STORAGE_KEY = "mini_tm_notifications";
-
-function loadNotifications(): SystemNotification[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
-}
-
-function saveNotifications(list: SystemNotification[]) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-}
+/** Local system notification (trial, limit) - merged with API notifications */
+export type SystemNotification = Notification & { id: string; _local?: true };
 
 type NotificationsContextValue = {
-  notifications: SystemNotification[];
+  notifications: Notification[];
   unreadCount: number;
-  addNotification: (n: Omit<SystemNotification, "id" | "read" | "createdAt">) => void;
+  isLoading: boolean;
   markRead: (id: string) => void;
   markAllRead: () => void;
-  remove: (id: string) => void;
+  refetch: () => void;
+  addNotification?: (n: { title: string; message: string }) => void;
 };
 
 const NotificationsContext = createContext<NotificationsContextValue | null>(null);
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
-  const [notifications, setNotifications] = useState<SystemNotification[]>(loadNotifications);
+  const queryClient = useQueryClient();
+  const { isAuthenticated } = useAuth();
+  const [localAlerts, setLocalAlerts] = useState<SystemNotification[]>([]);
+
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ["notifications"],
+    queryFn: () => fetchNotifications(1, 50),
+    enabled: isAuthenticated,
+    refetchInterval: (query) => (isNetworkError(query.state.error) ? false : REFETCH_INTERVAL_MS),
+    staleTime: 5 * 1000,
+  });
+
+  const markReadMutation = useMutation({
+    mutationFn: markNotificationAsRead,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+
+  const markAllReadMutation = useMutation({
+    mutationFn: markAllNotificationsAsRead,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      setLocalAlerts((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    },
+  });
+
+  const apiNotifications = data?.data ?? [];
+  const mergedNotifications = useMemo(() => {
+    const combined = [...apiNotifications, ...localAlerts];
+    return combined.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }, [apiNotifications, localAlerts]);
 
   const unreadCount = useMemo(
-    () => notifications.filter((n) => !n.read).length,
-    [notifications]
+    () => mergedNotifications.filter((n) => !n.isRead).length,
+    [mergedNotifications]
   );
 
+  const markRead = useCallback(
+    (id: string) => {
+      const isLocal = localAlerts.some((n) => n.id === id);
+      if (isLocal) {
+        setLocalAlerts((prev) =>
+          prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+        );
+      } else {
+        markReadMutation.mutate(id);
+      }
+    },
+    [localAlerts, markReadMutation]
+  );
+
+  const markAllRead = useCallback(() => {
+    setLocalAlerts((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    markAllReadMutation.mutate();
+  }, [markAllReadMutation]);
+
   const addNotification = useCallback(
-    (n: Omit<SystemNotification, "id" | "read" | "createdAt">) => {
+    (n: { title: string; message: string }) => {
       const item: SystemNotification = {
-        ...n,
-        id: `n-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        read: false,
+        id: `local-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        userId: "",
+        title: n.title,
+        message: n.message,
+        isRead: false,
         createdAt: new Date().toISOString(),
+        _local: true,
       };
-      setNotifications((prev) => {
-        const next = [item, ...prev].slice(0, 50);
-        saveNotifications(next);
-        return next;
-      });
+      setLocalAlerts((prev) => [item, ...prev].slice(0, 10));
     },
     []
   );
 
-  const markRead = useCallback((id: string) => {
-    setNotifications((prev) => {
-      const next = prev.map((n) => (n.id === id ? { ...n, read: true } : n));
-      saveNotifications(next);
-      return next;
-    });
-  }, []);
-
-  const markAllRead = useCallback(() => {
-    setNotifications((prev) => {
-      const next = prev.map((n) => ({ ...n, read: true }));
-      saveNotifications(next);
-      return next;
-    });
-  }, []);
-
-  const remove = useCallback((id: string) => {
-    setNotifications((prev) => {
-      const next = prev.filter((n) => n.id !== id);
-      saveNotifications(next);
-      return next;
-    });
-  }, []);
-
   const value = useMemo(
     () => ({
-      notifications,
+      notifications: mergedNotifications,
       unreadCount,
-      addNotification,
+      isLoading,
       markRead,
       markAllRead,
-      remove,
+      refetch,
+      addNotification,
     }),
-    [notifications, unreadCount, addNotification, markRead, markAllRead, remove]
+    [mergedNotifications, unreadCount, isLoading, markRead, markAllRead, refetch, addNotification]
   );
 
   return (

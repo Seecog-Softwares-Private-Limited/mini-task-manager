@@ -22,12 +22,21 @@ let PaymentsRepository = class PaymentsRepository {
     constructor(repo) {
         this.repo = repo;
     }
-    async findByInvoice(invoiceId) {
-        return this.repo.find({ where: { invoiceId } });
+    async findBySubscription(subscriptionId) {
+        return this.repo.find({ where: { subscriptionId }, order: { createdAt: 'DESC' } });
+    }
+    async findByRazorpayPaymentId(razorpayPaymentId) {
+        return this.repo.findOne({ where: { razorpayPaymentId } });
+    }
+    async findByRazorpayOrderId(razorpayOrderId) {
+        return this.repo.findOne({ where: { razorpayOrderId } });
     }
     async create(data) {
         const id = data.id ?? (0, uuid_util_1.generateUuid)();
         const entity = this.repo.create({ ...data, id });
+        return this.repo.save(entity);
+    }
+    async save(entity) {
         return this.repo.save(entity);
     }
 };

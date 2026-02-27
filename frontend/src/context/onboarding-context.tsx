@@ -6,10 +6,12 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import { useTenant } from "@/context/tenant-context";
+import { fetchWorkspaceProgress } from "@/services/api/organizations.api";
 import {
   getOnboardingState,
   setOnboardingState,
@@ -39,6 +41,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<OnboardingState>(() =>
     typeof window !== "undefined" ? getOnboardingState(orgId) : getOnboardingState(null)
   );
+  const reconciledRef = useRef<string | null>(null);
 
   const refresh = useCallback(() => {
     setState(getOnboardingState(orgId));
@@ -46,6 +49,85 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setState(getOnboardingState(orgId));
+  }, [orgId]);
+
+  /**
+   * Auto-reconcile: fetch actual data from the backend and mark any
+   * steps whose data already exists but localStorage missed.
+   * Runs once per orgId to avoid repeated calls.
+   */
+  useEffect(() => {
+    if (!orgId || reconciledRef.current === orgId) return;
+    const current = getOnboardingState(orgId);
+    // Skip if user explicitly skipped
+    if (current.skipped) {
+      reconciledRef.current = orgId;
+      return;
+    }
+
+    let cancelled = false;
+    fetchWorkspaceProgress(orgId)
+      .then((progress) => {
+        if (cancelled) return;
+        reconciledRef.current = orgId;
+        let changed = false;
+        if (progress.hasProjects && !current.stepCompleted.project) {
+          markStepCompletedStorage(orgId, "project");
+          changed = true;
+        }
+        if (progress.hasMembers && !current.stepCompleted.member) {
+          markStepCompletedStorage(orgId, "member");
+          changed = true;
+        }
+        if (progress.hasTasks && !current.stepCompleted.task) {
+          markStepCompletedStorage(orgId, "task");
+          changed = true;
+        }
+        // If completedAt was set prematurely but not all steps are actually done,
+        // clear it so the wizard can show again.
+        const updated = getOnboardingState(orgId);
+        const allActuallyDone = updated.stepCompleted.project && updated.stepCompleted.member && updated.stepCompleted.task;
+        if (updated.completedAt && !allActuallyDone) {
+          setOnboardingState(orgId, { completedAt: null });
+          changed = true;
+        }
+        if (changed) {
+          setState(getOnboardingState(orgId));
+        }
+      })
+      .catch(() => {
+        // Silently ignore - reconciliation is best-effort
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [orgId]);
+
+  /**
+   * Poll workspace progress when member step is incomplete, so we detect when
+   * an invitee accepts (status becomes ACTIVE). hasMembers is true only when
+   * there are >1 ACTIVE members.
+   */
+  useEffect(() => {
+    if (!orgId) return;
+    const current = getOnboardingState(orgId);
+    if (current.skipped || current.stepCompleted.member) return;
+
+    const poll = () => {
+      fetchWorkspaceProgress(orgId)
+        .then((progress) => {
+          if (progress.hasMembers) {
+            markStepCompletedStorage(orgId, "member");
+            setState(getOnboardingState(orgId));
+          }
+        })
+        .catch(() => {});
+    };
+
+    const id = setInterval(poll, 15000);
+    poll(); // run immediately
+    return () => clearInterval(id);
   }, [orgId]);
 
   const markStepCompleted = useCallback(

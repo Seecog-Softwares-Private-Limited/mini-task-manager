@@ -11,13 +11,25 @@ export class PaymentsRepository {
     private readonly repo: Repository<PaymentEntity>,
   ) {}
 
-  async findByInvoice(invoiceId: string): Promise<PaymentEntity[]> {
-    return this.repo.find({ where: { invoiceId } });
+  async findBySubscription(subscriptionId: string): Promise<PaymentEntity[]> {
+    return this.repo.find({ where: { subscriptionId }, order: { createdAt: 'DESC' } });
+  }
+
+  async findByRazorpayPaymentId(razorpayPaymentId: string): Promise<PaymentEntity | null> {
+    return this.repo.findOne({ where: { razorpayPaymentId } });
+  }
+
+  async findByRazorpayOrderId(razorpayOrderId: string): Promise<PaymentEntity | null> {
+    return this.repo.findOne({ where: { razorpayOrderId } });
   }
 
   async create(data: Partial<PaymentEntity>): Promise<PaymentEntity> {
     const id = data.id ?? generateUuid();
     const entity = this.repo.create({ ...data, id });
+    return this.repo.save(entity);
+  }
+
+  async save(entity: PaymentEntity): Promise<PaymentEntity> {
     return this.repo.save(entity);
   }
 }

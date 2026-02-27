@@ -12,11 +12,16 @@ import {
   UseInterceptors,
   StreamableFile,
   UploadedFile,
+  Logger,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SkipThrottle } from '@nestjs/throttler';
 import { createReadStream } from 'fs';
 import { TasksService } from './tasks.service';
+import { EmailService } from '../invitations/email.service';
+import { UsersService } from '../users/users.service';
+import { ProjectsService } from '../projects/projects.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
 import { TenantId } from '../../common/decorators/tenant.decorator';
@@ -41,7 +46,15 @@ interface MulterFile {
 @SkipThrottle({ auth: true })
 @UseGuards(JwtAuthGuard, TenantGuard)
 export class TasksController {
-  constructor(private readonly tasksService: TasksService) {}
+  private readonly logger = new Logger(TasksController.name);
+
+  constructor(
+    private readonly tasksService: TasksService,
+    private readonly emailService: EmailService,
+    private readonly usersService: UsersService,
+    private readonly projectsService: ProjectsService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   @Post()
   async create(
@@ -51,6 +64,15 @@ export class TasksController {
     const projectId = dto.projectId!;
     const organizationId = dto.organizationId!;
     const task = await this.tasksService.create(projectId, organizationId, reporterId, dto);
+
+    // Fire-and-forget: send assignment emails + in-app notifications
+    const assigneeIds = task.assigneeIds ?? (task.assigneeId ? [task.assigneeId] : []);
+    if (assigneeIds.length > 0) {
+      this.notifyAssignees(assigneeIds, reporterId, task.title, task.id, projectId).catch((err) =>
+        this.logger.warn(`Failed to send assignment notifications: ${err}`),
+      );
+    }
+
     return this.toResponse(task);
   }
 
@@ -126,7 +148,16 @@ export class TasksController {
     @Body() dto: CreateTaskCommentDto,
   ) {
     const comment = await this.tasksService.addComment(taskId, tenantId, userId, dto.body);
-    return comment ? this.toCommentResponse(comment) : null;
+    if (comment) {
+      const task = await this.tasksService.findByIdInOrganization(taskId, tenantId);
+      if (task) {
+        this.notifyCommentObservers(task, userId, dto.mentionedUserIds ?? []).catch((err) =>
+          this.logger.warn(`Comment notification failed: ${err}`),
+        );
+      }
+      return this.toCommentResponse(comment);
+    }
+    return null;
   }
 
   @Delete(':id/comments/:commentId')
@@ -153,10 +184,19 @@ export class TasksController {
   async updateAssignee(
     @Param('id') id: string,
     @TenantId() tenantId: string,
+    @CurrentUserId() currentUserId: string,
     @Body() body: { assigneeId: string | null },
   ): Promise<TaskResponseDto | null> {
-    const task = await this.tasksService.update(id, tenantId, { assigneeId: body.assigneeId ?? null });
+    const task = await this.tasksService.update(id, tenantId, { assigneeId: body.assigneeId ?? null }, currentUserId);
     if (!task) return null;
+
+    // Fire-and-forget: send assignment email + in-app notification
+    if (body.assigneeId) {
+      this.notifyAssignees([body.assigneeId], currentUserId, task.title, task.id, task.projectId).catch((err) =>
+        this.logger.warn(`Failed to send assignment notifications: ${err}`),
+      );
+    }
+
     return this.toResponse(task);
   }
 
@@ -164,11 +204,84 @@ export class TasksController {
   async update(
     @Param('id') id: string,
     @TenantId() tenantId: string,
+    @CurrentUserId() userId: string,
     @Body() dto: PatchTaskDto,
   ): Promise<TaskResponseDto | null> {
-    const task = await this.tasksService.update(id, tenantId, dto);
+    const task = await this.tasksService.update(id, tenantId, dto, userId);
     if (!task) return null;
     return this.toResponse(task);
+  }
+
+  private async notifyCommentObservers(
+    task: import('./entities/task.entity').TaskEntity,
+    commenterUserId: string,
+    mentionedUserIds: string[] = [],
+  ): Promise<void> {
+    const [commenter, project] = await Promise.all([
+      this.usersService.findById(commenterUserId),
+      this.projectsService.findById(task.projectId),
+    ]);
+    const commenterName = commenter?.fullName || commenter?.email || 'Someone';
+    const projectName = project?.name;
+    const assigneeIds = task.assigneeIds ?? (task.assigneeId ? [task.assigneeId] : []);
+    const toNotify = new Set<string>([
+      ...assigneeIds,
+      task.reporterId,
+      ...mentionedUserIds,
+    ].filter(Boolean));
+    toNotify.delete(commenterUserId);
+    for (const targetId of toNotify) {
+      const isMention = mentionedUserIds.includes(targetId);
+      const title = isMention
+        ? `${commenterName} mentioned you in "${task.title}"`
+        : `New comment on "${task.title}"`;
+      const message = isMention
+        ? `${commenterName} mentioned you in "${task.title}"${projectName ? ` in ${projectName}` : ''}.`
+        : `${commenterName} commented on "${task.title}"${projectName ? ` in ${projectName}` : ''}.`;
+      await this.notificationsService.createNotification(targetId, title, message);
+    }
+  }
+
+  private async notifyAssignees(
+    assigneeIds: string[],
+    assignerUserId: string,
+    taskTitle: string,
+    taskId: string,
+    projectId: string,
+  ): Promise<void> {
+    const [assigner, project] = await Promise.all([
+      this.usersService.findById(assignerUserId),
+      this.projectsService.findById(projectId),
+    ]);
+    const assignerName = assigner?.fullName || assigner?.email || 'Someone';
+    const projectName = project?.name;
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+    const taskUrl = `${frontendUrl}/dashboard/projects/${projectId}/board?task=${taskId}`;
+
+    for (const assigneeId of assigneeIds) {
+      if (assigneeId === assignerUserId) continue; // don't notify self
+      const assignee = await this.usersService.findById(assigneeId);
+      if (!assignee?.email) continue;
+
+      const assigneeName = assignee.fullName || assignee.email;
+
+      // In-app notification
+      await this.notificationsService.createNotification(
+        assigneeId,
+        `Task assigned: ${taskTitle}`,
+        `${assignerName} assigned you to "${taskTitle}"${projectName ? ` in ${projectName}` : ''}.`,
+      ).catch((err) => this.logger.warn(`In-app notification failed: ${err}`));
+
+      // Email notification
+      await this.emailService.sendTaskAssignment({
+        to: assignee.email,
+        assigneeName,
+        taskTitle,
+        projectName,
+        assignerName,
+        taskUrl,
+      }).catch((err) => this.logger.warn(`Task assignment email failed for ${assignee.email}: ${err}`));
+    }
   }
 
   private toCommentResponse(c: TaskCommentEntity) {

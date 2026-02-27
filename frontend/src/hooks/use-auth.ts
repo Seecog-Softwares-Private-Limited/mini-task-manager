@@ -47,7 +47,11 @@ export function useAuth() {
     loadFromStorage();
     const handler = () => loadFromStorage();
     window.addEventListener("auth:logout", handler);
-    return () => window.removeEventListener("auth:logout", handler);
+    window.addEventListener("auth:login", handler);
+    return () => {
+      window.removeEventListener("auth:logout", handler);
+      window.removeEventListener("auth:login", handler);
+    };
   }, [loadFromStorage]);
 
   const roles: AppRole[] = useMemo(() => {
