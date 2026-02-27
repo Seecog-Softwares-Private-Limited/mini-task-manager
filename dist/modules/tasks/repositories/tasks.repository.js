@@ -37,9 +37,19 @@ let TasksRepository = class TasksRepository {
             take: limit,
         });
     }
+    async countByProject(projectId) {
+        return this.repo.count({ where: { projectId } });
+    }
+    async countByOrganization(organizationId) {
+        return this.repo.count({ where: { organizationId } });
+    }
     async create(data) {
         const id = data.id ?? (0, uuid_util_1.generateUuid)();
-        const entity = this.repo.create({ ...data, id });
+        const payload = { ...data, id };
+        if (payload.statusId === undefined || payload.statusId === '') {
+            payload.statusId = null;
+        }
+        const entity = this.repo.create(payload);
         return this.repo.save(entity);
     }
     async update(id, data) {

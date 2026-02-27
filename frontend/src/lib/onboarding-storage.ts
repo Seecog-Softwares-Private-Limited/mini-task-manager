@@ -54,13 +54,18 @@ export function setOnboardingState(
 }
 
 export function markStepCompleted(orgId: string | null, step: OnboardingStep): void {
-  setOnboardingState(orgId, (prev) => ({
-    stepCompleted: { ...prev.stepCompleted, [step]: true },
-    completedAt:
-      step === "task" && prev.stepCompleted.project && prev.stepCompleted.member
-        ? new Date().toISOString()
-        : prev.completedAt,
-  }));
+  setOnboardingState(orgId, (prev) => {
+    const next = { ...prev.stepCompleted, [step]: true };
+    return {
+      stepCompleted: next,
+      // Don't set completedAt automatically — let the user finish explicitly
+    };
+  });
+}
+
+/** Explicitly mark onboarding as fully completed (all steps done). */
+export function markOnboardingCompleted(orgId: string | null): void {
+  setOnboardingState(orgId, { completedAt: new Date().toISOString() });
 }
 
 export function markOnboardingSkipped(orgId: string | null): void {

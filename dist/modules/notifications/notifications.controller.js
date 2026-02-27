@@ -30,6 +30,9 @@ let NotificationsController = class NotificationsController {
         await this.notificationsService.markAsRead(id, userId);
         return { message: 'OK' };
     }
+    async markAllAsRead(userId) {
+        return this.notificationsService.markAllAsRead(userId);
+    }
 };
 exports.NotificationsController = NotificationsController;
 __decorate([
@@ -48,6 +51,13 @@ __decorate([
     __metadata("design:paramtypes", [String, String]),
     __metadata("design:returntype", Promise)
 ], NotificationsController.prototype, "markAsRead", null);
+__decorate([
+    (0, common_1.Post)('read-all'),
+    __param(0, (0, current_user_decorator_1.CurrentUserId)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], NotificationsController.prototype, "markAllAsRead", null);
 exports.NotificationsController = NotificationsController = __decorate([
     (0, common_1.Controller)('notifications'),
     (0, throttler_1.SkipThrottle)({ auth: true }),

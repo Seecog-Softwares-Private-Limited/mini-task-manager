@@ -14,13 +14,33 @@ export class SubscriptionsRepository {
   async findByOrganization(organizationId: string): Promise<SubscriptionEntity | null> {
     return this.repo.findOne({
       where: { organizationId },
+      relations: ['plan'],
       order: { createdAt: 'DESC' },
     });
+  }
+
+  async findByRazorpaySubscriptionId(razorpaySubId: string): Promise<SubscriptionEntity | null> {
+    return this.repo.findOne({
+      where: { razorpaySubscriptionId: razorpaySubId },
+      relations: ['plan'],
+    });
+  }
+
+  async findExpiredTrials(): Promise<SubscriptionEntity[]> {
+    return this.repo
+      .createQueryBuilder('s')
+      .where('s.status = :status', { status: 'TRIAL' })
+      .andWhere('s.trial_ends_at <= NOW()')
+      .getMany();
   }
 
   async create(data: Partial<SubscriptionEntity>): Promise<SubscriptionEntity> {
     const id = data.id ?? generateUuid();
     const entity = this.repo.create({ ...data, id });
+    return this.repo.save(entity);
+  }
+
+  async save(entity: SubscriptionEntity): Promise<SubscriptionEntity> {
     return this.repo.save(entity);
   }
 }

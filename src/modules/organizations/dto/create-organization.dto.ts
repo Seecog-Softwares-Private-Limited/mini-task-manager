@@ -9,4 +9,9 @@ export class CreateOrganizationDto {
   @MaxLength(150)
   @Matches(/^[a-z0-9-]+$/, { message: 'slug must be lowercase alphanumeric and hyphens only' })
   slug!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(150_000)
+  logoUrl?: string;
 }

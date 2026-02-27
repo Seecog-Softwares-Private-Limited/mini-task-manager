@@ -78,6 +78,12 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.ValidateIf)((_o, v) => v != null),
+    (0, class_validator_1.IsUUID)('4', { message: 'sprintId must be a valid UUID' }),
+    __metadata("design:type", Object)
+], PatchTaskDto.prototype, "sprintId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.ValidateIf)((_o, v) => v != null),
     (0, class_validator_1.IsUUID)('4', { message: 'assigneeId must be a valid UUID' }),
     __metadata("design:type", Object)
 ], PatchTaskDto.prototype, "assigneeId", void 0);

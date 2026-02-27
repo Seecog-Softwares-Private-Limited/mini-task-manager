@@ -24,8 +24,20 @@ let PlansRepository = class PlansRepository {
     async findById(id) {
         return this.repo.findOne({ where: { id } });
     }
+    async findBySlug(slug) {
+        return this.repo.findOne({ where: { slug } });
+    }
     async findActive() {
-        return this.repo.find({ where: { isActive: true } });
+        return this.repo.find({ where: { isActive: true }, order: { displayOrder: 'ASC' } });
+    }
+    async findAll() {
+        return this.repo.find({ order: { displayOrder: 'ASC' } });
+    }
+    async save(entity) {
+        return this.repo.save(entity);
+    }
+    async upsert(data) {
+        await this.repo.upsert(data, ['slug']);
     }
 };
 exports.PlansRepository = PlansRepository;

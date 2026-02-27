@@ -15,9 +15,17 @@ export class InvoicesRepository {
     return this.repo.find({ where: { subscriptionId }, order: { issuedAt: 'DESC' } });
   }
 
+  async findByOrganization(organizationId: string): Promise<InvoiceEntity[]> {
+    return this.repo.find({ where: { organizationId }, order: { issuedAt: 'DESC' } });
+  }
+
   async create(data: Partial<InvoiceEntity>): Promise<InvoiceEntity> {
     const id = data.id ?? generateUuid();
     const entity = this.repo.create({ ...data, id });
+    return this.repo.save(entity);
+  }
+
+  async save(entity: InvoiceEntity): Promise<InvoiceEntity> {
     return this.repo.save(entity);
   }
 }

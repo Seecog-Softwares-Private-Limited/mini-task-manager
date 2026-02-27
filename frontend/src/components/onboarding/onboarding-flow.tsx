@@ -2,22 +2,54 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useOnboarding } from "@/context/onboarding-context";
 import { useAnalytics } from "@/hooks/use-analytics";
+import { markOnboardingCompleted } from "@/lib/onboarding-storage";
+import { useTenant } from "@/context/tenant-context";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Rocket, X, Check, ArrowRight, FolderKanban, Users, ListTodo } from "lucide-react";
+import { Rocket, X, Check, ArrowRight, FolderKanban, Users, ListTodo, PartyPopper } from "lucide-react";
 
 const STEPS = [
   { id: "project" as const, title: "Create your first project", cta: "Create project", href: "/dashboard/projects", icon: FolderKanban },
-  { id: "member" as const, title: "Invite a team member", cta: "Invite member", href: "/dashboard/organizations", icon: Users },
+  { id: "member" as const, title: "Invite a team member", cta: "Invite member", href: "/dashboard/settings/members", icon: Users },
   { id: "task" as const, title: "Create your first task", cta: "Create task", href: "/dashboard/tasks", icon: ListTodo },
 ];
 
+/** Paths where the user can complete onboarding actions - hide modal so they can use the page. */
+const ACTION_PATHS = [
+  "/dashboard/projects",
+  "/dashboard/organizations",
+  "/dashboard/settings/members",
+  "/dashboard/tasks",
+];
+
+function isOnActionPath(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return ACTION_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
+}
+
 export function OnboardingFlow() {
-  const { state, isFirstTime, currentStepIndex, setSeenStep, skip } = useOnboarding();
+  const pathname = usePathname();
+  const { orgId } = useTenant();
+  const { state, isFirstTime, currentStepIndex, setSeenStep, skip, refresh } = useOnboarding();
   const analytics = useAnalytics();
   const closeRef = useRef<HTMLButtonElement>(null);
+
+  const allDone = state.stepCompleted.project && state.stepCompleted.member && state.stepCompleted.task;
+
+  // Auto-advance to the first incomplete step
+  useEffect(() => {
+    if (!isFirstTime || allDone) return;
+    const currentDone = state.stepCompleted[STEPS[currentStepIndex]?.id];
+    if (currentDone) {
+      const nextIncomplete = STEPS.findIndex((s) => !state.stepCompleted[s.id]);
+      if (nextIncomplete >= 0 && nextIncomplete !== currentStepIndex) {
+        setSeenStep(nextIncomplete);
+      }
+    }
+  }, [isFirstTime, allDone, state.stepCompleted, currentStepIndex, setSeenStep]);
 
   useEffect(() => {
     if (!isFirstTime) return;
@@ -26,9 +58,16 @@ export function OnboardingFlow() {
 
   if (!isFirstTime) return null;
 
-  const current = STEPS[currentStepIndex];
+  if (isOnActionPath(pathname)) return null;
+
   const completedCount = STEPS.filter((_, i) => state.stepCompleted[STEPS[i].id]).length;
   const progressPct = (completedCount / 3) * 100;
+
+  const handleFinish = () => {
+    markOnboardingCompleted(orgId);
+    analytics.track("workspace_completed", {});
+    refresh();
+  };
 
   return (
     <div
@@ -44,27 +83,31 @@ export function OnboardingFlow() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20">
-                <Rocket className="h-5 w-5" />
+                {allDone ? <PartyPopper className="h-5 w-5" /> : <Rocket className="h-5 w-5" />}
               </div>
               <h2 id="onboarding-title" className="text-lg font-bold">
-                Get Started
+                {allDone ? "All Done!" : "Get Started"}
               </h2>
             </div>
-            <Button
-              ref={closeRef}
-              variant="ghost"
-              size="sm"
-              className="text-white/70 hover:text-white hover:bg-white/10"
-              onClick={() => {
-                analytics.track("onboarding_skipped", { at_step: currentStepIndex });
-                skip();
-              }}
-            >
-              Skip
-            </Button>
+            {!allDone && (
+              <Button
+                ref={closeRef}
+                variant="ghost"
+                size="sm"
+                className="text-white/70 hover:text-white hover:bg-white/10"
+                onClick={() => {
+                  analytics.track("onboarding_skipped", { at_step: currentStepIndex });
+                  skip();
+                }}
+              >
+                Skip
+              </Button>
+            )}
           </div>
           <p className="mt-2 text-sm text-white/70">
-            Complete these steps to get the most out of your workspace.
+            {allDone
+              ? "You\u2019ve completed all setup steps. Your workspace is ready!"
+              : "Complete these steps to get the most out of your workspace."}
           </p>
           <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-white/20">
             <div
@@ -78,7 +121,7 @@ export function OnboardingFlow() {
         <div className="p-5 space-y-3">
           {STEPS.map((step, i) => {
             const done = state.stepCompleted[step.id];
-            const active = i === currentStepIndex;
+            const active = i === currentStepIndex && !allDone;
             const Icon = step.icon;
             return (
               <div
@@ -116,6 +159,12 @@ export function OnboardingFlow() {
               </div>
             );
           })}
+
+          {allDone && (
+            <Button className="w-full mt-2" size="lg" onClick={handleFinish}>
+              Go to Dashboard <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
     </div>

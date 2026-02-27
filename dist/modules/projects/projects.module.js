@@ -12,6 +12,10 @@ const typeorm_1 = require("@nestjs/typeorm");
 const auth_module_1 = require("../auth/auth.module");
 const organizations_module_1 = require("../organizations/organizations.module");
 const workflows_module_1 = require("../workflows/workflows.module");
+const tasks_module_1 = require("../tasks/tasks.module");
+const billing_module_1 = require("../billing/billing.module");
+const activity_logs_module_1 = require("../activity-logs/activity-logs.module");
+const notifications_module_1 = require("../notifications/notifications.module");
 const project_entity_1 = require("./entities/project.entity");
 const project_member_entity_1 = require("./entities/project-member.entity");
 const projects_repository_1 = require("./repositories/projects.repository");
@@ -28,6 +32,10 @@ exports.ProjectsModule = ProjectsModule = __decorate([
             auth_module_1.AuthModule,
             organizations_module_1.OrganizationsModule,
             (0, common_1.forwardRef)(() => workflows_module_1.WorkflowsModule),
+            (0, common_1.forwardRef)(() => tasks_module_1.TasksModule),
+            (0, common_1.forwardRef)(() => billing_module_1.BillingModule),
+            activity_logs_module_1.ActivityLogsModule,
+            notifications_module_1.NotificationsModule,
         ],
         controllers: [projects_controller_1.ProjectsController],
         providers: [projects_repository_1.ProjectsRepository, project_members_repository_1.ProjectMembersRepository, projects_service_1.ProjectsService],

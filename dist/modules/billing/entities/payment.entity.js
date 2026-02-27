@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PaymentEntity = void 0;
 const typeorm_1 = require("typeorm");
 const base_entity_1 = require("../../../common/base.entity");
-const invoice_entity_1 = require("./invoice.entity");
+const subscription_entity_1 = require("./subscription.entity");
 let PaymentEntity = class PaymentEntity {
 };
 exports.PaymentEntity = PaymentEntity;
@@ -21,31 +21,57 @@ __decorate([
     __metadata("design:type", String)
 ], PaymentEntity.prototype, "id", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'invoice_id', type: 'binary', length: 16, transformer: base_entity_1.uuidBinaryTransformer }),
+    (0, typeorm_1.Column)({ name: 'subscription_id', type: 'binary', length: 16, transformer: base_entity_1.uuidBinaryTransformer }),
     __metadata("design:type", String)
-], PaymentEntity.prototype, "invoiceId", void 0);
+], PaymentEntity.prototype, "subscriptionId", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'payment_gateway', type: 'varchar', length: 100, nullable: true }),
-    __metadata("design:type", Object)
-], PaymentEntity.prototype, "paymentGateway", void 0);
+    (0, typeorm_1.Column)({ type: 'decimal', precision: 10, scale: 2 }),
+    __metadata("design:type", Number)
+], PaymentEntity.prototype, "amount", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'transaction_id', type: 'varchar', length: 255, nullable: true }),
-    __metadata("design:type", Object)
-], PaymentEntity.prototype, "transactionId", void 0);
+    (0, typeorm_1.Column)({ type: 'varchar', length: 10, default: 'INR' }),
+    __metadata("design:type", String)
+], PaymentEntity.prototype, "currency", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ type: 'varchar', length: 50, nullable: true }),
-    __metadata("design:type", Object)
+    (0, typeorm_1.Column)({ type: 'varchar', length: 50, default: 'PENDING' }),
+    __metadata("design:type", String)
 ], PaymentEntity.prototype, "status", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'razorpay_payment_id', type: 'varchar', length: 255, nullable: true }),
+    __metadata("design:type", Object)
+], PaymentEntity.prototype, "razorpayPaymentId", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'razorpay_order_id', type: 'varchar', length: 255, nullable: true }),
+    __metadata("design:type", Object)
+], PaymentEntity.prototype, "razorpayOrderId", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'razorpay_signature', type: 'varchar', length: 500, nullable: true }),
+    __metadata("design:type", Object)
+], PaymentEntity.prototype, "razorpaySignature", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'varchar', length: 20, nullable: true }),
+    __metadata("design:type", Object)
+], PaymentEntity.prototype, "method", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'json', nullable: true }),
+    __metadata("design:type", Object)
+], PaymentEntity.prototype, "metadata", void 0);
 __decorate([
     (0, typeorm_1.Column)({ name: 'paid_at', type: 'timestamp', nullable: true }),
     __metadata("design:type", Object)
 ], PaymentEntity.prototype, "paidAt", void 0);
 __decorate([
-    (0, typeorm_1.ManyToOne)(() => invoice_entity_1.InvoiceEntity, { onDelete: 'CASCADE' }),
-    (0, typeorm_1.JoinColumn)({ name: 'invoice_id' }),
-    __metadata("design:type", invoice_entity_1.InvoiceEntity)
-], PaymentEntity.prototype, "invoice", void 0);
+    (0, typeorm_1.Column)({ name: 'created_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' }),
+    __metadata("design:type", Date)
+], PaymentEntity.prototype, "createdAt", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => subscription_entity_1.SubscriptionEntity, { onDelete: 'CASCADE' }),
+    (0, typeorm_1.JoinColumn)({ name: 'subscription_id' }),
+    __metadata("design:type", subscription_entity_1.SubscriptionEntity)
+], PaymentEntity.prototype, "subscription", void 0);
 exports.PaymentEntity = PaymentEntity = __decorate([
-    (0, typeorm_1.Entity)('payments')
+    (0, typeorm_1.Entity)('payments'),
+    (0, typeorm_1.Index)('idx_payments_subscription_id', ['subscriptionId']),
+    (0, typeorm_1.Index)('idx_payments_razorpay_payment_id', ['razorpayPaymentId'])
 ], PaymentEntity);
 //# sourceMappingURL=payment.entity.js.map

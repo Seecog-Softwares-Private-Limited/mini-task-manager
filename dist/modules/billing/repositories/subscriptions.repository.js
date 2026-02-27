@@ -25,12 +25,29 @@ let SubscriptionsRepository = class SubscriptionsRepository {
     async findByOrganization(organizationId) {
         return this.repo.findOne({
             where: { organizationId },
+            relations: ['plan'],
             order: { createdAt: 'DESC' },
         });
+    }
+    async findByRazorpaySubscriptionId(razorpaySubId) {
+        return this.repo.findOne({
+            where: { razorpaySubscriptionId: razorpaySubId },
+            relations: ['plan'],
+        });
+    }
+    async findExpiredTrials() {
+        return this.repo
+            .createQueryBuilder('s')
+            .where('s.status = :status', { status: 'TRIAL' })
+            .andWhere('s.trial_ends_at <= NOW()')
+            .getMany();
     }
     async create(data) {
         const id = data.id ?? (0, uuid_util_1.generateUuid)();
         const entity = this.repo.create({ ...data, id });
+        return this.repo.save(entity);
+    }
+    async save(entity) {
         return this.repo.save(entity);
     }
 };

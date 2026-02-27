@@ -8,6 +8,14 @@ export async function fetchOrgMembers(orgId: string): Promise<OrgMember[]> {
   return data;
 }
 
+/** Fetch organization member count (lightweight, for org cards). */
+export async function fetchOrgMemberCount(orgId: string): Promise<number> {
+  const { data } = await apiClient.get<{ count: number }>(`/organizations/${orgId}/members/count`, {
+    headers: { "X-Organization-Id": orgId },
+  });
+  return data.count;
+}
+
 export interface InviteOrgMemberPayload {
   email: string;
   role: string;
@@ -25,7 +33,9 @@ export async function removeOrgMember(
   orgId: string,
   memberId: string
 ): Promise<void> {
-  await apiClient.delete(`/organizations/${orgId}/members/${memberId}`);
+  await apiClient.delete(`/organizations/${orgId}/members/${memberId}`, {
+    headers: { "X-Organization-Id": orgId },
+  });
 }
 
 export async function updateOrgMemberRole(
@@ -35,7 +45,8 @@ export async function updateOrgMemberRole(
 ): Promise<OrgMember> {
   const { data } = await apiClient.patch<OrgMember>(
     `/organizations/${orgId}/members/${memberId}`,
-    { role }
+    { role },
+    { headers: { "X-Organization-Id": orgId } }
   );
   return data;
 }

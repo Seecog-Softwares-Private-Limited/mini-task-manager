@@ -26,7 +26,7 @@ __decorate([
 ], SignupWithInviteDto.prototype, "fullName", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.MinLength)(8, { message: 'Password must be at least 8 characters' }),
+    (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], SignupWithInviteDto.prototype, "password", void 0);
 //# sourceMappingURL=signup-with-invite.dto.js.map

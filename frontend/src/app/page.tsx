@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
-
+"use client";
+import LandingPage from "./landing-sections/landing-page";
 export default function HomePage() {
-  redirect("/dashboard");
+  return <LandingPage />;
 }

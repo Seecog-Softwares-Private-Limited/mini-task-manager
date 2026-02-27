@@ -28,6 +28,12 @@ let UsersRepository = class UsersRepository {
     async findByEmail(email) {
         return this.repo.findOne({ where: { email: email.toLowerCase() } });
     }
+    async findByGoogleId(googleId) {
+        return this.repo.findOne({ where: { googleId } });
+    }
+    async findByPhone(phone) {
+        return this.repo.findOne({ where: { phone } });
+    }
     async create(data) {
         const id = data.id ?? (0, uuid_util_1.generateUuid)();
         const entity = this.repo.create({ ...data, id });

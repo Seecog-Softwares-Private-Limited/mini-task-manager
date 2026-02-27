@@ -28,6 +28,8 @@ const notifications_module_1 = require("./modules/notifications/notifications.mo
 const billing_module_1 = require("./modules/billing/billing.module");
 const activity_logs_module_1 = require("./modules/activity-logs/activity-logs.module");
 const invitations_module_1 = require("./modules/invitations/invitations.module");
+const api_keys_module_1 = require("./modules/api-keys/api-keys.module");
+const analytics_module_1 = require("./modules/analytics/analytics.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -55,6 +57,8 @@ exports.AppModule = AppModule = __decorate([
             billing_module_1.BillingModule,
             activity_logs_module_1.ActivityLogsModule,
             invitations_module_1.InvitationsModule,
+            api_keys_module_1.ApiKeysModule,
+            analytics_module_1.AnalyticsModule,
         ],
     })
 ], AppModule);

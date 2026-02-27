@@ -1,10 +1,16 @@
-import { InvoiceEntity } from './invoice.entity';
+import { SubscriptionEntity } from './subscription.entity';
 export declare class PaymentEntity {
     id: string;
-    invoiceId: string;
-    paymentGateway: string | null;
-    transactionId: string | null;
-    status: string | null;
+    subscriptionId: string;
+    amount: number;
+    currency: string;
+    status: string;
+    razorpayPaymentId: string | null;
+    razorpayOrderId: string | null;
+    razorpaySignature: string | null;
+    method: string | null;
+    metadata: Record<string, unknown> | null;
     paidAt: Date | null;
-    invoice?: InvoiceEntity;
+    createdAt: Date;
+    subscription?: SubscriptionEntity;
 }

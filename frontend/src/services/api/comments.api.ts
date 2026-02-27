@@ -6,9 +6,14 @@ export async function fetchComments(taskId: string): Promise<TaskComment[]> {
   return data;
 }
 
-export async function addComment(taskId: string, text: string): Promise<TaskComment> {
+export async function addComment(
+  taskId: string,
+  text: string,
+  mentionedUserIds?: string[]
+): Promise<TaskComment> {
   const { data } = await apiClient.post<TaskComment>(`/tasks/${taskId}/comments`, {
     body: text,
+    mentionedUserIds: mentionedUserIds ?? [],
   });
   return data;
 }

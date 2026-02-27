@@ -12,7 +12,24 @@ export declare class OrganizationsService {
     findById(id: string): Promise<OrganizationEntity | null>;
     findBySlug(slug: string): Promise<OrganizationEntity | null>;
     findOrganizationsForUser(userId: string): Promise<OrganizationEntity[]>;
+    findOrganizationsWithRoleForUser(userId: string): Promise<{
+        org: OrganizationEntity;
+        role: string;
+    }[]>;
     create(ownerId: string, dto: CreateOrganizationDto): Promise<OrganizationEntity>;
     getMembers(organizationId: string): Promise<OrganizationMemberEntity[]>;
+    getMemberCount(organizationId: string): Promise<number>;
     canAccess(organizationId: string, userId: string): Promise<boolean>;
+    update(id: string, dto: {
+        isArchived?: boolean;
+    }): Promise<OrganizationEntity | null>;
+    getMembership(organizationId: string, userId: string): Promise<OrganizationMemberEntity | null>;
+    getWorkspaceProgress(organizationId: string): Promise<{
+        hasProjects: boolean;
+        hasMembers: boolean;
+        hasTasks: boolean;
+    }>;
+    updateMemberRole(organizationId: string, memberId: string, role: string, actorUserId: string): Promise<OrganizationMemberEntity>;
+    removeMember(organizationId: string, memberId: string, actorUserId: string): Promise<void>;
+    delete(id: string, userId: string): Promise<void>;
 }

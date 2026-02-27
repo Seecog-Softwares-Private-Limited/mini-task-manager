@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, MinLength } from 'class-validator';
+import { IsString, IsNotEmpty } from 'class-validator';
 
 export class SignupWithInviteDto {
   @IsString()
@@ -10,6 +10,6 @@ export class SignupWithInviteDto {
   fullName!: string;
 
   @IsString()
-  @MinLength(8, { message: 'Password must be at least 8 characters' })
+  @IsNotEmpty()
   password!: string;
 }

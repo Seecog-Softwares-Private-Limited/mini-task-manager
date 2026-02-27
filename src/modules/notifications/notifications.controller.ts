@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { NotificationsService } from './notifications.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -26,5 +26,10 @@ export class NotificationsController {
   ): Promise<{ message: string }> {
     await this.notificationsService.markAsRead(id, userId);
     return { message: 'OK' };
+  }
+
+  @Post('read-all')
+  async markAllAsRead(@CurrentUserId() userId: string): Promise<{ count: number }> {
+    return this.notificationsService.markAllAsRead(userId);
   }
 }

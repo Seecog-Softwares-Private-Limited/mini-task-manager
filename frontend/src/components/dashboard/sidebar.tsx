@@ -4,14 +4,14 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Plus } from "lucide-react";
+import { Plus, Sparkles } from "lucide-react";
 import { OrgSwitcher } from "@/components/dashboard/org-switcher";
 
 interface SidebarProps {
   collapsed: boolean;
   mobileOpen: boolean;
   onCloseMobile: () => void;
-  visibleNav: { href: string; label: string; icon: React.ComponentType<{ className?: string }> }[];
+  visibleNav: { href: string; label: string; icon: React.ComponentType<{ className?: string }>; section?: string }[];
 }
 
 export function Sidebar({ collapsed, mobileOpen, onCloseMobile, visibleNav }: SidebarProps) {
@@ -27,9 +27,45 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile, visibleNav }: Si
     return () => window.removeEventListener("keydown", handler);
   }, [mobileOpen, onCloseMobile]);
 
+  const mainNav = visibleNav.filter((item) => !item.section);
+  const billingNav = visibleNav.filter((item) => item.section === "billing");
+
+  const renderNavItem = (item: typeof visibleNav[0]) => {
+    const isActive =
+      pathname === item.href ||
+      (item.href !== "/dashboard" && pathname.startsWith(item.href));
+    const Icon = item.icon;
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        onClick={onCloseMobile}
+        data-cy={item.href === "/dashboard/billing" ? "nav-billing" : item.href === "/dashboard/plans" ? "nav-plans" : undefined}
+        className={cn(
+          "group flex items-center gap-2.5 rounded-lg py-2.5 text-sm font-medium transition-all duration-200",
+          collapsed ? "justify-center px-2" : "px-3",
+          isActive
+            ? "gradient-bg text-white shadow-md shadow-primary/20"
+            : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+        )}
+        aria-current={isActive ? "page" : undefined}
+        title={collapsed ? item.label : undefined}
+      >
+        <Icon
+          className={cn(
+            "h-4 w-4 shrink-0 transition-transform duration-200",
+            !isActive && "group-hover:scale-110"
+          )}
+          aria-hidden
+        />
+        {!collapsed && <span className="truncate">{item.label}</span>}
+      </Link>
+    );
+  };
+
   const content = (
     <div className="flex h-full flex-col">
-      {/* Org switcher (replaces logo area) */}
+      {/* Org switcher */}
       <div className={cn("border-b border-border/50", collapsed ? "px-2 py-3" : "px-2 py-3")}>
         <OrgSwitcher collapsed={collapsed} />
       </div>
@@ -55,7 +91,7 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile, visibleNav }: Si
         </button>
       </div>
 
-      {/* Navigation */}
+      {/* Main Navigation */}
       <div className={cn("border-t border-border/40 px-3 pt-3", collapsed && "px-2")}>
         {!collapsed && (
           <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/90">
@@ -64,41 +100,29 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile, visibleNav }: Si
         )}
       </div>
       <nav className="flex-1 space-y-1 px-3 py-1" aria-label="Main navigation">
-        {visibleNav.map((item) => {
-          const isActive =
-            pathname === item.href ||
-            (item.href !== "/dashboard" && pathname.startsWith(item.href));
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onCloseMobile}
-              data-cy={item.href === "/dashboard/billing" ? "nav-billing" : undefined}
-              className={cn(
-                "group flex items-center gap-2.5 rounded-lg py-2.5 text-sm font-medium transition-all duration-200",
-                collapsed ? "justify-center px-2" : "px-3",
-                isActive
-                  ? "gradient-bg text-white shadow-md shadow-primary/20"
-                  : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-              )}
-              aria-current={isActive ? "page" : undefined}
-              title={collapsed ? item.label : undefined}
-            >
-              <Icon
-                className={cn(
-                  "h-4 w-4 shrink-0 transition-transform duration-200",
-                  !isActive && "group-hover:scale-110"
-                )}
-                aria-hidden
-              />
-              {!collapsed && <span className="truncate">{item.label}</span>}
-            </Link>
-          );
-        })}
+        {mainNav.map(renderNavItem)}
       </nav>
 
-      {/* Bottom section */}
+      {/* Billing Section - Separated with premium styling */}
+      {billingNav.length > 0 && (
+        <div className={cn("border-t border-border/40", collapsed ? "px-2 py-2" : "px-3 py-3")}>
+          {!collapsed && (
+            <div className="mb-2 flex items-center gap-1.5 px-1">
+              <div className="flex h-4 w-4 items-center justify-center rounded-md bg-gradient-to-br from-amber-400 to-orange-500">
+                <Sparkles className="h-2.5 w-2.5 text-white" />
+              </div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                Plans & Billing
+              </p>
+            </div>
+          )}
+          <div className="space-y-1">
+            {billingNav.map(renderNavItem)}
+          </div>
+        </div>
+      )}
+
+      {/* Bottom help section */}
       <div className={cn("border-t border-border/40 px-3 py-4", collapsed && "px-2")}>
         {!collapsed && (
           <div className="rounded-lg bg-gradient-to-br from-primary/10 to-purple-500/10 p-3">
