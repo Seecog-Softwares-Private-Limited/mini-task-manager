@@ -52,15 +52,33 @@ export class InitDatabaseSchema1700000000000 implements MigrationInterface {
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS \`plans\` (
         \`id\` BINARY(16) NOT NULL,
+        \`slug\` VARCHAR(50) NOT NULL,
         \`name\` VARCHAR(100) NOT NULL,
-        \`price_per_user\` DECIMAL(10,2) NULL,
-        \`billing_cycle\` VARCHAR(50) NOT NULL,
+        \`price_monthly\` DECIMAL(10,2) NOT NULL DEFAULT 0,
+        \`price_yearly\` DECIMAL(10,2) NOT NULL DEFAULT 0,
+        \`currency\` VARCHAR(10) NOT NULL DEFAULT 'INR',
+        \`billing_cycle\` VARCHAR(50) NOT NULL DEFAULT 'monthly',
+        \`max_users\` INT NULL,
         \`max_projects\` INT NULL,
-        \`max_members\` INT NULL,
+        \`storage_limit_gb\` INT NULL,
+        \`automation_limit\` INT NULL,
+        \`integration_limit\` INT NULL,
+        \`max_api_keys\` INT NULL,
+        \`api_enabled\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`sso_enabled\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`audit_logs_enabled\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`custom_workflows\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`advanced_reporting\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`time_tracking\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`priority_support\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`sla_uptime\` VARCHAR(10) NULL,
         \`features\` JSON NULL,
         \`is_active\` TINYINT(1) NOT NULL DEFAULT 1,
+        \`display_order\` INT NOT NULL DEFAULT 0,
+        \`is_popular\` TINYINT(1) NOT NULL DEFAULT 0,
         \`created_at\` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (\`id\`)
+        PRIMARY KEY (\`id\`),
+        UNIQUE KEY \`UQ_plans_slug\` (\`slug\`)
       )
     `);
 

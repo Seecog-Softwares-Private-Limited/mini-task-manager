@@ -1,3 +1,6 @@
+// Load properties.env before any other imports that read process.env
+require('dotenv').config({ path: require('path').join(process.cwd(), 'properties.env') });
+
 import { DataSource } from 'typeorm';
 import { configuration } from '../../config/configuration';
 
