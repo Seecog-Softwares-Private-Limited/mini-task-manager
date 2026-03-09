@@ -1,6 +1,7 @@
 /**
  * Database seed: creates users, org, plans, subscription, project, workflow, tasks, etc.
  * Run: npm run seed (from repo root)
+ * Loads env from properties.env at repo root.
  *
  * Login after seed:
  *   admin@example.com  / <SEED_USER_PASSWORD or Password123!>  (project ADMIN — can send invites)
@@ -8,6 +9,10 @@
  *   member@example.com / <SEED_USER_PASSWORD or Password123!>
  * (Select the seeded organization "Seed Org" in the app to see projects/tasks.)
  */
+
+import * as path from 'path';
+import * as dotenv from 'dotenv';
+dotenv.config({ path: path.join(process.cwd(), 'properties.env') });
 
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';

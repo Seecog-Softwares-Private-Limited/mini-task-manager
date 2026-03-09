@@ -9,7 +9,7 @@ import { validate } from './env.validation';
       isGlobal: true,
       load: [configuration],
       validate,
-      envFilePath: ['.env.local', '.env'],
+      envFilePath: ['properties.env', '.env.local', '.env'],
     }),
   ],
 })

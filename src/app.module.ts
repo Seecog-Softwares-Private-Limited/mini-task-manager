@@ -21,8 +21,10 @@ import { ActivityLogsModule } from './modules/activity-logs/activity-logs.module
 import { InvitationsModule } from './modules/invitations/invitations.module';
 import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { RootController } from './root.controller';
 
 @Module({
+  controllers: [RootController],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
