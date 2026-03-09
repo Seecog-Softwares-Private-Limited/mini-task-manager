@@ -14,7 +14,7 @@ async function bootstrap() {
   const nodeEnv = config.get('nodeEnv', { infer: true }) ?? 'development';
   const apiPrefix = config.get('apiPrefix', { infer: true }) ?? 'api/v1';
 
-  app.setGlobalPrefix(apiPrefix);
+  app.setGlobalPrefix(apiPrefix, { exclude: ['/'] });
 
   const corsOrigin = process.env.CORS_ORIGIN ?? (nodeEnv === 'production' ? undefined : 'http://localhost:3001');
   app.enableCors({

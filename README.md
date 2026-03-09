@@ -15,11 +15,7 @@ cd frontend && npm install && cd ..
 
 ### 2) Configure environment
 
-```bash
-cp .env.example .env
-```
-
-Update `.env` with your MySQL and app values:
+Create `properties.env` at the repo root (e.g. copy from `properties.env.example`) with your MySQL and app values:
 
 ```env
 DB_HOST=localhost
@@ -30,12 +26,14 @@ DB_DATABASE=mini_task_manager
 JWT_SECRET=replace-with-your-secret
 ```
 
-Optional seed overrides:
+Optional seed overrides in `properties.env`:
 
 ```env
 SEED_USER_PASSWORD=YourStrongPassword123!
 SEED_INVITED_EMAIL=invitee@example.com
 ```
+
+The backend, migrations, seed scripts, and frontend (via `next.config`) all read from `properties.env`. You can copy from `.env.example` as a template for SMTP and other optional vars.
 
 ### 3) Run migrations
 
@@ -68,20 +66,41 @@ Password is:
 
 ### 5) Start the app
 
-**Option A — Single command (recommended):**
+**Canonical backend start: `node app.js`**
+
+One entrypoint for both development and production:
+
+```bash
+# Development (runs src/main.ts via ts-node; no build required)
+node app.js
+# or explicitly:
+npm run start:app
+npm run start:app:dev
+
+# Production (requires build first)
+npm run build
+NODE_ENV=production node app.js
+# or:
+npm run start:app:prod
+```
+
+Mode is chosen by `NODE_ENV` or `APP_MODE` (development | production). In production, `dist/main.js` must exist (run `npm run build` first).
+
+**Option A — Backend + frontend together (recommended for dev):**
 
 ```bash
 npm run dev
 ```
 
-Runs backend (port `3000`) and frontend (port `3001`) together.
+Runs backend (port `3000`) and frontend (port `3001`) together (uses Nest in watch mode for backend).
 
-**Option B — Separate terminals:**
+**Option B — Backend only (e.g. `node app.js` or Nest CLI):**
 
 Terminal 1 (backend, port `3000`):
 
 ```bash
-npm run start:dev
+node app.js
+# or: npm run start:dev
 ```
 
 Terminal 2 (frontend, port `3001`):
@@ -95,11 +114,25 @@ Open:
 - Frontend: `http://localhost:3001`
 - Backend API: `http://localhost:3000/api/v1`
 
-> **Note:** For sign-in and API calls to work reliably, create `frontend/.env.local` with:
-> ```
-> NEXT_PUBLIC_API_URL=http://localhost:3000
-> ```
-> Then restart the frontend dev server. Without this, the frontend proxies `/api/v1` to the backend; ensure the backend is running.
+> **Note:** For sign-in and API calls to work reliably, set `NEXT_PUBLIC_API_URL=http://localhost:3000` in root `properties.env` (the frontend loads it via next.config). Alternatively you can use `frontend/.env.local`. Ensure the backend is running.
+
+**Migration and seed order (fresh install):** Create DB → run migrations (`npm run migration:run`) → run seed (`npm run seed`) → start app.
+
+---
+
+## Troubleshooting
+
+| Issue | What to do |
+|-------|-------------|
+| **`node app.js` in prod says "Production mode requires a build"** | Run `npm run build`, then `NODE_ENV=production node app.js` or `npm run start:app:prod`. |
+| **Dev: "ts-node" or "tsconfig-paths" not found** | Run `npm install`; both are devDependencies. |
+| **DB connection refused / ECONNREFUSED** | Ensure MySQL is running; check `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE` in `properties.env`. Create the database if it does not exist: `CREATE DATABASE mini_task_manager ...`. |
+| **"Table doesn't exist" or migration errors** | Run migrations: `npm run migration:run`. On a fresh DB, create the database first, then run migrations, then seed. |
+| **JWT_SECRET must be set in production** | Set `JWT_SECRET` in `properties.env` to a non-default value when `NODE_ENV=production`. |
+| **Port 3000 already in use** | Stop the process using port 3000 or set `PORT` in `properties.env`. |
+| **Frontend can't reach API (CORS)** | In production, set `CORS_ORIGIN` to your frontend origin (e.g. `https://app.example.com`). |
+
+More detail: see `docs/RUNTIME_AND_FEATURE_READINESS.md` for startup lifecycle and remediation backlog.
 
 ---
 

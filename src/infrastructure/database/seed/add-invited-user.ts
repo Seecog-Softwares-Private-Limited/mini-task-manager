@@ -1,9 +1,12 @@
 /**
  * Adds an invited user so they can login and accept their invitation.
  * Usage: npx ts-node -r tsconfig-paths/register src/infrastructure/database/seed/add-invited-user.ts
- *
- * Configure SEED_INVITED_EMAIL / SEED_USER_PASSWORD in env, then run: npm run seed:add-invited-user
+ * Loads env from properties.env at repo root. Configure SEED_INVITED_EMAIL / SEED_USER_PASSWORD there.
  */
+
+import * as path from 'path';
+import * as dotenv from 'dotenv';
+dotenv.config({ path: path.join(process.cwd(), 'properties.env') });
 
 import { DataSource } from 'typeorm';
 import * as bcrypt from 'bcrypt';
