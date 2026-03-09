@@ -8,6 +8,9 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
+    "start:app": "node app.js",
+    "start:app:dev": "cross-env APP_MODE=development node app.js",
+    "start:app:prod": "cross-env APP_MODE=production node app.js",
     "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js",
     "migration:run": "npm run typeorm -- migration:run -d src/infrastructure/database/data-source.ts",
     "test": "jest",
@@ -20,6 +23,7 @@
     "dev:frontend": "cd frontend && npm run dev"
   },
   "dependencies": {
+    "dotenv": "^16.4.5",
     "@nestjs/common": "^10.0.0",
     "@nestjs/config": "^3.0.0",
     "@nestjs/core": "^10.0.0",
@@ -59,6 +63,7 @@
     "@types/supertest": "^6.0.3",
     "@types/uuid": "^9.0.0",
     "concurrently": "^9.2.1",
+    "cross-env": "^7.0.3",
     "jest": "^30.2.0",
     "supertest": "^7.2.2",
     "ts-jest": "^29.4.6",
