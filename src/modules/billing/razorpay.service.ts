@@ -7,6 +7,32 @@ const Razorpay = require('razorpay') as new (options: { key_id: string; key_secr
   payments: { fetch: (id: string) => Promise<unknown>; refund: (id: string, params?: unknown) => Promise<unknown> };
 };
 
+/** Normalize Razorpay / HTTP errors from the Node SDK into a readable message + optional statusCode. */
+export function parseRazorpayFailure(err: unknown): { message: string; statusCode?: number } {
+  if (err == null) return { message: 'Unknown Razorpay error' };
+  if (typeof err === 'string') return { message: err };
+  if (!(typeof err === 'object')) return { message: String(err) };
+  const e = err as Record<string, unknown>;
+  const statusCode = typeof e.statusCode === 'number' ? e.statusCode : undefined;
+  if (typeof e.description === 'string' && e.description) {
+    return { message: e.description, statusCode };
+  }
+  const nested = e.error;
+  if (nested && typeof nested === 'object') {
+    const ne = nested as Record<string, unknown>;
+    if (typeof ne.description === 'string' && ne.description) {
+      return { message: ne.description, statusCode };
+    }
+    if (typeof ne.code === 'string') {
+      return { message: typeof e.message === 'string' ? `${ne.code}: ${e.message}` : ne.code, statusCode };
+    }
+  }
+  if (typeof e.message === 'string' && e.message) {
+    return { message: e.message, statusCode };
+  }
+  return { message: 'Razorpay request failed', statusCode };
+}
+
 export interface RazorpayOrder {
   id: string;
   amount: number;
@@ -23,14 +49,20 @@ export class RazorpayService {
   private readonly keySecret: string;
 
   constructor() {
-    this.keyId = process.env.RAZORPAY_KEY_ID || 'rzp_test_SKnj58Qr1OY0FK';
-    this.keySecret = process.env.RAZORPAY_KEY_SECRET || 'HldpEAu7h8FFF3OkXCzl4IAO';
+    this.keyId = (process.env.RAZORPAY_KEY_ID || 'rzp_test_SKnj58Qr1OY0FK').trim();
+    this.keySecret = (process.env.RAZORPAY_KEY_SECRET || 'HldpEAu7h8FFF3OkXCzl4IAO').trim();
 
     this.razorpay = new Razorpay({
       key_id: this.keyId,
       key_secret: this.keySecret,
     });
 
+    const fromEnv = !!(process.env.RAZORPAY_KEY_ID?.trim() && process.env.RAZORPAY_KEY_SECRET?.trim());
+    if (!fromEnv && process.env.NODE_ENV !== 'production') {
+      this.logger.warn(
+        'Razorpay: using fallback test keys from code. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in properties.env (Razorpay Dashboard → API Keys). Revoked keys cause create-order to fail.',
+      );
+    }
     this.logger.log('Razorpay initialized with key: ' + this.keyId.slice(0, 12) + '...');
   }
 
@@ -58,8 +90,12 @@ export class RazorpayService {
       this.logger.log(`Razorpay order created: ${order.id} for ₹${params.amount / 100}`);
       return order;
     } catch (error) {
-      this.logger.error('Failed to create Razorpay order', error);
-      throw error;
+      const { message, statusCode } = parseRazorpayFailure(error);
+      this.logger.error(`Failed to create Razorpay order: ${message}`, error instanceof Error ? error.stack : String(error));
+      const wrapped = new Error(message) as Error & { statusCode?: number; cause?: unknown };
+      wrapped.statusCode = statusCode;
+      wrapped.cause = error;
+      throw wrapped;
     }
   }
 

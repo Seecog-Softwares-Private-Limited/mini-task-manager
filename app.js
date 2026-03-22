@@ -40,6 +40,12 @@ function checkEnvFile() {
       '[app.js] No properties.env file found. Create properties.env and set DB_*, JWT_SECRET, etc.'
     );
   }
+  const legacyDotEnv = path.join(ROOT, '.env');
+  if (fs.existsSync(legacyDotEnv)) {
+    console.warn(
+      '[app.js] Found .env — this project does not load it. Move variables into properties.env and remove .env.'
+    );
+  }
 }
 
 function checkDbEnv() {

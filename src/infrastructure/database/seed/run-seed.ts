@@ -196,7 +196,7 @@ async function runSeed() {
         currency: 'INR',
         billingCycle: 'monthly',
         maxProjects: 1,
-        maxUsers: 3,
+        maxUsers: 5,
         storageLimitGb: 5,
         automationLimit: 0,
         integrationLimit: 0,
