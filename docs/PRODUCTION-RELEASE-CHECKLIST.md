@@ -19,7 +19,7 @@ Use this checklist for the first (and subsequent) manual Docker production deplo
 | # | Check | How to Verify | Go / No-Go |
 |---|--------|----------------|------------|
 | 1.1.1 | All required env vars are documented and set for production. | Compare against the table below; ensure no required var is missing. | ☐ |
-| 1.1.2 | No `.env` or secrets committed in the image (use runtime env or secret manager). | Do not COPY `.env` into Dockerfile; use `-e` or secrets at run. | ☐ |
+| 1.1.2 | No `properties.env` / secrets committed in the image (use runtime env or secret manager). | Do not COPY `properties.env` into Dockerfile; use `-e`, `env_file`, or secrets at run. | ☐ |
 
 **Required production environment variables:**
 

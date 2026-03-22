@@ -3,8 +3,11 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// Load root properties.env first so PORT is available (backend port)
-dotenv.config({ path: path.join(__dirname, '..', 'properties.env') });
+// Repo-root config (same file as Nest). Override so this wins over stray .env* in frontend/.
+dotenv.config({
+  path: path.join(__dirname, '..', 'properties.env'),
+  override: true,
+});
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {

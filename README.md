@@ -15,7 +15,9 @@ cd frontend && npm install && cd ..
 
 ### 2) Configure environment
 
-Create `properties.env` at the repo root (e.g. copy from `properties.env.example`) with your MySQL and app values:
+Create **`properties.env`** at the repo root (copy from `properties.env.example`). **Do not use `.env`** — it is not loaded anywhere.
+
+MySQL and app values:
 
 ```env
 DB_HOST=localhost
@@ -33,7 +35,7 @@ SEED_USER_PASSWORD=YourStrongPassword123!
 SEED_INVITED_EMAIL=invitee@example.com
 ```
 
-The backend, migrations, seed scripts, and frontend (via `next.config`) all read from `properties.env`. You can copy from `.env.example` as a template for SMTP and other optional vars.
+The backend, migrations, seed scripts, frontend (`next.config.mjs` + `npm run dev` in `frontend/`), Cypress, and Docker Compose (`env_file: properties.env` for the API) use **only** repo-root **`properties.env`**. There is no `.env` or `.env.example` in this repo. Optional SMTP, OAuth, Razorpay, and test vars belong in `properties.env` (see `properties.env.example`).
 
 ### 3) Run migrations
 
@@ -128,7 +130,7 @@ Open:
 - Frontend: `http://localhost:3001`
 - Backend API: `http://localhost:3000/api/v1`
 
-> **Note:** For sign-in and API calls to work reliably, set `NEXT_PUBLIC_API_URL=http://localhost:3000` in root `properties.env` (the frontend loads it via next.config). Alternatively you can use `frontend/.env.local`. Ensure the backend is running.
+> **Note:** Prefer same-origin `/api/v1` (leave `NEXT_PUBLIC_API_URL` empty). If the API is on another host, set `NEXT_PUBLIC_API_URL` in repo-root **`properties.env`** only. Ensure the backend is running on `PORT` from that file.
 
 **Migration and seed order (fresh install):** Create DB → run migrations (`npm run migration:run`) → run seed (`npm run seed`) → start app.
 

@@ -1,10 +1,17 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PlansRepository } from './repositories/plans.repository';
 import { SubscriptionsRepository } from './repositories/subscriptions.repository';
 import { InvoicesRepository } from './repositories/invoices.repository';
 import { PaymentsRepository } from './repositories/payments.repository';
-import { RazorpayService } from './razorpay.service';
+import { parseRazorpayFailure, RazorpayService } from './razorpay.service';
 import { UsageService, type OrganizationUsage } from './usage.service';
 import { PlanEntity } from './entities/plan.entity';
 import { SubscriptionEntity, type BillingCycle } from './entities/subscription.entity';
@@ -126,30 +133,70 @@ export class BillingService {
     const userCount = Math.max(1, usage.users.current);
     const totalAmount = Math.round(price * userCount * 100); // Convert to paise
 
-    const order = await this.razorpayService.createOrder({
-      amount: totalAmount,
-      currency: plan.currency || 'INR',
-      receipt: `sub_${organizationId.slice(0, 8)}_${Date.now()}`,
-      notes: {
-        organizationId,
-        planId,
-        billingCycle,
-        planName: plan.name,
-        userCount: String(userCount),
-      },
-    });
+    // Razorpay receipt max length 40; must be unique per account
+    const orgShort = organizationId.replace(/-/g, '').slice(0, 8);
+    const receipt = `sub_${orgShort}_${Date.now()}`.slice(0, 40);
+
+    let order: { id: string };
+    try {
+      order = await this.razorpayService.createOrder({
+        amount: totalAmount,
+        currency: plan.currency || 'INR',
+        receipt,
+        notes: {
+          organizationId,
+          planId,
+          billingCycle,
+          planName: plan.name,
+          userCount: String(userCount),
+        },
+      });
+    } catch (err: unknown) {
+      const parsed = parseRazorpayFailure(err);
+      const statusFromErr =
+        err && typeof err === 'object' && typeof (err as { statusCode?: number }).statusCode === 'number'
+          ? (err as { statusCode: number }).statusCode
+          : parsed.statusCode;
+      this.logger.warn(`createOrder Razorpay failure: ${parsed.message} (http ${statusFromErr ?? 'n/a'})`);
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.BAD_GATEWAY,
+          error: 'RazorpayError',
+          message: parsed.message,
+          hint:
+            'Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in properties.env using Test keys from https://dashboard.razorpay.com/app/keys (fallback keys in repo are often revoked).',
+        },
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
 
     // Create a pending payment record
     const subscription = await this.subscriptionsRepository.findByOrganization(organizationId);
     if (subscription) {
-      await this.paymentsRepository.create({
-        subscriptionId: subscription.id,
-        amount: totalAmount / 100,
-        currency: plan.currency || 'INR',
-        status: 'PENDING',
-        razorpayOrderId: order.id,
-        metadata: { planId, billingCycle, userCount },
-      });
+      try {
+        await this.paymentsRepository.create({
+          subscriptionId: subscription.id,
+          amount: Math.round((totalAmount / 100) * 100) / 100,
+          currency: plan.currency || 'INR',
+          status: 'PENDING',
+          razorpayOrderId: order.id,
+          metadata: { planId, billingCycle, userCount },
+        });
+      } catch (dbErr) {
+        this.logger.error(
+          `Payment row insert failed after Razorpay order ${order.id}; order may be orphaned`,
+          dbErr instanceof Error ? dbErr.stack : String(dbErr),
+        );
+        throw new HttpException(
+          {
+            statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+            error: 'PaymentRecordError',
+            message: 'Razorpay order was created but saving the pending payment failed.',
+            orderId: order.id,
+          },
+          HttpStatus.INTERNAL_SERVER_ERROR,
+        );
+      }
     }
 
     return {
