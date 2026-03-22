@@ -10,7 +10,6 @@ import * as dotenv from 'dotenv';
 dotenv.config({ path: path.join(process.cwd(), 'properties.env') });
 
 import { DataSource } from 'typeorm';
-import * as bcrypt from 'bcrypt';
 import { configuration } from '../../../config/configuration';
 import { generateUuid } from '../../../common/utils/uuid.util';
 import { UserEntity } from '../../../modules/users/entities/user.entity';
@@ -45,8 +44,6 @@ async function addAdmin() {
   await dataSource.initialize();
   console.log('Database connected. Adding admin...');
 
-  const hash = await bcrypt.hash(PASSWORD, 10);
-
   await dataSource.transaction(async (manager) => {
     const userRepo = manager.getRepository(UserEntity);
     const orgRepo = manager.getRepository(OrganizationEntity);
@@ -63,7 +60,7 @@ async function addAdmin() {
           id: adminId,
           email: ADMIN_EMAIL,
           fullName: 'Seed Admin',
-          passwordHash: hash,
+          passwordHash: PASSWORD,
         }),
       );
       console.log('  Created user: admin@example.com');

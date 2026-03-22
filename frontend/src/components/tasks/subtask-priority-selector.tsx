@@ -44,7 +44,7 @@ export function SubtaskPrioritySelector({
           type="button"
           variant="ghost"
           disabled={disabled}
-          className="h-7 rounded-full border border-border bg-background px-2 text-[11px] font-medium text-muted-foreground"
+          className="h-8 rounded-full bg-background/90 px-3 text-[11px] font-semibold text-foreground/90 shadow-sm ring-1 ring-border/25 transition-[box-shadow] hover:ring-border/40"
           aria-label={`Subtask priority ${selected.label}`}
         >
           <span className={cn("mr-1.5 h-2 w-2 rounded-full", selected.dotClass)} />

@@ -7,7 +7,7 @@
 | **Auth** | Centralized 401 handling: clear token + cookie and redirect in axios interceptor; `clearAuth()` used on explicit logout. |
 | **Auth** | httpOnly cookie strategy documented (see FRONTEND-AUTH-STRATEGY.md); current flow uses localStorage + cookie for middleware. |
 | **Tenant** | `TenantProvider` + `useTenant()` replace raw localStorage for org; `setOrgId` syncs context and storage. |
-| **Tenant** | `TenantGuard` redirects to `/dashboard/organizations` when path requires tenant but no org is set. |
+| **Tenant** | `TenantGuard` redirects to `/dashboard/workspaces` when path requires tenant but no org is set. |
 | **Tenant** | `X-Organization-Id` always from `getStoredOrgId()` (updated via `setOrgId` in context); never missing for protected routes that pass TenantGuard. |
 | **Errors** | `normalizeApiError()` normalizes backend `{ statusCode, message }` (message string or string[]). |
 | **Errors** | Global API errors (5xx, 429, network) reported via `reportGlobalError()` and shown in `GlobalErrorToast`. |
@@ -33,7 +33,7 @@ frontend/src/
 │   ├── dashboard/
 │   │   ├── loading.tsx          # NEW: route loading skeleton
 │   │   ├── layout.tsx           # UPDATED: TenantGuard, role nav, skeleton
-│   │   ├── organizations/page.tsx  # UPDATED: useTenant().setOrgId
+│   │   ├── workspaces/page.tsx     # Tenant picker; legacy organizations route redirects here
 │   │   ├── projects/
 │   │   │   ├── [id]/page.tsx    # UPDATED: useTenant, Skeleton, NetworkFallback
 │   │   │   └── page.tsx         # UPDATED: useTenant, Skeleton, EmptyState, optimistic
@@ -113,7 +113,7 @@ const setOrgId = useCallback((id: string | null) => {
 
 // components/tenant-guard.tsx: redirect when path requires tenant but orgId is null.
 if (isTenantRequiredPath(pathname) && !orgId) {
-  router.replace("/dashboard/organizations?required=1");
+  router.replace("/dashboard/workspaces?required=1");
   return <EmptyTenantUI />;
 }
 ```

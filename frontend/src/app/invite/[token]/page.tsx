@@ -114,7 +114,7 @@ export default function InviteAcceptPage() {
           );
         } else if (status === 404 || status === 405) {
           setSignupError(
-            "Unable to reach the server. Please ensure the backend is running on port 3000 and try again."
+            "Unable to reach the server. Please ensure the backend is running and try again."
           );
         } else {
           setSignupError(msg);
@@ -196,7 +196,7 @@ export default function InviteAcceptPage() {
               </div>
               <h1 className="text-2xl font-bold tracking-tight">You&apos;re in!</h1>
               <p className="text-muted-foreground">
-                You&apos;ve successfully joined {validation.organization?.name ?? "the organization"}.
+                You&apos;ve successfully joined {validation.organization?.name ?? "the workspace"}.
                 Redirecting to dashboard...
               </p>
               <div className="flex justify-center">
@@ -236,7 +236,7 @@ export default function InviteAcceptPage() {
                   You&apos;ve been invited to join
                 </p>
                 <p className="text-lg font-semibold mt-1">
-                  {validation.organization?.name ?? "Unknown Organization"}
+                  {validation.organization?.name ?? "Unknown workspace"}
                 </p>
               </div>
 
@@ -278,7 +278,7 @@ export default function InviteAcceptPage() {
                   You&apos;re invited!
                 </h1>
                 <p className="mt-2 text-muted-foreground">
-                  Create an account to join {validation.organization?.name ?? "the organization"} as {validation.role}
+                  Create an account to join {validation.organization?.name ?? "the workspace"} as {validation.role}
                 </p>
               </div>
 

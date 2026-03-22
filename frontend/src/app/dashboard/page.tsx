@@ -39,9 +39,9 @@ export default function DashboardPage() {
           </p>
           {!orgId && (
             <Button asChild variant="secondary" className="mt-4 bg-white/20 hover:bg-white/30 text-white border-0 shadow-none">
-              <Link href="/dashboard/organizations">
+              <Link href="/dashboard/workspaces">
                 <Building2 className="mr-2 h-4 w-4" />
-                Select an organization to get started
+                Select a workspace to get started
               </Link>
             </Button>
           )}

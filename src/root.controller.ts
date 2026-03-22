@@ -11,7 +11,7 @@ export class RootController {
     return {
       message: 'Mini Task Manager API',
       api: '/api/v1',
-      docs: 'Use the API at /api/v1. Frontend: http://localhost:3001',
+      docs: `Use the API at /api/v1. Frontend: http://localhost:${process.env.FRONTEND_PORT || '3001'}`,
     };
   }
 }

@@ -19,6 +19,9 @@ export class ProjectEntity extends BaseEntity {
   @Column({ type: 'text', nullable: true })
   description!: string | null;
 
+  @Column({ name: 'icon_url', type: 'mediumtext', nullable: true })
+  iconUrl!: string | null;
+
   @Column({ type: 'varchar', length: 50, default: 'PRIVATE' })
   visibility!: string;
 

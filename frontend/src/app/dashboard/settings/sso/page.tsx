@@ -166,7 +166,7 @@ export default function SSOPage() {
                 <p className="font-semibold">Available on Pro &amp; Enterprise Plans</p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   SSO (SAML 2.0 and OpenID Connect) is available on the Pro and Enterprise plans.
-                  Upgrade to configure single sign-on for your organization.
+                  Upgrade to configure single sign-on for your workspace.
                 </p>
               </div>
             </div>
@@ -196,7 +196,7 @@ export default function SSOPage() {
             <div>
               <p className="font-semibold">Access Restricted</p>
               <p className="mt-0.5 text-sm text-muted-foreground">
-                Only organization owners and admins can manage SSO settings.
+                Only workspace owners and admins can manage SSO settings.
               </p>
             </div>
           </CardContent>
@@ -210,7 +210,7 @@ export default function SSOPage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold tracking-tight">SSO Configuration</h1>
-        <p className="mt-1 text-muted-foreground">Configure SAML 2.0 or OpenID Connect for your organization.</p>
+        <p className="mt-1 text-muted-foreground">Configure SAML 2.0 or OpenID Connect for your workspace.</p>
       </div>
 
       {/* Status card */}

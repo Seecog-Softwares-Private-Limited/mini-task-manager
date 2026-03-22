@@ -51,11 +51,11 @@ export function SubtaskDueDatePicker({
           variant="ghost"
           disabled={disabled}
           className={cn(
-            "h-7 rounded-full border px-2.5 text-[11px] font-medium",
+            "h-8 rounded-full px-3 text-[11px] font-semibold shadow-sm ring-1 ring-border/25 transition-[background-color,box-shadow] hover:ring-border/40",
             value
-              ? "border-border bg-background text-foreground"
-              : "border-dashed border-muted-foreground/40 bg-muted/30 text-muted-foreground",
-            overdue && "border-destructive/40 bg-destructive/10 text-destructive"
+              ? "bg-background/90 text-foreground"
+              : "bg-muted/35 text-muted-foreground ring-dashed ring-muted-foreground/30",
+            overdue && "bg-destructive/10 text-destructive ring-destructive/30"
           )}
         >
           <CalendarDays className="mr-1 h-3.5 w-3.5" />

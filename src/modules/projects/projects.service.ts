@@ -44,11 +44,13 @@ export class ProjectsService {
   }
 
   async create(organizationId: string, createdBy: string, dto: CreateProjectDto): Promise<ProjectEntity> {
+    const iconTrimmed = dto.iconUrl?.trim();
     const project = await this.projectsRepository.create({
       organizationId,
       createdBy,
       name: dto.name,
       description: dto.description ?? null,
+      iconUrl: iconTrimmed && iconTrimmed.length > 0 ? dto.iconUrl! : null,
       visibility: dto.visibility ?? 'PRIVATE',
     });
     this.activityLogsService
@@ -70,6 +72,10 @@ export class ProjectsService {
     const payload: Partial<ProjectEntity> = {};
     if (dto.name !== undefined) payload.name = dto.name;
     if (dto.description !== undefined) payload.description = dto.description ?? null;
+    if (dto.iconUrl !== undefined) {
+      const v = dto.iconUrl.trim();
+      payload.iconUrl = v.length === 0 ? null : dto.iconUrl;
+    }
     if (dto.visibility !== undefined) payload.visibility = dto.visibility;
     if (dto.isArchived !== undefined) payload.isArchived = dto.isArchived;
     if (Object.keys(payload).length === 0) return project;

@@ -5,13 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { usePermissions } from "@/hooks/use-permissions";
-import { useTenant } from "@/context/tenant-context";
 import { usePlanOptional } from "@/context/plan-context";
 import { logout } from "@/services/api/auth.api";
 import { clearAuth } from "@/services/api/client";
 import { TenantGuard } from "@/components/tenant-guard";
 import { Sidebar } from "@/components/dashboard/sidebar";
-import { OrgSwitcher } from "@/components/dashboard/org-switcher";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { CommandPalette } from "@/components/command-palette";
 import { NotificationCenter } from "@/components/notifications/notification-center";
@@ -19,13 +17,12 @@ import { WorkspaceProgressBadge } from "@/components/workspace-progress-badge";
 import { StreakBadge } from "@/components/streak-badge";
 import { TrialBanner } from "@/components/trial-banner";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import type { AppRole } from "@/hooks/use-auth";
 import {
   LayoutDashboard, Building2, FolderKanban, ListTodo, Bell,
   CreditCard, Activity, BarChart3, ClipboardList, Settings,
-  Menu, PanelLeftClose, PanelLeft, LogOut, User, Sparkles,
+  Menu, PanelLeftClose, PanelLeft, LogOut, Sparkles,
 } from "lucide-react";
 
 const nav: {
@@ -38,7 +35,7 @@ const nav: {
   section?: string;
 }[] = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-  { href: "/dashboard/organizations", label: "Organizations", icon: Building2 },
+  { href: "/dashboard/workspaces", label: "Workspaces", icon: Building2 },
   { href: "/dashboard/projects", label: "Projects", icon: FolderKanban },
   { href: "/dashboard/tasks", label: "Tasks", icon: ListTodo },
   { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
@@ -53,8 +50,7 @@ const nav: {
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { user, hasRole } = useAuth();
-  const { orgId } = useTenant();
+  const { hasRole } = useAuth();
   const { canManageBilling, canViewAudit } = usePermissions();
   const planContext = usePlanOptional();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -100,7 +96,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             type="button"
             variant="ghost"
             size="icon"
-            className="md:hidden h-9 w-9"
+            className="md:hidden h-9 w-9 shrink-0"
             onClick={() => setMobileOpen(true)}
             aria-label="Open menu"
           >
@@ -110,7 +106,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             type="button"
             variant="ghost"
             size="icon"
-            className="hidden md:flex h-9 w-9"
+            className="hidden md:flex h-9 w-9 shrink-0"
             onClick={() => setSidebarCollapsed((c) => !c)}
             aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
@@ -121,11 +117,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             )}
           </Button>
 
-          <div className="hidden sm:block border-l border-border/60 pl-3 ml-1">
-            <OrgSwitcher variant="navbar" />
-          </div>
-
-          <div className="flex-1" />
+          <div className="flex-1 min-w-0" />
 
           <div className="flex items-center gap-2">
             <WorkspaceProgressBadge className="hidden sm:inline-flex" />
@@ -140,19 +132,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               >
                 {planContext.plan?.name ?? planContext.subscription?.planName ?? "Free"}
               </Link>
-            )}
-            {user?.email && (
-              <div className="hidden items-center gap-2 rounded-full border bg-muted/30 pl-1 pr-3 py-1 sm:flex">
-                <Avatar className="h-7 w-7">
-                  <AvatarImage src={undefined} />
-                  <AvatarFallback className="text-[10px] font-bold rounded-full gradient-bg text-white">
-                    {(user.fullName ?? user.email).slice(0, 2).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <span className="max-w-[120px] truncate text-xs font-medium text-muted-foreground">
-                  {user.email}
-                </span>
-              </div>
             )}
             <ThemeToggle />
             <Button

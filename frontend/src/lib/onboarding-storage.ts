@@ -1,5 +1,5 @@
 /**
- * Onboarding state per organization. Persisted in localStorage.
+ * Onboarding state per workspace (tenant). Persisted in localStorage.
  * Used to drive first-time setup flow and workspace progress.
  */
 

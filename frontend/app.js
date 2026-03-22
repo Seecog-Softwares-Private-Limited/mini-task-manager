@@ -2,10 +2,17 @@
 'use strict';
 
 const path = require('path');
+const fs = require('fs');
 const { spawn } = require('child_process');
 
+// Load properties.env from repo root so FRONTEND_PORT is available
+const propsPath = path.join(__dirname, '..', 'properties.env');
+if (fs.existsSync(propsPath)) {
+  require('dotenv').config({ path: propsPath });
+}
+
 const ROOT = path.resolve(__dirname);
-const PORT = process.env.PORT || '3001';
+const PORT = process.env.FRONTEND_PORT || process.env.PORT || '3001';
 
 console.log('[frontend app.js] Starting Next.js dev server on port', PORT);
 console.log('[frontend app.js] Open http://localhost:' + PORT);

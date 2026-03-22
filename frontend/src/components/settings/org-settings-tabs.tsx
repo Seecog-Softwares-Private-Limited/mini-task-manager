@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Building2, Users } from "lucide-react";
 
 const TABS = [
-  { href: "/dashboard/settings/organization", label: "Organization", icon: Building2 },
+  { href: "/dashboard/settings/workspace", label: "Workspace", icon: Building2 },
   { href: "/dashboard/settings/members", label: "Members", icon: Users },
 ] as const;
 
@@ -14,7 +14,7 @@ export function OrgSettingsTabs() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex gap-1 border-b border-border mb-6" aria-label="Organization settings">
+    <nav className="flex gap-1 border-b border-border mb-6" aria-label="Workspace settings">
       {TABS.map((tab) => {
         const active = pathname === tab.href;
         const Icon = tab.icon;

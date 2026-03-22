@@ -9,10 +9,16 @@ export interface CreateOrganizationPayload {
   logoUrl?: string;
 }
 
-/** Check if an organization slug is available (for create form). */
-export async function checkSlugAvailable(slug: string): Promise<{ available: boolean }> {
+/** Check if a workspace slug is available. Pass `excludeOrganizationId` when editing an existing workspace. */
+export async function checkSlugAvailable(
+  slug: string,
+  excludeOrganizationId?: string
+): Promise<{ available: boolean }> {
   const { data } = await apiClient.get<{ available: boolean }>("/organizations/slug/available", {
-    params: { slug: slug.trim().toLowerCase() },
+    params: {
+      slug: slug.trim().toLowerCase(),
+      ...(excludeOrganizationId ? { excludeOrganizationId } : {}),
+    },
   });
   return data;
 }
@@ -34,10 +40,16 @@ export async function fetchOrganization(id: string): Promise<Organization | null
   return data;
 }
 
-/** Archive or unarchive an organization. Owner only. */
+/** Update workspace (archive, name, slug, logo). Archive: owner only. Details: owner or admin. */
 export async function updateOrganization(
   orgId: string,
-  payload: { isArchived?: boolean }
+  payload: {
+    isArchived?: boolean;
+    name?: string;
+    slug?: string;
+    /** Empty string removes the logo */
+    logoUrl?: string;
+  }
 ): Promise<Organization> {
   const { data } = await apiClient.patch<Organization>(`/organizations/${orgId}`, payload, {
     headers: { "X-Organization-Id": orgId },

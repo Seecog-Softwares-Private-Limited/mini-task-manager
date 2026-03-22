@@ -58,9 +58,9 @@ export default function AnalyticsPage() {
         <h1 className="text-2xl font-bold tracking-tight">Analytics</h1>
         <Card className="max-w-md border-dashed border-2">
           <CardContent className="flex items-center gap-4 py-8 px-6">
-            <p className="text-sm text-muted-foreground">Select an organization to view analytics.</p>
+            <p className="text-sm text-muted-foreground">Select a workspace to view analytics.</p>
             <Button asChild size="sm" variant="outline">
-              <Link href="/dashboard/organizations">Organizations</Link>
+              <Link href="/dashboard/workspaces">Workspaces</Link>
             </Button>
           </CardContent>
         </Card>
@@ -117,7 +117,7 @@ export default function AnalyticsPage() {
           { label: "Activation Rate", value: `${analytics.activationRate}%`, sub: "Members who created a project", icon: Zap, color: "text-primary bg-primary/10" },
           { label: "Trial to Paid", value: trialLabel, sub: "Conversion status", icon: TrendingUp, color: "text-emerald-500 bg-emerald-500/10" },
           { label: "Active Members (7d)", value: String(analytics.activeMembers7d), sub: "Weekly active", icon: Users, color: "text-blue-500 bg-blue-500/10" },
-          { label: "Total Members", value: String(analytics.totalMembers), sub: "In this organization", icon: PieChart, color: "text-purple-500 bg-purple-500/10" },
+          { label: "Total Members", value: String(analytics.totalMembers), sub: "In this workspace", icon: PieChart, color: "text-purple-500 bg-purple-500/10" },
         ].map((kpi) => {
           const Icon = kpi.icon;
           return (
@@ -176,7 +176,7 @@ export default function AnalyticsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Workspace Summary</CardTitle>
-          <p className="text-sm text-muted-foreground">Projects and tasks in this organization.</p>
+          <p className="text-sm text-muted-foreground">Projects and tasks in this workspace.</p>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 sm:grid-cols-2">

@@ -133,6 +133,60 @@
       0 8px 24px rgba(0,0,0,0.06),
       0 24px 80px rgba(0,0,0,0.08);
   }
+
+  /* Task detail modal — layered depth, minimal hard borders */
+  .td-modal-shell {
+    box-shadow:
+      0 0 0 1px rgba(15, 23, 42, 0.05),
+      0 2px 4px rgba(15, 23, 42, 0.03),
+      0 32px 90px -24px rgba(15, 23, 42, 0.16),
+      0 12px 28px -16px rgba(15, 23, 42, 0.08);
+  }
+  .dark .td-modal-shell {
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.07),
+      0 32px 90px -24px rgba(0, 0, 0, 0.65),
+      0 12px 28px -16px rgba(0, 0, 0, 0.45);
+  }
+  .td-main-card {
+    box-shadow:
+      0 0 0 1px rgba(15, 23, 42, 0.045),
+      0 1px 2px rgba(15, 23, 42, 0.035),
+      0 20px 48px -18px rgba(15, 23, 42, 0.1),
+      inset 0 1px 0 rgba(255, 255, 255, 0.88);
+  }
+  .dark .td-main-card {
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.06),
+      0 1px 2px rgba(0, 0, 0, 0.25),
+      0 24px 56px -20px rgba(0, 0, 0, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+  .td-sidebar-card {
+    box-shadow:
+      0 1px 2px rgba(15, 23, 42, 0.04),
+      inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  }
+  .dark .td-sidebar-card {
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.35),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+  .td-modal-header-shade {
+    background: linear-gradient(
+      180deg,
+      hsl(220 14% 97% / 0.95) 0%,
+      hsl(var(--background)) 100%
+    );
+  }
+  .dark .td-modal-header-shade {
+    background: linear-gradient(
+      180deg,
+      hsl(224 30% 12% / 0.92) 0%,
+      hsl(var(--background)) 100%
+    );
+  }
+
   .premium-ring {
     @apply ring-2 ring-primary/20 ring-offset-2 ring-offset-background;
   }

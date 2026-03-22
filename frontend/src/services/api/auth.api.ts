@@ -1,4 +1,6 @@
 import { apiClient, setStoredToken, setStoredOrgId } from "@/services/api/client";
+import { LoginRequestError } from "@/lib/error";
+import { loginWithEmailPassword } from "@/services/auth/email-password-login";
 import type { LoginResponse } from "@/types/api";
 
 export interface LoginPayload {
@@ -19,13 +21,21 @@ export interface PublicSignupPayload {
 }
 
 export async function login(payload: LoginPayload): Promise<LoginResponse> {
-  const { data } = await apiClient.post<LoginResponse>("auth/login", payload);
-  setStoredToken(data.accessToken);
-  return data;
+  const result = await loginWithEmailPassword(payload.email, payload.password);
+  if (!result.ok) {
+    throw new LoginRequestError(result.message, result.status, result.network);
+  }
+  return result.data;
 }
 
-export async function signup(payload: PublicSignupPayload): Promise<{ message: string }> {
-  const { data } = await apiClient.post<{ message: string }>("auth/signup", payload);
+export interface SignupResponse {
+  message: string;
+  /** When true, user can sign in immediately (no inbox verification step). */
+  emailVerified?: boolean;
+}
+
+export async function signup(payload: PublicSignupPayload): Promise<SignupResponse> {
+  const { data } = await apiClient.post<SignupResponse>("auth/signup", payload);
   return data;
 }
 

@@ -18,6 +18,7 @@ export class UserEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 150, unique: true })
   email!: string;
 
+  /** Plain text for now (column name remains `password_hash` in DB). Do not expose in API responses. */
   @Column({ name: 'password_hash', type: 'text', nullable: true })
   passwordHash!: string | null;
 

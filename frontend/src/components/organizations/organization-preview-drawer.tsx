@@ -191,7 +191,7 @@ export function OrganizationPreviewDrawer({
           </div>
 
           {/* Summary stats */}
-          <section aria-label="Organization stats">
+          <section aria-label="Workspace stats">
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Summary
             </h3>
@@ -241,7 +241,7 @@ export function OrganizationPreviewDrawer({
           </section>
 
           {/* Members */}
-          <section aria-label="Organization members">
+          <section aria-label="Workspace members">
             <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <Users className="h-3.5 w-3.5" />
               Members
@@ -290,7 +290,7 @@ export function OrganizationPreviewDrawer({
               </div>
             ) : activityLogs.length === 0 ? (
               <p className="py-4 text-sm text-muted-foreground">
-                No recent activity for this organization.
+                No recent activity for this workspace.
               </p>
             ) : (
               <ul className="space-y-2" role="list">

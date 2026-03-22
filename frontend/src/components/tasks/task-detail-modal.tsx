@@ -1,16 +1,15 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
-  DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getStoredToken } from "@/services/api/client";
+import { getStoredToken, parseApiError } from "@/services/api/client";
 import { fetchTask, updateTask, updateTaskAssignee } from "@/services/api/tasks.api";
 import { fetchComments, addComment, deleteComment } from "@/services/api/comments.api";
 import { fetchOrgMembers } from "@/services/api/members.api";
@@ -39,6 +38,26 @@ import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-sel
 import { SubtaskDueDatePicker } from "@/components/tasks/subtask-due-date-picker";
 import { SubtaskPrioritySelector } from "@/components/tasks/subtask-priority-selector";
 import { CommentInputWithMentions } from "@/components/tasks/comment-input-with-mentions";
+import {
+  normalizeDescriptionHtml,
+  sanitizeTaskDescriptionHtml,
+  taskDescriptionLooksLikeHtml,
+  taskDescriptionPlainLength,
+} from "@/lib/task-description-html";
+
+const TaskDescriptionEditor = dynamic(
+  () =>
+    import("@/components/tasks/task-description-tinymce").then((mod) => mod.TaskDescriptionEditor),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="min-h-[320px] animate-pulse rounded-[0.875rem] bg-muted/30 ring-1 ring-border/20"
+        aria-hidden
+      />
+    ),
+  }
+);
 import type {
   Task,
   TaskAttachment,
@@ -67,7 +86,6 @@ import {
   CheckSquare,
   Pencil,
   ChevronDown,
-  ChevronRight,
   Plus,
   Tag,
   X,
@@ -93,6 +111,14 @@ const PRIORITIES = [
   { value: "CRITICAL", label: "Critical", color: "bg-purple-500", border: "border-l-purple-400/50" },
 ];
 
+/** Sidebar priority row — warm tint per level (visually distinct from status / primary actions). */
+const PRIORITY_SIDEBAR_SHELL: Record<string, string> = {
+  LOW: "bg-emerald-500/[0.07] ring-1 ring-emerald-600/15 dark:bg-emerald-500/[0.11] dark:ring-emerald-400/22",
+  MEDIUM: "bg-amber-500/[0.08] ring-1 ring-amber-600/18 dark:bg-amber-500/[0.12] dark:ring-amber-400/25",
+  HIGH: "bg-red-500/[0.07] ring-1 ring-red-600/18 dark:bg-red-500/[0.12] dark:ring-red-400/22",
+  CRITICAL: "bg-purple-500/[0.08] ring-1 ring-purple-600/18 dark:bg-purple-500/[0.12] dark:ring-purple-400/25",
+};
+
 const STATUS_DOT_FALLBACK = [
   "bg-blue-500",
   "bg-amber-500",
@@ -100,6 +126,45 @@ const STATUS_DOT_FALLBACK = [
   "bg-emerald-500",
   "bg-rose-500",
 ];
+
+/** Task detail — typography + surfaces (see globals `.td-*` for depth). */
+const tdEyebrow =
+  "text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/48";
+const tdMainSectionHeading =
+  "text-[0.9375rem] font-semibold tracking-[-0.01em] text-foreground/95";
+/** Enterprise off-white panel — matches board cards */
+const tdMainSurface = cn(
+  "td-main-card rounded-2xl border border-[#E7EAF0] bg-[#FCFCFD] p-6 sm:p-8",
+  "shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_40px_-16px_rgba(15,23,42,0.08)]",
+  "dark:border-border dark:bg-card/40 dark:shadow-none"
+);
+/** Description + checklist unified shell */
+const tdWorkUnified = cn(
+  "td-main-card overflow-hidden rounded-2xl border border-[#E7EAF0] bg-[#FCFCFD]",
+  "shadow-[0_1px_2px_rgba(15,23,42,0.04),0_16px_48px_-18px_rgba(15,23,42,0.1)]",
+  "dark:border-border dark:bg-card/40 dark:shadow-none"
+);
+const tdWorkSection = "px-6 py-6 sm:px-8 sm:py-7";
+const tdWorkSectionDivider = "h-px bg-gradient-to-r from-transparent via-[#E7EAF0] to-transparent dark:via-border";
+const tdSidebarSurface = cn(
+  "td-sidebar-card rounded-2xl border border-[#E7EAF0]/80 bg-[#FAFBFC] p-5",
+  "shadow-[0_1px_2px_rgba(15,23,42,0.03),inset_0_1px_0_rgba(255,255,255,0.9)]",
+  "transition-[box-shadow,transform] duration-200 hover:shadow-[0_4px_24px_-12px_rgba(15,23,42,0.12)]",
+  "dark:border-border/60 dark:bg-muted/20 dark:shadow-none dark:hover:bg-muted/25"
+);
+const tdSidebarHeading = cn(tdEyebrow, "mb-3 block");
+const tdSubtleDivider = "my-5 h-px bg-gradient-to-r from-transparent via-border/35 to-transparent";
+
+/** `YYYY-MM-DD` for native date input from API ISO / Date-only strings. */
+function taskDueDateToInputValue(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 function formatRelativeTime(input: string | Date): string {
   const date = input instanceof Date ? input : new Date(input);
@@ -115,6 +180,11 @@ function formatRelativeTime(input: string | Date): string {
   if (absMs < hour) return rtf.format(Math.round(diffMs / minute), "minute");
   if (absMs < day) return rtf.format(Math.round(diffMs / hour), "hour");
   return rtf.format(Math.round(diffMs / day), "day");
+}
+
+/** Renders DOMPurify-sanitized description HTML (XSS-safe when fed sanitized input). */
+function SanitizedDescriptionHtml({ html, className }: { html: string; className?: string }) {
+  return <div className={className} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
 export interface TaskDetailModalProps {
@@ -175,8 +245,9 @@ export function TaskDetailModal({
   const titleInputRef = React.useRef<HTMLInputElement | null>(null);
   const [isEditingDescription, setIsEditingDescription] = React.useState(false);
   const [editingDescription, setEditingDescription] = React.useState("");
+  const editingDescriptionRef = React.useRef(editingDescription);
+  editingDescriptionRef.current = editingDescription;
   const [isDescriptionExpanded, setIsDescriptionExpanded] = React.useState(false);
-  const descriptionInputRef = React.useRef<HTMLTextAreaElement | null>(null);
   const [isEditingStoryPoints, setIsEditingStoryPoints] = React.useState(false);
   const [editingStoryPointsValue, setEditingStoryPointsValue] = React.useState("");
   const storyPointsInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -316,13 +387,25 @@ export function TaskDetailModal({
     mutationFn: (payload: Parameters<typeof updateTask>[1]) =>
       updateTask(taskId!, payload),
     onSuccess: (updated) => {
+      if (!updated?.id) {
+        toast({
+          title: "Could not update task",
+          description: "The server returned an empty task. Check workspace context and try again.",
+          variant: "error",
+        });
+        return;
+      }
       queryClient.setQueryData(["task", taskId], updated);
       syncTaskIntoListCache(updated);
       onTaskUpdated?.(updated);
       toast({ title: "Task updated", variant: "success" });
     },
-    onError: () => {
-      toast({ title: "Failed to update task", variant: "error" });
+    onError: (err) => {
+      toast({
+        title: "Failed to update task",
+        description: parseApiError(err),
+        variant: "error",
+      });
     },
   });
 
@@ -495,15 +578,6 @@ export function TaskDetailModal({
   }, [editingTitle, task, updateMutation]);
 
   React.useEffect(() => {
-    if (!isEditingDescription) return;
-    requestAnimationFrame(() => {
-      descriptionInputRef.current?.focus();
-      const length = descriptionInputRef.current?.value.length ?? 0;
-      descriptionInputRef.current?.setSelectionRange(length, length);
-    });
-  }, [isEditingDescription]);
-
-  React.useEffect(() => {
     if (!isEditingStoryPoints) return;
     requestAnimationFrame(() => {
       storyPointsInputRef.current?.focus();
@@ -559,21 +633,29 @@ export function TaskDetailModal({
 
   const commitDescriptionEdit = React.useCallback(() => {
     if (!task) return;
-    const next = editingDescription.trim();
-    const current = (task.description ?? "").trim();
+    const next = normalizeDescriptionHtml(editingDescriptionRef.current);
+    const current = normalizeDescriptionHtml(task.description ?? "");
     setIsEditingDescription(false);
     if (next === current) return;
     updateMutation.mutate({ description: next || "" });
-  }, [editingDescription, task, updateMutation]);
+  }, [task, updateMutation]);
+
+  const cancelDescriptionEdit = React.useCallback(() => {
+    if (!task) return;
+    setIsEditingDescription(false);
+    setEditingDescription(task.description ?? "");
+  }, [task]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showClose={!updateMutation.isPending}
+        closeButtonClassName="h-10 w-10 rounded-xl bg-background/80 text-muted-foreground shadow-sm ring-1 ring-black/[0.05] backdrop-blur-sm transition-all hover:bg-muted hover:text-foreground hover:shadow-md dark:ring-white/10"
         onEscapeKeyDown={() => onOpenChange(false)}
         className={cn(
-          "max-w-5xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0 border-l-2",
-          "duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95",
+          "td-modal-shell max-w-6xl max-h-[92vh] overflow-hidden flex flex-col gap-0 border-0 bg-background p-0 sm:rounded-2xl",
+          "duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-[0.98] data-[state=closed]:zoom-out-95",
+          "border-l-[5px]",
           selectedPriority.border
         )}
         aria-labelledby="task-detail-title"
@@ -586,9 +668,9 @@ export function TaskDetailModal({
           </div>
         ) : (
           <>
-            <DialogHeader className="p-6 pb-2 shrink-0">
-              <div className="flex items-start gap-3 pr-8">
-                <div className="flex flex-1 flex-col gap-2">
+            <DialogHeader className="td-modal-header-shade shrink-0 border-b border-[#E7EAF0]/60 px-6 pb-6 pt-7 shadow-[0_1px_0_rgba(255,255,255,0.7)_inset] dark:border-border/40 sm:px-8 sm:pb-7 sm:pt-8">
+              <div className="flex items-start gap-4 pr-12">
+                <div className="flex min-w-0 flex-1 flex-col gap-3">
                   {isEditingTitle ? (
                     <Input
                       ref={titleInputRef}
@@ -606,7 +688,7 @@ export function TaskDetailModal({
                           setEditingTitle(task.title);
                         }
                       }}
-                      className="h-10 flex-1 text-xl font-semibold"
+                      className="h-14 flex-1 rounded-xl border-0 bg-background/95 text-2xl font-semibold tracking-[-0.02em] shadow-[inset_0_0_0_1px_rgba(15,23,42,0.07)] placeholder:text-muted-foreground/40 focus-visible:ring-2 focus-visible:ring-primary/25 dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)] md:text-[1.75rem]"
                       aria-label="Edit task title"
                     />
                   ) : (
@@ -614,53 +696,110 @@ export function TaskDetailModal({
                       id="task-detail-title"
                       type="button"
                       onClick={() => setIsEditingTitle(true)}
-                      className="group flex flex-1 items-center gap-2 rounded-md px-1 py-1 text-left"
+                      className="group flex max-w-full items-start gap-3 rounded-xl px-1 py-1 text-left transition-colors hover:bg-background/50"
                     >
-                      <span className="text-xl font-semibold">{task.title}</span>
-                      <Pencil className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-70" />
+                      <span className="min-w-0 text-balance text-2xl font-semibold leading-[1.2] tracking-[-0.025em] text-foreground md:text-[1.875rem] md:leading-[1.12]">
+                        {task.title}
+                      </span>
+                      <Pencil className="mt-2 h-4 w-4 shrink-0 text-muted-foreground/50 opacity-0 transition-opacity group-hover:opacity-100" />
                     </button>
                   )}
-                  {selectedStatus && (
-                    <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-border/60 bg-muted/30 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {selectedStatus && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            className="inline-flex w-fit items-center gap-2 rounded-full border border-[#E7EAF0] bg-white px-3 py-1.5 text-xs font-semibold tracking-wide text-foreground shadow-sm transition-all hover:border-primary/25 hover:bg-[#FCFCFD] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 dark:border-border dark:bg-muted/30 dark:hover:bg-muted/40"
+                            aria-label="Change task status"
+                          >
+                            <span
+                              className={cn(
+                                "h-2 w-2 shrink-0 rounded-full ring-2 ring-background/80",
+                                statusColorById.get(selectedStatus.id) ?? STATUS_DOT_FALLBACK[0]
+                              )}
+                            />
+                            {selectedStatus.name}
+                            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/70" aria-hidden />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="min-w-[200px] p-1" sideOffset={6}>
+                          {statuses.map((s) => {
+                            const isCurrent = s.id === selectedStatus?.id;
+                            return (
+                              <DropdownMenuItem
+                                key={s.id}
+                                onSelect={() => handleFieldChange("statusId", s.id)}
+                                className="rounded-lg text-sm"
+                              >
+                                <span
+                                  className={cn(
+                                    "mr-2 h-2.5 w-2.5 shrink-0 rounded-full",
+                                    statusColorById.get(s.id) ?? STATUS_DOT_FALLBACK[0]
+                                  )}
+                                  aria-hidden
+                                />
+                                <span className="flex-1">{s.name}</span>
+                                {isCurrent ? <Check className="h-3.5 w-3.5 shrink-0 text-primary" /> : null}
+                              </DropdownMenuItem>
+                            );
+                          })}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                    {task.dueDate && (
                       <span
                         className={cn(
-                          "h-2 w-2 rounded-full",
-                          statusColorById.get(selectedStatus.id) ?? STATUS_DOT_FALLBACK[0]
+                          "inline-flex items-center gap-1.5 rounded-full border border-[#E7EAF0] bg-[#FCFCFD] px-2.5 py-1 text-[11px] font-medium text-muted-foreground dark:border-border dark:bg-muted/20",
+                          isOverdue && "border-destructive/30 bg-destructive/5 text-destructive"
                         )}
+                      >
+                        <Calendar className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
+                        {new Date(task.dueDate).toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </span>
+                    )}
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#E7EAF0] bg-[#FCFCFD] px-2.5 py-1 text-[11px] font-medium text-muted-foreground dark:border-border dark:bg-muted/20">
+                      <span
+                        className={cn("h-1.5 w-1.5 shrink-0 rounded-full", selectedPriority.color)}
+                        aria-hidden
                       />
-                      {selectedStatus.name}
+                      {selectedPriority.label}
                     </span>
-                  )}
+                    <span
+                      id="task-detail-desc"
+                      className="text-[11px] font-medium tabular-nums text-muted-foreground/55"
+                    >
+                      {task.projectId ? `ID ${task.id.slice(0, 8).toUpperCase()}` : ""}
+                    </span>
+                  </div>
                 </div>
               </div>
             </DialogHeader>
 
-            <div className="flex-1 overflow-y-auto min-h-0">
-              <div className="grid grid-cols-1 lg:grid-cols-[1fr,320px] gap-6 p-6 pt-2">
-                {/* Left column: Description, Checklist, Comments */}
-                <div className="space-y-6">
-                  <div>
-                    <Label className="text-muted-foreground text-xs">Description</Label>
+            <div className="min-h-0 flex-1 overflow-y-auto bg-gradient-to-b from-[#F4F6FA]/90 via-background to-background dark:from-muted/10">
+              <div className="grid grid-cols-1 gap-6 p-5 pb-10 lg:grid-cols-[minmax(0,1fr),minmax(280px,320px)] lg:gap-x-8 lg:gap-y-6 lg:p-8">
+                {/* Left: unified work + comments + activity */}
+                <div className="flex min-w-0 flex-col gap-6">
+                  <div className={tdWorkUnified}>
+                    <div className={tdWorkSection}>
+                      <h3 className={cn(tdMainSectionHeading, "mb-4 flex items-center gap-2")}>
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/15">
+                          <FileText className="h-4 w-4" aria-hidden />
+                        </span>
+                        Description
+                      </h3>
                     {isEditingDescription ? (
-                      <Textarea
-                        ref={descriptionInputRef}
+                      <TaskDescriptionEditor
+                        key={`${task.id}-desc-edit`}
                         value={editingDescription}
-                        onChange={(e) => setEditingDescription(e.target.value)}
-                        onBlur={commitDescriptionEdit}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.shiftKey) {
-                            e.preventDefault();
-                            commitDescriptionEdit();
-                          }
-                          if (e.key === "Escape") {
-                            e.preventDefault();
-                            setIsEditingDescription(false);
-                            setEditingDescription(task.description ?? "");
-                          }
-                        }}
-                        className="mt-1.5 min-h-[96px] text-sm"
-                        placeholder="Add description... (Enter to save, Shift+Enter for new line)"
-                        aria-label="Edit description"
+                        onChange={setEditingDescription}
+                        onCommit={commitDescriptionEdit}
+                        onCancel={cancelDescriptionEdit}
+                        disabled={updateMutation.isPending}
                       />
                     ) : (
                       <div
@@ -673,59 +812,100 @@ export function TaskDetailModal({
                         }}
                         role="button"
                         tabIndex={0}
-                        className="group mt-1.5 w-full rounded-md px-1 py-1 text-left transition-colors hover:bg-muted/40"
+                        className="group -mx-1 min-h-[7.5rem] w-full rounded-xl border border-dashed border-transparent px-4 py-4 text-left transition-all hover:border-[#E7EAF0]/80 hover:bg-white/60 dark:hover:border-border/50 dark:hover:bg-muted/20"
                       >
-                        <div
-                          className={cn(
-                            "text-sm whitespace-pre-wrap text-foreground",
-                            !isDescriptionExpanded && "max-h-[4.5rem] overflow-hidden"
-                          )}
-                        >
-                          {task.description || (
-                            <span className="italic text-muted-foreground">No description</span>
-                          )}
-                        </div>
-                        {!!task.description && task.description.length > 180 && (
-                          <span
-                            className="mt-1 text-xs text-muted-foreground hover:text-foreground"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setIsDescriptionExpanded((prev) => !prev);
-                            }}
-                          >
-                            {isDescriptionExpanded ? "Show less" : "Show more"}
-                          </span>
-                        )}
-                        <span className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground/80 opacity-0 transition-opacity group-hover:opacity-100">
-                          <Pencil className="h-3 w-3" /> Click to edit
+                        {(() => {
+                          const raw = task.description ?? "";
+                          const isHtml = taskDescriptionLooksLikeHtml(raw);
+                          const safeHtml = isHtml ? sanitizeTaskDescriptionHtml(raw) : "";
+                          const plainLen = taskDescriptionPlainLength(raw);
+                          const showToggle = plainLen > 180;
+                          return (
+                            <>
+                              {raw ? (
+                                isHtml ? (
+                                  <SanitizedDescriptionHtml
+                                    html={safeHtml}
+                                    className={cn(
+                                      "task-desc-html text-[15px] leading-[1.75] text-foreground/90 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_a]:font-medium [&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2 [&_h2]:mt-3 [&_h2]:text-base [&_h2]:font-semibold [&_h3]:mt-2 [&_h3]:text-sm [&_h3]:font-semibold [&_blockquote]:border-l-2 [&_blockquote]:border-muted-foreground/30 [&_blockquote]:pl-3 [&_blockquote]:italic [&_code]:rounded [&_code]:bg-muted/60 [&_code]:px-1 [&_code]:font-mono [&_code]:text-sm",
+                                      !isDescriptionExpanded && "max-h-[5.5rem] overflow-hidden"
+                                    )}
+                                  />
+                                ) : (
+                                  <div
+                                    className={cn(
+                                      "whitespace-pre-wrap text-[15px] leading-[1.75] text-foreground/90",
+                                      !isDescriptionExpanded && "max-h-[5.5rem] overflow-hidden"
+                                    )}
+                                  >
+                                    {raw}
+                                  </div>
+                                )
+                              ) : (
+                                <span className="text-[15px] italic text-muted-foreground/75">
+                                  No description yet
+                                </span>
+                              )}
+                              {!!raw && showToggle && (
+                                <button
+                                  type="button"
+                                  className="mt-4 text-sm font-medium text-primary underline-offset-4 transition-colors hover:text-primary/90 hover:underline"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsDescriptionExpanded((prev) => !prev);
+                                  }}
+                                >
+                                  {isDescriptionExpanded ? "Show less" : "Show more"}
+                                </button>
+                              )}
+                            </>
+                          );
+                        })()}
+                        <span className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground/60 opacity-0 transition-opacity group-hover:opacity-100">
+                          <Pencil className="h-3.5 w-3.5" /> Click to edit
                         </span>
                       </div>
                     )}
-                  </div>
+                    </div>
 
-                  <div>
-                    <Label className="text-muted-foreground text-xs flex items-center gap-1.5">
-                      <CheckSquare className="h-3.5 w-3.5" /> Checklist
-                    </Label>
-                    <div className="mt-2">
-                      <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
-                        <span>{checklistStats.completed}/{checklistStats.total} completed</span>
-                        <span>{checklistStats.percent}%</span>
+                    <div className={tdWorkSectionDivider} aria-hidden />
+
+                    <div className={tdWorkSection}>
+                    <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600 shadow-sm ring-1 ring-violet-500/15 dark:text-violet-400">
+                          <CheckSquare className="h-4 w-4" aria-hidden />
+                        </span>
+                        <div>
+                          <h3 className={tdMainSectionHeading}>Checklist</h3>
+                          <p className="mt-0.5 text-xs text-muted-foreground/75">
+                            Subtasks, owners, and dates
+                          </p>
+                        </div>
                       </div>
-                      <div className="h-1 w-full overflow-hidden rounded-full bg-muted/60">
-                        <div
-                          className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
-                          style={{ width: `${checklistStats.percent}%` }}
-                        />
+                      <div className="flex w-full flex-col gap-2 sm:max-w-[220px] sm:flex-none">
+                        <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
+                          <span>
+                            {checklistStats.completed}/{checklistStats.total} done
+                          </span>
+                          <span className="tabular-nums text-foreground/85">{checklistStats.percent}%</span>
+                        </div>
+                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted/60 shadow-inner dark:bg-muted/30">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-primary via-primary to-primary/80 transition-[width] duration-500 ease-out"
+                            style={{ width: `${checklistStats.percent}%` }}
+                          />
+                        </div>
                       </div>
                     </div>
-                    <div className="mt-1.5 space-y-2">
+                    <div className="space-y-2">
                       {checklist.map((item) => (
                         <div
                           key={item.id}
                           className={cn(
-                            "group flex items-center gap-2 rounded-md px-1 py-1 transition-colors duration-150 hover:bg-muted/45",
-                            item.completed && "opacity-70"
+                            "group flex flex-wrap items-center gap-2 rounded-2xl px-4 py-3.5 transition-all duration-200 sm:flex-nowrap sm:gap-3",
+                            "bg-white/70 shadow-sm ring-1 ring-black/[0.04] hover:bg-white hover:shadow-md dark:bg-white/[0.04] dark:ring-white/[0.08] dark:hover:bg-white/[0.07]",
+                            item.completed && "opacity-[0.72]"
                           )}
                         >
                           <input
@@ -760,7 +940,7 @@ export function TaskDetailModal({
                                 subtaskInputRefs.current[item.id] = node;
                               }}
                               className={cn(
-                                "h-8 border-primary/30 bg-background/90 text-sm transition-all duration-200",
+                                "h-9 min-w-0 flex-1 rounded-lg border-border/50 bg-background/90 text-sm shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-primary/20",
                                 item.completed && "text-muted-foreground line-through decoration-1"
                               )}
                             />
@@ -769,7 +949,7 @@ export function TaskDetailModal({
                               type="button"
                               onClick={() => startSubtaskInlineEdit(item.id, item.title)}
                               className={cn(
-                                "flex-1 rounded-sm px-1 py-0.5 text-left text-sm transition-[color,text-decoration-color] duration-200 hover:bg-muted/50",
+                                "min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left text-sm font-medium transition-colors duration-200 hover:bg-background/80",
                                 item.completed &&
                                   "text-muted-foreground line-through decoration-1 [text-decoration-color:currentColor]"
                               )}
@@ -822,42 +1002,45 @@ export function TaskDetailModal({
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="ml-auto h-6 w-6 opacity-0 transition-opacity duration-150 group-hover:opacity-100"
+                            className="ml-auto h-8 w-8 shrink-0 rounded-lg text-muted-foreground opacity-0 transition-all duration-200 hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
                             onClick={() =>
                               updateSubtasksMutation.mutate(checklist.filter((i) => i.id !== item.id))
                             }
                             aria-label="Remove item"
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       ))}
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="Add an item..."
-                          value={newCheckItem}
-                          onChange={(e) => setNewCheckItem(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && newCheckItem.trim()) {
-                              updateSubtasksMutation.mutate([
-                                ...checklist,
-                                {
-                                  id: crypto.randomUUID(),
-                                  title: newCheckItem.trim(),
-                                  completed: false,
-                                  priority: "MEDIUM",
-                                  dueDate: undefined,
-                                },
-                              ]);
-                              setNewCheckItem("");
-                            }
-                          }}
-                          className="h-8 text-sm"
-                        />
+                      <div className="flex gap-2 pt-4">
+                        <div className="flex min-h-11 flex-1 items-center gap-2 rounded-2xl bg-muted/30 px-1 pl-3 ring-1 ring-border/20 transition-[box-shadow,ring-color] focus-within:bg-background/80 focus-within:ring-primary/25 dark:bg-muted/15">
+                          <Plus className="h-4 w-4 shrink-0 text-muted-foreground/50" aria-hidden />
+                          <Input
+                            placeholder="Add an item…"
+                            value={newCheckItem}
+                            onChange={(e) => setNewCheckItem(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && newCheckItem.trim()) {
+                                updateSubtasksMutation.mutate([
+                                  ...checklist,
+                                  {
+                                    id: crypto.randomUUID(),
+                                    title: newCheckItem.trim(),
+                                    completed: false,
+                                    priority: "MEDIUM",
+                                    dueDate: undefined,
+                                  },
+                                ]);
+                                setNewCheckItem("");
+                              }
+                            }}
+                            className="h-10 flex-1 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                          />
+                        </div>
                         <Button
                           type="button"
-                          size="sm"
-                          variant="outline"
+                          size="default"
+                          className="h-11 shrink-0 rounded-xl px-6 font-semibold shadow-[0_4px_14px_-2px_hsl(var(--primary)/0.45)] transition-[transform,box-shadow] hover:shadow-[0_8px_22px_-4px_hsl(var(--primary)/0.5)] active:scale-[0.98]"
                           disabled={!newCheckItem.trim()}
                           onClick={() => {
                             if (newCheckItem.trim()) {
@@ -879,15 +1062,23 @@ export function TaskDetailModal({
                         </Button>
                       </div>
                     </div>
+                    </div>
                   </div>
 
-                  <div>
-                    <Label className="text-muted-foreground text-xs flex items-center gap-1.5">
-                      <MessageSquare className="h-3.5 w-3.5" /> Comments
-                      <span className="text-muted-foreground/70 font-normal">(type @ to mention members)</span>
-                    </Label>
-                    <div className="mt-1.5 flex gap-2">
-                      <div className="flex-1 min-w-0">
+                  <div className={tdMainSurface}>
+                    <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                      <div className="flex items-center gap-2.5">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-sky-500/10 text-sky-600 ring-1 ring-sky-500/15 dark:text-sky-400">
+                          <MessageSquare className="h-4 w-4" aria-hidden />
+                        </span>
+                        <div>
+                          <h3 className={tdMainSectionHeading}>Comments</h3>
+                          <p className="text-xs text-muted-foreground/75">Type @ to mention someone</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex gap-3 sm:gap-4">
+                      <div className="min-w-0 flex-1 rounded-2xl bg-muted/25 p-1 ring-1 ring-border/20 transition-[box-shadow,ring-color] focus-within:bg-background/60 focus-within:ring-primary/20 dark:bg-muted/15">
                         <CommentInputWithMentions
                           value={commentText}
                           onChange={(v, ids) => {
@@ -897,18 +1088,19 @@ export function TaskDetailModal({
                           onSubmit={(text, ids) =>
                             addCommentMutation.mutate({ text, mentionedUserIds: ids })
                           }
-                          placeholder="Write a comment... Enter to send, Shift+Enter for new line"
+                          placeholder="Write a comment… Enter to send, Shift+Enter for new line"
                           disabled={!taskId}
                           isSubmitting={addCommentMutation.isPending}
                           orgMembers={orgMembers}
                           currentUserId={currentUserId}
                           textareaRef={commentTextareaRef}
                           rows={2}
+                          textareaClassName="min-h-[88px] rounded-xl border-0 bg-transparent px-3 py-3 text-[15px] leading-relaxed shadow-none placeholder:text-muted-foreground/45 focus-visible:ring-0"
                         />
                       </div>
                       <Button
                         size="icon"
-                        className="shrink-0 h-10 w-10 transition-transform duration-200 hover:scale-105 active:scale-95 disabled:pointer-events-none disabled:opacity-50 disabled:hover:scale-100"
+                        className="h-12 w-12 shrink-0 self-end rounded-xl shadow-[0_6px_20px_-4px_hsl(var(--primary)/0.5)] ring-1 ring-primary/25 transition-all hover:scale-[1.02] hover:shadow-[0_10px_28px_-4px_hsl(var(--primary)/0.55)] active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40 disabled:shadow-none"
                         onClick={() =>
                           commentText.trim() &&
                           addCommentMutation.mutate({
@@ -927,52 +1119,137 @@ export function TaskDetailModal({
                       </Button>
                     </div>
                     {commentsLoading ? (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
-                        <Loader2 className="h-4 w-4 animate-spin" /> Loading...
+                      <div className="mt-8 flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Loading comments…
                       </div>
                     ) : comments.length === 0 ? (
-                      <p className="text-sm text-muted-foreground mt-2">No comments yet.</p>
+                      <p className="mt-6 flex min-h-[6.5rem] items-center justify-center rounded-xl border border-dashed border-[#E7EAF0] bg-white/50 px-5 py-6 text-center text-sm leading-relaxed text-muted-foreground dark:border-border/50 dark:bg-muted/10">
+                        No comments yet. Be the first to share an update.
+                      </p>
                     ) : (
-                      <ul className="space-y-3 mt-2" role="list">
+                      <ul className="mt-8 space-y-4" role="list">
                         {comments.map((c: TaskComment) => (
-                          <li key={c.id} className="flex gap-3 rounded-lg border bg-muted/30 p-3">
-                            <Avatar className="h-9 w-9 shrink-0 ring-2 ring-background">
+                          <li
+                            key={c.id}
+                            className="flex gap-4 rounded-2xl bg-muted/[0.28] px-4 py-4 ring-1 ring-border/12 transition-colors duration-200 hover:bg-muted/40 dark:bg-muted/10 dark:ring-border/10"
+                          >
+                            <Avatar className="h-10 w-10 shrink-0 ring-2 ring-background/80 shadow-sm">
                               <AvatarImage src={c.user?.avatarUrl} alt="" />
-                              <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                              <AvatarFallback className="text-xs font-semibold bg-primary/10 text-primary">
                                 {(c.user?.fullName ?? c.user?.email ?? "?").slice(0, 2).toUpperCase()}
                               </AvatarFallback>
                             </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex flex-wrap items-baseline gap-2">
-                                <span className="text-sm font-medium">{c.user?.fullName ?? c.user?.email ?? "User"}</span>
-                                <span className="text-xs text-muted-foreground">
+                            <div className="min-w-0 flex-1 pt-0.5">
+                              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                                <span className="text-sm font-semibold text-foreground">
+                                  {c.user?.fullName ?? c.user?.email ?? "User"}
+                                </span>
+                                <time
+                                  dateTime={c.createdAt}
+                                  className="text-[11px] font-medium tabular-nums text-muted-foreground/65"
+                                >
                                   {new Date(c.createdAt).toLocaleString(undefined, {
-                                    dateStyle: "short",
+                                    dateStyle: "medium",
                                     timeStyle: "short",
                                   })}
-                                </span>
+                                </time>
                               </div>
-                              <p className="mt-1 text-sm whitespace-pre-wrap text-foreground">{c.body}</p>
+                              <p className="mt-2.5 text-[15px] leading-[1.65] whitespace-pre-wrap text-foreground/88">
+                                {c.body}
+                              </p>
                             </div>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => deleteCommentMutation.mutate(c.id)} disabled={deleteCommentMutation.isPending} aria-label="Delete comment">
-                              <Trash2 className="h-3.5 w-3.5" />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-9 w-9 shrink-0 rounded-xl text-muted-foreground opacity-60 transition-opacity hover:bg-destructive/10 hover:text-destructive hover:opacity-100"
+                              onClick={() => deleteCommentMutation.mutate(c.id)}
+                              disabled={deleteCommentMutation.isPending}
+                              aria-label="Delete comment"
+                            >
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </li>
                         ))}
                       </ul>
                     )}
                   </div>
+
+                  <div className={tdMainSurface}>
+                    <div className="mb-4 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 ring-1 ring-amber-500/15 dark:text-amber-400">
+                          <Activity className="h-4 w-4" aria-hidden />
+                        </span>
+                        <div>
+                          <h3 className={tdMainSectionHeading}>Activity</h3>
+                          <p className="text-xs text-muted-foreground/75">Recent changes on this task</p>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 shrink-0 rounded-lg text-xs text-muted-foreground"
+                        onClick={() => setActivityExpanded((e) => !e)}
+                        aria-expanded={activityExpanded}
+                        aria-controls="task-activity-content-main"
+                      >
+                        {activityExpanded ? "Collapse" : "Expand"}
+                      </Button>
+                    </div>
+                    <div
+                      id="task-activity-content-main"
+                      className={cn(!activityExpanded && "hidden")}
+                    >
+                      {activityLogs.length === 0 ? (
+                        <div className="flex min-h-[5rem] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[#E7EAF0]/90 bg-white/40 px-4 py-6 text-center dark:border-border/50 dark:bg-muted/10">
+                          <Activity className="h-8 w-8 text-muted-foreground/25" aria-hidden />
+                          <p className="text-sm text-muted-foreground">No activity logged yet</p>
+                        </div>
+                      ) : (
+                        <ul className="grid gap-2 lg:grid-cols-2" role="list">
+                          {activityLogs.slice(0, 12).map((log: ActivityLog) => (
+                            <li
+                              key={log.id}
+                              className="flex items-start gap-3 rounded-xl border border-[#E7EAF0]/60 bg-white/50 px-3 py-2.5 text-sm transition-colors hover:border-primary/15 hover:bg-white dark:border-border/40 dark:bg-muted/10 dark:hover:bg-muted/20"
+                            >
+                              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted/40 text-muted-foreground">
+                                <Activity className="h-3.5 w-3.5" aria-hidden />
+                              </span>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[13px] leading-snug text-foreground/85">
+                                  {log.action}
+                                  {log.metadata && typeof log.metadata === "object" && "details" in log.metadata
+                                    ? ` — ${String((log.metadata as { details?: string }).details ?? "")}`
+                                    : ""}
+                                </p>
+                                <time
+                                  dateTime={log.createdAt}
+                                  className="mt-1 block text-[11px] tabular-nums text-muted-foreground/65"
+                                >
+                                  {new Date(log.createdAt).toLocaleString(undefined, {
+                                    dateStyle: "medium",
+                                    timeStyle: "short",
+                                  })}
+                                </time>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
-                {/* Right column: Assignee, Due date, Priority, Status, Tags, Attachments, Activity */}
-                <div className="space-y-4 lg:border-l lg:pl-6">
-                  <div>
-                    <Label className="text-muted-foreground text-xs flex items-center gap-1.5"><User className="h-3.5 w-3.5" /> Assignee</Label>
+                {/* Right column: metadata modules */}
+                <aside className="flex min-w-0 flex-col gap-3 lg:sticky lg:top-0 lg:self-start lg:border-l lg:border-[#E7EAF0]/50 lg:pl-8 dark:lg:border-border/40">
+                  <div className={tdSidebarSurface}>
+                    <span className={tdSidebarHeading}>Assignee</span>
                     <DropdownMenu open={assigneeDropdownOpen} onOpenChange={(o) => { setAssigneeDropdownOpen(o); if (!o) setAssigneeSearch(""); }}>
                       <DropdownMenuTrigger asChild>
                         <button
                           type="button"
-                          className="mt-1.5 flex w-full items-center gap-2 rounded-md border border-transparent px-0 py-1 text-left text-sm outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
+                          className="flex w-full items-center gap-3 rounded-xl bg-white/85 px-4 py-3.5 text-left text-sm font-medium outline-none shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)] transition-[box-shadow,background-color] hover:bg-white hover:shadow-[inset_0_0_0_1px_rgba(15,23,42,0.09),0_4px_14px_-6px_rgba(15,23,42,0.1)] focus-visible:ring-2 focus-visible:ring-primary/25 dark:bg-white/[0.06] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)] dark:hover:bg-white/[0.1]"
                           aria-label="Change assignee"
                         >
                           {(() => {
@@ -982,7 +1259,7 @@ export function TaskDetailModal({
                             return (
                               <>
                                 <div className="relative shrink-0">
-                                  <Avatar className="h-8 w-8">
+                                  <Avatar className="h-10 w-10 ring-2 ring-background shadow-sm">
                                     <AvatarImage src={member?.user?.avatarUrl} />
                                     <AvatarFallback className="text-xs">
                                       {(member?.user?.fullName ?? member?.user?.email ?? "?").slice(0, 2).toUpperCase()}
@@ -997,7 +1274,8 @@ export function TaskDetailModal({
                                     aria-hidden
                                   />
                                 </div>
-                                <span className="min-w-0 truncate">{name}</span>
+                                <span className="min-w-0 flex-1 truncate font-medium">{name}</span>
+                                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground/60" />
                               </>
                             );
                           })()}
@@ -1069,72 +1347,131 @@ export function TaskDetailModal({
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                  <div>
-                    <Label className="text-muted-foreground text-xs flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" /> Due date</Label>
-                    <p className={cn("mt-1.5 text-sm", isOverdue && "text-destructive font-medium")}>
-                      {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "Not set"}
-                    </p>
-                    {isOverdue && <p className="text-xs text-destructive mt-1">Overdue</p>}
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground text-xs flex items-center gap-1.5"><Flag className="h-3.5 w-3.5" /> Priority</Label>
-                    <div className="mt-1.5 flex items-center gap-2 text-sm">
-                      <span className={cn("h-3.5 w-3.5 rounded-full shadow-sm", selectedPriority.color)} />
-                      <span className="font-medium">{selectedPriority.label}</span>
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-muted-foreground text-xs">Status</Label>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="mt-1.5 h-9 w-full justify-between border-border/70 bg-background/80 px-3 text-sm"
+
+                  <div className={tdSidebarSurface}>
+                    <span className={tdSidebarHeading}>Schedule</span>
+                    <div className="space-y-2">
+                      <Label className="mb-1 block text-xs font-medium text-muted-foreground/75" htmlFor="task-detail-due-date">
+                        Due date
+                      </Label>
+                      <Input
+                        id="task-detail-due-date"
+                        type="date"
+                        value={taskDueDateToInputValue(task.dueDate)}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          updateMutation.mutate({ dueDate: v ? v : null });
+                        }}
+                        disabled={updateMutation.isPending}
+                        className={cn(
+                          "h-12 rounded-xl border-0 bg-white/90 px-4 text-sm shadow-[inset_0_1px_2px_rgba(15,23,42,0.04),inset_0_0_0_1px_rgba(15,23,42,0.08)] transition-shadow focus-visible:shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.35),0_0_0_3px_hsl(var(--primary)/0.12)] focus-visible:ring-0 dark:bg-white/[0.06] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]",
+                          isOverdue && task.dueDate && "shadow-[inset_0_0_0_1px_hsl(var(--destructive)/0.45)]"
+                        )}
+                        aria-label="Due date"
+                      />
+                      <div className="flex items-center justify-between gap-2 pt-1">
+                        <p
+                          className={cn(
+                            "text-xs text-muted-foreground",
+                            isOverdue && task.dueDate && "font-medium text-destructive"
+                          )}
                         >
-                          <span className="flex items-center gap-2">
-                            <span
-                              className={cn(
-                                "h-2.5 w-2.5 rounded-full",
-                                selectedStatus ? statusColorById.get(selectedStatus.id) : "bg-muted-foreground"
-                              )}
-                            />
-                            <span>{selectedStatus?.name ?? "Select status"}</span>
-                          </span>
-                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent
-                        align="start"
-                        className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px] p-1 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 duration-150"
-                        sideOffset={6}
-                      >
-                        {statuses.map((s) => {
-                          const isCurrent = s.id === selectedStatus?.id;
-                          return (
-                            <DropdownMenuItem
-                              key={s.id}
-                              onSelect={() => handleFieldChange("statusId", s.id)}
-                              className="rounded-md text-sm"
-                            >
-                              <span className="mr-2 flex items-center gap-2">
+                          {task.dueDate
+                            ? new Date(task.dueDate).toLocaleDateString(undefined, {
+                                weekday: "short",
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })
+                            : "No date selected"}
+                        </p>
+                        {task.dueDate ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 shrink-0 rounded-lg px-2 text-xs text-muted-foreground hover:text-foreground"
+                            disabled={updateMutation.isPending}
+                            onClick={() => updateMutation.mutate({ dueDate: null })}
+                          >
+                            <X className="mr-1 h-3 w-3" />
+                            Clear
+                          </Button>
+                        ) : null}
+                      </div>
+                      {isOverdue && (
+                        <p className="text-xs font-medium text-destructive">Overdue</p>
+                      )}
+                    </div>
+
+                    <div className={tdSubtleDivider} />
+
+                    <div className="space-y-2">
+                      <span className="block text-xs font-medium text-muted-foreground/75">Priority</span>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={updateMutation.isPending}
+                            className={cn(
+                              "h-11 w-full justify-between rounded-xl border-0 px-4 text-sm font-semibold tracking-tight text-foreground transition-[background-color,box-shadow]",
+                              PRIORITY_SIDEBAR_SHELL[selectedPriority.value] ?? PRIORITY_SIDEBAR_SHELL.MEDIUM
+                            )}
+                            aria-label="Change task priority"
+                          >
+                            <span className="flex items-center gap-2.5">
+                              <span
+                                className={cn(
+                                  "h-2.5 w-2.5 rounded-full shadow-sm ring-2 ring-white/80 dark:ring-black/40",
+                                  selectedPriority.color
+                                )}
+                              />
+                              <span>{selectedPriority.label}</span>
+                            </span>
+                            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                          align="start"
+                          className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px] p-1 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 duration-150"
+                          sideOffset={6}
+                          onClick={(e) => e.stopPropagation()}
+                          onPointerDown={(e) => e.stopPropagation()}
+                        >
+                          {PRIORITIES.map((p) => {
+                            const isCurrent = p.value === selectedPriority.value;
+                            return (
+                              <DropdownMenuItem
+                                key={p.value}
+                                disabled={updateMutation.isPending}
+                                onSelect={() => updateMutation.mutate({ priority: p.value })}
+                                className="rounded-lg text-sm"
+                              >
                                 <span
-                                  className={cn(
-                                    "h-2.5 w-2.5 rounded-full",
-                                    statusColorById.get(s.id) ?? STATUS_DOT_FALLBACK[0]
-                                  )}
+                                  className={cn("mr-2 h-2.5 w-2.5 shrink-0 rounded-full", p.color)}
+                                  aria-hidden
                                 />
-                              </span>
-                              <span className="flex-1">{s.name}</span>
-                              {isCurrent && <Check className="h-3.5 w-3.5 text-primary" />}
-                            </DropdownMenuItem>
-                          );
-                        })}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                                <span className="flex-1">{p.label}</span>
+                                {isCurrent ? <Check className="h-3.5 w-3.5 shrink-0 text-primary" /> : null}
+                              </DropdownMenuItem>
+                            );
+                          })}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+
+                    <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground/70">
+                      Workflow status: open the <span className="font-medium text-foreground/80">status menu</span> in the header.
+                    </p>
                   </div>
-                  <div>
-                    <Label className="text-muted-foreground text-xs flex items-center gap-1.5"><Hash className="h-3.5 w-3.5" /> Story points</Label>
+
+                  <div className={tdSidebarSurface}>
+                    <span className={tdSidebarHeading}>Planning</span>
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground/80">
+                        <Hash className="h-3.5 w-3.5 opacity-60" aria-hidden /> Story points
+                      </Label>
                     {isEditingStoryPoints ? (
                       <Input
                         ref={storyPointsInputRef}
@@ -1154,38 +1491,42 @@ export function TaskDetailModal({
                             cancelStoryPointsEdit();
                           }
                         }}
-                        className="mt-1.5 h-9 w-24 font-mono"
+                        className="mt-1 h-11 w-full max-w-[7.5rem] rounded-xl border-0 bg-white/90 px-3 font-mono text-sm shadow-[inset_0_1px_2px_rgba(15,23,42,0.04),inset_0_0_0_1px_rgba(15,23,42,0.08)] transition-shadow focus-visible:shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.35),0_0_0_3px_hsl(var(--primary)/0.12)] focus-visible:ring-0 dark:bg-white/[0.06] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
                         aria-label="Edit story points"
                       />
                     ) : (
                       <button
                         type="button"
                         onClick={startStoryPointsEdit}
-                        className="group mt-1.5 flex w-fit items-center gap-2 rounded-md px-1 py-1 text-left transition-colors hover:bg-muted/40"
+                        className="group mt-1 flex w-full items-center justify-between gap-2 rounded-xl bg-white/70 px-4 py-3 text-left shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)] transition-all hover:bg-white hover:shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08),0_4px_14px_-8px_rgba(15,23,42,0.08)] dark:bg-white/[0.05] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07)] dark:hover:bg-white/[0.09]"
                       >
-                        {task.storyPoints != null && task.storyPoints >= 0 ? (
-                          <Badge variant="secondary" className="font-mono text-sm tabular-nums">
-                            {task.storyPoints}
-                          </Badge>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">Not set</span>
-                        )}
-                        <Pencil className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-70" />
+                        <span className="flex items-center gap-2">
+                          {task.storyPoints != null && task.storyPoints >= 0 ? (
+                            <Badge variant="secondary" className="rounded-lg px-2 py-0.5 font-mono text-sm tabular-nums font-medium shadow-none">
+                              {task.storyPoints}
+                            </Badge>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">Not set</span>
+                          )}
+                        </span>
+                        <Pencil className="h-4 w-4 shrink-0 text-muted-foreground/50 opacity-0 transition-opacity group-hover:opacity-100" />
                       </button>
                     )}
+                    </div>
                   </div>
-                  <div>
-                    <Label className="text-muted-foreground text-xs flex items-center gap-1.5">
-                      <Tag className="h-3.5 w-3.5" /> Tags
-                    </Label>
-                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                  <div className={tdSidebarSurface}>
+                    <span className={tdSidebarHeading}>Tags</span>
+                    <div>
+                    <Label className="sr-only">Tags</Label>
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
                       {tagsList.map((tag) => (
                         <span
                           key={tag.name}
-                          className="inline-flex items-center gap-1 rounded-full border pl-2.5 pr-1 py-1 text-xs font-medium text-foreground"
+                          className="inline-flex items-center gap-1 rounded-full pl-2.5 pr-1 py-1 text-xs font-medium text-foreground shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06]"
                           style={{
-                            backgroundColor: `${tag.color}22`,
-                            borderColor: `${tag.color}66`,
+                            backgroundColor: `${tag.color}20`,
+                            borderColor: "transparent",
+                            boxShadow: `inset 0 0 0 1px ${tag.color}40`,
                           }}
                         >
                           <span className="min-w-0 truncate max-w-[120px]">{tag.name}</span>
@@ -1207,7 +1548,7 @@ export function TaskDetailModal({
                             variant="outline"
                             size="sm"
                             disabled={updateMutation.isPending}
-                            className="h-8 gap-1.5 text-xs"
+                            className="h-8 gap-1.5 rounded-full border-dashed text-xs"
                           >
                             <Plus className="h-3.5 w-3.5" /> Add tag
                           </Button>
@@ -1266,12 +1607,15 @@ export function TaskDetailModal({
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
+                    </div>
                   </div>
-                  <div>
-                    <Label className="text-muted-foreground text-xs flex items-center gap-1.5">
-                      <Paperclip className="h-3.5 w-3.5" /> Attachments
-                    </Label>
-                    <div className="mt-1.5 space-y-2">
+                  <div className={tdSidebarSurface}>
+                    <div className="mb-3.5 flex items-center gap-2">
+                      <Paperclip className="h-3.5 w-3.5 text-muted-foreground/50" aria-hidden />
+                      <span className={tdEyebrow}>Attachments</span>
+                    </div>
+                    <Label className="sr-only">Attachments</Label>
+                    <div className="space-y-3">
                       <div
                         role="button"
                         tabIndex={0}
@@ -1299,9 +1643,8 @@ export function TaskDetailModal({
                           }
                         }}
                         className={cn(
-                          "flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground transition-colors cursor-pointer",
-                          "border-[1px] hover:bg-muted/40 hover:border-muted-foreground/30",
-                          dragOver && "bg-primary/5 border-primary/40"
+                          "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl bg-background/40 p-6 text-center text-sm text-muted-foreground ring-1 ring-dashed ring-border/35 transition-all duration-200 hover:bg-muted/25 hover:ring-border/50",
+                          dragOver && "bg-primary/[0.06] ring-2 ring-primary/35 ring-offset-0"
                         )}
                         aria-label="Upload files by drop or click"
                       >
@@ -1316,14 +1659,14 @@ export function TaskDetailModal({
                           }}
                           aria-hidden
                         />
-                        <Upload className="h-8 w-8 text-muted-foreground/70" />
-                        <span>Drag files here or click to upload</span>
+                        <Upload className="h-9 w-9 text-muted-foreground/55" />
+                        <span className="max-w-[200px] leading-snug">Drop files here or click to browse</span>
                       </div>
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="w-full gap-2"
+                        className="w-full gap-2 rounded-xl"
                         disabled={uploadAttachmentMutation.isPending}
                         onClick={() => fileInputRef.current?.click()}
                       >
@@ -1341,7 +1684,7 @@ export function TaskDetailModal({
                           {attachments.map((att: TaskAttachment) => (
                             <li
                               key={att.id}
-                              className="flex items-center gap-2 rounded-md border bg-muted/30 px-2.5 py-2 text-sm"
+                              className="flex items-center gap-2 rounded-xl bg-background/50 px-3 py-2.5 text-sm ring-1 ring-border/15 transition-colors hover:bg-background/80 dark:bg-background/20"
                             >
                               <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                               <button
@@ -1368,58 +1711,11 @@ export function TaskDetailModal({
                       ) : null}
                     </div>
                   </div>
-                  <div className={cn(activityLogs.length === 0 && "space-y-0")}>
-                    <button
-                      type="button"
-                      onClick={() => setActivityExpanded((e) => !e)}
-                      className="flex w-full items-center gap-1.5 rounded-md py-0.5 pr-1 text-left text-muted-foreground text-xs transition-colors hover:text-foreground hover:bg-muted/40"
-                      aria-expanded={activityExpanded}
-                      aria-controls="task-activity-content"
-                    >
-                      {activityExpanded ? (
-                        <ChevronDown className="h-3.5 w-3.5 shrink-0" />
-                      ) : (
-                        <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-                      )}
-                      <Activity className="h-3.5 w-3.5 shrink-0" />
-                      <span className="font-medium">Activity</span>
-                      {activityLogs.length > 0 && (
-                        <span className="text-muted-foreground/70">({activityLogs.length})</span>
-                      )}
-                    </button>
-                    <div
-                      id="task-activity-content"
-                      className={cn(
-                        !activityExpanded && "hidden",
-                        activityLogs.length === 0 ? "mt-1 py-1" : "mt-1.5"
-                      )}
-                    >
-                      {activityLogs.length === 0 ? (
-                        <div className="flex items-center gap-2 py-1 text-sm text-muted-foreground/80">
-                          <Activity className="h-5 w-5 shrink-0 opacity-40" aria-hidden />
-                          <span>No recent activity.</span>
-                        </div>
-                      ) : (
-                        <ul className="space-y-2" role="list">
-                          {activityLogs.slice(0, 8).map((log: ActivityLog) => (
-                            <li key={log.id} className="flex items-start gap-2 text-sm text-muted-foreground">
-                              <Activity className="h-4 w-4 shrink-0 mt-0.5" />
-                              <span className="flex-1 min-w-0">
-                                {log.action}
-                                {log.metadata && typeof log.metadata === "object" && "details" in log.metadata ? ` — ${String((log.metadata as { details?: string }).details ?? "")}` : ""}
-                              </span>
-                              <span className="shrink-0 text-xs">{new Date(log.createdAt).toLocaleString()}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                </aside>
               </div>
             </div>
 
-            <div className="shrink-0 border-t px-6 py-2 flex flex-wrap justify-end gap-x-4 gap-y-0.5 text-[11px] text-muted-foreground/70">
+            <div className="flex shrink-0 flex-wrap justify-end gap-x-8 gap-y-1 border-t border-[#E7EAF0]/70 bg-[#FAFBFC]/90 px-6 py-3.5 text-[11px] font-medium tracking-wide text-muted-foreground/60 dark:border-border/40 dark:bg-muted/15 sm:px-8">
               {task.createdAt && (
                 <span>Created {formatRelativeTime(task.createdAt) || new Date(task.createdAt).toLocaleString()}</span>
               )}

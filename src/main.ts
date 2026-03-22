@@ -1,3 +1,4 @@
+import './bootstrap-env';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -16,9 +17,11 @@ async function bootstrap() {
 
   app.setGlobalPrefix(apiPrefix, { exclude: ['/'] });
 
-  const corsOrigin = process.env.CORS_ORIGIN ?? (nodeEnv === 'production' ? undefined : 'http://localhost:3001');
+  // If CORS_ORIGIN is unset: reflect the browser's Origin (works for any localhost port, e.g. 3008 with FRONTEND_PORT).
+  // A single hard-coded dev origin breaks logins when the UI runs on a different port than FRONTEND_PORT in env.
+  const corsOrigin = process.env.CORS_ORIGIN || true;
   app.enableCors({
-    origin: corsOrigin ?? true,
+    origin: corsOrigin,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Organization-Id'],
@@ -38,9 +41,11 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   const port = config.get('port', { infer: true }) ?? 3000;
+  const db = config.get('database', { infer: true });
   await app.listen(port);
 
   logger.log(`Listening on port ${port} (prefix=${apiPrefix}, NODE_ENV=${nodeEnv})`);
+  logger.log(`Database: ${db?.host ?? 'localhost'}:${db?.port ?? 3306} / ${db?.database ?? 'mini_task_manager'}`);
   return { app, port };
 }
 

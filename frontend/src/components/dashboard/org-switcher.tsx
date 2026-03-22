@@ -22,10 +22,12 @@ export interface OrgSwitcherProps {
   collapsed?: boolean;
   /** Compact variant for navbar - always shows org name, no collapse behavior */
   variant?: "sidebar" | "navbar";
+  /** Menu alignment; use `start` when the trigger is on the left (e.g. above project picker) */
+  contentAlign?: "start" | "end";
   className?: string;
 }
 
-export function OrgSwitcher({ collapsed, variant = "sidebar", className }: OrgSwitcherProps) {
+export function OrgSwitcher({ collapsed, variant = "sidebar", contentAlign, className }: OrgSwitcherProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { orgId, setOrgId } = useTenant();
@@ -48,6 +50,7 @@ export function OrgSwitcher({ collapsed, variant = "sidebar", className }: OrgSw
   };
 
   const isNavbar = variant === "navbar";
+  const dropdownAlign = contentAlign ?? (isNavbar ? "end" : "start");
 
   if (isLoading) {
     return (
@@ -70,7 +73,7 @@ export function OrgSwitcher({ collapsed, variant = "sidebar", className }: OrgSw
               : cn("w-full justify-between gap-2", collapsed ? "justify-center px-2" : "px-3"),
             className
           )}
-          aria-label={currentOrg ? `Current organization: ${currentOrg.name}. Switch organization.` : "Switch organization"}
+          aria-label={currentOrg ? `Current workspace: ${currentOrg.name}. Switch workspace.` : "Switch workspace"}
         >
           <div className="flex items-center gap-2 min-w-0">
             <Avatar className="h-8 w-8 shrink-0 rounded-lg">
@@ -81,17 +84,17 @@ export function OrgSwitcher({ collapsed, variant = "sidebar", className }: OrgSw
             </Avatar>
             {(isNavbar || !collapsed) && (
               <span className="truncate max-w-[160px] sm:max-w-[200px]">
-                {currentOrg?.name ?? "Select org"}
+                {currentOrg?.name ?? "Select workspace"}
               </span>
             )}
           </div>
           {(isNavbar || !collapsed) && <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align={isNavbar ? "end" : "start"} className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px] max-w-[320px]">
+      <DropdownMenuContent align={dropdownAlign} className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px] max-w-[320px]">
         <DropdownMenuLabel>Switch workspace</DropdownMenuLabel>
         {organizations.length === 0 ? (
-          <DropdownMenuItem disabled>No organizations</DropdownMenuItem>
+          <DropdownMenuItem disabled>No workspaces</DropdownMenuItem>
         ) : (
           organizations.map((org) => (
             <DropdownMenuItem

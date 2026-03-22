@@ -69,7 +69,7 @@ export default function BillingPage() {
             </div>
             <div>
               <p className="font-semibold">Access Restricted</p>
-              <p className="mt-0.5 text-sm text-muted-foreground">Only organization owners and admins can manage billing.</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">Only workspace owners and admins can manage billing.</p>
               <Button asChild size="sm" className="mt-3" variant="outline">
                 <Link href="/dashboard">Back to Dashboard</Link>
               </Button>
@@ -90,10 +90,10 @@ export default function BillingPage() {
               <Building2 className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <p className="font-semibold">Select an Organization</p>
-              <p className="mt-0.5 text-sm text-muted-foreground">Choose an organization to view billing.</p>
+              <p className="font-semibold">Select a workspace</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">Choose a workspace to view billing.</p>
               <Button asChild size="sm" className="mt-3">
-                <Link href="/dashboard/organizations">Organizations</Link>
+                <Link href="/dashboard/workspaces">Workspaces</Link>
               </Button>
             </div>
           </CardContent>

@@ -26,13 +26,21 @@ export class OrganizationsController {
   @Get('slug/available')
   async checkSlugAvailable(
     @Query('slug') slug: string | undefined,
+    @Query('excludeOrganizationId') excludeOrganizationId?: string,
   ): Promise<{ available: boolean }> {
     const trimmed = typeof slug === 'string' ? slug.trim().toLowerCase() : '';
     if (!trimmed || !/^[a-z0-9-]+$/.test(trimmed)) {
       return { available: false };
     }
     const existing = await this.organizationsService.findBySlug(trimmed);
-    return { available: !existing };
+    if (!existing) {
+      return { available: true };
+    }
+    const exclude = excludeOrganizationId?.trim();
+    if (exclude && existing.id === exclude) {
+      return { available: true };
+    }
+    return { available: false };
   }
 
   @Post()

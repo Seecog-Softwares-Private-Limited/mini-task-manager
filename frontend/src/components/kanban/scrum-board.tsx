@@ -125,6 +125,7 @@ function ScrumDraggableCard(props: {
   task: Task;
   swimlaneId: string;
   statusId: string;
+  boardColumnStatus?: WorkflowStatus;
   onTaskClick?: (task: Task) => void;
   assigneeMap?: AssigneeMap;
   commentCount?: number;
@@ -167,6 +168,7 @@ function ScrumDraggableCard(props: {
         commentCount={props.commentCount}
         subtaskInfo={props.subtaskInfo}
         statuses={props.statuses}
+        boardColumnStatus={props.boardColumnStatus}
         quickActions={props.quickActions}
         isMoving={props.isMoving}
         isSelected={props.isSelected}
@@ -254,6 +256,7 @@ function ScrumCell({
             task={task}
             swimlaneId={swimlaneId}
             statusId={status.id}
+            boardColumnStatus={status}
             onTaskClick={onTaskClick}
             assigneeMap={assigneeMap}
             commentCount={commentCountMap?.[task.id]}
@@ -351,6 +354,17 @@ export function ScrumBoard({
     }
     return null;
   }, [activeId, tasksByCell]);
+
+  const overlayBoardColumnStatus = useMemo(() => {
+    if (!activeId) return undefined;
+    for (const [key, taskList] of Object.entries(tasksByCell)) {
+      if (!taskList.some((t) => t.id === activeId)) continue;
+      const parsed = parseCellId(key);
+      if (!parsed) continue;
+      return statuses.find((s) => s.id === parsed.statusId);
+    }
+    return undefined;
+  }, [activeId, tasksByCell, statuses]);
 
   const handleDragStart = useCallback((e: DragStartEvent) => {
     if (!canDrag) return;
@@ -504,6 +518,8 @@ export function ScrumBoard({
               assigneeMap={assigneeMap}
               commentCount={commentCountMap?.[activeTask.id]}
               subtaskInfo={subtaskMap?.[activeTask.id]}
+              statuses={statuses}
+              boardColumnStatus={overlayBoardColumnStatus}
             />
           </div>
         ) : null}
