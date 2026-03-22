@@ -20,7 +20,7 @@ import {
 
 const navItems: { href: string; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-  { href: "/dashboard/organizations", label: "Organizations", icon: Building2 },
+  { href: "/dashboard/workspaces", label: "Workspaces", icon: Building2 },
   { href: "/dashboard/projects", label: "Projects", icon: FolderKanban },
   { href: "/dashboard/tasks", label: "Tasks", icon: ListTodo },
   { href: "/dashboard/notifications", label: "Notifications", icon: Bell },

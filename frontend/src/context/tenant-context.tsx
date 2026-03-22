@@ -51,7 +51,7 @@ export function useTenant() {
   return ctx;
 }
 
-/** Routes that require a tenant (X-Organization-Id) to be set. */
+/** Routes that require a tenant workspace (header `X-Organization-Id`) to be set. */
 export const TENANT_REQUIRED_PATHS = [
   "/dashboard/projects",
   "/dashboard/tasks",

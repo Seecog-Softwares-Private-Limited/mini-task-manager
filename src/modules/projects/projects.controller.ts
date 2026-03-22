@@ -43,7 +43,7 @@ export class ProjectsController {
 
     // Auto-create default workflow (To Do / In Progress / Done)
     try {
-      await this.workflowsService.createDefaultWorkflow(project.id);
+      await this.workflowsService.createDefaultWorkflow(project.id, tenantId!);
     } catch (err) {
       this.logger.warn(`Failed to auto-create default workflow for project ${project.id}: ${err}`);
     }
@@ -181,6 +181,7 @@ export class ProjectsController {
       organizationId: p.organizationId,
       name: p.name,
       description: p.description ?? undefined,
+      iconUrl: p.iconUrl ?? undefined,
       visibility: p.visibility,
       isArchived: p.isArchived,
       createdBy: p.createdBy,

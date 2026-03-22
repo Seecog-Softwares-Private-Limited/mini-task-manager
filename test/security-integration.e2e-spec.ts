@@ -9,7 +9,6 @@ import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { ValidationPipe } from '@nestjs/common';
 import * as request from 'supertest';
-import * as bcrypt from 'bcrypt';
 import { DataSource, In } from 'typeorm';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { AppModule } from '../src/app.module';
@@ -169,7 +168,6 @@ describe('Security integration (tenant isolation, IDOR, users)', () => {
     await app.init();
 
     const dataSource = app.get(getDataSourceToken()) as DataSource;
-    const hash = await bcrypt.hash(PASSWORD, 10);
 
     // 1. Cleanup: remove any existing seed data in reverse FK order so re-runs don't hit unique/FK errors.
     await cleanupSeedData(dataSource);
@@ -192,13 +190,13 @@ describe('Security integration (tenant isolation, IDOR, users)', () => {
         id: userAId,
         email: SEED_EMAIL_A,
         fullName: 'User A',
-        passwordHash: hash,
+        passwordHash: PASSWORD,
       });
       const userB = userRepo.create({
         id: userBId,
         email: SEED_EMAIL_B,
         fullName: 'User B',
-        passwordHash: hash,
+        passwordHash: PASSWORD,
       });
       await userRepo.save(userA);
       await userRepo.save(userB);

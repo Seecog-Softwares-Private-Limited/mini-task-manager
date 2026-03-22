@@ -6,7 +6,7 @@ import { fetchUsage } from "@/services/api/billing.api";
 import type { UsageData } from "@/types/api";
 
 /**
- * Fetches real-time usage data for the current organization.
+ * Fetches real-time usage data for the current workspace.
  * Includes users, projects, storage, automations, and integrations usage with limits.
  */
 export function useUsage() {

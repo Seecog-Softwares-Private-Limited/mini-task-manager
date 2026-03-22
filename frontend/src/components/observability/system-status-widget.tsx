@@ -4,11 +4,9 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { config } from "@/config/env";
 import { Activity, ExternalLink, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const HEALTH_URL = `${config.apiOrigin}/health`;
 const LAST_DEPLOYMENT = process.env.NEXT_PUBLIC_DEPLOY_TIME ?? "—";
 
 export function SystemStatusWidget() {
@@ -17,7 +15,8 @@ export function SystemStatusWidget() {
   useEffect(() => {
     let cancelled = false;
     setHealthStatus("loading");
-    fetch(HEALTH_URL, { method: "GET" })
+    const healthUrl = `${window.location.origin}/api/v1/health`;
+    fetch(healthUrl, { method: "GET" })
       .then((r) => {
         if (cancelled) return;
         setHealthStatus(r.ok ? "ok" : "error");
@@ -68,7 +67,7 @@ export function SystemStatusWidget() {
           <span className="text-xs font-medium">{LAST_DEPLOYMENT}</span>
         </div>
         <Button variant="ghost" size="sm" asChild className="w-full justify-center text-muted-foreground">
-          <Link href={HEALTH_URL} target="_blank" rel="noopener noreferrer">
+          <Link href="/api/v1/health" target="_blank" rel="noopener noreferrer">
             Health Endpoint <ExternalLink className="ml-1 h-3 w-3" />
           </Link>
         </Button>

@@ -58,7 +58,7 @@ function SignupForm() {
         password: values.password,
       });
       window.dispatchEvent(new CustomEvent("auth:login"));
-      window.location.href = "/dashboard/organizations";
+      window.location.href = "/dashboard/workspaces";
     } catch (err) {
       if (isRateLimited(err)) {
         setError("Too many attempts. Please try again later.");
@@ -69,6 +69,8 @@ function SignupForm() {
   }
 
   const [signupSuccess, setSignupSuccess] = useState(false);
+  /** When true, backend skipped email verification — show “sign in” instead of “check email”. */
+  const [signupEmailVerified, setSignupEmailVerified] = useState(false);
   const [signupEmail, setSignupEmail] = useState("");
   const [resendMsg, setResendMsg] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
@@ -76,18 +78,23 @@ function SignupForm() {
   async function handlePublicSubmit(values: PublicFormData) {
     setError(null);
     try {
-      await signup({
+      const res = await signup({
         email: values.email.trim().toLowerCase(),
         fullName: values.fullName.trim(),
         password: values.password,
       });
       setSignupEmail(values.email.trim().toLowerCase());
+      setSignupEmailVerified(res.emailVerified === true);
       setSignupSuccess(true);
     } catch (err) {
       if (isRateLimited(err)) {
         setError("Too many attempts. Please try again later.");
       } else {
-        setError(parseApiError(err));
+        const msg = parseApiError(err);
+        const isNetwork = !(err as { response?: unknown })?.response || /network|connection|refused|fetch/i.test(msg);
+        setError(isNetwork
+          ? "Could not reach the server. Ensure the backend is running (see properties.env PORT) and the frontend is using the same port, then try again."
+          : msg);
       }
     }
   }
@@ -152,6 +159,26 @@ function SignupForm() {
   }
 
   if (signupSuccess) {
+    if (signupEmailVerified) {
+      return (
+        <div className="relative w-full max-w-md animate-scale-in">
+          <div className="glass-card p-8 sm:p-10 text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/20">
+              <Mail className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight">You&apos;re all set</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Account created for <strong>{signupEmail}</strong>. You can sign in with your password now.
+            </p>
+            <div className="mt-6">
+              <Button asChild className="w-full h-12">
+                <Link href="/login">Go to Sign in</Link>
+              </Button>
+            </div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="relative w-full max-w-md animate-scale-in">
         <div className="glass-card p-8 sm:p-10 text-center">
@@ -181,8 +208,10 @@ function SignupForm() {
                 try {
                   const res = await resendVerificationEmail(signupEmail);
                   setResendMsg(res.message);
-                } catch {
-                  setResendMsg("Failed to resend. Please try again.");
+                } catch (err) {
+                  const msg = parseApiError(err);
+                  const isNetwork = /network|connection|refused|fetch/i.test(msg) || (err as { code?: string })?.code === "ERR_NETWORK";
+                  setResendMsg(isNetwork ? "Cannot reach the server. Check that the backend is running (see properties.env PORT)." : msg || "Failed to resend. Please try again.");
                 } finally {
                   setResending(false);
                 }

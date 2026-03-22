@@ -10,7 +10,7 @@ interface TenantGuardProps {
   children: ReactNode;
 }
 
-/** Redirects to organizations when current path requires tenant but none is set. */
+/** Redirects to workspaces when current path requires tenant but none is set. */
 export function TenantGuard({ children }: TenantGuardProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -19,7 +19,7 @@ export function TenantGuard({ children }: TenantGuardProps) {
   useEffect(() => {
     if (!ready) return;
     if (isTenantRequiredPath(pathname) && !orgId) {
-      router.replace("/dashboard/organizations?required=1");
+      router.replace("/dashboard/workspaces?required=1");
     }
   }, [ready, orgId, pathname, router]);
 
@@ -27,9 +27,9 @@ export function TenantGuard({ children }: TenantGuardProps) {
   if (isTenantRequiredPath(pathname) && !orgId) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <p className="text-muted-foreground">Select or create an organization to continue.</p>
+        <p className="text-muted-foreground">Select or create a workspace to continue.</p>
         <Button asChild className="mt-4">
-          <Link href="/dashboard/organizations">Go to Organizations</Link>
+          <Link href="/dashboard/workspaces">Go to workspaces</Link>
         </Button>
       </div>
     );

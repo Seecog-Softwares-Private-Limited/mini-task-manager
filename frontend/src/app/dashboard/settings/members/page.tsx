@@ -186,12 +186,12 @@ export default function SettingsMembersPage() {
               <Building2 className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <p className="font-semibold">Select an Organization</p>
+              <p className="font-semibold">Select a workspace</p>
               <p className="mt-0.5 text-sm text-muted-foreground">
-                Choose an organization to manage members.
+                Choose a workspace to manage members.
               </p>
               <Button asChild size="sm" className="mt-3">
-                <Link href="/dashboard/organizations">Organizations</Link>
+                <Link href="/dashboard/workspaces">Workspaces</Link>
               </Button>
             </div>
           </CardContent>
@@ -207,7 +207,7 @@ export default function SettingsMembersPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Members</h1>
           <p className="mt-1 text-muted-foreground">
-            Manage organization members, roles, and invitations.
+            Manage workspace members, roles, and invitations.
           </p>
         </div>
         <Button onClick={() => setInviteOpen(true)} aria-label="Invite member">
@@ -338,7 +338,7 @@ export default function SettingsMembersPage() {
         <CardHeader className="pb-4">
           <CardTitle className="text-lg">Pending Invitations</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Email invitations that have been sent to join this organization.
+            Email invitations that have been sent to join this workspace.
           </p>
         </CardHeader>
         <CardContent className="p-0">
@@ -352,7 +352,7 @@ export default function SettingsMembersPage() {
           <CardHeader>
             <CardTitle className="text-destructive">Danger zone</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Transfer organization ownership to another member. This action cannot be undone.
+              Transfer workspace ownership to another member. This action cannot be undone.
             </p>
           </CardHeader>
           <CardContent>
@@ -400,7 +400,7 @@ export default function SettingsMembersPage() {
         title="Remove member"
         description={
           removeMember
-            ? `Remove ${removeMember.user?.email ?? "this member"} from the organization? They will lose access.`
+            ? `Remove ${removeMember.user?.email ?? "this member"} from the workspace? They will lose access.`
             : ""
         }
         confirmLabel="Remove"

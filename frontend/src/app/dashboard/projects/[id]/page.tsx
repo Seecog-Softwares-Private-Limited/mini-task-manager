@@ -11,6 +11,7 @@ import { useTenant } from "@/context/tenant-context";
 import { Button } from "@/components/ui/button";
 import { ProjectDashboard } from "@/components/projects/project-dashboard";
 import { CreateTaskModal, type CreateTaskFormData } from "@/components/tasks/create-task-modal";
+import { useTaskCreatedCelebration } from "@/components/tasks/task-create-celebration";
 import { useToast } from "@/components/ui/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createTask } from "@/services/api/tasks.api";
@@ -24,6 +25,7 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { trackFirstTaskCreated } = useRetentionTracking();
+  const { triggerTaskCreatedCelebration, celebrationLayer } = useTaskCreatedCelebration();
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
   const { data: project } = useQuery({
@@ -66,6 +68,7 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
       setCreateModalOpen(false);
       toast({ title: "Task created", variant: "success" });
       trackFirstTaskCreated();
+      triggerTaskCreatedCelebration();
     },
     onError: (err) => toast({ title: "Failed to create task", description: parseApiError(err), variant: "error" }),
   });
@@ -100,6 +103,7 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
 
   return (
     <div className="space-y-6">
+      {celebrationLayer}
       {/* Quick actions */}
       <div className="flex flex-wrap items-center gap-2">
         <Button

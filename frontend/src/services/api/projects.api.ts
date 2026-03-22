@@ -5,6 +5,7 @@ export interface CreateProjectPayload {
   name: string;
   description?: string;
   visibility?: string;
+  iconUrl?: string;
 }
 
 export interface ProjectTemplate {
@@ -44,8 +45,17 @@ export async function fetchProject(id: string): Promise<Project | null> {
   return data;
 }
 
-export async function createProject(payload: CreateProjectPayload): Promise<Project> {
-  const { data } = await apiClient.post<Project>("/projects", payload);
+/**
+ * Create a project in a workspace. Pass `organizationId` to create under a specific workspace
+ * (sets `X-Organization-Id`); otherwise the stored tenant org is used.
+ */
+export async function createProject(
+  payload: CreateProjectPayload,
+  organizationId?: string
+): Promise<Project> {
+  const { data } = await apiClient.post<Project>("/projects", payload, {
+    headers: organizationId ? { "X-Organization-Id": organizationId } : undefined,
+  });
   return data;
 }
 
@@ -54,6 +64,8 @@ export interface UpdateProjectPayload {
   description?: string;
   visibility?: string;
   isArchived?: boolean;
+  /** Omit to leave unchanged; send "" to clear stored icon */
+  iconUrl?: string;
 }
 
 export async function updateProject(

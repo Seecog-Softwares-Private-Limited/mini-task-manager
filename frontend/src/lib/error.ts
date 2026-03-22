@@ -9,8 +9,28 @@ export interface NormalizedError {
   isRateLimited: boolean;
 }
 
+/** Thrown by {@link login} when email/password sign-in fails (non-Axios). */
+export class LoginRequestError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode?: number,
+    public readonly isNetwork = false
+  ) {
+    super(message);
+    this.name = "LoginRequestError";
+  }
+}
+
 /** Normalize backend error shape { statusCode, message }. Message can be string or string[]. */
 export function normalizeApiError(err: unknown): NormalizedError {
+  if (err instanceof LoginRequestError) {
+    return {
+      message: err.message,
+      statusCode: err.statusCode,
+      isNetwork: err.isNetwork,
+      isRateLimited: err.statusCode === 429,
+    };
+  }
   if (axios.isAxiosError(err)) {
     const status = err.response?.status;
     const data = err.response?.data as ApiErrorBody | undefined;

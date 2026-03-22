@@ -30,8 +30,10 @@ const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
     showClose?: boolean;
+    /** Merged onto the default close control (e.g. task modals). */
+    closeButtonClassName?: string;
   }
->(({ className, children, showClose = true, ...props }, ref) => (
+>(({ className, children, showClose = true, closeButtonClassName, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
@@ -48,7 +50,10 @@ const DialogContent = React.forwardRef<
           <Button
             variant="ghost"
             size="icon"
-            className="absolute right-4 top-4 z-10 h-8 w-8 rounded-lg"
+            className={cn(
+              "absolute right-4 top-4 z-10 h-8 w-8 rounded-lg",
+              closeButtonClassName
+            )}
             aria-label="Close (Esc)"
           >
             <X className="h-4 w-4" />

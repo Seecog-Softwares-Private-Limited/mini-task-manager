@@ -17,6 +17,8 @@ export interface CommentInputWithMentionsProps {
   currentUserId: string;
   textareaRef?: React.RefObject<HTMLTextAreaElement | null>;
   className?: string;
+  /** Merged onto the inner textarea (e.g. task modal composer). */
+  textareaClassName?: string;
   rows?: number;
 }
 
@@ -45,6 +47,7 @@ export function CommentInputWithMentions({
   currentUserId,
   textareaRef,
   className,
+  textareaClassName,
   rows = 2,
 }: CommentInputWithMentionsProps) {
   const [mentionedUserIds, setMentionedUserIds] = React.useState<string[]>([]);
@@ -164,15 +167,18 @@ export function CommentInputWithMentions({
         onKeyUp={handleSelect}
         disabled={disabled}
         rows={rows}
-        className="min-h-[80px] max-h-[240px] resize-none overflow-y-auto pr-2"
+        className={cn(
+          "min-h-[80px] max-h-[240px] resize-none overflow-y-auto pr-2",
+          textareaClassName
+        )}
         aria-label="Comment text"
       />
       {showMentionDropdown && (
         <div
-          className="absolute top-full left-0 mt-1 w-64 max-h-48 overflow-y-auto rounded-lg border bg-popover shadow-lg z-50 animate-in fade-in-0 zoom-in-95"
+          className="absolute left-0 top-full z-50 mt-2 w-64 max-h-48 overflow-y-auto rounded-xl border-0 bg-popover p-1 shadow-[0_12px_40px_-8px_rgba(15,23,42,0.18)] ring-1 ring-border/40 animate-in fade-in-0 zoom-in-95 dark:shadow-[0_12px_40px_-8px_rgba(0,0,0,0.5)]"
           role="listbox"
         >
-          <div className="p-1.5 text-xs font-medium text-muted-foreground border-b">
+          <div className="border-b border-border/40 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
             Mention a member
           </div>
           {filteredMembers.map((m, i) => {

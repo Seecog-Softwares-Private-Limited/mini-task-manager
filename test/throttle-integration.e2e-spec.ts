@@ -8,7 +8,6 @@ import { Test } from '@nestjs/testing';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as request from 'supertest';
-import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';
 import { getDataSourceToken } from '@nestjs/typeorm';
 import { AppModule } from '../src/app.module';
@@ -68,7 +67,6 @@ describe('Throttle integration (rate limiting, brute-force protection)', () => {
     await app.init();
 
     const dataSource = app.get(getDataSourceToken()) as DataSource;
-    const hash = await bcrypt.hash(PASSWORD, 10);
 
     await dataSource.transaction(async (manager) => {
       const userId = generateUuid();
@@ -80,7 +78,7 @@ describe('Throttle integration (rate limiting, brute-force protection)', () => {
           id: userId,
           email: THROTTLE_TEST_EMAIL,
           fullName: 'Throttle Test User',
-          passwordHash: hash,
+          passwordHash: PASSWORD,
         }),
       );
       await manager.getRepository(OrganizationEntity).save(

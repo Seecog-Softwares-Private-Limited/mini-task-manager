@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { getStoredToken } from "@/services/api/client";
+import { fetchCurrentUserProfile } from "@/services/api/users.api";
 import type { LoginResponse } from "@/types/api";
 
 type User = LoginResponse["user"];
@@ -43,6 +44,37 @@ export function useAuth() {
     setReady(true);
   }, []);
 
+  const mergeUser = useCallback((partial: Partial<User>) => {
+    setUser((prev) => (prev ? { ...prev, ...partial } : null));
+  }, []);
+
+  const refreshProfile = useCallback(async () => {
+    const t = getStoredToken();
+    if (!t) return;
+    try {
+      const p = await fetchCurrentUserProfile();
+      if (p) {
+        setUser((prev) =>
+          prev
+            ? {
+                ...prev,
+                fullName: p.fullName,
+                email: p.email,
+                avatarUrl: p.avatarUrl,
+              }
+            : {
+                id: p.id,
+                email: p.email,
+                fullName: p.fullName,
+                avatarUrl: p.avatarUrl,
+              }
+        );
+      }
+    } catch {
+      /* offline or 401 — keep JWT-derived user */
+    }
+  }, []);
+
   useEffect(() => {
     loadFromStorage();
     const handler = () => loadFromStorage();
@@ -53,6 +85,11 @@ export function useAuth() {
       window.removeEventListener("auth:login", handler);
     };
   }, [loadFromStorage]);
+
+  useEffect(() => {
+    if (!token) return;
+    void refreshProfile();
+  }, [token, refreshProfile]);
 
   const roles: AppRole[] = useMemo(() => {
     if (!token) return [];
@@ -76,5 +113,15 @@ export function useAuth() {
     [hasRole]
   );
 
-  return { user, token, isAuthenticated: !!token, ready, roles, hasRole, canManageBilling };
+  return {
+    user,
+    token,
+    isAuthenticated: !!token,
+    ready,
+    roles,
+    hasRole,
+    canManageBilling,
+    refreshProfile,
+    mergeUser,
+  };
 }

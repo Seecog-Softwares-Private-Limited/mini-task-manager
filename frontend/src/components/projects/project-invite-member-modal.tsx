@@ -97,7 +97,7 @@ export function ProjectInviteMemberModal({
         <DialogHeader>
           <DialogTitle id="project-invite-title">Invite member</DialogTitle>
           <DialogDescription id="project-invite-desc">
-            Send an invitation by email. They will receive a link to join your organization and can then be added to this project.
+            Send an invitation by email. They will receive a link to join your workspace and can then be added to this project.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">

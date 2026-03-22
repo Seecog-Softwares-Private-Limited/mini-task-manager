@@ -20,7 +20,7 @@ const STEPS = [
 /** Paths where the user can complete onboarding actions - hide modal so they can use the page. */
 const ACTION_PATHS = [
   "/dashboard/projects",
-  "/dashboard/organizations",
+  "/dashboard/workspaces",
   "/dashboard/settings/members",
   "/dashboard/tasks",
 ];

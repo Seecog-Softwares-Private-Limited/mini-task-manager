@@ -131,6 +131,7 @@ export class InitDatabaseSchema1700000000000 implements MigrationInterface {
         \`organization_id\` BINARY(16) NOT NULL,
         \`name\` VARCHAR(200) NOT NULL,
         \`description\` TEXT NULL,
+        \`icon_url\` MEDIUMTEXT NULL,
         \`visibility\` VARCHAR(50) NOT NULL DEFAULT 'PRIVATE',
         \`is_archived\` TINYINT(1) NOT NULL DEFAULT 0,
         \`created_by\` BINARY(16) NOT NULL,
