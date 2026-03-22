@@ -13,13 +13,13 @@ Next.js 14 (App Router) SaaS frontend for the Mini Task Manager backend.
 ## Prerequisites
 
 - Node 20+
-- Backend running at `http://localhost:3000` (or set `NEXT_PUBLIC_API_URL`)
+- Backend running (port from repo-root `properties.env`, default `3000`). Optional: set `NEXT_PUBLIC_API_URL` in **`../properties.env`** if the API is not same-origin.
 
 ## Run locally
 
 ```bash
 cd frontend
-# Optional: create .env.local with NEXT_PUBLIC_API_URL=http://localhost:3000 (default)
+# Env: repo-root ../properties.env (loaded by scripts/dev.mjs + next.config.mjs)
 npm install
 npm run dev
 ```

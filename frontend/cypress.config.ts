@@ -1,4 +1,9 @@
+import path from "path";
+import dotenv from "dotenv";
 import { defineConfig } from "cypress";
+
+// Repo-root env (same as Nest / Next). Do not rely on frontend/.env* for app config.
+dotenv.config({ path: path.join(__dirname, "..", "properties.env"), override: true });
 
 export default defineConfig({
   e2e: {
