@@ -29,7 +29,7 @@ export default function ExportPage() {
     <div className="space-y-6 animate-slide-up">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Data Export</h1>
-        <p className="mt-1 text-muted-foreground">Export your organization data as CSV.</p>
+        <p className="mt-1 text-muted-foreground">Export your workspace data as CSV.</p>
       </div>
 
       <Card>

@@ -90,10 +90,10 @@ export default function AuditLogPage() {
               <Building2 className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <p className="font-semibold">Select an Organization</p>
-              <p className="mt-0.5 text-sm text-muted-foreground">Choose an organization to view the audit log.</p>
+              <p className="font-semibold">Select a workspace</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">Choose a workspace to view the audit log.</p>
               <Button asChild size="sm" className="mt-3">
-                <Link href="/dashboard/organizations">Organizations</Link>
+                <Link href="/dashboard/workspaces">Workspaces</Link>
               </Button>
             </div>
           </CardContent>
@@ -106,7 +106,7 @@ export default function AuditLogPage() {
     <div className="space-y-6 animate-slide-up" data-cy="audit-log-page">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Audit Log</h1>
-        <p className="mt-1 text-sm text-muted-foreground">View organization activity. Owner/admin only.</p>
+        <p className="mt-1 text-sm text-muted-foreground">View workspace activity. Owner/admin only.</p>
       </div>
 
       {/* Filters */}

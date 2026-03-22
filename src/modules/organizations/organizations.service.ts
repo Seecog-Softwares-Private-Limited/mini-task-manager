@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { QueryFailedError } from 'typeorm';
@@ -7,6 +7,7 @@ import { OrganizationMembersRepository } from './repositories/organization-membe
 import { OrganizationEntity } from './entities/organization.entity';
 import { OrganizationMemberEntity } from './entities/organization-member.entity';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
+import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { OrganizationResponseDto } from './dto/organization-response.dto';
 import { generateUuid } from '../../common/utils/uuid.util';
 
@@ -107,14 +108,57 @@ export class OrganizationsService {
     return membership != null && membership.status === 'ACTIVE';
   }
 
-  async update(id: string, dto: { isArchived?: boolean }): Promise<OrganizationEntity | null> {
+  async update(id: string, dto: UpdateOrganizationDto): Promise<OrganizationEntity | null> {
     const org = await this.organizationsRepository.findById(id);
     if (!org) return null;
+
+    const patch: Partial<Pick<OrganizationEntity, 'name' | 'slug' | 'logoUrl' | 'isArchived'>> = {};
+
     if (dto.isArchived !== undefined) {
-      await this.organizationsRepository.update(id, { isArchived: dto.isArchived });
-      return { ...org, isArchived: dto.isArchived } as OrganizationEntity;
+      patch.isArchived = dto.isArchived;
     }
-    return org;
+    if (dto.name !== undefined) {
+      const trimmed = dto.name.trim();
+      if (!trimmed) {
+        throw new BadRequestException('Workspace name cannot be empty');
+      }
+      patch.name = trimmed;
+    }
+    if (dto.slug !== undefined) {
+      const nextSlug = dto.slug.trim().toLowerCase();
+      if (!nextSlug) {
+        throw new BadRequestException('URL slug cannot be empty');
+      }
+      if (nextSlug !== org.slug) {
+        const taken = await this.organizationsRepository.findBySlug(nextSlug);
+        if (taken && taken.id !== id) {
+          throw new ConflictException('A workspace with this slug already exists. Please choose a different slug.');
+        }
+      }
+      patch.slug = nextSlug;
+    }
+    if (dto.logoUrl !== undefined) {
+      const v = dto.logoUrl.trim();
+      patch.logoUrl = v.length === 0 ? null : dto.logoUrl;
+    }
+
+    if (Object.keys(patch).length > 0) {
+      try {
+        await this.organizationsRepository.update(id, patch);
+      } catch (err) {
+        const driverError = err instanceof QueryFailedError ? (err as QueryFailedError).driverError : null;
+        const isDup =
+          (driverError && (driverError as { code?: string }).code === 'ER_DUP_ENTRY') ||
+          (driverError && (driverError as { errno?: number }).errno === 1062) ||
+          (err instanceof Error && err.message.includes('Duplicate entry'));
+        if (isDup) {
+          throw new ConflictException('A workspace with this slug already exists. Please choose a different slug.');
+        }
+        throw err;
+      }
+    }
+
+    return this.organizationsRepository.findById(id);
   }
 
   /** Returns the user's membership in the organization (for role display). */

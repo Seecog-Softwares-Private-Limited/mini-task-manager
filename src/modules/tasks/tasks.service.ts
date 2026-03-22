@@ -133,6 +133,19 @@ export class TasksService {
       patch.assigneeId = dto.assigneeId ?? null;
       patch.assigneeIds = patch.assigneeId ? [patch.assigneeId] : null;
     }
+    if (dto.dueDate !== undefined) {
+      if (dto.dueDate === null || dto.dueDate === '') {
+        patch.dueDate = null;
+      } else {
+        // MySQL `DATE`: use calendar YYYY-MM-DD string. JS `Date` from "YYYY-MM-DD" is UTC midnight and
+        // can produce driver/sql errors or off-by-one days vs local date pickers.
+        const ymd = String(dto.dueDate).slice(0, 10);
+        patch.dueDate = ymd as unknown as Date;
+      }
+    }
+    if (dto.priority !== undefined) {
+      patch.priority = dto.priority;
+    }
     if (dto.storyPoints !== undefined) patch.storyPoints = dto.storyPoints ?? null;
     if (dto.tags !== undefined) {
       const normalized = this.normalizeTags(dto.tags);

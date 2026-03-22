@@ -15,7 +15,6 @@ import * as dotenv from 'dotenv';
 dotenv.config({ path: path.join(process.cwd(), 'properties.env') });
 
 import { DataSource } from 'typeorm';
-import * as bcrypt from 'bcrypt';
 import { configuration } from '../../../config/configuration';
 import { generateUuid } from '../../../common/utils/uuid.util';
 import { UserEntity } from '../../../modules/users/entities/user.entity';
@@ -68,8 +67,6 @@ async function runSeed() {
   await dataSource.initialize();
   console.log('Database connected. Running seed...');
 
-  const hash = await bcrypt.hash(PASSWORD, 10);
-
   await dataSource.transaction(async (manager) => {
     const userRepo = manager.getRepository(UserEntity);
     const orgRepo = manager.getRepository(OrganizationEntity);
@@ -97,12 +94,12 @@ async function runSeed() {
           id: ownerId,
           email: OWNER_EMAIL,
           fullName: 'Seed Owner',
-          passwordHash: hash,
+          passwordHash: PASSWORD,
           isEmailVerified: true,
         }),
       );
     } else {
-      await userRepo.update(owner.id, { passwordHash: hash, isEmailVerified: true });
+      await userRepo.update(owner.id, { passwordHash: PASSWORD, isEmailVerified: true });
     }
     if (!member) {
       const memberId = generateUuid();
@@ -111,12 +108,12 @@ async function runSeed() {
           id: memberId,
           email: MEMBER_EMAIL,
           fullName: 'Seed Member',
-          passwordHash: hash,
+          passwordHash: PASSWORD,
           isEmailVerified: true,
         }),
       );
     } else {
-      await userRepo.update(member.id, { passwordHash: hash, isEmailVerified: true });
+      await userRepo.update(member.id, { passwordHash: PASSWORD, isEmailVerified: true });
     }
     if (!admin) {
       const adminId = generateUuid();
@@ -125,12 +122,12 @@ async function runSeed() {
           id: adminId,
           email: ADMIN_EMAIL,
           fullName: 'Seed Admin',
-          passwordHash: hash,
+          passwordHash: PASSWORD,
           isEmailVerified: true,
         }),
       );
     } else {
-      await userRepo.update(admin.id, { passwordHash: hash, isEmailVerified: true });
+      await userRepo.update(admin.id, { passwordHash: PASSWORD, isEmailVerified: true });
     }
 
     const ownerId = owner.id;

@@ -49,7 +49,7 @@ frontend/src/
 
 - **OnboardingFlow** (rendered in providers): Modal with 3 steps:
   1. Create your first project → link to `/dashboard/projects`
-  2. Invite a team member → link to `/dashboard/organizations`
+  2. Invite a team member → link to `/dashboard/workspaces`
   3. Create your first task → link to `/dashboard/tasks`
 - Progress bar reflects completed steps; each step shows "Done" or a CTA button.
 - **Skip** button marks onboarding skipped and tracks `onboarding_skipped` (at_step in properties).

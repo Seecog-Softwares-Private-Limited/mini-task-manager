@@ -31,12 +31,12 @@ function formatActivityMessage(log: ActivityLog): string {
     if (action === "delete") return "deleted a task";
   }
   if (entity === "organization") {
-    if (action === "create") return "created the organization";
-    if (action === "update") return "updated organization settings";
+    if (action === "create") return "created the workspace";
+    if (action === "update") return "updated workspace settings";
   }
   if (entity === "member" || entity === "invitation") {
     if (action === "invite") return "invited a member";
-    if (action === "join") return "joined the organization";
+    if (action === "join") return "joined the workspace";
     if (action === "remove") return "removed a member";
   }
 
@@ -78,7 +78,7 @@ export default function ActivityPage() {
       <div className="space-y-6 animate-slide-up">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Activity</h1>
-          <p className="mt-1 text-muted-foreground">Organization activity log.</p>
+          <p className="mt-1 text-muted-foreground">Workspace activity log.</p>
         </div>
         <Card className="max-w-md border-dashed border-2">
           <CardContent className="flex items-center gap-4 py-12 px-6">
@@ -86,12 +86,12 @@ export default function ActivityPage() {
               <Building2 className="h-7 w-7 text-primary" />
             </div>
             <div>
-              <p className="font-semibold">Select an organization</p>
+              <p className="font-semibold">Select a workspace</p>
               <p className="mt-0.5 text-sm text-muted-foreground">
-                Choose an organization to view its activity feed.
+                Choose a workspace to view its activity feed.
               </p>
               <Button asChild size="sm" className="mt-3">
-                <Link href="/dashboard/organizations">Organizations</Link>
+                <Link href="/dashboard/workspaces">Workspaces</Link>
               </Button>
             </div>
           </CardContent>
@@ -106,7 +106,7 @@ export default function ActivityPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Activity</h1>
           <p className="mt-1 text-muted-foreground">
-            Recent activity for your organization. Updates every 15 seconds.
+            Recent activity for your workspace. Updates every 15 seconds.
           </p>
         </div>
         <Button

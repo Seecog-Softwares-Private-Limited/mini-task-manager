@@ -62,7 +62,9 @@ import {
 } from "@/components/tasks/create-task-modal";
 import { CreateSprintModal } from "@/components/sprints/create-sprint-modal";
 import { TaskDetailModal } from "@/components/tasks/task-detail-modal";
+import { useTaskCreatedCelebration } from "@/components/tasks/task-create-celebration";
 import { ProjectSwitcher } from "@/components/tasks/project-switcher";
+import { OrgSwitcher } from "@/components/dashboard/org-switcher";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useSavedViews } from "@/hooks/use-saved-views";
 import { useBulkSelection } from "@/hooks/use-bulk-selection";
@@ -90,6 +92,7 @@ export default function TasksPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { trackFirstTaskCreated } = useRetentionTracking();
+  const { triggerTaskCreatedCelebration, celebrationLayer } = useTaskCreatedCelebration();
   const currentUserId = useMemo(() => getCurrentUserId(), []);
 
   // URL-driven project selection
@@ -365,6 +368,7 @@ export default function TasksPage() {
       setCreateModalOpen(false);
       toast({ title: "Task created", variant: "success" });
       trackFirstTaskCreated();
+      triggerTaskCreatedCelebration();
     },
   });
 
@@ -472,9 +476,9 @@ export default function TasksPage() {
           <CardContent className="flex items-center gap-4 py-8 px-6">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 shrink-0"><Building2 className="h-6 w-6 text-primary" /></div>
             <div className="flex-1">
-              <p className="font-semibold">No organization selected</p>
-              <p className="mt-0.5 text-sm text-muted-foreground">Select an organization first to see your projects and tasks.</p>
-              <Button asChild size="sm" className="mt-3"><Link href="/dashboard/organizations">Select Organization</Link></Button>
+              <p className="font-semibold">No workspace selected</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">Select a workspace first to see your projects and tasks.</p>
+              <Button asChild size="sm" className="mt-3"><Link href="/dashboard/workspaces">Select workspace</Link></Button>
             </div>
           </CardContent>
         </Card>
@@ -509,23 +513,28 @@ export default function TasksPage() {
 
   return (
     <div className="space-y-4 animate-slide-up">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-2 flex-wrap">
-          <h1 className="text-lg font-bold tracking-tight">Tasks</h1>
-          {permissions.isViewer && (
-            <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-              <Shield className="h-3 w-3" /> View only
-            </span>
-          )}
-          <ProjectSwitcher
-            projects={selectableProjects}
-            selectedProjectId={selectedProjectId}
-            selectedTaskCount={projectTasks.length}
-            onProjectChange={setProjectInUrl}
-            disabled={projectsLoading}
-          />
+      {celebrationLayer}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 flex-1 flex-col gap-3">
+          <div className="w-full max-w-md">
+            <OrgSwitcher variant="navbar" contentAlign="start" />
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {permissions.isViewer && (
+              <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                <Shield className="h-3 w-3" /> View only
+              </span>
+            )}
+            <ProjectSwitcher
+              projects={selectableProjects}
+              selectedProjectId={selectedProjectId}
+              selectedTaskCount={projectTasks.length}
+              onProjectChange={setProjectInUrl}
+              disabled={projectsLoading}
+            />
+          </div>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
           <TooltipProvider delayDuration={300}>
             <Tooltip>
               <TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-muted-foreground"><Keyboard className="h-4 w-4" /></Button></TooltipTrigger>

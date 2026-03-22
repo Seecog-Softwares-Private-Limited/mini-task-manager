@@ -5,7 +5,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Plus, Sparkles } from "lucide-react";
-import { OrgSwitcher } from "@/components/dashboard/org-switcher";
+import { useAuth } from "@/hooks/use-auth";
+import { DashboardProfileAvatar } from "@/components/dashboard/dashboard-profile-avatar";
 
 interface SidebarProps {
   collapsed: boolean;
@@ -17,6 +18,7 @@ interface SidebarProps {
 export function Sidebar({ collapsed, mobileOpen, onCloseMobile, visibleNav }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { user, mergeUser } = useAuth();
 
   useEffect(() => {
     if (!mobileOpen) return;
@@ -65,10 +67,25 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile, visibleNav }: Si
 
   const content = (
     <div className="flex h-full flex-col">
-      {/* Org switcher */}
-      <div className={cn("border-b border-border/50", collapsed ? "px-2 py-3" : "px-2 py-3")}>
-        <OrgSwitcher collapsed={collapsed} />
-      </div>
+      {/* Account — top of sidebar (workspace switch lives on Tasks + Workspaces nav) */}
+      {user?.email && (
+        <div className={cn("border-b border-border/50", collapsed ? "px-2 py-3" : "px-3 py-3")}>
+          <div
+            className={cn(
+              "flex items-center gap-2.5 rounded-xl border border-[#E7EAF0] bg-[#FCFCFD] p-2 shadow-sm dark:border-border dark:bg-muted/25",
+              collapsed && "justify-center px-1"
+            )}
+            title={collapsed ? user.email : undefined}
+          >
+            <DashboardProfileAvatar user={user} mergeUser={mergeUser} size="lg" />
+            {!collapsed && (
+              <span className="min-w-0 flex-1 truncate text-xs font-medium leading-tight text-muted-foreground">
+                {user.email}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Quick action */}
       <div className={cn("px-3 pt-3 pb-3", collapsed && "px-2")}>

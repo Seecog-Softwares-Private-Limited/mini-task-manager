@@ -10,7 +10,6 @@ import {
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { DataSource, Repository } from 'typeorm';
-import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { UsersService } from '../users/users.service';
 import { InvitationsService } from '../invitations/invitations.service';
@@ -54,12 +53,22 @@ export class AuthService {
   ) {}
 
   async login(dto: LoginDto): Promise<LoginResponseDto> {
-    const user = await this.usersService.findByEmail(dto.email);
+    const email = dto.email.toLowerCase().trim();
+    const user = await this.usersService.findByEmail(email);
     if (!user || !(await this.usersService.validatePassword(user.id, dto.password))) {
       throw new UnauthorizedException('Invalid credentials');
     }
+    // Email verification: strict only if REQUIRE_EMAIL_VERIFIED_FOR_LOGIN=true (e.g. production).
+    // By default, successful password login auto-verifies so legacy / seed users are not stuck.
+    const strictEmailVerification =
+      String(process.env.REQUIRE_EMAIL_VERIFIED_FOR_LOGIN ?? '').toLowerCase() === 'true';
     if (!user.isEmailVerified) {
-      throw new UnauthorizedException('Please verify your email first. Check your inbox for the verification link.');
+      if (strictEmailVerification) {
+        throw new UnauthorizedException(
+          'Please verify your email first. Check your inbox for the verification link.',
+        );
+      }
+      await this.usersService.updateEmailVerified(user.id, true);
     }
     const payload = { sub: user.id, email: user.email };
     const accessToken = this.jwtService.sign(payload);
@@ -120,7 +129,7 @@ export class AuthService {
     return { id: userId, email, fullName };
   }
 
-  async signup(dto: PublicSignupDto): Promise<{ message: string }> {
+  async signup(dto: PublicSignupDto): Promise<{ message: string; emailVerified?: boolean }> {
     const email = dto.email.toLowerCase().trim();
     const existingUser = await this.usersService.findByEmail(email);
 
@@ -160,7 +169,6 @@ export class AuthService {
     }
 
     const userId = generateUuid();
-    const hash = await bcrypt.hash(dto.password, 10);
 
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -171,43 +179,17 @@ export class AuthService {
         id: userId,
         email,
         fullName: dto.fullName.trim(),
-        passwordHash: hash,
-        isEmailVerified: false,
+        passwordHash: dto.password,
+        // Default: skip email verification gate so new users can sign in immediately (dev / simplified onboarding)
+        isEmailVerified: true,
       } as Partial<UserEntity>);
       await queryRunner.commitTransaction();
+      this.logger.log(`User created: ${email} (id: ${userId})`);
     } catch (err) {
       await queryRunner.rollbackTransaction();
       throw err;
     } finally {
       await queryRunner.release();
-    }
-
-    // Create verification token
-    const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24);
-
-    await this.verificationTokenRepo.save({
-      id: generateUuid(),
-      userId,
-      token,
-      expiresAt,
-    } as Partial<EmailVerificationTokenEntity>);
-
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
-    const verifyUrl = `${frontendUrl}/verify-email?token=${token}`;
-
-    // Send verification email — don't let email failure crash the signup
-    let emailSent = true;
-    try {
-      await this.emailService.sendVerificationEmail({
-        to: email,
-        fullName: dto.fullName.trim(),
-        verifyUrl,
-      });
-    } catch (emailErr) {
-      emailSent = false;
-      this.logger.error(`Failed to send verification email to ${email}: ${emailErr}`);
     }
 
     // Create default workspace
@@ -220,10 +202,10 @@ export class AuthService {
       // Org creation may fail (e.g. slug collision); user already exists
     }
 
-    if (emailSent) {
-      return { message: 'Verification email sent. Please check your inbox.' };
-    }
-    return { message: 'Account created. Verification email could not be sent — please use "Resend verification" on the sign-in page.' };
+    return {
+      message: 'Account created. You can sign in now.',
+      emailVerified: true,
+    };
   }
 
   async verifyEmail(token: string): Promise<{ message: string }> {
@@ -319,8 +301,7 @@ export class AuthService {
       throw new BadRequestException('Reset link has expired. Please request a new one.');
     }
 
-    const hash = await bcrypt.hash(password, 10);
-    await this.usersService.updatePassword(record.userId, hash);
+    await this.usersService.updatePassword(record.userId, password);
     await this.passwordResetTokenRepo.delete(record.id);
 
     return { message: 'Password reset successfully. You can now sign in.' };
@@ -428,7 +409,6 @@ export class AuthService {
 
     const userId = generateUuid();
     const email = invitation.email.toLowerCase();
-    const hash = await bcrypt.hash(dto.password, 10);
 
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -441,7 +421,7 @@ export class AuthService {
         id: userId,
         email,
         fullName: dto.fullName,
-        passwordHash: hash,
+        passwordHash: dto.password,
         isEmailVerified: true,
       } as Partial<UserEntity>);
 

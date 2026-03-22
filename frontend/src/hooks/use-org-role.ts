@@ -9,7 +9,7 @@ import type { Organization } from "@/types/api";
 export type OrgRole = "owner" | "admin" | "member" | null;
 
 /**
- * Fetches the current user's role in the selected organization.
+ * Fetches the current user's role in the selected workspace.
  * The /organizations/:id endpoint returns `myRole` based on the TenantGuard membership check.
  * This is the source of truth for org-level RBAC on the frontend (JWT does NOT contain roles).
  */

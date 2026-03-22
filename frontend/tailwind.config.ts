@@ -81,12 +81,30 @@ const config: Config = {
         shimmer: {
           "100%": { transform: "translateX(100%)" },
         },
+        /** Subtle task-created burst (center vignette + sparks) */
+        "celebrate-micro-core": {
+          "0%": { opacity: "0", transform: "scale(0.85)" },
+          "35%": { opacity: "1", transform: "scale(1)" },
+          "100%": { opacity: "0", transform: "scale(1.08)" },
+        },
+        "celebrate-micro-ring": {
+          "0%": { opacity: "0.4", transform: "scale(0.65)" },
+          "100%": { opacity: "0", transform: "scale(1.4)" },
+        },
+        "celebrate-micro-spark": {
+          "0%": { opacity: "0", transform: "translate(0, 0) scale(0.3)" },
+          "25%": { opacity: "0.85" },
+          "100%": { opacity: "0", transform: "var(--celebrate-drift) scale(0.2)" },
+        },
       },
       animation: {
         "fade-in": "fade-in 0.4s ease-out both",
         "slide-up": "slide-up 0.5s ease-out both",
         "scale-in": "scale-in 0.3s ease-out both",
         shimmer: "shimmer 2s infinite",
+        "celebrate-micro-core": "celebrate-micro-core 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards",
+        "celebrate-micro-ring": "celebrate-micro-ring 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards",
+        "celebrate-micro-spark": "celebrate-micro-spark 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards",
       },
     },
   },

@@ -106,6 +106,7 @@ function TaskCard({
   attachmentCount = 0,
   subtaskInfo,
   statuses,
+  boardColumnStatus,
   quickActions,
   isMoving,
   isSelected,
@@ -121,6 +122,7 @@ function TaskCard({
   attachmentCount?: number;
   subtaskInfo?: SubtaskInfo;
   statuses?: WorkflowStatus[];
+  boardColumnStatus?: WorkflowStatus;
   quickActions?: TaskCardQuickActions;
   isMoving?: boolean;
   isSelected?: boolean;
@@ -138,6 +140,7 @@ function TaskCard({
       attachmentCount={attachmentCount}
       subtaskInfo={subtaskInfo}
       statuses={statuses}
+      boardColumnStatus={boardColumnStatus}
       quickActions={quickActions}
       isMoving={isMoving}
       isSelected={isSelected}
@@ -153,6 +156,7 @@ function TaskCard({
 function DraggableCard(props: {
   task: Task;
   statusId: string;
+  boardColumnStatus?: WorkflowStatus;
   onTaskClick?: (task: Task) => void;
   assigneeMap?: AssigneeMap;
   commentCount?: number;
@@ -473,6 +477,7 @@ function DroppableColumn({
             key={task.id}
             task={task}
             statusId={status.id}
+            boardColumnStatus={status}
             onTaskClick={onTaskClick}
             assigneeMap={assigneeMap}
             commentCount={commentCountMap?.[task.id]}
@@ -674,6 +679,14 @@ export function KanbanBoard({
     return null;
   }, [activeId, tasksByStatus]);
 
+  const overlayBoardColumnStatus = useMemo(() => {
+    if (!activeId) return undefined;
+    for (const s of statuses) {
+      if ((tasksByStatus[s.id] ?? []).some((t) => t.id === activeId)) return s;
+    }
+    return undefined;
+  }, [activeId, tasksByStatus, statuses]);
+
   const filteredTasksByStatus = useMemo(() => {
     const result: Record<string, Task[]> = {};
     for (const [statusId, tasks] of Object.entries(tasksByStatus)) {
@@ -776,6 +789,8 @@ export function KanbanBoard({
               commentCount={commentCountMap?.[activeTask.id]}
               attachmentCount={attachmentCountMap?.[activeTask.id]}
               subtaskInfo={subtaskMap?.[activeTask.id]}
+              statuses={statuses}
+              boardColumnStatus={overlayBoardColumnStatus}
             />
           </div>
         ) : null}

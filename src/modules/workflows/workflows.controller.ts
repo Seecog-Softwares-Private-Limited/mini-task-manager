@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, ParseUUIDPipe, UseGuards } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { WorkflowsService } from './workflows.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -50,10 +50,10 @@ export class WorkflowsController {
 
   @Post('project/:projectId/default')
   async createDefault(
-    @Param('projectId') projectId: string,
+    @Param('projectId', ParseUUIDPipe) projectId: string,
     @TenantId() tenantId: string,
   ): Promise<WorkflowResponseDto> {
-    const workflow = await this.workflowsService.createDefaultWorkflow(projectId);
+    const workflow = await this.workflowsService.createDefaultWorkflow(projectId, tenantId);
     return { id: workflow.id, projectId: workflow.projectId, name: workflow.name, isDefault: workflow.isDefault };
   }
 

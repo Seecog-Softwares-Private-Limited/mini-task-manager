@@ -67,7 +67,7 @@ frontend/src/
 
 ## Organization settings
 
-- **Route:** `/dashboard/settings/organization`.
+- **Route:** `/dashboard/settings/workspace` (legacy `/dashboard/settings/organization` redirects).
 - **Details:** Name and slug inputs (prefilled from `fetchOrganization`); “Save” disabled with note until backend PATCH exists.
 - **Subscription:** Plan name and status from `usePlan()`; link to “Manage billing”.
 - **Danger zone:** “Delete organization” with short warning; button disabled “contact support” until backend supports.

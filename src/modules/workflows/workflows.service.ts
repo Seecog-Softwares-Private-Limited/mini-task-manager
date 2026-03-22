@@ -1,9 +1,19 @@
-import { Injectable } from '@nestjs/common';
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { WorkflowsRepository } from './repositories/workflows.repository';
 import { WorkflowStatusesRepository } from './repositories/workflow-statuses.repository';
 import { ProjectsService } from '../projects/projects.service';
 import { WorkflowEntity } from './entities/workflow.entity';
+import { WorkflowStatusEntity } from './entities/workflow-status.entity';
 import { CreateWorkflowDto } from './dto/create-workflow.dto';
+import { generateUuid } from '../../common/utils/uuid.util';
 
 const DEFAULT_STATUSES = [
   { name: 'To Do', position: 0, type: 'TODO' },
@@ -16,7 +26,10 @@ export class WorkflowsService {
   constructor(
     private readonly workflowsRepository: WorkflowsRepository,
     private readonly workflowStatusesRepository: WorkflowStatusesRepository,
+    @Inject(forwardRef(() => ProjectsService))
     private readonly projectsService: ProjectsService,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
 
   async findById(id: string): Promise<WorkflowEntity | null> {
@@ -52,32 +65,71 @@ export class WorkflowsService {
   /**
    * Creates a default workflow with To Do / In Progress / Done statuses for a project.
    * Idempotent: if a default workflow already exists, ensures statuses exist too.
+   *
+   * @param organizationId When set, verifies the project belongs to this org (avoids FK 500s and cross-tenant writes).
    */
-  async createDefaultWorkflow(projectId: string): Promise<WorkflowEntity> {
-    const existing = await this.workflowsRepository.findByProject(projectId);
-    let workflow = existing.find((w) => w.isDefault);
-
-    if (!workflow) {
-      workflow = await this.workflowsRepository.create({
-        projectId,
-        name: 'Default',
-        isDefault: true,
-      });
-    }
-
-    // Ensure statuses exist (handles case where workflow was created without statuses)
-    const currentStatuses = await this.workflowStatusesRepository.findByWorkflow(workflow.id);
-    if (currentStatuses.length === 0) {
-      for (const s of DEFAULT_STATUSES) {
-        await this.workflowStatusesRepository.create({
-          workflowId: workflow.id,
-          name: s.name,
-          position: s.position,
-          type: s.type,
-        });
+  async createDefaultWorkflow(projectId: string, organizationId?: string): Promise<WorkflowEntity> {
+    if (organizationId != null && organizationId !== '') {
+      const project = await this.projectsService.findByIdInOrganization(projectId, organizationId);
+      if (!project) {
+        throw new NotFoundException('Project not found in this organization');
       }
     }
 
-    return workflow;
+    /**
+     * Run workflow + default statuses in one DB transaction and reload the workflow row
+     * before inserting statuses. Fixes intermittent FK failures (`fk_status_workflow` /
+     * `fk_workflow_statuses_workflow`) when BINARY(16) ids were not aligned between
+     * separate TypeORM operations.
+     */
+    return await this.dataSource.transaction(async (manager) => {
+      const wfRepo = manager.getRepository(WorkflowEntity);
+      const stRepo = manager.getRepository(WorkflowStatusEntity);
+
+      const existing = await wfRepo.find({
+        where: { projectId },
+        order: { name: 'ASC' },
+      });
+      let workflow = existing.find((w) => !!w.isDefault);
+
+      if (!workflow) {
+        workflow = await wfRepo.save(
+          wfRepo.create({
+            id: generateUuid(),
+            projectId,
+            name: 'Default',
+            isDefault: true,
+          }),
+        );
+      }
+
+      const persisted = await wfRepo.findOne({ where: { id: workflow.id } });
+      if (!persisted) {
+        throw new InternalServerErrorException('Default workflow could not be loaded after save');
+      }
+      workflow = persisted;
+
+      const currentStatuses = await stRepo.find({
+        where: { workflowId: workflow.id },
+        order: { position: 'ASC' },
+      });
+
+      if (currentStatuses.length === 0) {
+        for (const s of DEFAULT_STATUSES) {
+          await stRepo.save(
+            stRepo.create({
+              id: generateUuid(),
+              workflowId: workflow.id,
+              name: s.name,
+              position: s.position,
+              type: s.type,
+              color: null,
+            }),
+          );
+        }
+      }
+
+      return workflow;
+    });
   }
 }

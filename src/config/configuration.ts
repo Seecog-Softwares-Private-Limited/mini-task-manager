@@ -15,7 +15,7 @@ export const configuration = () => {
 
   return {
     nodeEnv,
-    port: parseInt(process.env.PORT || '3000', 10),
+    port: parseInt(process.env.PORT ?? '3000', 10),
     apiPrefix: process.env.API_PREFIX || 'api/v1',
     uploadsPath: process.env.UPLOADS_PATH || join(process.cwd(), 'uploads'),
     jwt: {
@@ -45,6 +45,8 @@ export const configuration = () => {
     extra: {
       connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || '10', 10),
       queueLimit: parseInt(process.env.DB_QUEUE_LIMIT || '0', 10) || undefined,
+      // Avoid hanging forever when MySQL is down (otherwise login waits indefinitely).
+      connectTimeout: parseInt(process.env.DB_CONNECT_TIMEOUT_MS || '15000', 10),
     },
   },
   };

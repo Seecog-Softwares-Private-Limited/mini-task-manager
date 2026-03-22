@@ -27,6 +27,7 @@ import { BoardSettingsModal, type BoardSettings } from "@/components/kanban/boar
 import { BoardSkeleton } from "@/components/kanban/board-skeleton";
 import { BulkActionBar } from "@/components/kanban/bulk-action-bar";
 import { CreateTaskModal, type CreateTaskFormData } from "@/components/tasks/create-task-modal";
+import { useTaskCreatedCelebration } from "@/components/tasks/task-create-celebration";
 import { CreateSprintModal } from "@/components/sprints/create-sprint-modal";
 import { TaskDetailModal } from "@/components/tasks/task-detail-modal";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { trackFirstTaskCreated } = useRetentionTracking();
+  const { triggerTaskCreatedCelebration, celebrationLayer } = useTaskCreatedCelebration();
   const currentUserId = useMemo(() => getCurrentUserId(), []);
 
   // ─── UI state ──────────────────────────────────────────────
@@ -309,6 +311,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
       setCreateModalOpen(false);
       toast({ title: "Task created", variant: "success" });
       trackFirstTaskCreated();
+      triggerTaskCreatedCelebration();
     },
   });
 
@@ -561,6 +564,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
 
   return (
     <div className="space-y-4">
+      {celebrationLayer}
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div>

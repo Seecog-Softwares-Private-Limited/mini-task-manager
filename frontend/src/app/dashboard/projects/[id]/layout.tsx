@@ -51,10 +51,10 @@ export default function ProjectLayout({
             <Building2 className="h-6 w-6 text-primary" />
           </div>
           <div>
-            <p className="font-semibold">Organization required</p>
-            <p className="mt-0.5 text-sm text-muted-foreground">Set an organization to view this project.</p>
+            <p className="font-semibold">Workspace required</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">Select a workspace to view this project.</p>
             <Button asChild size="sm" className="mt-3">
-              <Link href="/dashboard/organizations">Organizations</Link>
+              <Link href="/dashboard/workspaces">Workspaces</Link>
             </Button>
           </div>
         </CardContent>
