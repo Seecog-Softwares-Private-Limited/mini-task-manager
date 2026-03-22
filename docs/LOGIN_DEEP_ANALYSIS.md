@@ -53,7 +53,7 @@ Source: **`performance.js:44`**
 | `BACKEND_INTERNAL_URL` | Optional override for the proxy base URL (Docker / custom host). |
 | `BACKEND_HOST` | Optional; default `127.0.0.1` when building URL from `PORT`. |
 
-If you start **only** Next (`cd frontend && npm run dev`) without `app.js`, set `MINI_TM_BACKEND_URL` or `BACKEND_INTERNAL_URL` in `frontend/.env.local` to match Nest, or rely on scanning `../properties.env` (may fail with `next start` standalone cwd).
+If you start **only** Next (`cd frontend && npm run dev`) without `app.js`, set `MINI_TM_BACKEND_URL` or `BACKEND_INTERNAL_URL` in repo-root **`properties.env`** to match Nest; the API route also scans parent dirs for `properties.env` (standalone `next start` cwd may differ).
 
 ## Quick verification
 

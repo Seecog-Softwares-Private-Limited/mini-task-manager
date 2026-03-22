@@ -1,6 +1,5 @@
 # Optional: run backend and frontend together.
-# Backend: current repo root (NestJS). Move to backend/ and set build context to ./backend if you restructure.
-# Frontend: ./frontend
+# Copy properties.env.example → properties.env at repo root (not .env). Backend loads vars from properties.env.
 #
 # Local dev email: docker compose up -d mailhog
 # View captured emails at http://localhost:8025
@@ -17,6 +16,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
+    env_file:
+      - properties.env
     environment:
       NODE_ENV: production
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}

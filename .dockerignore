@@ -13,10 +13,10 @@ npm-debug.log*
 *.swp
 *.swo
 
-# Env and secrets (do not bake into image)
+# Env and secrets (do not bake into image — inject at runtime or use compose env_file: properties.env)
 .env
 .env.*
-!.env.example
+properties.env
 
 # Tests and docs (not needed in runtime image)
 test

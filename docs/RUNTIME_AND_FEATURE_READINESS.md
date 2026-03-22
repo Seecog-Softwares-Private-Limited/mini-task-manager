@@ -17,7 +17,7 @@ This document summarizes startup lifecycle, failure points, dependency risks, fe
 
 ### Bootstrap sequence (Nest)
 
-1. **Config load** — `ConfigModule` loads `properties.env` (then `.env.local`, `.env`) and runs `configuration()`.  
+1. **Config load** — `bootstrap-env` + `ConfigModule` load repo-root **`properties.env` only** (no `.env` / `.env.local`), then `configuration()` / `validate()`.  
    - **Failure**: Missing or invalid env (e.g. production without `JWT_SECRET`) → throw in `configuration()` or `validate()`.
 2. **DB connection** — `DatabaseModule` uses TypeORM `forRootAsync` with config.  
    - **Failure**: MySQL unreachable, wrong credentials, or DB missing → TypeORM connection error; process exits in `bootstrap().catch()`.
@@ -102,4 +102,4 @@ This document summarizes startup lifecycle, failure points, dependency risks, fe
 - **Startup**: Use `node app.js` (or `npm run start:app`) for a single entrypoint; dev uses ts-node, prod uses `dist/main.js` after `npm run build`.
 - **Risks**: DB and env are the main failure sources; config validation already prevents dangerous production defaults (JWT, synchronize).
 - **Features**: Core task/project/org/auth and billing/analytics surfaces are implemented; billing and analytics are suitable for production with correct env and roles.
-- **Next steps**: P1 (config defaults and .env.example) and P2 (CORS and billing env docs) give the highest benefit for minimal change.
+- **Next steps**: P1 (config defaults and `properties.env.example`) and P2 (CORS and billing env docs) give the highest benefit for minimal change.
