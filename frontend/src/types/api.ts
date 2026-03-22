@@ -23,7 +23,7 @@ export interface ApiErrorBody {
 
 export interface LoginResponse {
   accessToken: string;
-  user: { id: string; email: string; fullName: string };
+  user: { id: string; email: string; fullName: string; avatarUrl?: string };
   organizationId?: string;
 }
 
@@ -38,6 +38,7 @@ export interface User {
   lastSeenAt?: string;
 }
 
+/** Tenant / workspace (API: organization). */
 export interface Organization {
   id: string;
   name: string;
@@ -54,6 +55,8 @@ export interface Project {
   organizationId: string;
   name: string;
   description?: string;
+  /** Data URL or URL for project card icon */
+  iconUrl?: string | null;
   visibility: string;
   isArchived: boolean;
   createdBy: string;

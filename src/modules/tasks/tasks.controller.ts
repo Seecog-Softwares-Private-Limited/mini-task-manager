@@ -13,6 +13,7 @@ import {
   StreamableFile,
   UploadedFile,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SkipThrottle } from '@nestjs/throttler';
@@ -206,9 +207,11 @@ export class TasksController {
     @TenantId() tenantId: string,
     @CurrentUserId() userId: string,
     @Body() dto: PatchTaskDto,
-  ): Promise<TaskResponseDto | null> {
+  ): Promise<TaskResponseDto> {
     const task = await this.tasksService.update(id, tenantId, dto, userId);
-    if (!task) return null;
+    if (!task) {
+      throw new NotFoundException('Task not found or not in this organization');
+    }
     return this.toResponse(task);
   }
 

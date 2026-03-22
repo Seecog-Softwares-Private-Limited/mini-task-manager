@@ -9,7 +9,6 @@ import * as dotenv from 'dotenv';
 dotenv.config({ path: path.join(process.cwd(), 'properties.env') });
 
 import { DataSource } from 'typeorm';
-import * as bcrypt from 'bcrypt';
 import { configuration } from '../../../config/configuration';
 import { generateUuid } from '../../../common/utils/uuid.util';
 import { UserEntity } from '../../../modules/users/entities/user.entity';
@@ -34,7 +33,6 @@ async function addUser() {
   await dataSource.initialize();
   console.log(`Adding user: ${EMAIL}`);
 
-  const hash = await bcrypt.hash(PASSWORD, 10);
   const userRepo = dataSource.getRepository(UserEntity);
 
   const existing = await userRepo.findOne({ where: { email: EMAIL.toLowerCase() } });
@@ -49,7 +47,7 @@ async function addUser() {
       id: generateUuid(),
       email: EMAIL.toLowerCase(),
       fullName: EMAIL.split('@')[0],
-      passwordHash: hash,
+      passwordHash: PASSWORD,
     }),
   );
 

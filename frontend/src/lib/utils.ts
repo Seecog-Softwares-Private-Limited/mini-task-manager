@@ -46,7 +46,7 @@ export function nameToSlug(name: string | undefined): string {
     .replace(/^-|-$/g, "");
 }
 
-/** Get initials from organization or project name (e.g. "Acme Inc" → "AI"). */
+/** Get initials from workspace or project name (e.g. "Acme Inc" → "AI"). */
 export function getInitials(name: string | undefined): string {
   if (!name || !name.trim()) return "?";
   const words = name.trim().split(/\s+/).filter(Boolean);

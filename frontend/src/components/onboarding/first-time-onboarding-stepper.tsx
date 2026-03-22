@@ -5,10 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  createOrganization,
-  checkSlugAvailable,
-} from "@/services/api/organizations.api";
+import { createOrganization } from "@/services/api/organizations.api";
 import {
   createProject,
   fetchProjectTemplates,
@@ -35,6 +32,7 @@ import {
   ImagePlus,
   Loader2,
 } from "lucide-react";
+import { WorkspaceAvatarPresetsPicker } from "@/components/workspaces/workspace-avatar-presets-picker";
 
 const STEP_1_SCHEMA = z.object({
   name: z.string().min(1, "Name is required").max(150),
@@ -48,7 +46,7 @@ const STEP_1_SCHEMA = z.object({
 type Step1Form = z.infer<typeof STEP_1_SCHEMA>;
 
 const STEPS = [
-  { id: "org", title: "Create Organization", icon: Building2 },
+  { id: "org", title: "Create workspace", icon: Building2 },
   { id: "invite", title: "Invite Members", icon: Users },
   { id: "project", title: "Create First Project", icon: FolderKanban },
   { id: "tasks", title: "Add Demo Tasks", icon: ListTodo },
@@ -60,6 +58,7 @@ export function FirstTimeOnboardingStepper() {
   const { orgId, setOrgId } = useTenant();
   const [step, setStep] = useState(0);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [inviteEmails, setInviteEmails] = useState<string[]>([]);
   const [currentEmail, setCurrentEmail] = useState("");
@@ -229,14 +228,14 @@ export function FirstTimeOnboardingStepper() {
         </div>
 
         <div className="p-6">
-          {/* Step 1: Create Organization */}
+          {/* Step 1: Create workspace */}
           {step === 0 && (
             <form
               onSubmit={step1Form.handleSubmit(handleStep1Submit)}
               className="space-y-4"
             >
               <div className="space-y-2">
-                <Label>Organization name</Label>
+                <Label>Workspace name</Label>
                 <Input
                   {...step1Form.register("name")}
                   placeholder="Acme Inc"
@@ -262,41 +261,66 @@ export function FirstTimeOnboardingStepper() {
                   </p>
                 )}
               </div>
-              <div className="space-y-2">
-                <Label>Logo (optional)</Label>
+              <div className="space-y-3">
+                <Label>Workspace icon (optional)</Label>
                 <div className="flex items-center gap-4">
-                  <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-muted">
+                  <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-muted">
                     {logoPreview ? (
-                      <img
-                        src={logoPreview}
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
+                      <>
+                        <img
+                          src={logoPreview}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLogoPreview(null);
+                            if (logoFileInputRef.current) logoFileInputRef.current.value = "";
+                          }}
+                          className="absolute inset-0 flex items-center justify-center bg-black/50 text-[10px] font-medium text-white opacity-0 transition-opacity hover:opacity-100"
+                          aria-label="Remove icon"
+                        >
+                          Clear
+                        </button>
+                      </>
                     ) : (
                       <span className="text-sm font-semibold text-muted-foreground">
                         {getInitials(name) || "—"}
                       </span>
                     )}
                   </div>
-                  <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="sr-only"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file?.type.startsWith("image/")) {
+                  <div className="flex-1 space-y-1">
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+                      <input
+                        ref={logoFileInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="sr-only"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file?.type.startsWith("image/")) return;
+                          const maxSize = 100 * 1024;
+                          if (file.size > maxSize) return;
                           const r = new FileReader();
                           r.onload = () =>
                             typeof r.result === "string" && setLogoPreview(r.result);
                           r.readAsDataURL(file);
-                        }
-                      }}
-                    />
-                    <ImagePlus className="h-4 w-4" />
-                    Upload logo
-                  </label>
+                        }}
+                      />
+                      <ImagePlus className="h-4 w-4" />
+                      Upload image
+                    </label>
+                    <p className="text-xs text-muted-foreground/80">PNG, JPG up to 100KB.</p>
+                  </div>
                 </div>
+                <WorkspaceAvatarPresetsPicker
+                  value={logoPreview}
+                  onSelectPreset={(dataUrl) => {
+                    setLogoPreview(dataUrl);
+                    if (logoFileInputRef.current) logoFileInputRef.current.value = "";
+                  }}
+                />
               </div>
               {createOrgMutation.error && (
                 <p className="text-xs text-destructive">

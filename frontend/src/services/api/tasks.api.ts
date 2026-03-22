@@ -70,7 +70,7 @@ export async function fetchTasksByProject(
 }
 
 /**
- * Backend PatchTaskDto accepts: title, description, statusId, assigneeId, storyPoints, tags, subtasks.
+ * Backend PatchTaskDto accepts: title, description, statusId, assigneeId, dueDate, priority, storyPoints, tags, subtasks.
  */
 export interface UpdateTaskPayload {
   title?: string;
@@ -95,6 +95,8 @@ export async function updateTask(
   if (payload.statusId !== undefined) body.statusId = payload.statusId;
   if (payload.sprintId !== undefined) body.sprintId = payload.sprintId;
   if (payload.assigneeId !== undefined) body.assigneeId = payload.assigneeId;
+  if (payload.dueDate !== undefined) body.dueDate = payload.dueDate;
+  if (payload.priority !== undefined) body.priority = payload.priority;
   if (payload.storyPoints !== undefined) body.storyPoints = payload.storyPoints;
   if (payload.tags !== undefined) body.tags = payload.tags;
   if (payload.subtasks !== undefined) body.subtasks = payload.subtasks;

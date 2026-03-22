@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, UseGuards, Req, Res } from '@nestjs/common';
+import { Controller, Post, Body, Get, UseGuards, Req, Res, Logger } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { AuthGuard } from '@nestjs/passport';
 import { Response } from 'express';
@@ -18,6 +18,8 @@ import { Public } from '../../common/decorators/public.decorator';
 
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(private readonly authService: AuthService) {}
 
   @Public()
@@ -30,7 +32,8 @@ export class AuthController {
   @Public()
   @SkipThrottle({ default: true })
   @Post('signup')
-  async signup(@Body() dto: PublicSignupDto): Promise<{ message: string }> {
+  async signup(@Body() dto: PublicSignupDto): Promise<{ message: string; emailVerified?: boolean }> {
+    this.logger.log(`Signup request: ${dto.email?.toLowerCase?.() ?? dto.email}`);
     return this.authService.signup(dto);
   }
 

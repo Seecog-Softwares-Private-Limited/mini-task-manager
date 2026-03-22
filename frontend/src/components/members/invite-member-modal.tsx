@@ -68,7 +68,7 @@ export function InviteMemberModal({
         <DialogHeader>
           <DialogTitle id="invite-member-title">Invite member</DialogTitle>
           <DialogDescription id="invite-member-desc">
-            Send an invitation to join this organization. They will receive an email with a link to accept.
+            Send an invitation to join this workspace. They will receive an email with a link to accept.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">

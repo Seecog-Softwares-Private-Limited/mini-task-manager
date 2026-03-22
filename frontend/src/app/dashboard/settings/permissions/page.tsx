@@ -11,7 +11,7 @@ const CAPABILITIES = [
   { id: "billing", label: "Manage billing & subscription", owner: true, admin: true, member: false },
   { id: "audit", label: "View audit log", owner: true, admin: true, member: false },
   { id: "analytics", label: "View analytics / growth", owner: true, admin: true, member: false },
-  { id: "org_settings", label: "Edit organization settings", owner: true, admin: true, member: false },
+  { id: "org_settings", label: "Edit workspace settings", owner: true, admin: true, member: false },
   { id: "api_keys", label: "Create / revoke API keys", owner: true, admin: false, member: false },
   { id: "webhooks", label: "Manage webhooks", owner: true, admin: true, member: false },
   { id: "invite", label: "Invite members", owner: true, admin: true, member: false },

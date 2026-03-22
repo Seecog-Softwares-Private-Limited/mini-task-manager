@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -21,10 +21,16 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
+/** Seed owner (see README / `npm run seed`). Default password unless `SEED_USER_PASSWORD` was set when seeding. */
+const SEED_OWNER_EMAIL = "owner@example.com";
+const SEED_OWNER_DEFAULT_PASSWORD = "Password123!";
+
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const from = searchParams.get("from") ?? "/dashboard";
+  const fromParam = searchParams.get("from") ?? "/dashboard";
+  /** Open-redirect safe: only same-app paths */
+  const from =
+    fromParam.startsWith("/") && !fromParam.startsWith("//") ? fromParam : "/dashboard";
   const emailParam = searchParams.get("email") ?? "";
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -35,6 +41,8 @@ function LoginForm() {
   const [otpSubmitting, setOtpSubmitting] = useState(false);
   const [resendSuccess, setResendSuccess] = useState<string | null>(null);
   const urlError = searchParams.get("error");
+  const prepopulateSeed =
+    process.env.NODE_ENV === "development" && !emailParam;
 
   const {
     register,
@@ -44,11 +52,18 @@ function LoginForm() {
     formState: { isSubmitting, errors },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { email: emailParam, password: "" },
+    defaultValues: {
+      email: emailParam || (prepopulateSeed ? SEED_OWNER_EMAIL : ""),
+      password: emailParam ? "" : prepopulateSeed ? SEED_OWNER_DEFAULT_PASSWORD : "",
+    },
   });
 
   useEffect(() => {
-    if (emailParam) reset({ email: emailParam, password: "" });
+    if (emailParam) {
+      reset({ email: emailParam, password: "" });
+    } else if (process.env.NODE_ENV === "development") {
+      reset({ email: SEED_OWNER_EMAIL, password: SEED_OWNER_DEFAULT_PASSWORD });
+    }
   }, [emailParam, reset]);
 
   async function onSubmit(values: FormData) {
@@ -56,7 +71,10 @@ function LoginForm() {
     try {
       await login(values);
       window.dispatchEvent(new CustomEvent("auth:login"));
-      window.location.href = from;
+      // Defer navigation so `mini_tm_signed_in` cookie is visible to middleware on the next request.
+      requestAnimationFrame(() => {
+        window.location.assign(from);
+      });
     } catch (err) {
       if (isRateLimited(err)) {
         setError("Too many attempts. Please try again later.");

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Building2, Shield, Key, Webhook, Download, Lock, ArrowLeft, ArrowRight, Users } from "lucide-react";
 
 const SECTIONS = [
-  { href: "/dashboard/settings/organization", title: "Organization", description: "Name, slug, subscription, danger zone", icon: Building2, color: "text-primary bg-primary/10", requiredCap: "canEditOrgSettings" as const },
+  { href: "/dashboard/settings/workspace", title: "Workspace", description: "Name, slug, subscription, danger zone", icon: Building2, color: "text-primary bg-primary/10", requiredCap: "canEditOrgSettings" as const },
   { href: "/dashboard/settings/members", title: "Members", description: "Invite members, manage roles, transfer ownership", icon: Users, color: "text-emerald-600 bg-emerald-500/10", requiredCap: "canInviteMembers" as const },
   { href: "/dashboard/settings/permissions", title: "Roles & Permissions", description: "Role matrix and feature access", icon: Shield, color: "text-purple-500 bg-purple-500/10", requiredCap: null },
   { href: "/dashboard/settings/api-keys", title: "API Keys", description: "Create and revoke API keys", icon: Key, color: "text-amber-500 bg-amber-500/10", requiredCap: "canManageApiKeys" as const },
@@ -27,7 +27,7 @@ export default function SettingsPage() {
     <div className="space-y-8 animate-slide-up">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-        <p className="mt-1 text-muted-foreground">Manage organization and security settings.</p>
+        <p className="mt-1 text-muted-foreground">Manage workspace and security settings.</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

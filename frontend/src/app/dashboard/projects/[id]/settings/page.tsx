@@ -45,7 +45,7 @@ export default function ProjectSettingsPage({ params }: { params: { id: string }
             <Settings className="h-5 w-5" /> Project settings
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Name, visibility, and archive. Organization-level settings are in Settings.
+            Name, visibility, and archive. Workspace-level settings are in Settings.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">

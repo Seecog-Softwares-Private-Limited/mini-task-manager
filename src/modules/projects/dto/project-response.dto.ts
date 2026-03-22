@@ -3,6 +3,7 @@ export class ProjectResponseDto {
   organizationId!: string;
   name!: string;
   description?: string;
+  iconUrl?: string | null;
   visibility!: string;
   isArchived!: boolean;
   createdBy!: string;

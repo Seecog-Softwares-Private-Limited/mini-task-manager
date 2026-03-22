@@ -1,13 +1,21 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { fetchProjects, createProject, updateProject, type CreateProjectPayload } from "@/services/api/projects.api";
+import {
+  fetchProjects,
+  createProject,
+  updateProject,
+  type CreateProjectPayload,
+  type UpdateProjectPayload,
+} from "@/services/api/projects.api";
+import { fetchOrganizations } from "@/services/api/organizations.api";
 import { fetchTasksByProject } from "@/services/api/tasks.api";
 import { fetchProjectMembers, fetchOrgMembers } from "@/services/api/members.api";
 import { fetchWorkflowsByProject, fetchWorkflowStatuses } from "@/services/api/workflows.api";
@@ -17,7 +25,7 @@ import { useFeatureGate } from "@/hooks/use-feature-gate";
 import { useUpgradeModalOptional } from "@/context/upgrade-modal-context";
 import { useOnboardingOptional } from "@/context/onboarding-context";
 import { useAnalytics } from "@/hooks/use-analytics";
-import type { Project, WorkflowStatus } from "@/types/api";
+import type { Organization, Project, WorkflowStatus } from "@/types/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -52,12 +60,13 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
+import { stripHtmlToPlainText, truncatePlainText } from "@/lib/project-description-plain";
+import { WorkspaceThumb } from "@/components/workspaces/workspace-thumb";
 import {
   FolderKanban,
   Plus,
   Lock,
   ArrowRight,
-  X,
   LayoutGrid as LayoutGridIcon,
   List as ListIcon,
   MoreHorizontal,
@@ -77,8 +86,30 @@ import {
   FileSpreadsheet,
   SquarePen,
   Eye,
+  Trash2,
 } from "lucide-react";
 import type { Task } from "@/types/api";
+
+const ProjectFormDescriptionEditor = dynamic(
+  () =>
+    import("@/components/projects/project-form-description-editor").then(
+      (mod) => mod.ProjectFormDescriptionEditor
+    ),
+  { ssr: false, loading: () => <Skeleton className="h-[240px] w-full rounded-xl" /> }
+);
+
+const ProjectIconPicker = dynamic(
+  () => import("@/components/projects/project-icon-picker").then((mod) => mod.ProjectIconPicker),
+  { ssr: false, loading: () => <Skeleton className="h-48 w-full rounded-xl" /> }
+);
+
+function escapeHtml(s: string) {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 
 // Safe icon refs to avoid undefined component (e.g. name collision in bundle)
 function FallbackGridIcon({ className }: { className?: string }) {
@@ -92,8 +123,9 @@ const ListViewIcon = ListIcon ?? FallbackListIcon;
 
 const createSchema = z.object({
   name: z.string().min(1, "Name required").max(200),
-  description: z.string().max(2000).optional(),
+  description: z.string().max(400_000).optional(),
   visibility: z.string().optional(),
+  workspaceId: z.string().min(1, "Select a workspace"),
 });
 
 type CreateFormData = z.infer<typeof createSchema>;
@@ -252,9 +284,13 @@ function getProjectColumns(
   defaultWorkflowIds: (string | undefined)[],
   doneStatusIdsByWorkflowId: Map<string, string[]>,
   membersQueries: { data?: ProjectMember[]; isLoading?: boolean }[],
-  options: { onArchive: (p: Project) => void; onPreview: (p: Project) => void }
+  options: {
+    onArchive: (p: Project) => void;
+    onPreview: (p: Project) => void;
+    onEditProject: (p: Project) => void;
+  }
 ): DataTableColumn<Project>[] {
-  const { onArchive, onPreview } = options;
+  const { onArchive, onPreview, onEditProject } = options;
   return [
     {
       key: "name",
@@ -274,15 +310,28 @@ function getProjectColumns(
         return (
           <Link href={p.id.startsWith("temp-") ? "#" : `/dashboard/projects/${p.id}`} className="flex items-center gap-2 font-semibold hover:text-primary transition-colors">
             <ProjectHealthDot health={health} loading={loading} label={`${health}: ${overdueCount} overdue, ${progressPercent}% complete`} />
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-              <FolderKanban className="h-4 w-4 text-primary" />
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary/10">
+              {p.iconUrl ? (
+                <img src={p.iconUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <FolderKanban className="h-4 w-4 text-primary" />
+              )}
             </div>
             {p.name}
           </Link>
         );
       },
     },
-    { key: "description", header: "Description", sortable: false, render: (p) => <span className="text-muted-foreground">{p.description ?? "—"}</span> },
+    {
+      key: "description",
+      header: "Description",
+      sortable: false,
+      render: (p) => (
+        <span className="max-w-[240px] text-muted-foreground line-clamp-2">
+          {truncatePlainText(stripHtmlToPlainText(p.description), 140) || "—"}
+        </span>
+      ),
+    },
     {
       key: "members",
       header: "Members",
@@ -444,13 +493,20 @@ function getProjectColumns(
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Edit project" asChild>
-                    <Link href={`/dashboard/projects/${p.id}`}>
-                      <Pencil className="h-4 w-4" />
-                    </Link>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-sky-600 hover:bg-sky-500/15 hover:text-sky-700 dark:text-sky-400"
+                    aria-label="Edit project"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onEditProject(p);
+                    }}
+                  >
+                    <Pencil className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="left">Edit</TooltipContent>
+                <TooltipContent side="left">Edit project</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -530,13 +586,17 @@ const ACTIVITY_FILTER_OPTIONS = [
 export default function ProjectsPage() {
   const queryClient = useQueryClient();
   const router = useRouter();
-  const { orgId } = useTenant();
+  const { orgId, setOrgId } = useTenant();
   const { toast } = useToast();
   const upgradeModal = useUpgradeModalOptional();
   const onboarding = useOnboardingOptional();
   const analytics = useAnalytics();
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  /** When set, project form modal opens in edit mode (same UI as create). */
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [projectIconUrl, setProjectIconUrl] = useState<string | null>(null);
+  const projectModalOpen = createOpen || !!editingProject;
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [sort, setSort] = useState<{ key: keyof Project | string; direction: SortDirection } | null>({ key: "name", direction: "asc" });
   const [nameFilter, setNameFilter] = useState("");
@@ -598,47 +658,120 @@ export default function ProjectsPage() {
     enabled: !!orgId,
   });
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<CreateFormData>({
-    resolver: zodResolver(createSchema),
-    defaultValues: { name: "", description: "", visibility: "PRIVATE" },
+  const { data: workspaces = [] } = useQuery({
+    queryKey: ["organizations"],
+    queryFn: fetchOrganizations,
   });
 
+  const createFormDefaults = useMemo(
+    () =>
+      ({
+        name: "",
+        description: "",
+        visibility: "PRIVATE",
+        workspaceId: orgId ?? "",
+      }) satisfies CreateFormData,
+    [orgId]
+  );
+
+  const { register, handleSubmit, reset, setValue, watch, control, formState: { errors } } = useForm<CreateFormData>({
+    resolver: zodResolver(createSchema),
+    defaultValues: createFormDefaults,
+  });
+
+  const selectedWorkspaceId = watch("workspaceId");
+  const createProjectName = watch("name");
+
+  useEffect(() => {
+    if (createOpen && orgId && !editingProject) {
+      setValue("workspaceId", orgId);
+    }
+  }, [createOpen, orgId, editingProject, setValue]);
+
+  useEffect(() => {
+    if (!editingProject) return;
+    reset({
+      name: editingProject.name,
+      description: editingProject.description ?? "",
+      visibility: editingProject.visibility ?? "PRIVATE",
+      workspaceId: editingProject.organizationId,
+    });
+    setProjectIconUrl(editingProject.iconUrl ?? null);
+  }, [editingProject?.id, reset]);
+
+  function openProjectEditModal(p: Project) {
+    if (p.id.startsWith("temp-")) return;
+    setCreateOpen(false);
+    setEditingProject(p);
+  }
+
+  type CreateMutationVars = { payload: CreateProjectPayload; targetOrgId: string };
+
   const createMutation = useMutation({
-    mutationFn: (payload: CreateProjectPayload) => createProject(payload),
-    onMutate: async (payload) => {
-      await queryClient.cancelQueries({ queryKey: ["projects", orgId ?? ""] });
-      const previous = queryClient.getQueryData<Project[]>(["projects", orgId ?? ""]);
+    mutationFn: ({ payload, targetOrgId }: CreateMutationVars) => createProject(payload, targetOrgId),
+    onMutate: async ({ payload, targetOrgId }) => {
+      await queryClient.cancelQueries({ queryKey: ["projects", targetOrgId] });
+      const previous = queryClient.getQueryData<Project[]>(["projects", targetOrgId]);
       const previousCount = (previous ?? []).length;
-      const optimistic: Project = {
-        id: `temp-${Date.now()}`,
-        organizationId: orgId!,
-        name: payload.name,
-        description: payload.description,
-        visibility: payload.visibility ?? "PRIVATE",
-        isArchived: false,
-        createdBy: "",
-      };
-      queryClient.setQueryData<Project[]>(["projects", orgId ?? ""], (old) => [...(old ?? []), optimistic]);
-      return { previous, previousCount };
+      if (targetOrgId === orgId) {
+        const optimistic: Project = {
+          id: `temp-${Date.now()}`,
+          organizationId: targetOrgId,
+          name: payload.name,
+          description: payload.description,
+          visibility: payload.visibility ?? "PRIVATE",
+          isArchived: false,
+          createdBy: "",
+          iconUrl: payload.iconUrl ?? null,
+        };
+        queryClient.setQueryData<Project[]>(["projects", targetOrgId], (old) => [...(old ?? []), optimistic]);
+      }
+      return { previous, previousCount, targetOrgId };
     },
     onError: (_err, _vars, context) => {
-      if (context?.previous != null) {
-        queryClient.setQueryData(["projects", orgId ?? ""], context.previous);
+      if (context?.previous != null && context.targetOrgId) {
+        queryClient.setQueryData(["projects", context.targetOrgId], context.previous);
       }
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
     },
-    onSuccess: (_data, _vars, context: { previous?: Project[]; previousCount?: number } | undefined) => {
+    onSuccess: (_data, { targetOrgId }, context) => {
       setCreateOpen(false);
-      reset();
-      analytics.track("project_created", {});
+      setProjectIconUrl(null);
+      reset({
+        name: "",
+        description: "",
+        visibility: "PRIVATE",
+        workspaceId: targetOrgId,
+      });
+      if (targetOrgId !== orgId) {
+        setOrgId(targetOrgId);
+        router.refresh();
+      }
+      analytics.track("project_created", { workspaceId: targetOrgId });
       const wasFirstProject = context?.previousCount === 0;
       if (wasFirstProject) {
         onboarding?.markStepCompleted("project");
         analytics.track("first_project_created", {});
         router.push("/dashboard");
       }
+    },
+  });
+
+  const updateProjectFormMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: UpdateProjectPayload }) => updateProject(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      queryClient.invalidateQueries({ queryKey: ["project"] });
+      setEditingProject(null);
+      setProjectIconUrl(null);
+      reset(createFormDefaults);
+      toast({ title: "Project updated", variant: "success" });
+      analytics.track("project_updated", {});
+    },
+    onError: (err) => {
+      toast({ title: "Failed to update project", description: parseApiError(err), variant: "error" });
     },
   });
 
@@ -659,18 +792,37 @@ export default function ProjectsPage() {
   });
 
   function onSubmit(values: CreateFormData) {
+    if (editingProject) {
+      const payload: UpdateProjectPayload = {
+        name: values.name,
+        description: values.description || undefined,
+        visibility: values.visibility || "PRIVATE",
+        iconUrl: projectIconUrl?.trim() ? projectIconUrl : "",
+      };
+      updateProjectFormMutation.mutate({ id: editingProject.id, payload });
+      return;
+    }
     createMutation.mutate({
-      name: values.name,
-      description: values.description || undefined,
-      visibility: values.visibility || "PRIVATE",
+      targetOrgId: values.workspaceId,
+      payload: {
+        name: values.name,
+        description: values.description || undefined,
+        visibility: values.visibility || "PRIVATE",
+        iconUrl: projectIconUrl || undefined,
+      },
     });
   }
+
+  const formBusy = createMutation.isPending || updateProjectFormMutation.isPending;
 
   const filteredOnly = useMemo(() => {
     let list = projects ?? [];
     if (nameFilter.trim()) {
       const q = nameFilter.trim().toLowerCase();
-      list = list.filter((p) => p.name.toLowerCase().includes(q) || (p.description ?? "").toLowerCase().includes(q));
+      list = list.filter((p) => {
+        const plain = stripHtmlToPlainText(p.description ?? "");
+        return p.name.toLowerCase().includes(q) || plain.toLowerCase().includes(q);
+      });
     }
     if (filterStatus) {
       if (filterStatus === "active") list = list.filter((p) => !p.isArchived);
@@ -863,11 +1015,17 @@ export default function ProjectsPage() {
 
   function handleTemplateSelect(template: ProjectTemplate | null) {
     setTemplateModalOpen(false);
+    setEditingProject(null);
     setCreateOpen(true);
+    setProjectIconUrl(null);
+    const ws = orgId ?? "";
     if (template && template.id !== "blank") {
-      reset({ name: template.name, description: template.description, visibility: "PRIVATE" });
+      const descHtml = template.description.trim()
+        ? `<p>${escapeHtml(template.description)}</p>`
+        : "";
+      reset({ name: template.name, description: descHtml, visibility: "PRIVATE", workspaceId: ws });
     } else {
-      reset({ name: "", description: "", visibility: "PRIVATE" });
+      reset({ name: "", description: "", visibility: "PRIVATE", workspaceId: ws });
     }
   }
 
@@ -1143,20 +1301,85 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {/* Create form */}
-      {createOpen && (
-        <Card className="border-primary/20 shadow-glow" data-cy="create-project-form">
-          <CardHeader className="flex-row items-center justify-between space-y-0">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Plus className="h-5 w-5 text-primary" />
-              Create Project
-            </CardTitle>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setCreateOpen(false); reset(); }}>
-              <X className="h-4 w-4" />
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+      {/* Create / edit project — same modal */}
+      <Dialog
+        open={projectModalOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCreateOpen(false);
+            setEditingProject(null);
+            setProjectIconUrl(null);
+            reset(createFormDefaults);
+          }
+        }}
+      >
+        <DialogContent
+          className="max-h-[90vh] max-w-2xl overflow-y-auto sm:max-w-2xl"
+          data-cy={editingProject ? "edit-project-form" : "create-project-form"}
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 pr-8 text-left">
+              {editingProject ? (
+                <Pencil className="h-5 w-5 shrink-0 text-sky-600 dark:text-sky-400" />
+              ) : (
+                <Plus className="h-5 w-5 shrink-0 text-primary" />
+              )}
+              {editingProject ? "Edit project" : "Create Project"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingProject
+                ? "Update name, description, and icon. Workspace cannot be moved here."
+                : "Choose a workspace, then name your project. Optional rich description and icon."}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 pt-1">
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Workspace
+                </Label>
+                <Select
+                  value={selectedWorkspaceId || undefined}
+                  onValueChange={(v) => setValue("workspaceId", v, { shouldValidate: true })}
+                  disabled={workspaces.length === 0 || !!editingProject}
+                >
+                  <SelectTrigger className="h-10" aria-label="Workspace for project">
+                    {/*
+                      SelectValue mirrors the selected SelectItem (thumb + name). Avoid a second thumb in the trigger.
+                    */}
+                    <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden pr-1 text-left">
+                      <SelectValue
+                        placeholder="Select workspace"
+                        className="min-w-0 flex-1 truncate data-[placeholder]:truncate"
+                      />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {workspaces.map((w: Organization) => (
+                      <SelectItem
+                        key={w.id}
+                        value={w.id}
+                        textValue={`${w.name}${w.isArchived ? " (archived)" : ""}`}
+                      >
+                        <span className="flex min-w-0 w-full items-center gap-2">
+                          <WorkspaceThumb workspace={w} size="sm" className="shrink-0" />
+                          <span className="min-w-0 flex-1 truncate font-medium">{w.name}</span>
+                          {w.isArchived && (
+                            <span className="shrink-0 text-xs text-muted-foreground">(archived)</span>
+                          )}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.workspaceId && (
+                  <p className="text-xs text-destructive">{errors.workspaceId.message}</p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  {editingProject
+                    ? "This project stays in its current workspace."
+                    : "Projects belong to one workspace. Choose where this project should live."}
+                </p>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Project Name
@@ -1165,32 +1388,79 @@ export default function ProjectsPage() {
                 {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="description" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Description (optional)
                 </Label>
-                <Input id="description" {...register("description")} placeholder="Brief description of the project" />
+                <Controller
+                  name="description"
+                  control={control}
+                  render={({ field }) => (
+                    <ProjectFormDescriptionEditor
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      placeholder="Brief description of the project"
+                      disabled={formBusy}
+                    />
+                  )}
+                />
+                {errors.description && (
+                  <p className="text-xs text-destructive">{errors.description.message}</p>
+                )}
               </div>
+              <ProjectIconPicker
+                value={projectIconUrl}
+                onChange={setProjectIconUrl}
+                projectNamePlaceholder={createProjectName?.trim() || "Project"}
+                disabled={formBusy}
+              />
               <div className="flex gap-3">
-                <Button type="submit" disabled={createMutation.isPending} data-cy="project-create-submit">
-                  {createMutation.isPending ? "Creating..." : (
-                    <span className="flex items-center gap-2">Create <ArrowRight className="h-4 w-4" /></span>
+                <Button
+                  type="submit"
+                  disabled={formBusy || (!editingProject && !selectedWorkspaceId)}
+                  data-cy={editingProject ? "project-edit-submit" : "project-create-submit"}
+                >
+                  {formBusy ? (
+                    editingProject ? "Saving…" : "Creating…"
+                  ) : editingProject ? (
+                    <span className="flex items-center gap-2">Save changes</span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      Create <ArrowRight className="h-4 w-4" />
+                    </span>
                   )}
                 </Button>
-                <Button type="button" variant="outline" onClick={() => { setCreateOpen(false); reset(); }}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setCreateOpen(false);
+                    setEditingProject(null);
+                    setProjectIconUrl(null);
+                    reset(createFormDefaults);
+                  }}
+                >
                   Cancel
                 </Button>
               </div>
-              {createMutation.error && (
+              {createMutation.error && !editingProject && (
                 <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3">
                   <p className="text-sm text-destructive">
                     {isRateLimited(createMutation.error) ? "Too many requests. Try again later." : parseApiError(createMutation.error)}
                   </p>
                 </div>
               )}
-            </form>
-          </CardContent>
-        </Card>
-      )}
+              {updateProjectFormMutation.error && editingProject && (
+                <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3">
+                  <p className="text-sm text-destructive">
+                    {isRateLimited(updateProjectFormMutation.error)
+                      ? "Too many requests. Try again later."
+                      : parseApiError(updateProjectFormMutation.error)}
+                  </p>
+                </div>
+              )}
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Table / list */}
       <div>
@@ -1206,7 +1476,7 @@ export default function ProjectsPage() {
             <p className="text-sm text-destructive">{parseApiError(error)}</p>
           </div>
         )}
-        {!isLoading && projects && projects.length === 0 && !createOpen && (
+        {!isLoading && projects && projects.length === 0 && !projectModalOpen && (
           <ProjectsEmptyState
             onCreateClick={() => setTemplateModalOpen(true)}
             canCreate={canCreateProject}
@@ -1215,7 +1485,11 @@ export default function ProjectsPage() {
         )}
         {!isLoading && projects && projects.length > 0 && viewMode === "list" && (
           <DataTable<Project>
-            columns={getProjectColumns(tasksQueries, projectIds, defaultWorkflowIds, doneStatusIdsByWorkflowId, membersQueries, { onArchive: setArchiveTarget, onPreview: setPreviewProject })}
+            columns={getProjectColumns(tasksQueries, projectIds, defaultWorkflowIds, doneStatusIdsByWorkflowId, membersQueries, {
+              onArchive: setArchiveTarget,
+              onPreview: setPreviewProject,
+              onEditProject: openProjectEditModal,
+            })}
             data={paginated}
             keyExtractor={(p) => p.id}
             sort={sort ?? undefined}
@@ -1264,34 +1538,83 @@ export default function ProjectsPage() {
                   <CardHeader className="flex flex-row items-start justify-between space-y-0 gap-2 p-4 pb-2">
                     <Link href={p.id.startsWith("temp-") ? "#" : `/dashboard/projects/${p.id}`} className="flex items-center gap-3 min-w-0 flex-1">
                       <ProjectHealthDot health={health} loading={tasksLoading} label={`${health}: ${overdueCount} overdue, ${progressPercent}% complete`} />
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                        <FolderKanban className="h-5 w-5 text-primary" />
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-primary/10">
+                        {p.iconUrl ? (
+                          <img src={p.iconUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <FolderKanban className="h-5 w-5 text-primary" />
+                        )}
                       </div>
                       <CardTitle className="text-base truncate">{p.name}</CardTitle>
                     </Link>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label="Project actions">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setPreviewProject(p)}>
-                          <Eye className="mr-2 h-4 w-4" />
-                          Quick preview
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setArchiveTarget(p)}>
-                          {p.isArchived ? (
-                            <><ArchiveRestore className="mr-2 h-4 w-4" /> Unarchive</>
-                          ) : (
-                            <><Archive className="mr-2 h-4 w-4" /> Archive</>
-                          )}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {p.id.startsWith("temp-") ? null : (
+                      <div className="flex shrink-0 items-center gap-0.5">
+                        <TooltipProvider delayDuration={250}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-sky-600 hover:bg-sky-500/15 hover:text-sky-700 dark:text-sky-400 dark:hover:bg-sky-500/20 dark:hover:text-sky-300"
+                                aria-label="Edit project"
+                                onClick={() => openProjectEditModal(p)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">Edit project</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className={cn(
+                                  "h-8 w-8",
+                                  p.isArchived
+                                    ? "text-emerald-600 hover:bg-emerald-500/15 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-500/20 dark:hover:text-emerald-300"
+                                    : "text-red-600 hover:bg-red-500/15 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/20 dark:hover:text-red-300"
+                                )}
+                                aria-label={p.isArchived ? "Restore project from archive" : "Archive project"}
+                                onClick={() => setArchiveTarget(p)}
+                              >
+                                {p.isArchived ? (
+                                  <ArchiveRestore className="h-4 w-4" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">
+                              {p.isArchived ? "Restore from archive" : "Archive (remove from active list)"}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0 text-muted-foreground" aria-label="More project actions">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link href={`/dashboard/projects/${p.id}`} className="cursor-pointer">
+                                Open board
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setPreviewProject(p)}>
+                              <Eye className="mr-2 h-4 w-4" />
+                              Quick preview
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    )}
                   </CardHeader>
                   <CardContent className="pt-0 px-4 pb-4 flex-1 flex flex-col gap-2.5">
-                    <p className="text-sm text-muted-foreground line-clamp-2">{p.description ?? "No description"}</p>
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {truncatePlainText(stripHtmlToPlainText(p.description), 200) || "No description"}
+                    </p>
 
                     {/* Progress bar (animated, updates in real time via refetchInterval) */}
                     <div className="space-y-1.5">
