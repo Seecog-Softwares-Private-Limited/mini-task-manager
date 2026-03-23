@@ -705,48 +705,6 @@ export function TaskDetailModal({
                     </button>
                   )}
                   <div className="flex flex-wrap items-center gap-2">
-                    {selectedStatus && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button
-                            type="button"
-                            className="inline-flex w-fit items-center gap-2 rounded-full border border-[#E7EAF0] bg-white px-3 py-1.5 text-xs font-semibold tracking-wide text-foreground shadow-sm transition-all hover:border-primary/25 hover:bg-[#FCFCFD] hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 dark:border-border dark:bg-muted/30 dark:hover:bg-muted/40"
-                            aria-label="Change task status"
-                          >
-                            <span
-                              className={cn(
-                                "h-2 w-2 shrink-0 rounded-full ring-2 ring-background/80",
-                                statusColorById.get(selectedStatus.id) ?? STATUS_DOT_FALLBACK[0]
-                              )}
-                            />
-                            {selectedStatus.name}
-                            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/70" aria-hidden />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" className="min-w-[200px] p-1" sideOffset={6}>
-                          {statuses.map((s) => {
-                            const isCurrent = s.id === selectedStatus?.id;
-                            return (
-                              <DropdownMenuItem
-                                key={s.id}
-                                onSelect={() => handleFieldChange("statusId", s.id)}
-                                className="rounded-lg text-sm"
-                              >
-                                <span
-                                  className={cn(
-                                    "mr-2 h-2.5 w-2.5 shrink-0 rounded-full",
-                                    statusColorById.get(s.id) ?? STATUS_DOT_FALLBACK[0]
-                                  )}
-                                  aria-hidden
-                                />
-                                <span className="flex-1">{s.name}</span>
-                                {isCurrent ? <Check className="h-3.5 w-3.5 shrink-0 text-primary" /> : null}
-                              </DropdownMenuItem>
-                            );
-                          })}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
                     {task.dueDate && (
                       <span
                         className={cn(
@@ -1407,6 +1365,65 @@ export function TaskDetailModal({
                     <div className={tdSubtleDivider} />
 
                     <div className="space-y-2">
+                      <span className="block text-xs font-medium text-muted-foreground/75">Task status</span>
+                      {selectedStatus ? (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              disabled={updateMutation.isPending}
+                              className="h-11 w-full justify-between rounded-xl border-0 bg-white/85 px-4 text-sm font-semibold tracking-tight text-foreground shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08)] transition-[background-color,box-shadow] hover:bg-white hover:shadow-[inset_0_0_0_1px_rgba(15,23,42,0.12),0_4px_12px_-6px_rgba(15,23,42,0.12)] dark:bg-white/[0.06] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)] dark:hover:bg-white/[0.1]"
+                              aria-label="Change task status"
+                            >
+                              <span className="flex items-center gap-2.5">
+                                <span
+                                  className={cn(
+                                    "h-2.5 w-2.5 rounded-full shadow-sm ring-2 ring-white/80 dark:ring-black/40",
+                                    statusColorById.get(selectedStatus.id) ?? STATUS_DOT_FALLBACK[0]
+                                  )}
+                                />
+                                <span>{selectedStatus.name}</span>
+                              </span>
+                              <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="start"
+                            className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px] p-1"
+                            sideOffset={6}
+                            onClick={(e) => e.stopPropagation()}
+                            onPointerDown={(e) => e.stopPropagation()}
+                          >
+                            {statuses.map((s) => {
+                              const isCurrent = s.id === selectedStatus?.id;
+                              return (
+                                <DropdownMenuItem
+                                  key={s.id}
+                                  disabled={updateMutation.isPending}
+                                  onSelect={() => handleFieldChange("statusId", s.id)}
+                                  className="rounded-lg text-sm"
+                                >
+                                  <span
+                                    className={cn(
+                                      "mr-2 h-2.5 w-2.5 shrink-0 rounded-full",
+                                      statusColorById.get(s.id) ?? STATUS_DOT_FALLBACK[0]
+                                    )}
+                                    aria-hidden
+                                  />
+                                  <span className="flex-1">{s.name}</span>
+                                  {isCurrent ? <Check className="h-3.5 w-3.5 shrink-0 text-primary" /> : null}
+                                </DropdownMenuItem>
+                              );
+                            })}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      ) : null}
+                    </div>
+
+                    <div className={tdSubtleDivider} />
+
+                    <div className="space-y-2">
                       <span className="block text-xs font-medium text-muted-foreground/75">Priority</span>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -1461,9 +1478,6 @@ export function TaskDetailModal({
                       </DropdownMenu>
                     </div>
 
-                    <p className="mt-3 text-[11px] leading-relaxed text-muted-foreground/70">
-                      Workflow status: open the <span className="font-medium text-foreground/80">status menu</span> in the header.
-                    </p>
                   </div>
 
                   <div className={tdSidebarSurface}>

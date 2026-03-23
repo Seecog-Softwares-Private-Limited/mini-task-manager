@@ -199,6 +199,86 @@
   .animate-scale-in {
     animation: scaleIn 0.3s ease-out both;
   }
+  .auth-ambient-blob {
+    animation: authBlobDrift 14s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+    will-change: transform, opacity;
+  }
+  /** Variants share the same drift keyframe; stagger direction / speed for depth */
+  .auth-ambient-blob--alt {
+    animation-direction: reverse;
+    animation-duration: 17s;
+  }
+  .auth-ambient-blob--slow {
+    animation-duration: 20s;
+    animation-timing-function: ease-in-out;
+  }
+  /** Animated light-blue gradient wash (auth shell background) */
+  .auth-sky-wash {
+    background: linear-gradient(
+      118deg,
+      rgba(248, 250, 252, 0.9) 0%,
+      rgba(233, 213, 255, 0.18) 24%,
+      rgba(186, 230, 253, 0.28) 52%,
+      rgba(199, 210, 254, 0.2) 76%,
+      rgba(248, 250, 252, 0.92) 100%
+    );
+    background-size: 220% 220%;
+    animation: authSkyWashMove 22s ease-in-out infinite;
+    will-change: background-position;
+  }
+  /** Subtle "task list" pattern overlay for auth background */
+  .auth-task-pattern {
+    background-image:
+      radial-gradient(circle at 10px 10px, rgba(148, 163, 184, 0.2) 2px, transparent 2.5px),
+      linear-gradient(rgba(148, 163, 184, 0.14) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148, 163, 184, 0.11) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(99, 102, 241, 0.11) 10px, transparent 10px);
+    background-size:
+      26px 26px,
+      26px 26px,
+      26px 26px,
+      120px 52px;
+    background-position:
+      0 0,
+      0 0,
+      0 0,
+      0 0;
+    mask-image: radial-gradient(ellipse at center, black 62%, transparent 100%);
+    opacity: 0.4;
+    animation: authTaskPatternDrift 30s linear infinite;
+    will-change: background-position;
+  }
+  .auth-vignette {
+    background:
+      radial-gradient(70% 52% at 50% 44%, rgba(255, 255, 255, 0) 0%, rgba(241, 245, 249, 0.42) 100%),
+      radial-gradient(120% 90% at 50% 8%, rgba(255, 255, 255, 0.38) 0%, rgba(248, 250, 252, 0) 62%);
+  }
+  .auth-grid {
+    animation: authGridShift 26s linear infinite;
+    will-change: background-position;
+  }
+  /** One-shot entrance (separate from .auth-icon-float — never stack two `animation` on one node) */
+  .auth-card-enter {
+    animation: authCardEnter 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .auth-icon-pop {
+    animation: authIconPop 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .auth-icon-float {
+    animation: authIconFloat 4.8s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+    will-change: transform, box-shadow;
+  }
+  /** Stronger glass — Safari needs explicit webkit blur */
+  .auth-glass-panel {
+    background: rgba(255, 255, 255, 0.52);
+    -webkit-backdrop-filter: blur(28px) saturate(1.15);
+    backdrop-filter: blur(28px) saturate(1.15);
+  }
+  .dark .auth-glass-panel {
+    background: rgba(15, 23, 42, 0.45);
+    -webkit-backdrop-filter: blur(28px) saturate(1.1);
+    backdrop-filter: blur(28px) saturate(1.1);
+  }
 
   /* Project status badges – distinct, standardized, accessible contrast */
   .badge-status-active {
@@ -247,6 +327,75 @@
 @keyframes scaleIn {
   from { opacity: 0; transform: scale(0.95); }
   to { opacity: 1; transform: scale(1); }
+}
+@keyframes authBlobDrift {
+  0% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.85; }
+  25% { transform: translate3d(28px, -32px, 0) scale(1.06); opacity: 1; }
+  50% { transform: translate3d(-22px, 24px, 0) scale(0.96); opacity: 0.82; }
+  75% { transform: translate3d(20px, 28px, 0) scale(1.04); opacity: 0.95; }
+  100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.85; }
+}
+@keyframes authGridShift {
+  from { background-position: 0 0, 0 0; }
+  to { background-position: 0 42px, 42px 0; }
+}
+/** Slow drift of oversized sky gradient — reads as soft light-blue motion */
+@keyframes authSkyWashMove {
+  0%,
+  100% {
+    background-position: 12% 24%;
+  }
+  33% {
+    background-position: 88% 38%;
+  }
+  66% {
+    background-position: 42% 78%;
+  }
+}
+@keyframes authIconFloat {
+  0% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+  100% { transform: translateY(0); }
+}
+@keyframes authTaskPatternDrift {
+  from { background-position: 0 0, 0 0, 0 0; }
+  to { background-position: 26px 26px, 0 26px, 26px 0; }
+}
+
+@keyframes authCardEnter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 22px, 0) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes authIconPop {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-ambient-blob,
+  .auth-grid,
+  .auth-sky-wash,
+  .auth-task-pattern,
+  .auth-icon-float {
+    animation: none !important;
+  }
+  .auth-card-enter,
+  .auth-icon-pop {
+    animation: none !important;
+  }
 }
 
 /* Scrollbar styling */
