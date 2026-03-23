@@ -1029,6 +1029,15 @@ export default function ProjectsPage() {
     }
   }
 
+  function handleWorkspaceSwitch(nextWorkspaceId: string) {
+    if (!nextWorkspaceId || nextWorkspaceId === orgId) return;
+    setOrgId(nextWorkspaceId);
+    setPage(1);
+    clearAllFilters();
+    setNameFilter("");
+    router.refresh();
+  }
+
   return (
     <div className="space-y-6 animate-slide-up">
       {/* Header */}
@@ -1036,6 +1045,37 @@ export default function ProjectsPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Projects</h1>
           <p className="mt-1 text-sm text-muted-foreground">Manage and organize your team&apos;s work</p>
+          <div className="mt-3 w-[260px] max-w-full">
+            <Label
+              htmlFor="projects-workspace-switcher"
+              className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+            >
+              Switch Workspace
+            </Label>
+            <Select
+              value={orgId ?? ""}
+              onValueChange={handleWorkspaceSwitch}
+              disabled={workspaces.length === 0}
+            >
+              <SelectTrigger
+                id="projects-workspace-switcher"
+                className="h-10 w-full"
+                aria-label="Switch workspace for projects"
+              >
+                <SelectValue placeholder="Select workspace" />
+              </SelectTrigger>
+              <SelectContent>
+                {workspaces.map((w: Organization) => (
+                  <SelectItem key={w.id} value={w.id} textValue={w.name}>
+                    <span className="flex min-w-0 w-full items-center gap-2">
+                      <WorkspaceThumb workspace={w} size="sm" className="shrink-0" />
+                      <span className="min-w-0 flex-1 truncate font-medium">{w.name}</span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <DropdownMenu open={filterOpen} onOpenChange={setFilterOpen}>

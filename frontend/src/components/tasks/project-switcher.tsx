@@ -110,23 +110,13 @@ export function ProjectSwitcher({
   return (
     <div
       className={cn(
-        "relative isolate min-w-[260px] max-w-[380px] overflow-hidden rounded-xl",
-        "border border-primary/25 bg-gradient-to-br from-primary/[0.09] via-card to-muted/25",
-        "p-3.5 shadow-premium ring-1 ring-primary/15",
-        "dark:from-primary/[0.14] dark:via-card dark:to-muted/15 dark:border-primary/35 dark:ring-primary/25",
-        "transition-shadow duration-300 hover:shadow-premium-lg hover:ring-primary/25"
+        "w-full min-w-[260px] max-w-[380px]"
       )}
     >
-      {/* Premium top highlight */}
-      <div
-        className="pointer-events-none absolute inset-x-4 top-0 h-[2px] rounded-full bg-gradient-to-r from-transparent via-primary/60 to-transparent opacity-90"
-        aria-hidden
-      />
-      <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-primary/10 blur-2xl dark:bg-primary/20" aria-hidden />
       <div className="relative flex flex-col gap-2">
         <Label
           htmlFor={triggerId}
-          className="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary"
+          className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
         >
           {label}
         </Label>
@@ -137,7 +127,7 @@ export function ProjectSwitcher({
         >
           <SelectTrigger
             id={triggerId}
-            className="h-10 w-full min-w-0 border-primary/20 bg-background/85 shadow-sm backdrop-blur-sm transition-colors hover:bg-background focus:ring-primary/25 dark:border-primary/30 dark:bg-background/70"
+            className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white text-slate-900 shadow-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-primary/20"
           >
             <div className="flex min-w-0 items-center gap-2">
               {selectedProject ? (

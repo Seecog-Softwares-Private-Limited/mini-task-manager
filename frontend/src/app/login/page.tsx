@@ -13,6 +13,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Lock, Mail, ArrowRight, Eye, EyeOff, Smartphone } from "lucide-react";
+import {
+  AuthDivider,
+  PremiumAuthCard,
+  PremiumAuthShell,
+  authGoogleButtonClass,
+  authInputClass,
+  authPrimaryButtonClass,
+  authSecondaryButtonClass,
+} from "@/components/auth/premium-auth-shell";
 
 const schema = z.object({
   email: z.string().email("Invalid email"),
@@ -85,31 +94,35 @@ function LoginForm() {
   }
 
   return (
-    <div className="relative w-full max-w-md animate-scale-in">
-      {/* Glass card */}
-      <div className="glass-card p-8 sm:p-10">
-        {/* Logo / Brand */}
-        <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl gradient-bg shadow-lg shadow-primary/25">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 11l3 3L22 4" />
-              <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
-            </svg>
-          </div>
-          <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Sign in to your Mini Task Manager account
-          </p>
-        </div>
-
-        {mode === "email" ? (
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-          <div className="space-y-2">
-            <Label htmlFor="email" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+    <PremiumAuthCard
+      title="Welcome back"
+      subtitle="Sign in to your Mini Task Manager account"
+      icon={
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 11l3 3L22 4" />
+          <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" />
+        </svg>
+      }
+      footer={
+        <p className="text-xs tracking-[0.01em] text-slate-500">
+          Don&apos;t have an account?{" "}
+          <Link
+            href="/signup"
+            className="font-semibold text-violet-700 underline-offset-2 transition-all duration-300 hover:text-violet-800 hover:underline"
+          >
+            Sign up for free
+          </Link>
+        </p>
+      }
+    >
+      {mode === "email" ? (
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <div className="space-y-2.5">
+            <Label htmlFor="email" className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
               Email address
             </Label>
             <div className="relative">
-              <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50" />
+              <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 id="email"
                 type="email"
@@ -117,20 +130,18 @@ function LoginForm() {
                 data-cy="login-email"
                 {...register("email")}
                 autoComplete="email"
-                className="pl-10"
+                className={`pl-10 ${authInputClass}`}
               />
             </div>
-            {errors.email && (
-              <p className="text-xs text-destructive">{errors.email.message}</p>
-            )}
+            {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="password" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <div className="space-y-2.5">
+            <Label htmlFor="password" className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
               Password
             </Label>
             <div className="relative">
-              <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50" />
+              <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 id="password"
                 type={showPassword ? "text" : "password"}
@@ -138,37 +149,38 @@ function LoginForm() {
                 data-cy="login-password"
                 {...register("password")}
                 autoComplete="current-password"
-                className="pl-10 pr-10"
+                className={`pl-10 pr-10 ${authInputClass}`}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 transition-colors duration-200 hover:text-slate-700"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
-            {errors.password && (
-              <p className="text-xs text-destructive">{errors.password.message}</p>
-            )}
+            {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
           </div>
 
           <div className="flex justify-end">
-            <Link href="/forgot-password" className="text-xs text-primary hover:underline">
+            <Link
+              href="/forgot-password"
+              className="text-xs font-medium text-violet-700 underline-offset-2 transition-colors hover:text-violet-800 hover:underline"
+            >
               Forgot password?
             </Link>
           </div>
 
           {(error || urlError) && (
-            <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3 space-y-2">
-              <p className="text-sm text-destructive font-medium">
+            <div className="space-y-2 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3">
+              <p className="text-sm font-medium text-destructive">
                 {error ?? (urlError === "google_not_configured" ? "Google sign-in is not configured." : urlError)}
               </p>
               {error?.includes("verify your email") && (
                 <button
                   type="button"
-                  className="text-xs text-primary hover:underline"
+                  className="text-xs font-medium text-violet-700 hover:underline"
                   onClick={async () => {
                     const email = getValues("email");
                     if (email) {
@@ -190,14 +202,15 @@ function LoginForm() {
             </div>
           )}
           {resendSuccess && (
-            <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-4 py-3">
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3">
               <p className="text-sm text-emerald-700 dark:text-emerald-400">{resendSuccess}</p>
             </div>
           )}
 
           <Button
             type="submit"
-            className="w-full h-12 text-base"
+            variant="secondary"
+            className={authPrimaryButtonClass}
             size="lg"
             disabled={isSubmitting}
             data-cy="login-submit"
@@ -218,19 +231,12 @@ function LoginForm() {
             )}
           </Button>
 
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
-            </div>
-          </div>
+          <AuthDivider />
 
           <Button
             type="button"
             variant="ghost"
-            className="w-full text-muted-foreground"
+            className={authSecondaryButtonClass}
             onClick={() => setMode(mode === "email" ? "otp" : "email")}
           >
             {mode === "email" ? "Sign in with OTP instead" : "Sign in with email instead"}
@@ -239,7 +245,7 @@ function LoginForm() {
           <Button
             type="button"
             variant="outline"
-            className="w-full h-12"
+            className={authGoogleButtonClass}
             onClick={() => {
               const base = typeof window !== "undefined" ? window.location.origin : "";
               const apiBase = config.apiBaseUrl.startsWith("http") ? config.apiBaseUrl : base + config.apiBaseUrl;
@@ -255,34 +261,35 @@ function LoginForm() {
             Sign in with Google
           </Button>
         </form>
-        ) : (
+      ) : (
         <div className="space-y-5">
           {!otpSent ? (
             <>
               <div className="space-y-2">
-                <Label htmlFor="otp-phone" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <Label htmlFor="otp-phone" className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                   Phone number
                 </Label>
                 <div className="relative">
-                  <Smartphone className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50" />
+                  <Smartphone className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <Input
                     id="otp-phone"
                     type="tel"
                     placeholder="+1234567890"
                     value={otpPhone}
                     onChange={(e) => setOtpPhone(e.target.value)}
-                    className="pl-10"
+                    className={`pl-10 ${authInputClass}`}
                   />
                 </div>
               </div>
               {(error || urlError) && (
-                <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3">
-                  <p className="text-sm text-destructive font-medium">{error ?? urlError}</p>
+                <div className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3">
+                  <p className="text-sm font-medium text-destructive">{error ?? urlError}</p>
                 </div>
               )}
               <Button
                 type="button"
-                className="w-full h-12"
+                variant="secondary"
+                className={authPrimaryButtonClass}
                 disabled={otpSubmitting || otpPhone.length < 10}
                 onClick={async () => {
                   setError(null);
@@ -302,9 +309,9 @@ function LoginForm() {
             </>
           ) : (
             <>
-              <p className="text-sm text-muted-foreground">Code sent to {otpPhone}</p>
+              <p className="text-sm text-slate-500">Code sent to {otpPhone}</p>
               <div className="space-y-2">
-                <Label htmlFor="otp-code" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <Label htmlFor="otp-code" className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                   Verification code
                 </Label>
                 <Input
@@ -314,17 +321,18 @@ function LoginForm() {
                   maxLength={6}
                   value={otpCode}
                   onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
-                  className="text-center text-lg tracking-[0.5em]"
+                  className={`${authInputClass} text-center text-lg tracking-[0.5em]`}
                 />
               </div>
               {(error || urlError) && (
-                <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3">
-                  <p className="text-sm text-destructive font-medium">{error ?? urlError}</p>
+                <div className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3">
+                  <p className="text-sm font-medium text-destructive">{error ?? urlError}</p>
                 </div>
               )}
               <Button
                 type="button"
-                className="w-full h-12"
+                variant="secondary"
+                className={authPrimaryButtonClass}
                 disabled={otpSubmitting || otpCode.length !== 6}
                 onClick={async () => {
                   setError(null);
@@ -344,8 +352,11 @@ function LoginForm() {
               </Button>
               <button
                 type="button"
-                className="w-full text-sm text-muted-foreground hover:text-foreground"
-                onClick={() => { setOtpSent(false); setOtpCode(""); }}
+                className="w-full text-sm text-slate-500 transition-colors hover:text-slate-900"
+                onClick={() => {
+                  setOtpSent(false);
+                  setOtpCode("");
+                }}
               >
                 Use a different number
               </button>
@@ -354,41 +365,26 @@ function LoginForm() {
           <Button
             type="button"
             variant="ghost"
-            className="w-full text-muted-foreground"
-            onClick={() => { setMode("email"); setOtpSent(false); setOtpPhone(""); setOtpCode(""); setError(null); }}
+            className={authSecondaryButtonClass}
+            onClick={() => {
+              setMode("email");
+              setOtpSent(false);
+              setOtpPhone("");
+              setOtpCode("");
+              setError(null);
+            }}
           >
             Sign in with email instead
           </Button>
         </div>
-        )}
-
-        <div className="mt-6 text-center space-y-2">
-          <p className="text-xs text-muted-foreground">
-            Don&apos;t have an account?{" "}
-            <Link href="/signup" className="font-medium text-primary hover:underline">
-              Sign up for free
-            </Link>
-          </p>
-        </div>
-      </div>
-    </div>
+      )}
+    </PremiumAuthCard>
   );
 }
 
 export default function LoginPage() {
   return (
-    <div
-      className="relative flex min-h-screen items-center justify-center overflow-hidden p-4"
-      data-cy="login-page"
-    >
-      {/* Background gradient */}
-      <div className="fixed inset-0 -z-10">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-purple-500/5" />
-        <div className="absolute left-1/4 top-1/4 h-[500px] w-[500px] rounded-full bg-primary/10 blur-[120px]" />
-        <div className="absolute bottom-1/4 right-1/4 h-[400px] w-[400px] rounded-full bg-purple-500/10 blur-[120px]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(99,102,241,0.12),rgba(255,255,255,0))]" />
-      </div>
-
+    <PremiumAuthShell dataCy="login-page">
       <Suspense
         fallback={
           <div className="flex items-center gap-2 text-muted-foreground">
@@ -402,6 +398,6 @@ export default function LoginPage() {
       >
         <LoginForm />
       </Suspense>
-    </div>
+    </PremiumAuthShell>
   );
 }
