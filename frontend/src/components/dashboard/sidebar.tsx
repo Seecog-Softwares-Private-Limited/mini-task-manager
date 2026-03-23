@@ -2,9 +2,9 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Plus, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { DashboardProfileAvatar } from "@/components/dashboard/dashboard-profile-avatar";
 
@@ -17,7 +17,6 @@ interface SidebarProps {
 
 export function Sidebar({ collapsed, mobileOpen, onCloseMobile, visibleNav }: SidebarProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const { user, mergeUser } = useAuth();
 
   useEffect(() => {
@@ -87,29 +86,8 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile, visibleNav }: Si
         </div>
       )}
 
-      {/* Quick action */}
-      <div className={cn("px-3 pt-3 pb-3", collapsed && "px-2")}>
-        {!collapsed && (
-          <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/90">
-            Quick Actions
-          </p>
-        )}
-        <button
-          type="button"
-          onClick={() => { onCloseMobile(); router.push("/dashboard/tasks"); }}
-          className={cn(
-            "flex w-full items-center gap-2.5 rounded-lg gradient-bg px-3 py-2.5 text-sm font-semibold text-white shadow-md shadow-primary/20 transition-all hover:brightness-110 active:scale-[0.98]",
-            collapsed && "justify-center px-2"
-          )}
-          data-cy="sidebar-new-task"
-        >
-          <Plus className="h-4 w-4 shrink-0" />
-          {!collapsed && <span>New Task</span>}
-        </button>
-      </div>
-
       {/* Main Navigation */}
-      <div className={cn("border-t border-border/40 px-3 pt-3", collapsed && "px-2")}>
+      <div className={cn("px-3 pt-3", collapsed && "px-2")}>
         {!collapsed && (
           <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/90">
             Navigation

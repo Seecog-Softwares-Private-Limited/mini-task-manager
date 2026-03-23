@@ -516,8 +516,26 @@ export default function TasksPage() {
       {celebrationLayer}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 flex-1 flex-col gap-3">
-          <div className="w-full max-w-md">
-            <OrgSwitcher variant="navbar" contentAlign="start" />
+          <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="w-full sm:max-w-[280px]">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                Select workspace
+              </p>
+              <OrgSwitcher
+                variant="navbar"
+                contentAlign="start"
+                className="h-10 w-full justify-between rounded-xl border border-slate-200 bg-white px-3 text-slate-900 shadow-sm hover:bg-white"
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <ProjectSwitcher
+                projects={selectableProjects}
+                selectedProjectId={selectedProjectId}
+                selectedTaskCount={projectTasks.length}
+                onProjectChange={setProjectInUrl}
+                disabled={projectsLoading}
+              />
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {permissions.isViewer && (
@@ -525,13 +543,6 @@ export default function TasksPage() {
                 <Shield className="h-3 w-3" /> View only
               </span>
             )}
-            <ProjectSwitcher
-              projects={selectableProjects}
-              selectedProjectId={selectedProjectId}
-              selectedTaskCount={projectTasks.length}
-              onProjectChange={setProjectInUrl}
-              disabled={projectsLoading}
-            />
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">

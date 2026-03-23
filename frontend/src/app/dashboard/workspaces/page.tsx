@@ -388,12 +388,12 @@ export default function WorkspacesPage() {
   }
 
   return (
-    <div className="space-y-8 animate-slide-up">
+    <div className="space-y-10 animate-slide-up">
       {/* Page header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Workspaces</h1>
-          <p className="mt-1 text-muted-foreground">
+          <h1 className="text-[2rem] font-semibold tracking-[-0.02em] text-slate-900 dark:text-foreground">Workspaces</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
             Select a workspace to work in, or create a new one.
           </p>
         </div>
@@ -403,7 +403,7 @@ export default function WorkspacesPage() {
             setCreateModalOpen(true);
           }}
           size="sm"
-          className="shrink-0"
+          className="h-9 shrink-0 rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-fuchsia-600 text-white shadow-[0_10px_24px_-14px_rgba(109,40,217,0.65)] transition-all duration-300 hover:-translate-y-0.5 hover:brightness-105"
         >
           <Plus className="mr-2 h-4 w-4" />
           New Workspace
@@ -418,10 +418,10 @@ export default function WorkspacesPage() {
               type="button"
               onClick={() => setFilter("all")}
               className={cn(
-                "rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                "rounded-full border px-3.5 py-1.5 text-sm font-medium transition-all duration-200",
                 filter === "all"
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  ? "border-violet-200 bg-violet-500/10 text-violet-700 shadow-sm dark:border-violet-500/40 dark:text-violet-300"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 dark:border-border dark:bg-card dark:text-muted-foreground"
               )}
             >
               <span className="tabular-nums">{totalCount}</span>
@@ -431,10 +431,10 @@ export default function WorkspacesPage() {
               type="button"
               onClick={() => setFilter("active")}
               className={cn(
-                "rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                "rounded-full border px-3.5 py-1.5 text-sm font-medium transition-all duration-200",
                 filter === "active"
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  ? "border-violet-200 bg-violet-500/10 text-violet-700 shadow-sm dark:border-violet-500/40 dark:text-violet-300"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 dark:border-border dark:bg-card dark:text-muted-foreground"
               )}
             >
               <span className="tabular-nums">{activeCount}</span>
@@ -444,10 +444,10 @@ export default function WorkspacesPage() {
               type="button"
               onClick={() => setFilter("archived")}
               className={cn(
-                "rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                "rounded-full border px-3.5 py-1.5 text-sm font-medium transition-all duration-200",
                 filter === "archived"
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  ? "border-violet-200 bg-violet-500/10 text-violet-700 shadow-sm dark:border-violet-500/40 dark:text-violet-300"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 dark:border-border dark:bg-card dark:text-muted-foreground"
               )}
             >
               <span className="tabular-nums">{archivedCount}</span>
@@ -455,12 +455,12 @@ export default function WorkspacesPage() {
             </button>
           </div>
         )}
-        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+        <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
           {organizations.length > 0 ? "Your workspaces" : "Get started"}
         </h2>
         <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3">
           {organizations.length === 0 && !isLoading ? (
-            <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-muted-foreground/25 bg-muted/5 py-16 text-center">
+            <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300/70 bg-white/70 py-16 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] dark:border-border/60 dark:bg-muted/10">
               <Building2 className="mb-3 h-12 w-12 text-muted-foreground/60" />
               <p className="text-sm font-medium text-muted-foreground">No workspaces yet</p>
               <p className="mt-1 text-xs text-muted-foreground/80">Create your first workspace to get started.</p>
@@ -478,7 +478,7 @@ export default function WorkspacesPage() {
             </div>
           ) : isLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
-                <Card key={i} className="overflow-hidden">
+                <Card key={i} className="overflow-hidden rounded-2xl border-[#E7EAF0] bg-[#FCFCFD] dark:border-border dark:bg-card/50">
                   <CardContent className="p-7 md:p-8">
                     <div className="flex items-start gap-6">
                       <Skeleton className="h-20 w-20 shrink-0 rounded-2xl md:h-[5.5rem] md:w-[5.5rem]" />
@@ -492,7 +492,7 @@ export default function WorkspacesPage() {
                 </Card>
               ))
             ) : filteredOrgs.length === 0 ? (
-              <div className="col-span-full flex flex-col items-center justify-center rounded-xl border border-dashed border-muted-foreground/25 bg-muted/5 py-16 text-center">
+              <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300/70 bg-white/70 py-16 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] dark:border-border/60 dark:bg-muted/10">
                 <Building2 className="mb-3 h-12 w-12 text-muted-foreground/60" />
                 <p className="text-sm font-medium text-muted-foreground">
                   {filter === "archived" ? "No archived workspaces" : "No active workspaces"}
@@ -549,12 +549,12 @@ export default function WorkspacesPage() {
                     tabIndex={0}
                     aria-current={isCurrent ? "true" : undefined}
                     className={cn(
-                      "group/card relative cursor-pointer transition-all duration-200 hover:shadow-premium",
+                      "group/card relative cursor-pointer rounded-2xl border border-[#E7EAF0] bg-[#FCFCFD]/95 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_20px_45px_-28px_rgba(15,23,42,0.24)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_1px_2px_rgba(15,23,42,0.06),0_24px_48px_-24px_rgba(15,23,42,0.3)] dark:border-border dark:bg-card/60",
                       "focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2",
                       "outline-none",
                       isCurrent
-                        ? "border-2 border-primary bg-primary/[0.06] dark:bg-primary/[0.1] shadow-glow shadow-premium"
-                        : "hover:border-primary/20",
+                        ? "border-violet-300 bg-violet-500/[0.06] ring-1 ring-violet-300/70 dark:border-violet-500/50 dark:bg-violet-500/[0.12]"
+                        : "hover:border-violet-200/80 dark:hover:border-violet-500/35",
                       org.isArchived && "opacity-75"
                     )}
                     onClick={() => {
@@ -574,8 +574,8 @@ export default function WorkspacesPage() {
                         {/* Logo / workspace icon */}
                         <div
                           className={cn(
-                            "flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl transition-colors md:h-[5.5rem] md:w-[5.5rem]",
-                            isCurrent ? "gradient-bg text-white shadow-md shadow-primary/25 md:shadow-lg" : "bg-muted"
+                            "flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl ring-1 ring-black/[0.04] transition-colors md:h-[5.5rem] md:w-[5.5rem]",
+                            isCurrent ? "gradient-bg text-white shadow-md shadow-primary/25 md:shadow-lg" : "bg-slate-100 text-slate-700 dark:bg-muted"
                           )}
                         >
                           {org.logoUrl ? (
@@ -594,7 +594,7 @@ export default function WorkspacesPage() {
                               loading={healthLoading}
                               label={`${orgHealth}: ${overdueCount} overdue${totalTasks > 0 ? `, ${totalTasks} tasks` : ""}`}
                             />
-                            <p className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight md:text-xl">
+                            <p className="min-w-0 flex-1 truncate text-lg font-semibold tracking-[-0.01em] text-slate-900 dark:text-foreground md:text-xl">
                               {org.name}
                             </p>
                           </div>
@@ -669,7 +669,7 @@ export default function WorkspacesPage() {
                             </p>
                             {/* Hover-only action buttons - right-aligned, never overlap name */}
                             <div
-                              className="flex shrink-0 flex-wrap items-center justify-end gap-1 opacity-0 transition-opacity duration-200 group-hover/card:opacity-100 group-focus-within/card:opacity-100"
+                              className="flex shrink-0 flex-wrap items-center justify-end gap-1 opacity-0 translate-y-0.5 transition-all duration-200 group-hover/card:translate-y-0 group-hover/card:opacity-100 group-focus-within/card:translate-y-0 group-focus-within/card:opacity-100"
                               onClick={(e) => e.stopPropagation()}
                               onKeyDown={(e) => e.stopPropagation()}
                             >
