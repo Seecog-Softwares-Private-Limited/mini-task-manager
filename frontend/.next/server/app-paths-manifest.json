@@ -1,8 +1,10 @@
 {
   "/api/v1/[...path]/route": "app/api/v1/[...path]/route.js",
+  "/page": "app/page.js",
   "/login/page": "app/login/page.js",
-  "/dashboard/page": "app/dashboard/page.js",
-  "/dashboard/workspaces/page": "app/dashboard/workspaces/page.js",
   "/dashboard/tasks/page": "app/dashboard/tasks/page.js",
-  "/dashboard/projects/page": "app/dashboard/projects/page.js"
+  "/dashboard/page": "app/dashboard/page.js",
+  "/dashboard/plans/page": "app/dashboard/plans/page.js",
+  "/dashboard/projects/page": "app/dashboard/projects/page.js",
+  "/dashboard/workspaces/page": "app/dashboard/workspaces/page.js"
 }

@@ -403,7 +403,7 @@ export default function WorkspacesPage() {
             setCreateModalOpen(true);
           }}
           size="sm"
-          className="h-9 shrink-0 rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-fuchsia-600 text-white shadow-[0_10px_24px_-14px_rgba(109,40,217,0.65)] transition-all duration-300 hover:-translate-y-0.5 hover:brightness-105"
+          className="h-10 w-full rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-fuchsia-600 text-white shadow-[0_10px_24px_-14px_rgba(109,40,217,0.65)] transition-all duration-300 hover:-translate-y-0.5 hover:brightness-105 sm:h-9 sm:w-auto sm:shrink-0"
         >
           <Plus className="mr-2 h-4 w-4" />
           New Workspace
@@ -458,7 +458,7 @@ export default function WorkspacesPage() {
         <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
           {organizations.length > 0 ? "Your workspaces" : "Get started"}
         </h2>
-        <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3">
+        <div className="grid gap-4 sm:gap-6 sm:grid-cols-1 md:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3">
           {organizations.length === 0 && !isLoading ? (
             <div className="col-span-full flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300/70 bg-white/70 py-16 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] dark:border-border/60 dark:bg-muted/10">
               <Building2 className="mb-3 h-12 w-12 text-muted-foreground/60" />
@@ -549,7 +549,7 @@ export default function WorkspacesPage() {
                     tabIndex={0}
                     aria-current={isCurrent ? "true" : undefined}
                     className={cn(
-                      "group/card relative cursor-pointer rounded-2xl border border-[#E7EAF0] bg-[#FCFCFD]/95 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_20px_45px_-28px_rgba(15,23,42,0.24)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_1px_2px_rgba(15,23,42,0.06),0_24px_48px_-24px_rgba(15,23,42,0.3)] dark:border-border dark:bg-card/60",
+                      "group/card relative cursor-pointer rounded-2xl border border-[#E7EAF0] bg-[#FCFCFD]/95 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_20px_45px_-28px_rgba(15,23,42,0.24)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_1px_2px_rgba(15,23,42,0.06),0_24px_48px_-24px_rgba(15,23,42,0.3)] active:scale-[0.998] dark:border-border dark:bg-card/60",
                       "focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2",
                       "outline-none",
                       isCurrent
@@ -559,22 +559,24 @@ export default function WorkspacesPage() {
                     )}
                     onClick={() => {
                       setOrgId(org.id);
+                      setPreviewOrg(org);
                       router.refresh();
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
                         setOrgId(org.id);
+                        setPreviewOrg(org);
                         router.refresh();
                       }
                     }}
                   >
-                    <CardContent className="relative p-7 md:p-8">
-                      <div className="flex items-start gap-5 md:gap-6">
+                    <CardContent className="relative p-5 sm:p-6 md:p-8">
+                      <div className="flex items-start gap-4 sm:gap-5 md:gap-6">
                         {/* Logo / workspace icon */}
                         <div
                           className={cn(
-                            "flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl ring-1 ring-black/[0.04] transition-colors md:h-[5.5rem] md:w-[5.5rem]",
+                            "flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl ring-1 ring-black/[0.04] transition-colors sm:h-20 sm:w-20 md:h-[5.5rem] md:w-[5.5rem]",
                             isCurrent ? "gradient-bg text-white shadow-md shadow-primary/25 md:shadow-lg" : "bg-slate-100 text-slate-700 dark:bg-muted"
                           )}
                         >
@@ -594,7 +596,7 @@ export default function WorkspacesPage() {
                               loading={healthLoading}
                               label={`${orgHealth}: ${overdueCount} overdue${totalTasks > 0 ? `, ${totalTasks} tasks` : ""}`}
                             />
-                            <p className="min-w-0 flex-1 truncate text-lg font-semibold tracking-[-0.01em] text-slate-900 dark:text-foreground md:text-xl">
+                            <p className="min-w-0 flex-1 truncate text-xl font-semibold tracking-[-0.01em] text-slate-900 dark:text-foreground">
                               {org.name}
                             </p>
                           </div>
@@ -626,7 +628,7 @@ export default function WorkspacesPage() {
                             )}
                           </div>
                           {/* Slug */}
-                          <p className="mt-1.5 text-sm text-muted-foreground truncate">{org.slug}</p>
+                          <p className="mt-1.5 text-sm text-muted-foreground break-all sm:truncate">{org.slug}</p>
 
                           {/* Stats row */}
                           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
@@ -669,7 +671,7 @@ export default function WorkspacesPage() {
                             </p>
                             {/* Hover-only action buttons - right-aligned, never overlap name */}
                             <div
-                              className="flex shrink-0 flex-wrap items-center justify-end gap-1 opacity-0 translate-y-0.5 transition-all duration-200 group-hover/card:translate-y-0 group-hover/card:opacity-100 group-focus-within/card:translate-y-0 group-focus-within/card:opacity-100"
+                              className="hidden shrink-0 flex-wrap items-center justify-end gap-1 opacity-0 translate-y-0.5 transition-all duration-200 group-hover/card:translate-y-0 group-hover/card:opacity-100 group-focus-within/card:translate-y-0 group-focus-within/card:opacity-100 sm:flex"
                               onClick={(e) => e.stopPropagation()}
                               onKeyDown={(e) => e.stopPropagation()}
                             >
@@ -754,6 +756,44 @@ export default function WorkspacesPage() {
                                 </Button>
                               )}
                             </div>
+                          </div>
+
+                          {/* Mobile action row (always visible on touch devices) */}
+                          <div
+                            className="mt-3 flex flex-wrap items-center gap-2 sm:hidden"
+                            onClick={(e) => e.stopPropagation()}
+                            onKeyDown={(e) => e.stopPropagation()}
+                          >
+                            <Button
+                              size="sm"
+                              className="h-8 rounded-lg px-3 text-xs"
+                              onClick={() => {
+                                setOrgId(org.id);
+                                setPreviewOrg(org);
+                                router.refresh();
+                              }}
+                            >
+                              Open
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 rounded-lg px-3 text-xs"
+                              onClick={() => setPreviewOrg(org)}
+                            >
+                              Preview
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 rounded-lg px-3 text-xs"
+                              onClick={() => {
+                                setOrgId(org.id);
+                                router.push("/dashboard/projects");
+                              }}
+                            >
+                              Projects
+                            </Button>
                           </div>
 
                         </div>
