@@ -41,7 +41,15 @@ export function NotificationCenter() {
         )}
       </Button>
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border bg-card shadow-premium-lg animate-scale-in overflow-hidden">
+        <div
+          className={cn(
+            "z-50 overflow-hidden rounded-xl border bg-card shadow-premium-lg animate-scale-in",
+            // Mobile: pinned panel with viewport-safe width.
+            "fixed left-2 right-2 top-14 mt-0",
+            // Desktop: classic anchored dropdown.
+            "sm:absolute sm:right-0 sm:left-auto sm:top-full sm:mt-2 sm:w-80"
+          )}
+        >
           <div className="flex items-center justify-between border-b px-4 py-3">
             <span className="font-semibold text-sm">Notifications</span>
             {unreadCount > 0 && (
@@ -50,7 +58,7 @@ export function NotificationCenter() {
               </Button>
             )}
           </div>
-          <div className="max-h-80 overflow-y-auto">
+          <div className="max-h-[60vh] overflow-y-auto sm:max-h-80">
             {ctx.isLoading ? (
               <div className="flex flex-col items-center justify-center py-10">
                 <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
