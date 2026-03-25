@@ -57,25 +57,10 @@
       "static/chunks/main-app.js",
       "static/chunks/app/dashboard/tasks/page.js"
     ],
-    "/dashboard/settings/members/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/settings/members/page.js"
-    ],
-    "/dashboard/projects/[id]/board/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/projects/[id]/board/page.js"
-    ],
     "/dashboard/projects/[id]/members/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/dashboard/projects/[id]/members/page.js"
-    ],
-    "/dashboard/plans/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/plans/page.js"
     ]
   }
 }
