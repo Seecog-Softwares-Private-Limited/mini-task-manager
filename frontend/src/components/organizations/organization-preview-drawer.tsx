@@ -196,33 +196,48 @@ export function OrganizationPreviewDrawer({
               Summary
             </h3>
             <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-lg border bg-muted/30 p-3">
+              <button
+                type="button"
+                onClick={() => handleNavigate("/dashboard/settings/members")}
+                className="rounded-lg border bg-muted/30 p-3 text-left transition-colors hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+                aria-label="Open workspace members"
+              >
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Users className="h-4 w-4" />
                   <span className="text-xs">Members</span>
                 </div>
-                <p className="mt-1 text-xl font-bold tabular-nums">
+                <p className="mt-1 text-xl font-bold tabular-nums text-foreground">
                   {membersLoading ? "…" : memberCount}
                 </p>
-              </div>
-              <div className="rounded-lg border bg-muted/30 p-3">
+              </button>
+              <button
+                type="button"
+                onClick={() => handleNavigate("/dashboard/projects")}
+                className="rounded-lg border bg-muted/30 p-3 text-left transition-colors hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+                aria-label="Open workspace projects"
+              >
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <FolderKanban className="h-4 w-4" />
                   <span className="text-xs">Projects</span>
                 </div>
-                <p className="mt-1 text-xl font-bold tabular-nums">
+                <p className="mt-1 text-xl font-bold tabular-nums text-foreground">
                   {projectCount ?? "…"}
                 </p>
-              </div>
-              <div className="rounded-lg border bg-muted/30 p-3">
+              </button>
+              <button
+                type="button"
+                onClick={() => handleNavigate("/dashboard/tasks")}
+                className="rounded-lg border bg-muted/30 p-3 text-left transition-colors hover:bg-muted/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+                aria-label="Open workspace tasks"
+              >
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <CheckSquare className="h-4 w-4" />
                   <span className="text-xs">Tasks</span>
                 </div>
-                <p className="mt-1 text-xl font-bold tabular-nums">
+                <p className="mt-1 text-xl font-bold tabular-nums text-foreground">
                   {totalTasks}
                 </p>
-              </div>
+              </button>
               <div className="rounded-lg border bg-muted/30 p-3">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <CalendarClock className="h-4 w-4" />

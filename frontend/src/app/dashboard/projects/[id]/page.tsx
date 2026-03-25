@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { fetchProject } from "@/services/api/projects.api";
 import { fetchWorkflowsByProject, fetchWorkflowStatuses } from "@/services/api/workflows.api";
@@ -17,6 +16,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createTask } from "@/services/api/tasks.api";
 import { parseApiError, isRateLimited } from "@/services/api/client";
 import { useRetentionTracking } from "@/hooks/use-retention-tracking";
+import { useCreateProjectInvitation } from "@/hooks/use-project-invitations";
+import { ProjectInviteMemberModal } from "@/components/projects/project-invite-member-modal";
 import { Plus, UserPlus } from "lucide-react";
 
 export default function ProjectOverviewPage({ params }: { params: { id: string } }) {
@@ -27,6 +28,7 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
   const { trackFirstTaskCreated } = useRetentionTracking();
   const { triggerTaskCreatedCelebration, celebrationLayer } = useTaskCreatedCelebration();
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
 
   const { data: project } = useQuery({
     queryKey: ["project", id],
@@ -60,6 +62,7 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
   });
 
   const tasks = tasksData?.data ?? [];
+  const { createInvite, isPending: invitePending, error: inviteError } = useCreateProjectInvitation(orgId);
 
   const createMutation = useMutation({
     mutationFn: (payload: Parameters<typeof createTask>[0]) => createTask(payload),
@@ -99,6 +102,19 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
     });
   };
 
+  function handleInviteSubmit(values: { email: string; role: string; message?: string }) {
+    const orgRole = values.role === "ADMIN" ? "admin" : "member";
+    createInvite(
+      { email: values.email, role: orgRole },
+      {
+        onSuccess: () => {
+          setInviteModalOpen(false);
+          queryClient.invalidateQueries({ queryKey: ["org-members", orgId ?? ""] });
+        },
+      }
+    );
+  }
+
   if (!project) return null;
 
   return (
@@ -113,10 +129,13 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
         >
           <Plus className="mr-1.5 h-4 w-4" /> New Task
         </Button>
-        <Button variant="outline" asChild aria-label="Invite member to project">
-          <Link href={`/dashboard/projects/${id}/members`}>
-            <UserPlus className="mr-1.5 h-4 w-4" /> Invite Member
-          </Link>
+        <Button
+          variant="outline"
+          aria-label="Invite member to project"
+          onClick={() => setInviteModalOpen(true)}
+          disabled={!orgId || invitePending}
+        >
+          <UserPlus className="mr-1.5 h-4 w-4" /> Invite Member
         </Button>
       </div>
 
@@ -137,6 +156,14 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
         projectId={id}
         statuses={statuses}
         defaultStatusId={statuses[0]?.id}
+      />
+
+      <ProjectInviteMemberModal
+        open={inviteModalOpen}
+        onOpenChange={setInviteModalOpen}
+        onSubmit={handleInviteSubmit}
+        isSubmitting={invitePending}
+        error={inviteError ? parseApiError(inviteError) : null}
       />
     </div>
   );
