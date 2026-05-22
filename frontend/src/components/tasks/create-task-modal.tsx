@@ -169,9 +169,9 @@ export function CreateTaskModal({
       aria-labelledby="create-task-title"
       data-cy="create-task-modal"
     >
-      <div className="w-full max-w-xl rounded-2xl border bg-card shadow-premium-lg animate-scale-in overflow-hidden max-h-[90vh] flex flex-col">
+      <div className="w-full max-w-2xl rounded-2xl border bg-card shadow-premium-lg animate-scale-in overflow-hidden max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="gradient-bg p-5 text-white shrink-0">
+        <div className="gradient-bg p-4 text-white shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/20">
@@ -196,7 +196,7 @@ export function CreateTaskModal({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit(handleFormSubmit)} className="flex-1 overflow-y-auto p-5 space-y-5">
+        <form onSubmit={handleSubmit(handleFormSubmit)} className="flex-1 overflow-y-auto p-5 space-y-4">
           {/* Title */}
           <div className="space-y-2">
             <Label htmlFor="task-title" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
