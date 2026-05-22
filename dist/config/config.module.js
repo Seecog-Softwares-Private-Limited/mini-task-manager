@@ -7,10 +7,12 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ConfigModule = void 0;
+const path_1 = require("path");
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const configuration_1 = require("./configuration");
 const env_validation_1 = require("./env.validation");
+const PROPERTIES_ENV = (0, path_1.join)(process.cwd(), 'properties.env');
 let ConfigModule = class ConfigModule {
 };
 exports.ConfigModule = ConfigModule;
@@ -21,7 +23,7 @@ exports.ConfigModule = ConfigModule = __decorate([
                 isGlobal: true,
                 load: [configuration_1.configuration],
                 validate: env_validation_1.validate,
-                envFilePath: ['properties.env', '.env.local', '.env'],
+                envFilePath: [PROPERTIES_ENV],
             }),
         ],
     })

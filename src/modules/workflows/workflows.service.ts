@@ -101,13 +101,9 @@ export class WorkflowsService {
             isDefault: true,
           }),
         );
+        await manager.query('SELECT 1');
       }
 
-      const persisted = await wfRepo.findOne({ where: { id: workflow.id } });
-      if (!persisted) {
-        throw new InternalServerErrorException('Default workflow could not be loaded after save');
-      }
-      workflow = persisted;
 
       const currentStatuses = await stRepo.find({
         where: { workflowId: workflow.id },
@@ -119,7 +115,7 @@ export class WorkflowsService {
           await stRepo.save(
             stRepo.create({
               id: generateUuid(),
-              workflowId: workflow.id,
+              workflowId: String(workflow.id),
               name: s.name,
               position: s.position,
               type: s.type,

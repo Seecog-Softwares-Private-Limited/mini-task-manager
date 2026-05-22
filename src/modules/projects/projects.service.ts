@@ -44,6 +44,14 @@ export class ProjectsService {
   }
 
   async create(organizationId: string, createdBy: string, dto: CreateProjectDto): Promise<ProjectEntity> {
+    const existingProject = await this.projectsRepository.findByName(
+      dto.name,
+      organizationId,
+    );
+    
+    if (existingProject) {
+      throw new ConflictException('Project name already exists');
+    }
     const iconTrimmed = dto.iconUrl?.trim();
     const project = await this.projectsRepository.create({
       organizationId,

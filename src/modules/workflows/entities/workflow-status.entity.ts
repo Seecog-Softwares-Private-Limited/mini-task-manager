@@ -7,7 +7,11 @@ export class WorkflowStatusEntity {
   @PrimaryColumn({ type: 'binary', length: 16, transformer: uuidBinaryTransformer })
   id!: string;
 
-  @Column({ name: 'workflow_id', type: 'binary', length: 16, transformer: uuidBinaryTransformer })
+  @Column({
+    name: 'workflow_id',
+    type: 'char',
+    length: 36,
+  })
   workflowId!: string;
 
   @Column({ type: 'varchar', length: 100 })

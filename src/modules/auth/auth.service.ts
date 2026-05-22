@@ -60,16 +60,12 @@ export class AuthService {
     }
     // Email verification: strict only if REQUIRE_EMAIL_VERIFIED_FOR_LOGIN=true (e.g. production).
     // By default, successful password login auto-verifies so legacy / seed users are not stuck.
-    const strictEmailVerification =
-      String(process.env.REQUIRE_EMAIL_VERIFIED_FOR_LOGIN ?? '').toLowerCase() === 'true';
     if (!user.isEmailVerified) {
-      if (strictEmailVerification) {
-        throw new UnauthorizedException(
-          'Please verify your email first. Check your inbox for the verification link.',
-        );
-      }
-      await this.usersService.updateEmailVerified(user.id, true);
+      throw new UnauthorizedException(
+        'Please verify your email first. Check your inbox for the verification link.',
+      );
     }
+    
     const payload = { sub: user.id, email: user.email };
     const accessToken = this.jwtService.sign(payload);
     return {
@@ -181,7 +177,7 @@ export class AuthService {
         fullName: dto.fullName.trim(),
         passwordHash: dto.password,
         // Default: skip email verification gate so new users can sign in immediately (dev / simplified onboarding)
-        isEmailVerified: true,
+        isEmailVerified: false,
       } as Partial<UserEntity>);
       await queryRunner.commitTransaction();
       this.logger.log(`User created: ${email} (id: ${userId})`);
@@ -201,10 +197,36 @@ export class AuthService {
     } catch {
       // Org creation may fail (e.g. slug collision); user already exists
     }
+    const token = crypto.randomBytes(32).toString('hex');
+
+const expiresAt = new Date();
+expiresAt.setHours(expiresAt.getHours() + 24);
+
+await this.verificationTokenRepo.save({
+  id: generateUuid(),
+  userId,
+  token,
+  expiresAt,
+} as Partial<EmailVerificationTokenEntity>);
+
+const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+const verifyUrl = `${frontendUrl}/verify-email?token=${token}`;
+
+try {
+  await this.emailService.sendVerificationEmail({
+    to: email,
+    fullName: dto.fullName,
+    verifyUrl,
+  });
+
+  this.logger.log(`Verification email sent to ${email}`);
+} catch (emailErr) {
+  this.logger.error(`Failed to send verification email to ${email}: ${emailErr}`);
+}
 
     return {
-      message: 'Account created. You can sign in now.',
-      emailVerified: true,
+      message: 'Account created. Please verify your email before signing in.',
+      emailVerified: false,
     };
   }
 

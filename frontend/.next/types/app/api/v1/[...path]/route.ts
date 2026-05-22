@@ -1,4 +1,4 @@
-// File: /Users/pankajkumaragarwal/Documents/GitHub/mini-task-manager/frontend/src/app/api/v1/[...path]/route.ts
+// File: C:\Projects\mini-task-manager\frontend\src\app\api\v1\[...path]\route.ts
 import * as entry from '../../../../../../src/app/api/v1/[...path]/route.js'
 import type { NextRequest } from 'next/server.js'
 

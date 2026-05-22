@@ -32,16 +32,6 @@
       "static/chunks/main-app.js",
       "static/chunks/app/dashboard/loading.js"
     ],
-    "/dashboard/workspaces/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/workspaces/page.js"
-    ],
-    "/dashboard/projects/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/projects/page.js"
-    ],
     "/dashboard/projects/[id]/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -56,11 +46,6 @@
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/dashboard/tasks/page.js"
-    ],
-    "/dashboard/projects/[id]/members/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/dashboard/projects/[id]/members/page.js"
     ]
   }
 }

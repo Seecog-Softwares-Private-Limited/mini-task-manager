@@ -30,6 +30,15 @@ export class ProjectsRepository {
     return this.repo.count({ where: { organizationId } });
   }
 
+  async findByName(name: string, organizationId: string): Promise<ProjectEntity | null> {
+    return this.repo.findOne({
+      where: {
+        name,
+        organizationId,
+      },
+    });
+  }
+
   async create(data: Partial<ProjectEntity>): Promise<ProjectEntity> {
     const id = data.id ?? generateUuid();
     const entity = this.repo.create({ ...data, id });

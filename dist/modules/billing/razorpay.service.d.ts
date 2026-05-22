@@ -1,3 +1,7 @@
+export declare function parseRazorpayFailure(err: unknown): {
+    message: string;
+    statusCode?: number;
+};
 export interface RazorpayOrder {
     id: string;
     amount: number;

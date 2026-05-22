@@ -1,4 +1,4 @@
-// File: /Users/pankajkumaragarwal/Documents/GitHub/mini-task-manager/frontend/src/app/dashboard/projects/[id]/layout.tsx
+// File: C:\Projects\mini-task-manager\frontend\src\app\dashboard\projects\[id]\layout.tsx
 import * as entry from '../../../../../../src/app/dashboard/projects/[id]/layout.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

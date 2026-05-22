@@ -69,8 +69,18 @@ export function CommandPalette() {
           ⌘K
         </kbd>
       </button>
-      <CommandDialog open={open} onOpenChange={setOpen} label="Command palette">
-        <CommandInput placeholder="Search pages or projects..." aria-label="Search" />
+      <CommandDialog
+  open={open}
+  onOpenChange={setOpen}
+  label="Command palette"
+  className="fixed top-[50%] left-[50%] z-50 w-full max-w-lg translate-x-[-50%] translate-y-[-50%] overflow-hidden rounded-xl border bg-background shadow-2xl"
+>
+      <CommandInput
+  className="w-full border-b bg-transparent px-4 py-3 outline-none"
+  placeholder="Search pages or projects..."
+  aria-label="Search"
+  autoFocus
+/>
         <CommandList>
           <CommandEmpty>No results found.</CommandEmpty>
           <CommandGroup heading="Pages">

@@ -4,7 +4,10 @@ import { ProjectEntity } from '../../projects/entities/project.entity';
 
 @Entity('workflows')
 export class WorkflowEntity {
-  @PrimaryColumn({ type: 'binary', length: 16, transformer: uuidBinaryTransformer })
+  @PrimaryColumn({
+    type: 'char',
+    length: 36,
+  })
   id!: string;
 
   @Column({ name: 'project_id', type: 'binary', length: 16, transformer: uuidBinaryTransformer })
