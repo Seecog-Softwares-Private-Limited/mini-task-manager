@@ -87,11 +87,16 @@ async function runSeed() {
     let member = await userRepo.findOne({ where: { email: MEMBER_EMAIL } });
     let admin = await userRepo.findOne({ where: { email: ADMIN_EMAIL } });
 
+    /** After insert, TypeORM can return a malformed `id` on the entity; use the UUID we passed in for FKs. */
+    let ownerUserId: string;
+    let memberUserId: string;
+    let adminUserId: string;
+
     if (!owner) {
-      const ownerId = generateUuid();
+      ownerUserId = generateUuid();
       owner = await userRepo.save(
         userRepo.create({
-          id: ownerId,
+          id: ownerUserId,
           email: OWNER_EMAIL,
           fullName: 'Seed Owner',
           passwordHash: PASSWORD,
@@ -99,13 +104,14 @@ async function runSeed() {
         }),
       );
     } else {
+      ownerUserId = owner.id;
       await userRepo.update(owner.id, { passwordHash: PASSWORD, isEmailVerified: true });
     }
     if (!member) {
-      const memberId = generateUuid();
+      memberUserId = generateUuid();
       member = await userRepo.save(
         userRepo.create({
-          id: memberId,
+          id: memberUserId,
           email: MEMBER_EMAIL,
           fullName: 'Seed Member',
           passwordHash: PASSWORD,
@@ -113,13 +119,14 @@ async function runSeed() {
         }),
       );
     } else {
+      memberUserId = member.id;
       await userRepo.update(member.id, { passwordHash: PASSWORD, isEmailVerified: true });
     }
     if (!admin) {
-      const adminId = generateUuid();
+      adminUserId = generateUuid();
       admin = await userRepo.save(
         userRepo.create({
-          id: adminId,
+          id: adminUserId,
           email: ADMIN_EMAIL,
           fullName: 'Seed Admin',
           passwordHash: PASSWORD,
@@ -127,12 +134,13 @@ async function runSeed() {
         }),
       );
     } else {
+      adminUserId = admin.id;
       await userRepo.update(admin.id, { passwordHash: PASSWORD, isEmailVerified: true });
     }
 
-    const ownerId = owner.id;
-    const memberId = member.id;
-    const adminId = admin.id;
+    const ownerId = ownerUserId;
+    const memberId = memberUserId;
+    const adminId = adminUserId;
     console.log('  Users ready (owner@example.com, member@example.com, admin@example.com)');
 
     // 2. Organization

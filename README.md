@@ -72,6 +72,8 @@ Password is:
 
 `REQUIRE_EMAIL_VERIFIED_FOR_LOGIN=true`
 
+**Public signup — verification email:** After a successful signup, the API sends a **Verify your email** message via SMTP (`SMTP_*` in `properties.env`). The link uses **`FRONTEND_URL`**, or if unset, **`http://localhost:<FRONTEND_PORT>`** (set `FRONTEND_PORT` to match your Next.js dev port). If no email arrives, check Spam/Promotions and API logs for SMTP errors.
+
 **“Invalid credentials” on seed users?** Ensure password matches `SEED_USER_PASSWORD` or `Password123!`, or run:
 
 ```bash
@@ -101,6 +103,28 @@ npm run start:app:prod
 ```
 
 Mode is chosen by `NODE_ENV` or `APP_MODE` (development | production). In production, `dist/main.js` must exist (run `npm run build` first).
+
+**Production with PM2 (API + Next):**
+
+```bash
+npm install
+npm run build:all
+npm run pm2:start
+```
+
+(PM2 is a devDependency; scripts use `npx pm2`. Global install is optional: `npm install -g pm2`.)
+
+- API: `http://localhost:<PORT>/api/v1` (from `properties.env`, default `3000`)
+- Web: `http://localhost:<FRONTEND_PORT>` (default `3001`)
+
+```bash
+npm run pm2:logs
+npm run pm2:restart
+npm run pm2:stop
+npm run pm2:delete
+```
+
+Logs are written under `logs/`. `ecosystem.config.cjs` loads `properties.env` and sets `MINI_TM_BACKEND_URL` for the Next.js API proxy.
 
 **Option A — Backend + frontend together (recommended for dev):**
 

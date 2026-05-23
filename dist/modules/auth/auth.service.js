@@ -30,6 +30,7 @@ const password_reset_token_entity_1 = require("./entities/password-reset-token.e
 const otp_code_entity_1 = require("./entities/otp-code.entity");
 const sms_service_1 = require("./services/sms.service");
 const uuid_util_1 = require("../../common/utils/uuid.util");
+const frontend_url_util_1 = require("../../common/utils/frontend-url.util");
 const organizations_service_1 = require("../organizations/organizations.service");
 let AuthService = AuthService_1 = class AuthService {
     constructor(usersService, jwtService, emailService, invitationsService, organizationsService, verificationTokenRepo, passwordResetTokenRepo, otpCodeRepo, smsService, dataSource) {
@@ -123,8 +124,7 @@ let AuthService = AuthService_1 = class AuthService {
                     token,
                     expiresAt,
                 });
-                const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
-                const verifyUrl = `${frontendUrl}/verify-email?token=${token}`;
+                const verifyUrl = `${(0, frontend_url_util_1.resolveFrontendPublicUrl)()}/verify-email?token=${token}`;
                 try {
                     await this.emailService.sendVerificationEmail({
                         to: email,
@@ -149,7 +149,7 @@ let AuthService = AuthService_1 = class AuthService {
                 email,
                 fullName: dto.fullName.trim(),
                 passwordHash: dto.password,
-                isEmailVerified: true,
+                isEmailVerified: false,
             });
             await queryRunner.commitTransaction();
             this.logger.log(`User created: ${email} (id: ${userId})`);
@@ -169,9 +169,33 @@ let AuthService = AuthService_1 = class AuthService {
         }
         catch {
         }
+        const token = crypto.randomBytes(32).toString('hex');
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + 24);
+        await this.verificationTokenRepo.save({
+            id: (0, uuid_util_1.generateUuid)(),
+            userId,
+            token,
+            expiresAt,
+        });
+        const verifyUrl = `${(0, frontend_url_util_1.resolveFrontendPublicUrl)()}/verify-email?token=${token}`;
+        try {
+            await this.emailService.sendVerificationEmail({
+                to: email,
+                fullName: dto.fullName.trim(),
+                verifyUrl,
+            });
+        }
+        catch (emailErr) {
+            this.logger.error(`Failed to send signup verification email to ${email}: ${emailErr}`);
+            return {
+                message: 'Account created, but we could not send the verification email. Check SMTP settings in properties.env, or use "Resend verification" on the sign-in page.',
+                emailVerified: false,
+            };
+        }
         return {
-            message: 'Account created. You can sign in now.',
-            emailVerified: true,
+            message: 'Verification email sent. Please check your inbox (and spam folder).',
+            emailVerified: false,
         };
     }
     async verifyEmail(token) {
@@ -207,8 +231,7 @@ let AuthService = AuthService_1 = class AuthService {
             token,
             expiresAt,
         });
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
-        const verifyUrl = `${frontendUrl}/verify-email?token=${token}`;
+        const verifyUrl = `${(0, frontend_url_util_1.resolveFrontendPublicUrl)()}/verify-email?token=${token}`;
         await this.emailService.sendVerificationEmail({
             to: user.email,
             fullName: user.fullName,
@@ -230,8 +253,7 @@ let AuthService = AuthService_1 = class AuthService {
             token,
             expiresAt,
         });
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
-        const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
+        const resetUrl = `${(0, frontend_url_util_1.resolveFrontendPublicUrl)()}/reset-password?token=${token}`;
         await this.emailService.sendPasswordResetEmail({
             to: user.email,
             fullName: user.fullName,

@@ -14,6 +14,7 @@ import { OrganizationMembersRepository } from '../organizations/repositories/org
 import { UserEntity } from '../users/entities/user.entity';
 import { OrganizationInvitationEntity } from './entities/organization-invitation.entity';
 import { generateUuid } from '../../common/utils/uuid.util';
+import { resolveFrontendPublicUrl } from '../../common/utils/frontend-url.util';
 
 const INVITE_EXPIRY_DAYS = 7;
 
@@ -75,8 +76,7 @@ export class InvitationsService {
     const org = await this.orgsService.findById(organizationId);
     const inviter = await this.usersService.findById(invitedByUserId);
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
-    const acceptUrl = `${frontendUrl}/invite/${token}`;
+    const acceptUrl = `${resolveFrontendPublicUrl()}/invite/${token}`;
 
     await this.emailService.sendInvitation({
       to: normalizedEmail,
@@ -248,8 +248,7 @@ export class InvitationsService {
     const org = await this.orgsService.findById(organizationId);
     const inviter = await this.usersService.findById(invitation.invitedBy);
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
-    const acceptUrl = `${frontendUrl}/invite/${newToken}`;
+    const acceptUrl = `${resolveFrontendPublicUrl()}/invite/${newToken}`;
 
     await this.emailService.sendInvitation({
       to: invitation.email,

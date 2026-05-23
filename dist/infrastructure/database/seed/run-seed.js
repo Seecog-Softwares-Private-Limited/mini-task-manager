@@ -69,10 +69,13 @@ async function runSeed() {
         let owner = await userRepo.findOne({ where: { email: OWNER_EMAIL } });
         let member = await userRepo.findOne({ where: { email: MEMBER_EMAIL } });
         let admin = await userRepo.findOne({ where: { email: ADMIN_EMAIL } });
+        let ownerUserId;
+        let memberUserId;
+        let adminUserId;
         if (!owner) {
-            const ownerId = (0, uuid_util_1.generateUuid)();
+            ownerUserId = (0, uuid_util_1.generateUuid)();
             owner = await userRepo.save(userRepo.create({
-                id: ownerId,
+                id: ownerUserId,
                 email: OWNER_EMAIL,
                 fullName: 'Seed Owner',
                 passwordHash: PASSWORD,
@@ -80,12 +83,13 @@ async function runSeed() {
             }));
         }
         else {
+            ownerUserId = owner.id;
             await userRepo.update(owner.id, { passwordHash: PASSWORD, isEmailVerified: true });
         }
         if (!member) {
-            const memberId = (0, uuid_util_1.generateUuid)();
+            memberUserId = (0, uuid_util_1.generateUuid)();
             member = await userRepo.save(userRepo.create({
-                id: memberId,
+                id: memberUserId,
                 email: MEMBER_EMAIL,
                 fullName: 'Seed Member',
                 passwordHash: PASSWORD,
@@ -93,12 +97,13 @@ async function runSeed() {
             }));
         }
         else {
+            memberUserId = member.id;
             await userRepo.update(member.id, { passwordHash: PASSWORD, isEmailVerified: true });
         }
         if (!admin) {
-            const adminId = (0, uuid_util_1.generateUuid)();
+            adminUserId = (0, uuid_util_1.generateUuid)();
             admin = await userRepo.save(userRepo.create({
-                id: adminId,
+                id: adminUserId,
                 email: ADMIN_EMAIL,
                 fullName: 'Seed Admin',
                 passwordHash: PASSWORD,
@@ -106,11 +111,12 @@ async function runSeed() {
             }));
         }
         else {
+            adminUserId = admin.id;
             await userRepo.update(admin.id, { passwordHash: PASSWORD, isEmailVerified: true });
         }
-        const ownerId = owner.id;
-        const memberId = member.id;
-        const adminId = admin.id;
+        const ownerId = ownerUserId;
+        const memberId = memberUserId;
+        const adminId = adminUserId;
         console.log('  Users ready (owner@example.com, member@example.com, admin@example.com)');
         const orgId = (0, uuid_util_1.generateUuid)();
         const slug = 'seed-org-' + Date.now();
@@ -158,7 +164,7 @@ async function runSeed() {
                 currency: 'INR',
                 billingCycle: 'monthly',
                 maxProjects: 1,
-                maxUsers: 3,
+                maxUsers: 5,
                 storageLimitGb: 5,
                 automationLimit: 0,
                 integrationLimit: 0,

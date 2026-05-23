@@ -18,6 +18,7 @@ const organizations_service_1 = require("../organizations/organizations.service"
 const users_service_1 = require("../users/users.service");
 const organization_members_repository_1 = require("../organizations/repositories/organization-members.repository");
 const uuid_util_1 = require("../../common/utils/uuid.util");
+const frontend_url_util_1 = require("../../common/utils/frontend-url.util");
 const INVITE_EXPIRY_DAYS = 7;
 function generateToken() {
     return (0, crypto_1.randomBytes)(32).toString('hex');
@@ -58,8 +59,7 @@ let InvitationsService = class InvitationsService {
         });
         const org = await this.orgsService.findById(organizationId);
         const inviter = await this.usersService.findById(invitedByUserId);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
-        const acceptUrl = `${frontendUrl}/invite/${token}`;
+        const acceptUrl = `${(0, frontend_url_util_1.resolveFrontendPublicUrl)()}/invite/${token}`;
         await this.emailService.sendInvitation({
             to: normalizedEmail,
             organizationName: org?.name ?? 'Unknown Organization',
@@ -194,8 +194,7 @@ let InvitationsService = class InvitationsService {
         await this.invitationsRepo.updateTokenAndExpiry(invitationId, newToken, expiresAt());
         const org = await this.orgsService.findById(organizationId);
         const inviter = await this.usersService.findById(invitation.invitedBy);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
-        const acceptUrl = `${frontendUrl}/invite/${newToken}`;
+        const acceptUrl = `${(0, frontend_url_util_1.resolveFrontendPublicUrl)()}/invite/${newToken}`;
         await this.emailService.sendInvitation({
             to: invitation.email,
             organizationName: org?.name ?? 'Unknown Organization',

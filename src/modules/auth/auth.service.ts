@@ -22,6 +22,7 @@ import { PasswordResetTokenEntity } from './entities/password-reset-token.entity
 import { OtpCodeEntity } from './entities/otp-code.entity';
 import { SmsService } from './services/sms.service';
 import { generateUuid } from '../../common/utils/uuid.util';
+import { resolveFrontendPublicUrl } from '../../common/utils/frontend-url.util';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
@@ -150,8 +151,7 @@ export class AuthService {
           expiresAt,
         } as Partial<EmailVerificationTokenEntity>);
 
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
-        const verifyUrl = `${frontendUrl}/verify-email?token=${token}`;
+        const verifyUrl = `${resolveFrontendPublicUrl()}/verify-email?token=${token}`;
 
         try {
           await this.emailService.sendVerificationEmail({
@@ -180,8 +180,9 @@ export class AuthService {
         email,
         fullName: dto.fullName.trim(),
         passwordHash: dto.password,
-        // Default: skip email verification gate so new users can sign in immediately (dev / simplified onboarding)
-        isEmailVerified: true,
+        // Verification email is sent after commit; login still works when REQUIRE_EMAIL_VERIFIED_FOR_LOGIN is not set
+        // (login auto-verifies), but users receive the inbox link they expect from the signup UI.
+        isEmailVerified: false,
       } as Partial<UserEntity>);
       await queryRunner.commitTransaction();
       this.logger.log(`User created: ${email} (id: ${userId})`);
@@ -202,9 +203,36 @@ export class AuthService {
       // Org creation may fail (e.g. slug collision); user already exists
     }
 
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 24);
+
+    await this.verificationTokenRepo.save({
+      id: generateUuid(),
+      userId,
+      token,
+      expiresAt,
+    } as Partial<EmailVerificationTokenEntity>);
+
+    const verifyUrl = `${resolveFrontendPublicUrl()}/verify-email?token=${token}`;
+    try {
+      await this.emailService.sendVerificationEmail({
+        to: email,
+        fullName: dto.fullName.trim(),
+        verifyUrl,
+      });
+    } catch (emailErr) {
+      this.logger.error(`Failed to send signup verification email to ${email}: ${emailErr}`);
+      return {
+        message:
+          'Account created, but we could not send the verification email. Check SMTP settings in properties.env, or use "Resend verification" on the sign-in page.',
+        emailVerified: false,
+      };
+    }
+
     return {
-      message: 'Account created. You can sign in now.',
-      emailVerified: true,
+      message: 'Verification email sent. Please check your inbox (and spam folder).',
+      emailVerified: false,
     };
   }
 
@@ -248,8 +276,7 @@ export class AuthService {
       expiresAt,
     } as Partial<EmailVerificationTokenEntity>);
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
-    const verifyUrl = `${frontendUrl}/verify-email?token=${token}`;
+    const verifyUrl = `${resolveFrontendPublicUrl()}/verify-email?token=${token}`;
 
     await this.emailService.sendVerificationEmail({
       to: user.email,
@@ -277,8 +304,7 @@ export class AuthService {
       expiresAt,
     } as Partial<PasswordResetTokenEntity>);
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
-    const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
+    const resetUrl = `${resolveFrontendPublicUrl()}/reset-password?token=${token}`;
 
     await this.emailService.sendPasswordResetEmail({
       to: user.email,
