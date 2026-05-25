@@ -3,7 +3,7 @@ name: Build & Deploy mini-frontend
 on:
   push:
     branches:
-      - main
+      - lakshya
 
 jobs:
   deploy:
