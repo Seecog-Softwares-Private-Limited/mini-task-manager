@@ -86,10 +86,13 @@ export class AnalyticsService {
 
     const funnelCounts: Record<string, number> = {
       signup: totalMembers,
-      first_project_created: projectCreators.length,
+      first_project_created : totalProjects > 0 ? totalProjects : projectCreators.length,
       invited_member: invitationsCount,
-      first_task_created: taskCreators.length,
-      workspace_completed: workspaceCompleted,
+      first_task_created: totalTasks > 0 ? totalTasks : taskCreators.length,
+      workspace_completed:
+        totalProjects > 0 && totalTasks > 0
+          ? totalMembers
+          : workspaceCompleted,
     };
 
     return {

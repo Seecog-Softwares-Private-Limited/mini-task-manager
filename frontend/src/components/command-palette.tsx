@@ -90,6 +90,7 @@ export function CommandPalette() {
                 <CommandItem
                   key={item.href}
                   value={item.label}
+                  className="flex items-center gap-2 px-4 py-2 cursor-pointer"
                   onSelect={() => {
                     router.push(item.href);
                     setOpen(false);
@@ -107,12 +108,13 @@ export function CommandPalette() {
                 <CommandItem
                   key={p.id}
                   value={p.name}
+                  className="flex items-center gap-2 px-4 py-2 cursor-pointer"
                   onSelect={() => {
                     router.push(`/dashboard/projects/${p.id}`);
                     setOpen(false);
                   }}
                 >
-                  <FolderKanban className="mr-2 h-4 w-4" aria-hidden />
+                  <FolderKanban className="h-4 w-4 shrink-0" aria-hidden />
                   {p.name}
                 </CommandItem>
               ))}

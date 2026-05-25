@@ -45,6 +45,10 @@ let ProjectsService = class ProjectsService {
         return this.projectsRepository.countByOrganization(organizationId);
     }
     async create(organizationId, createdBy, dto) {
+        const existingProject = await this.projectsRepository.findByName(dto.name, organizationId);
+        if (existingProject) {
+            throw new common_1.ConflictException('Project name already exists');
+        }
         const iconTrimmed = dto.iconUrl?.trim();
         const project = await this.projectsRepository.create({
             organizationId,

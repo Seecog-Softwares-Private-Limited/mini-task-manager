@@ -51,12 +51,8 @@ let AuthService = AuthService_1 = class AuthService {
         if (!user || !(await this.usersService.validatePassword(user.id, dto.password))) {
             throw new common_1.UnauthorizedException('Invalid credentials');
         }
-        const strictEmailVerification = String(process.env.REQUIRE_EMAIL_VERIFIED_FOR_LOGIN ?? '').toLowerCase() === 'true';
         if (!user.isEmailVerified) {
-            if (strictEmailVerification) {
-                throw new common_1.UnauthorizedException('Please verify your email first. Check your inbox for the verification link.');
-            }
-            await this.usersService.updateEmailVerified(user.id, true);
+            throw new common_1.UnauthorizedException('Please verify your email first. Check your inbox for the verification link.');
         }
         const payload = { sub: user.id, email: user.email };
         const accessToken = this.jwtService.sign(payload);
@@ -149,7 +145,7 @@ let AuthService = AuthService_1 = class AuthService {
                 email,
                 fullName: dto.fullName.trim(),
                 passwordHash: dto.password,
-                isEmailVerified: true,
+                isEmailVerified: false,
             });
             await queryRunner.commitTransaction();
             this.logger.log(`User created: ${email} (id: ${userId})`);
@@ -169,9 +165,31 @@ let AuthService = AuthService_1 = class AuthService {
         }
         catch {
         }
+        const token = crypto.randomBytes(32).toString('hex');
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + 24);
+        await this.verificationTokenRepo.save({
+            id: (0, uuid_util_1.generateUuid)(),
+            userId,
+            token,
+            expiresAt,
+        });
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+        const verifyUrl = `${frontendUrl}/verify-email?token=${token}`;
+        try {
+            await this.emailService.sendVerificationEmail({
+                to: email,
+                fullName: dto.fullName,
+                verifyUrl,
+            });
+            this.logger.log(`Verification email sent to ${email}`);
+        }
+        catch (emailErr) {
+            this.logger.error(`Failed to send verification email to ${email}: ${emailErr}`);
+        }
         return {
-            message: 'Account created. You can sign in now.',
-            emailVerified: true,
+            message: 'Account created. Please verify your email before signing in.',
+            emailVerified: false,
         };
     }
     async verifyEmail(token) {

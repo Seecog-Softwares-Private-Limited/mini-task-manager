@@ -67,10 +67,12 @@ let AnalyticsService = class AnalyticsService {
         const planDistribution = [{ plan: planSlug.charAt(0).toUpperCase() + planSlug.slice(1), count: 1, color: PLAN_COLORS[planSlug] ?? 'bg-muted' }];
         const funnelCounts = {
             signup: totalMembers,
-            first_project_created: projectCreators.length,
+            first_project_created: totalProjects > 0 ? totalProjects : projectCreators.length,
             invited_member: invitationsCount,
-            first_task_created: taskCreators.length,
-            workspace_completed: workspaceCompleted,
+            first_task_created: totalTasks > 0 ? totalTasks : taskCreators.length,
+            workspace_completed: totalProjects > 0 && totalTasks > 0
+                ? totalMembers
+                : workspaceCompleted,
         };
         return {
             totalMembers,

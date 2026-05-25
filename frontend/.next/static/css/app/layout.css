@@ -1664,9 +1664,6 @@ video {
 .max-w-xs {
   max-width: 20rem;
 }
-.max-w-3xl {
-  max-width: 48rem;
-}
 .flex-1 {
   flex: 1 1 0%;
 }
@@ -3425,9 +3422,6 @@ video {
 .p-\[3px\] {
   padding: 3px;
 }
-.p-10 {
-  padding: 2.5rem;
-}
 .px-0 {
   padding-left: 0px;
   padding-right: 0px;
@@ -3640,9 +3634,6 @@ video {
 }
 .pt-7 {
   padding-top: 1.75rem;
-}
-.pt-10 {
-  padding-top: 2.5rem;
 }
 .text-left {
   text-align: left;

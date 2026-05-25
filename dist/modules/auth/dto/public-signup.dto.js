@@ -27,6 +27,9 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.MinLength)(8, {
+        message: 'Password must be at least 8 characters long',
+    }),
     __metadata("design:type", String)
 ], PublicSignupDto.prototype, "password", void 0);
 //# sourceMappingURL=public-signup.dto.js.map

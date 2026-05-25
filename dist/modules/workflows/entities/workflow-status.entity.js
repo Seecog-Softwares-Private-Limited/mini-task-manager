@@ -21,7 +21,11 @@ __decorate([
     __metadata("design:type", String)
 ], WorkflowStatusEntity.prototype, "id", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'workflow_id', type: 'binary', length: 16, transformer: base_entity_1.uuidBinaryTransformer }),
+    (0, typeorm_1.Column)({
+        name: 'workflow_id',
+        type: 'char',
+        length: 36,
+    }),
     __metadata("design:type", String)
 ], WorkflowStatusEntity.prototype, "workflowId", void 0);
 __decorate([
