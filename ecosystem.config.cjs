@@ -1,13 +1,14 @@
 /**
- * PM2 production config for mini-task-manager.
+ * PM2 config for mini-task-manager.
  *
  * Prereqs:
- *   npm run build              (Nest → dist/)
- *   cd frontend && npm run build && cd ..
+ *   npm run build:all
  *
- * Start:  pm2 start ecosystem.config.cjs
- * Stop:   pm2 stop ecosystem.config.cjs
- * Logs:   pm2 logs
+ * Start:  npm run pm2:start
+ * Stop:   npm run pm2:stop
+ *
+ * Production: set JWT_SECRET in properties.env to a non-default value, then:
+ *   pm2 start ecosystem.config.cjs --env production
  */
 const path = require('path');
 const fs = require('fs');
@@ -22,10 +23,25 @@ if (fs.existsSync(envPath)) {
 const apiPort = process.env.PORT || '3000';
 const frontendPort = process.env.FRONTEND_PORT || '3001';
 const backendUrl = `http://127.0.0.1:${apiPort}`;
+const defaultJwt = 'change-me-in-production';
+const jwtSecret = process.env.JWT_SECRET || defaultJwt;
+const jwtOkForProduction = jwtSecret && jwtSecret !== defaultJwt;
 
-const sharedEnv = {
+/** Base env from properties.env (DB, SMTP, ports, etc.) */
+const baseEnv = { ...process.env };
+
+const localEnv = {
+  ...baseEnv,
+  NODE_ENV: 'development',
+  PORT: apiPort,
+  MINI_TM_BACKEND_URL: backendUrl,
+};
+
+const productionEnv = {
+  ...baseEnv,
   NODE_ENV: 'production',
-  ...process.env,
+  PORT: apiPort,
+  MINI_TM_BACKEND_URL: backendUrl,
 };
 
 module.exports = {
@@ -39,9 +55,8 @@ module.exports = {
       autorestart: true,
       watch: false,
       max_memory_restart: '512M',
-      env: {
-        ...sharedEnv,
-      },
+      env: localEnv,
+      env_production: productionEnv,
       error_file: path.join(ROOT, 'logs', 'api-error.log'),
       out_file: path.join(ROOT, 'logs', 'api-out.log'),
       merge_logs: true,
@@ -50,18 +65,21 @@ module.exports = {
     {
       name: 'mini-task-manager-web',
       cwd: path.join(ROOT, 'frontend'),
-      script: 'npm',
-      args: ['run', 'start'],
-      interpreter: 'none',
+      script: path.join(ROOT, 'frontend', 'node_modules', 'next', 'dist', 'bin', 'next'),
+      args: ['start', '-p', String(frontendPort)],
+      interpreter: 'node',
       instances: 1,
       exec_mode: 'fork',
       autorestart: true,
       watch: false,
       max_memory_restart: '768M',
       env: {
-        ...sharedEnv,
+        ...localEnv,
         PORT: frontendPort,
-        MINI_TM_BACKEND_URL: backendUrl,
+      },
+      env_production: {
+        ...productionEnv,
+        PORT: frontendPort,
       },
       error_file: path.join(ROOT, 'logs', 'web-error.log'),
       out_file: path.join(ROOT, 'logs', 'web-out.log'),
@@ -70,3 +88,11 @@ module.exports = {
     },
   ],
 };
+
+if (!jwtOkForProduction) {
+  // eslint-disable-next-line no-console
+  console.warn(
+    '[ecosystem.config.cjs] JWT_SECRET is default; PM2 uses env (development). ' +
+      'For production: set JWT_SECRET in properties.env, then pm2 start ecosystem.config.cjs --env production',
+  );
+}

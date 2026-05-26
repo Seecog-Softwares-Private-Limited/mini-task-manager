@@ -14,3 +14,7 @@ frontend/node_modules/
 
 .next/
 frontend/.next/
+node_modules/
+*.zip
+.next/
+dist/

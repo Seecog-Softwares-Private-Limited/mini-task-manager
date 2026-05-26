@@ -79,6 +79,7 @@ function SignupForm() {
   /** When true, backend skipped email verification — show “sign in” instead of “check email”. */
   const [signupEmailVerified, setSignupEmailVerified] = useState(false);
   const [signupEmail, setSignupEmail] = useState("");
+  const [signupMessage, setSignupMessage] = useState<string | null>(null);
   const [resendMsg, setResendMsg] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
 
@@ -92,6 +93,7 @@ function SignupForm() {
       });
       setSignupEmail(values.email.trim().toLowerCase());
       setSignupEmailVerified(res.emailVerified === true);
+      setSignupMessage(res.message ?? null);
       setSignupSuccess(true);
     } catch (err) {
       if (isRateLimited(err)) {
@@ -184,16 +186,42 @@ function SignupForm() {
         </PremiumAuthCard>
       );
     }
+    const emailSendFailed =
+      signupMessage != null &&
+      /could not send the verification email|check smtp/i.test(signupMessage);
+
     return (
       <PremiumAuthCard
-        title="Check your email"
-        subtitle={`We’ve sent a verification link to ${signupEmail}. Click it to verify, then sign in.`}
+        title={emailSendFailed ? "Account created" : "Check your email"}
+        subtitle={
+          signupMessage ??
+          `We’ve sent a verification link to ${signupEmail}. Click it to verify, then sign in.`
+        }
         icon={
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/20">
-            <Mail className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
+          <div
+            className={`flex h-14 w-14 items-center justify-center rounded-2xl ${
+              emailSendFailed ? "bg-amber-500/20" : "bg-emerald-500/20"
+            }`}
+          >
+            <Mail
+              className={`h-7 w-7 ${
+                emailSendFailed
+                  ? "text-amber-600 dark:text-amber-400"
+                  : "text-emerald-600 dark:text-emerald-400"
+              }`}
+            />
           </div>
         }
       >
+          {emailSendFailed && (
+            <p className="mt-2 text-center text-sm text-muted-foreground">
+              You can still{" "}
+              <Link href="/login" className="font-medium text-primary hover:underline">
+                sign in
+              </Link>{" "}
+              with your password — email verification is optional in local dev.
+            </p>
+          )}
           {resendMsg && (
             <div className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2">
               <p className="text-sm text-emerald-700 dark:text-emerald-400">{resendMsg}</p>
