@@ -20,7 +20,7 @@ const nextConfig = {
   },
   // API proxy: see frontend/src/app/api/v1/[...path]/route.ts
   experimental: {
-    serverComponentsExternalPackages: ['jsdom'],
+    serverComponentsExternalPackages: ['jsdom', 'html-encoding-sniffer', '@exodus/bytes'],
   },
 };
 
