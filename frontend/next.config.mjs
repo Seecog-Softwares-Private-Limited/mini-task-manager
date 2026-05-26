@@ -19,9 +19,6 @@ const nextConfig = {
     NEXT_PUBLIC_API_URL: '',
   },
   // API proxy: see frontend/src/app/api/v1/[...path]/route.ts
-  experimental: {
-    serverComponentsExternalPackages: ['jsdom', 'html-encoding-sniffer', '@exodus/bytes'],
-  },
 };
 
 export default nextConfig;
