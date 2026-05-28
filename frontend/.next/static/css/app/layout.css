@@ -2432,6 +2432,9 @@ video {
 .border-white\/70 {
   border-color: rgb(255 255 255 / 0.7);
 }
+.border-emerald-400\/40 {
+  border-color: rgb(52 211 153 / 0.4);
+}
 .border-l-amber-400\/50 {
   border-left-color: rgb(251 191 36 / 0.5);
 }
@@ -2593,9 +2596,6 @@ video {
 }
 .bg-destructive\/15 {
   background-color: hsl(var(--destructive) / 0.15);
-}
-.bg-destructive\/20 {
-  background-color: hsl(var(--destructive) / 0.2);
 }
 .bg-destructive\/5 {
   background-color: hsl(var(--destructive) / 0.05);
@@ -2916,6 +2916,10 @@ video {
 }
 .bg-white\/90 {
   background-color: rgb(255 255 255 / 0.9);
+}
+.bg-emerald-50 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(236 253 245 / var(--tw-bg-opacity, 1));
 }
 .bg-\[linear-gradient\(rgba\(148\2c 163\2c 184\2c 0\.07\)_1px\2c transparent_1px\)\2c linear-gradient\(90deg\2c rgba\(148\2c 163\2c 184\2c 0\.06\)_1px\2c transparent_1px\)\] {
   background-image: linear-gradient(rgba(148,163,184,0.07) 1px,transparent 1px),linear-gradient(90deg,rgba(148,163,184,0.06) 1px,transparent 1px);
@@ -3816,6 +3820,9 @@ video {
 .tracking-\[0\.2em\] {
   letter-spacing: 0.2em;
 }
+.tracking-\[0\.35em\] {
+  letter-spacing: 0.35em;
+}
 .tracking-\[0\.5em\] {
   letter-spacing: 0.5em;
 }
@@ -3830,6 +3837,9 @@ video {
 }
 .tracking-widest {
   letter-spacing: 0.1em;
+}
+.tracking-\[0\.3em\] {
+  letter-spacing: 0.3em;
 }
 .text-\[hsl\(var\(--success\)\)\] {
   color: hsl(var(--success));
@@ -4102,6 +4112,13 @@ video {
 }
 .text-white\/70 {
   color: rgb(255 255 255 / 0.7);
+}
+.text-emerald-700\/80 {
+  color: rgb(4 120 87 / 0.8);
+}
+.text-emerald-800 {
+  --tw-text-opacity: 1;
+  color: rgb(6 95 70 / var(--tw-text-opacity, 1));
 }
 .underline {
   text-decoration-line: underline;
@@ -6380,6 +6397,9 @@ video {
 .dark\:bg-white\/\[0\.08\]:is(.dark *) {
   background-color: rgb(255 255 255 / 0.08);
 }
+.dark\:bg-emerald-950\/30:is(.dark *) {
+  background-color: rgb(2 44 34 / 0.3);
+}
 .dark\:bg-\[radial-gradient\(circle_at_50\%_45\%\2c hsl\(var\(--primary\)\/0\.12\)_0\%\2c transparent_50\%\)\]:is(.dark *) {
   background-image: radial-gradient(circle at 50% 45%,hsl(var(--primary)/0.12) 0%,transparent 50%);
 }
@@ -6576,6 +6596,9 @@ video {
 .dark\:text-violet-400:is(.dark *) {
   --tw-text-opacity: 1;
   color: rgb(167 139 250 / var(--tw-text-opacity, 1));
+}
+.dark\:text-emerald-400\/80:is(.dark *) {
+  color: rgb(52 211 153 / 0.8);
 }
 .dark\:shadow-\[0_12px_40px_-8px_rgba\(0\2c 0\2c 0\2c 0\.5\)\]:is(.dark *) {
   --tw-shadow: 0 12px 40px -8px rgba(0,0,0,0.5);

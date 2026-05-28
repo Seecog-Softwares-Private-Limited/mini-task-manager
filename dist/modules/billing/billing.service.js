@@ -100,28 +100,57 @@ let BillingService = BillingService_1 = class BillingService {
         const usage = await this.usageService.getOrganizationUsage(organizationId);
         const userCount = Math.max(1, usage.users.current);
         const totalAmount = Math.round(price * userCount * 100);
-        const order = await this.razorpayService.createOrder({
-            amount: totalAmount,
-            currency: plan.currency || 'INR',
-            receipt: `sub_${organizationId.slice(0, 8)}_${Date.now()}`,
-            notes: {
-                organizationId,
-                planId,
-                billingCycle,
-                planName: plan.name,
-                userCount: String(userCount),
-            },
-        });
+        const orgShort = organizationId.replace(/-/g, '').slice(0, 8);
+        const receipt = `sub_${orgShort}_${Date.now()}`.slice(0, 40);
+        let order;
+        try {
+            order = await this.razorpayService.createOrder({
+                amount: totalAmount,
+                currency: plan.currency || 'INR',
+                receipt,
+                notes: {
+                    organizationId,
+                    planId,
+                    billingCycle,
+                    planName: plan.name,
+                    userCount: String(userCount),
+                },
+            });
+        }
+        catch (err) {
+            const parsed = (0, razorpay_service_1.parseRazorpayFailure)(err);
+            const statusFromErr = err && typeof err === 'object' && typeof err.statusCode === 'number'
+                ? err.statusCode
+                : parsed.statusCode;
+            this.logger.warn(`createOrder Razorpay failure: ${parsed.message} (http ${statusFromErr ?? 'n/a'})`);
+            throw new common_1.HttpException({
+                statusCode: common_1.HttpStatus.BAD_GATEWAY,
+                error: 'RazorpayError',
+                message: parsed.message,
+                hint: 'Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in properties.env using Test keys from https://dashboard.razorpay.com/app/keys (fallback keys in repo are often revoked).',
+            }, common_1.HttpStatus.BAD_GATEWAY);
+        }
         const subscription = await this.subscriptionsRepository.findByOrganization(organizationId);
         if (subscription) {
-            await this.paymentsRepository.create({
-                subscriptionId: subscription.id,
-                amount: totalAmount / 100,
-                currency: plan.currency || 'INR',
-                status: 'PENDING',
-                razorpayOrderId: order.id,
-                metadata: { planId, billingCycle, userCount },
-            });
+            try {
+                await this.paymentsRepository.create({
+                    subscriptionId: subscription.id,
+                    amount: Math.round((totalAmount / 100) * 100) / 100,
+                    currency: plan.currency || 'INR',
+                    status: 'PENDING',
+                    razorpayOrderId: order.id,
+                    metadata: { planId, billingCycle, userCount },
+                });
+            }
+            catch (dbErr) {
+                this.logger.error(`Payment row insert failed after Razorpay order ${order.id}; order may be orphaned`, dbErr instanceof Error ? dbErr.stack : String(dbErr));
+                throw new common_1.HttpException({
+                    statusCode: common_1.HttpStatus.INTERNAL_SERVER_ERROR,
+                    error: 'PaymentRecordError',
+                    message: 'Razorpay order was created but saving the pending payment failed.',
+                    orderId: order.id,
+                }, common_1.HttpStatus.INTERNAL_SERVER_ERROR);
+            }
         }
         return {
             orderId: order.id,

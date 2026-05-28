@@ -17,6 +17,7 @@
     "db:ensure-project-icon-url": "npx ts-node -r tsconfig-paths/register src/infrastructure/database/ensure-project-icon-url-column.ts",
     "test": "jest",
     "test:security": "jest --testPathPattern=security-integration",
+    "test:email": "jest test/email.integration-spec.ts",
     "test:throttle": "jest --testPathPattern=throttle-integration --runInBand",
     "seed": "npx ts-node -r tsconfig-paths/register src/infrastructure/database/seed/run-seed.ts",
     "seed:add-admin": "npx ts-node -r tsconfig-paths/register src/infrastructure/database/seed/add-admin.ts",

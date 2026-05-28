@@ -1,32 +1,47 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { verifyEmail } from "@/services/api/auth.api";
 import { parseApiError } from "@/services/api/client";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { CheckCircle2, XCircle } from "lucide-react";
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
-  const token = searchParams.get("token");
-  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
+  const tokenFromUrl = searchParams.get("token");
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">(
+    tokenFromUrl ? "loading" : "idle",
+  );
   const [error, setError] = useState<string | null>(null);
+  const [code, setCode] = useState("");
 
-  useEffect(() => {
-    if (!token) {
+  const runVerification = useCallback(async (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) {
       setStatus("error");
-      setError("Missing verification token.");
+      setError("Enter your 6-digit verification code.");
       return;
     }
-    verifyEmail(token)
-      .then(() => setStatus("success"))
-      .catch((err) => {
-        setStatus("error");
-        setError(parseApiError(err));
-      });
-  }, [token]);
+    setStatus("loading");
+    setError(null);
+    try {
+      await verifyEmail(trimmed);
+      setStatus("success");
+    } catch (err) {
+      setStatus("error");
+      setError(parseApiError(err));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tokenFromUrl) {
+      runVerification(tokenFromUrl);
+    }
+  }, [tokenFromUrl, runVerification]);
 
   if (status === "loading") {
     return (
@@ -66,13 +81,52 @@ function VerifyEmailContent() {
 
   return (
     <div className="relative w-full max-w-md animate-scale-in">
-      <div className="glass-card p-8 sm:p-10 text-center">
-        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-destructive/20">
-          <XCircle className="h-7 w-7 text-destructive" />
+      <div className="glass-card p-8 sm:p-10">
+        <div className="text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/20">
+            <CheckCircle2 className="h-7 w-7 text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight">Verify your email</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Gmail often blocks localhost links. Enter the <strong>6-digit code</strong> from your email instead.
+          </p>
         </div>
-        <h1 className="text-2xl font-bold tracking-tight">Verification failed</h1>
-        <p className="mt-2 text-sm text-muted-foreground">{error ?? "Invalid or expired link."}</p>
-        <Button asChild variant="outline" className="mt-6">
+
+        <form
+          className="mt-6 space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            runVerification(code);
+          }}
+        >
+          <div className="space-y-2">
+            <Label htmlFor="verification-code">Verification code</Label>
+            <Input
+              id="verification-code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              placeholder="123456"
+              maxLength={6}
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              className="text-center text-2xl tracking-[0.35em] font-semibold"
+            />
+          </div>
+          {error ? (
+            <div className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3">
+              <p className="text-sm text-destructive">{error}</p>
+            </div>
+          ) : null}
+          <Button type="submit" className="w-full" disabled={code.length !== 6}>
+            Verify email
+          </Button>
+        </form>
+
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          Open this page directly:{" "}
+          <span className="font-mono text-foreground">/verify-email</span>
+        </p>
+        <Button asChild variant="outline" className="mt-4 w-full">
           <Link href="/login">Back to Sign in</Link>
         </Button>
       </div>

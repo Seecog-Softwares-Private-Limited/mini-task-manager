@@ -39,12 +39,16 @@ export declare class AuthService {
     signup(dto: PublicSignupDto): Promise<{
         message: string;
         emailVerified?: boolean;
+        devVerificationCode?: string;
+        verifyPageUrl?: string;
     }>;
-    verifyEmail(token: string): Promise<{
+    verifyEmail(tokenOrCode: string): Promise<{
         message: string;
     }>;
     resendVerificationEmail(email: string): Promise<{
         message: string;
+        devVerificationCode?: string;
+        verifyPageUrl?: string;
     }>;
     requestPasswordReset(email: string): Promise<{
         message: string;
@@ -62,4 +66,7 @@ export declare class AuthService {
     }>;
     verifyOtp(phone: string, code: string): Promise<LoginResponseDto>;
     signupWithInvite(dto: SignupWithInviteDto): Promise<LoginResponseDto>;
+    private issueAndSendVerificationEmail;
+    private withDevVerificationCode;
+    private generateUniqueVerificationShortCode;
 }

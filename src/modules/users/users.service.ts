@@ -11,7 +11,7 @@ import * as path from 'path';
 import { UsersRepository } from './repositories/users.repository';
 import { UserEntity } from './entities/user.entity';
 import { OrganizationsService } from '../organizations/organizations.service';
-import { verifyPasswordAgainstStored } from './password-storage.util';
+import { verifyPasswordAgainstStored, toStoredPassword } from './password-storage.util';
 import { Configuration } from '../../config/configuration';
 
 const AVATAR_MIME_EXT: Record<string, string> = {
@@ -69,7 +69,7 @@ export class UsersService {
     return this.usersRepository.create({
       email: data.email.toLowerCase(),
       fullName: data.fullName,
-      passwordHash: data.password,
+      passwordHash: toStoredPassword(data.password),
     });
   }
 
@@ -103,9 +103,13 @@ export class UsersService {
     await this.usersRepository.update(userId, { isEmailVerified: verified });
   }
 
-  /** Stores password as plain text in `password_hash` (see password-storage.util). */
+  async updateFullName(userId: string, fullName: string): Promise<void> {
+    await this.usersRepository.update(userId, { fullName });
+  }
+
+  /** Stores password as plain text in `password_hash`. */
   async updatePassword(userId: string, plainPassword: string): Promise<void> {
-    await this.usersRepository.update(userId, { passwordHash: plainPassword });
+    await this.usersRepository.update(userId, { passwordHash: toStoredPassword(plainPassword) });
   }
 
   async linkGoogleId(userId: string, googleId: string): Promise<void> {

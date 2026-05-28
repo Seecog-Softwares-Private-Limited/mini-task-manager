@@ -11,18 +11,50 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var RazorpayService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RazorpayService = void 0;
+exports.parseRazorpayFailure = parseRazorpayFailure;
 const common_1 = require("@nestjs/common");
 const crypto = require("crypto");
 const Razorpay = require('razorpay');
+function parseRazorpayFailure(err) {
+    if (err == null)
+        return { message: 'Unknown Razorpay error' };
+    if (typeof err === 'string')
+        return { message: err };
+    if (!(typeof err === 'object'))
+        return { message: String(err) };
+    const e = err;
+    const statusCode = typeof e.statusCode === 'number' ? e.statusCode : undefined;
+    if (typeof e.description === 'string' && e.description) {
+        return { message: e.description, statusCode };
+    }
+    const nested = e.error;
+    if (nested && typeof nested === 'object') {
+        const ne = nested;
+        if (typeof ne.description === 'string' && ne.description) {
+            return { message: ne.description, statusCode };
+        }
+        if (typeof ne.code === 'string') {
+            return { message: typeof e.message === 'string' ? `${ne.code}: ${e.message}` : ne.code, statusCode };
+        }
+    }
+    if (typeof e.message === 'string' && e.message) {
+        return { message: e.message, statusCode };
+    }
+    return { message: 'Razorpay request failed', statusCode };
+}
 let RazorpayService = RazorpayService_1 = class RazorpayService {
     constructor() {
         this.logger = new common_1.Logger(RazorpayService_1.name);
-        this.keyId = process.env.RAZORPAY_KEY_ID || 'rzp_test_SKnj58Qr1OY0FK';
-        this.keySecret = process.env.RAZORPAY_KEY_SECRET || 'HldpEAu7h8FFF3OkXCzl4IAO';
+        this.keyId = (process.env.RAZORPAY_KEY_ID || 'rzp_test_SKnj58Qr1OY0FK').trim();
+        this.keySecret = (process.env.RAZORPAY_KEY_SECRET || 'HldpEAu7h8FFF3OkXCzl4IAO').trim();
         this.razorpay = new Razorpay({
             key_id: this.keyId,
             key_secret: this.keySecret,
         });
+        const fromEnv = !!(process.env.RAZORPAY_KEY_ID?.trim() && process.env.RAZORPAY_KEY_SECRET?.trim());
+        if (!fromEnv && process.env.NODE_ENV !== 'production') {
+            this.logger.warn('Razorpay: using fallback test keys from code. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in properties.env (Razorpay Dashboard → API Keys). Revoked keys cause create-order to fail.');
+        }
         this.logger.log('Razorpay initialized with key: ' + this.keyId.slice(0, 12) + '...');
     }
     getKeyId() {
@@ -40,8 +72,12 @@ let RazorpayService = RazorpayService_1 = class RazorpayService {
             return order;
         }
         catch (error) {
-            this.logger.error('Failed to create Razorpay order', error);
-            throw error;
+            const { message, statusCode } = parseRazorpayFailure(error);
+            this.logger.error(`Failed to create Razorpay order: ${message}`, error instanceof Error ? error.stack : String(error));
+            const wrapped = new Error(message);
+            wrapped.statusCode = statusCode;
+            wrapped.cause = error;
+            throw wrapped;
         }
     }
     verifyPaymentSignature(params) {

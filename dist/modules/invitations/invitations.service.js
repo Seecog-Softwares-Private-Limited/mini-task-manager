@@ -8,6 +8,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var InvitationsService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.InvitationsService = void 0;
 const common_1 = require("@nestjs/common");
@@ -18,6 +19,7 @@ const organizations_service_1 = require("../organizations/organizations.service"
 const users_service_1 = require("../users/users.service");
 const organization_members_repository_1 = require("../organizations/repositories/organization-members.repository");
 const uuid_util_1 = require("../../common/utils/uuid.util");
+const frontend_url_util_1 = require("../../common/utils/frontend-url.util");
 const INVITE_EXPIRY_DAYS = 7;
 function generateToken() {
     return (0, crypto_1.randomBytes)(32).toString('hex');
@@ -27,13 +29,14 @@ function expiresAt() {
     d.setDate(d.getDate() + INVITE_EXPIRY_DAYS);
     return d;
 }
-let InvitationsService = class InvitationsService {
+let InvitationsService = InvitationsService_1 = class InvitationsService {
     constructor(invitationsRepo, emailService, orgsService, usersService, orgMembersRepo) {
         this.invitationsRepo = invitationsRepo;
         this.emailService = emailService;
         this.orgsService = orgsService;
         this.usersService = usersService;
         this.orgMembersRepo = orgMembersRepo;
+        this.logger = new common_1.Logger(InvitationsService_1.name);
     }
     async createInvitation(organizationId, email, role, invitedByUserId) {
         const normalizedEmail = email.toLowerCase().trim();
@@ -58,8 +61,8 @@ let InvitationsService = class InvitationsService {
         });
         const org = await this.orgsService.findById(organizationId);
         const inviter = await this.usersService.findById(invitedByUserId);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
-        const acceptUrl = `${frontendUrl}/invite/${token}`;
+        const acceptUrl = `${(0, frontend_url_util_1.getFrontendUrl)()}/invite/${token}`;
+        this.logger.log(`Sending workspace invitation to ${normalizedEmail} for org ${organizationId} (acceptUrl host=${new URL(acceptUrl).host})`);
         await this.emailService.sendInvitation({
             to: normalizedEmail,
             organizationName: org?.name ?? 'Unknown Organization',
@@ -67,6 +70,7 @@ let InvitationsService = class InvitationsService {
             role,
             acceptUrl,
         });
+        this.logger.log(`Workspace invitation email dispatched to ${normalizedEmail} (invitationId=${invitation.id})`);
         return invitation;
     }
     async listByOrganization(organizationId) {
@@ -194,8 +198,8 @@ let InvitationsService = class InvitationsService {
         await this.invitationsRepo.updateTokenAndExpiry(invitationId, newToken, expiresAt());
         const org = await this.orgsService.findById(organizationId);
         const inviter = await this.usersService.findById(invitation.invitedBy);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
-        const acceptUrl = `${frontendUrl}/invite/${newToken}`;
+        const acceptUrl = `${(0, frontend_url_util_1.getFrontendUrl)()}/invite/${newToken}`;
+        this.logger.log(`Resending workspace invitation to ${invitation.email} (invitationId=${invitationId})`);
         await this.emailService.sendInvitation({
             to: invitation.email,
             organizationName: org?.name ?? 'Unknown Organization',
@@ -203,11 +207,12 @@ let InvitationsService = class InvitationsService {
             role: invitation.role,
             acceptUrl,
         });
+        this.logger.log(`Workspace invitation resent to ${invitation.email}`);
         return (await this.invitationsRepo.findById(invitationId));
     }
 };
 exports.InvitationsService = InvitationsService;
-exports.InvitationsService = InvitationsService = __decorate([
+exports.InvitationsService = InvitationsService = InvitationsService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [invitations_repository_1.InvitationsRepository,
         email_service_1.EmailService,
