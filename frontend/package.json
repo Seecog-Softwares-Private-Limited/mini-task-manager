@@ -32,7 +32,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
-    "isomorphic-dompurify": "^2.36.0",
+    "dompurify": "^3.4.5",
     "lucide-react": "^0.454.0",
     "next": "14.2.15",
     "next-themes": "^0.4.6",
@@ -47,6 +47,7 @@
   "devDependencies": {
     "@types/node": "^20.16.11",
     "@types/react": "^18.3.12",
+    "@types/dompurify": "^3.2.0",
     "@types/react-dom": "^18.3.1",
     "autoprefixer": "^10.4.20",
     "cypress": "^15.10.0",
