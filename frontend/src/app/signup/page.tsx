@@ -79,7 +79,7 @@ function SignupForm() {
   /** When true, backend skipped email verification — show “sign in” instead of “check email”. */
   const [signupEmailVerified, setSignupEmailVerified] = useState(false);
   const [signupEmail, setSignupEmail] = useState("");
-  const [signupMessage, setSignupMessage] = useState<string | null>(null);
+  const [devVerificationCode, setDevVerificationCode] = useState<string | null>(null);
   const [resendMsg, setResendMsg] = useState<string | null>(null);
   const [resending, setResending] = useState(false);
 
@@ -93,7 +93,7 @@ function SignupForm() {
       });
       setSignupEmail(values.email.trim().toLowerCase());
       setSignupEmailVerified(res.emailVerified === true);
-      setSignupMessage(res.message ?? null);
+      setDevVerificationCode(res.devVerificationCode ?? null);
       setSignupSuccess(true);
     } catch (err) {
       if (isRateLimited(err)) {
@@ -186,41 +186,32 @@ function SignupForm() {
         </PremiumAuthCard>
       );
     }
-    const emailSendFailed =
-      signupMessage != null &&
-      /could not send the verification email|check smtp/i.test(signupMessage);
-
     return (
       <PremiumAuthCard
-        title={emailSendFailed ? "Account created" : "Check your email"}
+        title="Check your email"
         subtitle={
-          signupMessage ??
-          `We’ve sent a verification link to ${signupEmail}. Click it to verify, then sign in.`
+          devVerificationCode
+            ? `Gmail often blocks localhost verification emails. Use the code below to verify ${signupEmail}.`
+            : `We’ve sent a verification code to ${signupEmail}. Enter the 6-digit code at the link below (Gmail often blocks localhost links).`
         }
         icon={
-          <div
-            className={`flex h-14 w-14 items-center justify-center rounded-2xl ${
-              emailSendFailed ? "bg-amber-500/20" : "bg-emerald-500/20"
-            }`}
-          >
-            <Mail
-              className={`h-7 w-7 ${
-                emailSendFailed
-                  ? "text-amber-600 dark:text-amber-400"
-                  : "text-emerald-600 dark:text-emerald-400"
-              }`}
-            />
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/20">
+            <Mail className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
           </div>
         }
       >
-          {emailSendFailed && (
-            <p className="mt-2 text-center text-sm text-muted-foreground">
-              You can still{" "}
-              <Link href="/login" className="font-medium text-primary hover:underline">
-                sign in
-              </Link>{" "}
-              with your password — email verification is optional in local dev.
-            </p>
+          {devVerificationCode && (
+            <div className="mt-4 rounded-xl border-2 border-emerald-400/40 bg-emerald-50 px-4 py-4 text-center dark:bg-emerald-950/30">
+              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                Your verification code (local dev)
+              </p>
+              <p className="mt-2 font-mono text-3xl font-bold tracking-[0.3em] text-emerald-800 dark:text-emerald-300">
+                {devVerificationCode}
+              </p>
+              <p className="mt-2 text-xs text-emerald-700/80 dark:text-emerald-400/80">
+                Email may not arrive — use this code at Verify email below.
+              </p>
+            </div>
           )}
           {resendMsg && (
             <div className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2">
@@ -229,6 +220,9 @@ function SignupForm() {
           )}
           <div className="mt-6 flex flex-col gap-3">
             <Button asChild className={authPrimaryButtonClass}>
+              <Link href="/verify-email">Enter verification code</Link>
+            </Button>
+            <Button asChild variant="outline">
               <Link href="/login">Go to Sign in</Link>
             </Button>
             <button
@@ -241,6 +235,9 @@ function SignupForm() {
                 try {
                   const res = await resendVerificationEmail(signupEmail);
                   setResendMsg(res.message);
+                  if (res.devVerificationCode) {
+                    setDevVerificationCode(res.devVerificationCode);
+                  }
                 } catch (err) {
                   const msg = parseApiError(err);
                   const isNetwork = /network|connection|refused|fetch/i.test(msg) || (err as { code?: string })?.code === "ERR_NETWORK";

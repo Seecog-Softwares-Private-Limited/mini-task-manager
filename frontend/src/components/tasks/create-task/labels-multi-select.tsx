@@ -12,6 +12,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Plus, Tag, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+/** Above create-task modal overlay (z-[100]). */
+const DROPDOWN_Z = "z-[110]";
 
 export interface TaskLabelDraft {
   name: string;
@@ -48,6 +52,7 @@ export function LabelsMultiSelect({ value, onChange, disabled }: LabelsMultiSele
     if (value.some((l) => l.name.toLowerCase() === label.toLowerCase())) return;
     onChange([...value, { name: label, color }]);
     setName("");
+    setOpen(false);
   }
 
   function removeLabel(labelName: string) {
@@ -85,7 +90,7 @@ export function LabelsMultiSelect({ value, onChange, disabled }: LabelsMultiSele
           </Badge>
         ))}
 
-        <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
           <DropdownMenuTrigger asChild>
             <Button type="button" variant="outline" size="sm" disabled={disabled} className="h-7">
               <Plus className="mr-1 h-3.5 w-3.5" /> Add label
@@ -93,7 +98,7 @@ export function LabelsMultiSelect({ value, onChange, disabled }: LabelsMultiSele
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="start"
-            className="w-72 p-3"
+            className={cn("w-72 p-3", DROPDOWN_Z)}
             sideOffset={8}
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}

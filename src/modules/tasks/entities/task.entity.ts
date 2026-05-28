@@ -45,6 +45,7 @@ export class TaskEntity extends BaseEntity {
     assigneeId?: string;
     dueDate?: string;
     priority?: string;
+    statusId?: string;
   }> | null;
 
   @Column({ name: 'reporter_id', type: 'binary', length: 16, transformer: uuidBinaryTransformer })

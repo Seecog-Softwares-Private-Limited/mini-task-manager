@@ -35,6 +35,10 @@ class CreateTaskSubtaskDto {
   @IsOptional()
   @IsIn(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'])
   priority?: string;
+
+  @IsOptional()
+  @IsUUID('4')
+  statusId?: string;
 }
 
 class CreateTaskTagDto {

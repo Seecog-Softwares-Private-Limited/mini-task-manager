@@ -11,10 +11,26 @@ const configuration = () => {
             throw new Error('JWT_SECRET must be set to a non-default value in production. Refusing to start.');
         }
     }
+    const frontendPort = process.env.FRONTEND_PORT || '3001';
+    const frontendUrlExplicit = process.env.FRONTEND_URL?.trim();
+    const frontendUrl = frontendUrlExplicit
+        ? frontendUrlExplicit.replace(/\/+$/, '')
+        : `http://localhost:${frontendPort}`;
+    const smtpHost = process.env.SMTP_HOST || 'localhost';
+    const smtpPort = parseInt(process.env.SMTP_PORT || '1025', 10);
     return {
         nodeEnv,
         port: parseInt(process.env.PORT ?? '3000', 10),
         apiPrefix: process.env.API_PREFIX || 'api/v1',
+        frontendUrl,
+        smtp: {
+            host: smtpHost,
+            port: smtpPort,
+            user: process.env.SMTP_USER || '',
+            pass: process.env.SMTP_PASS || '',
+            from: process.env.SMTP_FROM || 'noreply@minitaskmanager.local',
+            verifyOnStartup: String(process.env.SMTP_VERIFY_ON_STARTUP ?? 'true').toLowerCase() !== 'false',
+        },
         uploadsPath: process.env.UPLOADS_PATH || (0, path_1.join)(process.cwd(), 'uploads'),
         jwt: {
             secret: jwtSecret,

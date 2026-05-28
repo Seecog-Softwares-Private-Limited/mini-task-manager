@@ -17,7 +17,6 @@ export type ActivationFunnelStep = (typeof ACTIVATION_FUNNEL_STEPS)[number];
 export type AnalyticsEvent =
   | "signup"
   | "project_created"
-  | "project_updated"
   | "task_created"
   | "plan_upgrade_clicked"
   | "upgrade_success"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -164,7 +164,7 @@ export default function TasksPage() {
     bulk.exitSelectionMode();
   }, [selectedProjectId, bulk.exitSelectionMode]);
 
-  const { data: workflows = [] } = useQuery({
+  const { data: workflows = [], isLoading: workflowsLoading, isFetched: workflowsFetched } = useQuery({
     queryKey: ["workflows", selectedProjectId],
     queryFn: () => fetchWorkflowsByProject(selectedProjectId!),
     enabled: !!selectedProjectId && !!orgId,
@@ -363,12 +363,24 @@ export default function TasksPage() {
 
   const createMutation = useMutation({
     mutationFn: (payload: Parameters<typeof createTask>[0]) => createTask(payload),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ["tasks", selectedProjectId] }),
+    onSettled: () => {
+      if (!selectedProjectId) return;
+      queryClient.invalidateQueries({ queryKey: ["tasks", selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ["workflows", selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ["workflow-statuses"] });
+    },
     onSuccess: () => {
       setCreateModalOpen(false);
       toast({ title: "Task created", variant: "success" });
       trackFirstTaskCreated();
       triggerTaskCreatedCelebration();
+    },
+    onError: (err) => {
+      toast({
+        title: "Failed to create task",
+        description: isRateLimited(err) ? "Too many requests. Try again later." : parseApiError(err),
+        variant: "error",
+      });
     },
   });
 
@@ -382,6 +394,8 @@ export default function TasksPage() {
     },
   });
 
+  const autoSetupAttemptedRef = useRef<string | null>(null);
+
   const setupWorkflowMutation = useMutation({
     mutationFn: (projectId: string) => createDefaultWorkflow(projectId),
     onSuccess: () => {
@@ -391,7 +405,35 @@ export default function TasksPage() {
         queryClient.invalidateQueries({ queryKey: ["tasks", selectedProjectId] });
       }
     },
+    onError: (err) => {
+      autoSetupAttemptedRef.current = null;
+      toast({
+        title: "Could not set up task board",
+        description: parseApiError(err),
+        variant: "error",
+      });
+    },
   });
+
+  // Projects created before auto-workflow seeding (or failed setup) need a board before tasks show.
+  useEffect(() => {
+    if (!selectedProjectId || !orgId || workflowsLoading || !workflowsFetched) return;
+    if (workflows.length > 0) {
+      autoSetupAttemptedRef.current = null;
+      return;
+    }
+    if (autoSetupAttemptedRef.current === selectedProjectId) return;
+    if (setupWorkflowMutation.isPending) return;
+    autoSetupAttemptedRef.current = selectedProjectId;
+    setupWorkflowMutation.mutate(selectedProjectId);
+  }, [
+    selectedProjectId,
+    orgId,
+    workflowsLoading,
+    workflowsFetched,
+    workflows.length,
+    setupWorkflowMutation.isPending,
+  ]);
 
   const handleMoveTask = useCallback(
     (taskId: string, _from: string | null, toStatusId: string) => {
@@ -434,7 +476,7 @@ export default function TasksPage() {
       organizationId: orgId,
       title: data.title,
       description: data.description || undefined,
-      statusId: data.statusId || undefined,
+      statusId: data.statusId || statuses[0]?.id || undefined,
       priority: data.priority,
       assigneeIds: data.assigneeIds?.length ? data.assigneeIds : undefined,
       assigneeId: data.assigneeIds?.[0] || undefined,
@@ -451,7 +493,7 @@ export default function TasksPage() {
         }))
         .filter((s) => s.title.length > 0),
     });
-  }, [orgId, selectedProjectId, createMutation]);
+  }, [orgId, selectedProjectId, createMutation, statuses]);
 
   const quickActions = useMemo(() => ({
     onEdit: (task: Task) => setSelectedTaskId(task.id),
@@ -509,7 +551,7 @@ export default function TasksPage() {
 
   if (!selectedProject) return <BoardSkeleton />;
 
-  const isBoardLoading = statusesLoading || tasksLoading;
+  const isBoardLoading = workflowsLoading || statusesLoading || tasksLoading || setupWorkflowMutation.isPending;
 
   return (
     <div className="space-y-4 animate-slide-up">
@@ -703,9 +745,13 @@ export default function TasksPage() {
         <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed bg-muted/10 py-16 text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10"><Columns3 className="h-8 w-8 text-primary" /></div>
           <p className="mt-5 text-lg font-semibold">Board not set up yet</p>
-          <p className="mt-1.5 text-sm text-muted-foreground max-w-sm">This project needs a task board before you can add tasks.</p>
+          <p className="mt-1.5 text-sm text-muted-foreground max-w-sm">
+            {setupWorkflowMutation.isPending
+              ? "Setting up your task board…"
+              : "This project needs a task board before tasks can appear on the board."}
+          </p>
           <Button className="mt-6 shadow-lg shadow-primary/20" onClick={() => setupWorkflowMutation.mutate(selectedProject.id)} disabled={setupWorkflowMutation.isPending}>
-            <Columns3 className="h-4 w-4 mr-1.5" /> Setup Task Board
+            {setupWorkflowMutation.isPending ? "Setting up..." : <><Columns3 className="h-4 w-4 mr-1.5" /> Setup Task Board</>}
           </Button>
           {setupWorkflowMutation.error && <p className="mt-3 text-sm text-destructive">{parseApiError(setupWorkflowMutation.error)}</p>}
         </div>
@@ -745,7 +791,7 @@ export default function TasksPage() {
         <CreateSprintModal
           open={createSprintModalOpen}
           onClose={() => setCreateSprintModalOpen(false)}
-          onSubmit={(data) => createSprintMutation.mutate(data)}
+          onSubmit={(data) => createSprintMutation.mutate({ projectId: selectedProjectId, ...data })}
           isSubmitting={createSprintMutation.isPending}
           error={createSprintMutation.error ? parseApiError(createSprintMutation.error) : null}
         />

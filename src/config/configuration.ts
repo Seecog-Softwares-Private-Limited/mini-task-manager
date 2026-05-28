@@ -13,10 +13,29 @@ export const configuration = () => {
     }
   }
 
+  const frontendPort = process.env.FRONTEND_PORT || '3001';
+  const frontendUrlExplicit = process.env.FRONTEND_URL?.trim();
+  const frontendUrl = frontendUrlExplicit
+    ? frontendUrlExplicit.replace(/\/+$/, '')
+    : `http://localhost:${frontendPort}`;
+
+  const smtpHost = process.env.SMTP_HOST || 'localhost';
+  const smtpPort = parseInt(process.env.SMTP_PORT || '1025', 10);
+
   return {
     nodeEnv,
     port: parseInt(process.env.PORT ?? '3000', 10),
     apiPrefix: process.env.API_PREFIX || 'api/v1',
+    frontendUrl,
+    smtp: {
+      host: smtpHost,
+      port: smtpPort,
+      user: process.env.SMTP_USER || '',
+      pass: process.env.SMTP_PASS || '',
+      from: process.env.SMTP_FROM || 'noreply@minitaskmanager.local',
+      /** When true (default), verify SMTP on startup and log failures. */
+      verifyOnStartup: String(process.env.SMTP_VERIFY_ON_STARTUP ?? 'true').toLowerCase() !== 'false',
+    },
     uploadsPath: process.env.UPLOADS_PATH || join(process.cwd(), 'uploads'),
     jwt: {
       secret: jwtSecret,

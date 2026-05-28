@@ -15,6 +15,7 @@ import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { GoogleConfigGuard } from './guards/google-config.guard';
 import { Public } from '../../common/decorators/public.decorator';
+import { getFrontendUrl } from '../../common/utils/frontend-url.util';
 
 @Controller('auth')
 export class AuthController {
@@ -107,7 +108,7 @@ export class AuthController {
   @UseGuards(GoogleConfigGuard, AuthGuard('google'))
   async googleAuthCallback(@Req() req: { user: { id: string; email: string; fullName: string } }, @Res() res: Response) {
     const token = await this.authService.loginWithGoogleUser(req.user);
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+    const frontendUrl = getFrontendUrl();
     res.redirect(`${frontendUrl}/auth/callback?token=${encodeURIComponent(token)}`);
   }
 }

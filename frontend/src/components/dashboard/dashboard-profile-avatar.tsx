@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Camera, ImagePlus, Trash2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { AvatarCropDialog } from "@/components/dashboard/avatar-crop-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { deleteMyAvatar, uploadMyAvatar } from "@/services/api/users.api";
 import { parseApiError } from "@/services/api/client";
@@ -40,9 +41,19 @@ export function DashboardProfileAvatar({
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [open, setOpen] = useState(false);
+  const [cropOpen, setCropOpen] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
   const sz = sizeClasses[size];
 
-  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  useEffect(() => {
+    return () => {
+      if (cropImageSrc?.startsWith("blob:")) {
+        URL.revokeObjectURL(cropImageSrc);
+      }
+    };
+  }, [cropImageSrc]);
+
+  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
@@ -50,12 +61,24 @@ export function DashboardProfileAvatar({
       toast({ title: "Choose an image file", variant: "error" });
       return;
     }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: "Image must be 5 MB or smaller", variant: "error" });
+      return;
+    }
+    setOpen(false);
+    if (cropImageSrc?.startsWith("blob:")) {
+      URL.revokeObjectURL(cropImageSrc);
+    }
+    setCropImageSrc(URL.createObjectURL(file));
+    setCropOpen(true);
+  }
+
+  async function uploadCroppedFile(file: File) {
     if (file.size > 2 * 1024 * 1024) {
-      toast({ title: "Image must be 2 MB or smaller", variant: "error" });
+      toast({ title: "Cropped image must be 2 MB or smaller", variant: "error" });
       return;
     }
     setUploading(true);
-    setOpen(false);
     try {
       const updated = await uploadMyAvatar(file);
       const url = updated.avatarUrl;
@@ -64,14 +87,27 @@ export function DashboardProfileAvatar({
         avatarUrl: url ? `${url.split("?")[0]}?t=${Date.now()}` : undefined,
       });
       toast({ title: "Profile photo updated", variant: "success" });
+      if (cropImageSrc?.startsWith("blob:")) {
+        URL.revokeObjectURL(cropImageSrc);
+      }
+      setCropImageSrc(null);
     } catch (err) {
       toast({
         title: "Upload failed",
         description: parseApiError(err),
         variant: "error",
       });
+      throw err;
     } finally {
       setUploading(false);
+    }
+  }
+
+  function onCropOpenChange(next: boolean) {
+    setCropOpen(next);
+    if (!next && cropImageSrc?.startsWith("blob:")) {
+      URL.revokeObjectURL(cropImageSrc);
+      setCropImageSrc(null);
     }
   }
 
@@ -102,6 +138,13 @@ export function DashboardProfileAvatar({
         className="sr-only"
         aria-hidden
         onChange={onFileChange}
+      />
+      <AvatarCropDialog
+        open={cropOpen}
+        imageSrc={cropImageSrc}
+        onOpenChange={onCropOpenChange}
+        onConfirm={uploadCroppedFile}
+        isUploading={uploading}
       />
       <DropdownMenu open={open} onOpenChange={setOpen}>
         <DropdownMenuTrigger asChild>
@@ -165,7 +208,7 @@ export function DashboardProfileAvatar({
             <span className="flex flex-col gap-0.5">
               <span className="font-medium">Upload profile photo</span>
               <span className="text-xs font-normal text-muted-foreground">
-                JPG, PNG, WebP or GIF · max 2 MB
+                JPG, PNG, WebP or GIF · crop before save
               </span>
             </span>
           </DropdownMenuItem>

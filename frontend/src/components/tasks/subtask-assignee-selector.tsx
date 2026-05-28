@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchProjectMembers } from "@/services/api/members.api";
+import { fetchOrgMembers, fetchProjectMembers } from "@/services/api/members.api";
+import { useTenant } from "@/context/tenant-context";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,8 +15,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Check, Search, UserRoundPlus, UserRoundX } from "lucide-react";
+import { Check, Loader2, Search, UserRoundPlus, UserRoundX } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const DROPDOWN_Z = "z-[110]";
 
 interface SubtaskAssigneeSelectorProps {
   projectId: string;
@@ -30,26 +33,55 @@ export function SubtaskAssigneeSelector({
   onChange,
   disabled,
 }: SubtaskAssigneeSelectorProps) {
+  const { orgId } = useTenant();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
-  const { data: members = [] } = useQuery({
+  const { data: projectMembers = [], isLoading: projectLoading } = useQuery({
     queryKey: ["project-members", projectId],
     queryFn: () => fetchProjectMembers(projectId),
-    enabled: open && !!projectId,
+    enabled: !!projectId,
     staleTime: 60_000,
   });
 
-  const options = useMemo(
-    () =>
-      members.map((m) => ({
+  const { data: orgMembers = [], isLoading: orgLoading } = useQuery({
+    queryKey: ["org-members", orgId ?? ""],
+    queryFn: () => fetchOrgMembers(orgId!),
+    enabled: !!orgId,
+    staleTime: 60_000,
+  });
+
+  const isLoading = projectLoading || orgLoading;
+
+  const options = useMemo(() => {
+    const byUserId = new Map<
+      string,
+      { id: string; name: string; email: string; avatarUrl?: string }
+    >();
+
+    for (const m of projectMembers) {
+      byUserId.set(m.userId, {
         id: m.userId,
         name: m.user?.fullName ?? m.user?.email ?? "User",
         email: m.user?.email ?? "",
         avatarUrl: m.user?.avatarUrl,
-      })),
-    [members]
-  );
+      });
+    }
+
+    if (byUserId.size === 0) {
+      for (const om of orgMembers) {
+        if (om.status?.toLowerCase() !== "active") continue;
+        byUserId.set(om.userId, {
+          id: om.userId,
+          name: om.user?.fullName ?? om.user?.email ?? "User",
+          email: om.user?.email ?? "",
+          avatarUrl: om.user?.avatarUrl,
+        });
+      }
+    }
+
+    return Array.from(byUserId.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [projectMembers, orgMembers]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -60,7 +92,7 @@ export function SubtaskAssigneeSelector({
   const selected = options.find((m) => m.id === value);
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
+    <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
       <DropdownMenuTrigger asChild>
         <Button
           type="button"
@@ -86,7 +118,7 @@ export function SubtaskAssigneeSelector({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="w-72 p-0"
+        className={cn("w-72 p-0", DROPDOWN_Z)}
         sideOffset={8}
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
@@ -120,7 +152,13 @@ export function SubtaskAssigneeSelector({
             Clear assignee
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          {filtered.map((member) => {
+          {isLoading ? (
+            <div className="flex items-center justify-center gap-2 px-2 py-6 text-xs text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading…
+            </div>
+          ) : (
+            filtered.map((member) => {
             const checked = member.id === value;
             return (
               <DropdownMenuItem
@@ -155,9 +193,12 @@ export function SubtaskAssigneeSelector({
                 </div>
               </DropdownMenuItem>
             );
-          })}
-          {filtered.length === 0 && (
-            <div className="px-2 py-3 text-center text-xs text-muted-foreground">No matching members</div>
+          })
+          )}
+          {!isLoading && filtered.length === 0 && (
+            <div className="px-2 py-3 text-center text-xs text-muted-foreground">
+              {options.length === 0 ? "No members available" : "No matching members"}
+            </div>
           )}
         </div>
       </DropdownMenuContent>

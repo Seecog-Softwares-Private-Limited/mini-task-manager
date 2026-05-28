@@ -12,6 +12,7 @@ import { JwtService } from '@nestjs/jwt';
 import { DataSource, Repository } from 'typeorm';
 import * as crypto from 'crypto';
 import { UsersService } from '../users/users.service';
+import { toStoredPassword } from '../users/password-storage.util';
 import { InvitationsService } from '../invitations/invitations.service';
 import { EmailService } from '../invitations/email.service';
 import { UserEntity } from '../users/entities/user.entity';
@@ -22,7 +23,7 @@ import { PasswordResetTokenEntity } from './entities/password-reset-token.entity
 import { OtpCodeEntity } from './entities/otp-code.entity';
 import { SmsService } from './services/sms.service';
 import { generateUuid } from '../../common/utils/uuid.util';
-import { resolveFrontendPublicUrl } from '../../common/utils/frontend-url.util';
+import { getFrontendUrl } from '../../common/utils/frontend-url.util';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
@@ -130,45 +131,42 @@ export class AuthService {
     return { id: userId, email, fullName };
   }
 
-  async signup(dto: PublicSignupDto): Promise<{ message: string; emailVerified?: boolean }> {
+  async signup(
+    dto: PublicSignupDto,
+  ): Promise<{
+    message: string;
+    emailVerified?: boolean;
+    devVerificationCode?: string;
+    verifyPageUrl?: string;
+  }> {
     const email = dto.email.toLowerCase().trim();
+    const skipVerification =
+      String(process.env.SKIP_EMAIL_VERIFICATION ?? '').toLowerCase() === 'true';
     const existingUser = await this.usersService.findByEmail(email);
 
-    // If user exists but hasn't verified email, allow re-sending verification
+    // If user exists but hasn't verified email, allow re-signup (refresh password + verification email)
     if (existingUser) {
       if (!existingUser.isEmailVerified) {
-        // User exists but never verified — resend verification email
-        await this.verificationTokenRepo.delete({ userId: existingUser.id });
-
-        const token = crypto.randomBytes(32).toString('hex');
-        const expiresAt = new Date();
-        expiresAt.setHours(expiresAt.getHours() + 24);
-
-        await this.verificationTokenRepo.save({
-          id: generateUuid(),
-          userId: existingUser.id,
-          token,
-          expiresAt,
-        } as Partial<EmailVerificationTokenEntity>);
-
-        const verifyUrl = `${resolveFrontendPublicUrl()}/verify-email?token=${token}`;
-
-        try {
-          await this.emailService.sendVerificationEmail({
-            to: email,
-            fullName: existingUser.fullName,
-            verifyUrl,
-          });
-        } catch (emailErr) {
-          this.logger.error(`Failed to resend verification email to ${email}: ${emailErr}`);
+        await this.usersService.updatePassword(existingUser.id, dto.password);
+        const fullName = dto.fullName.trim();
+        if (fullName && fullName !== existingUser.fullName) {
+          await this.usersService.updateFullName(existingUser.id, fullName);
         }
-
-        return { message: 'Verification email sent. Please check your inbox.' };
+        const sent = await this.issueAndSendVerificationEmail(
+          existingUser.id,
+          email,
+          fullName || existingUser.fullName,
+        );
+        return this.withDevVerificationCode(
+          { message: 'Verification email sent. Please check your inbox.', emailVerified: false },
+          sent,
+        );
       }
       throw new ConflictException('An account with this email already exists. Please sign in instead.');
     }
 
     const userId = generateUuid();
+    const fullName = dto.fullName.trim();
 
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -178,14 +176,12 @@ export class AuthService {
       await queryRunner.manager.save(UserEntity, {
         id: userId,
         email,
-        fullName: dto.fullName.trim(),
-        passwordHash: dto.password,
-        // Verification email is sent after commit; login still works when REQUIRE_EMAIL_VERIFIED_FOR_LOGIN is not set
-        // (login auto-verifies), but users receive the inbox link they expect from the signup UI.
-        isEmailVerified: false,
+        fullName,
+        passwordHash: toStoredPassword(dto.password),
+        isEmailVerified: skipVerification,
       } as Partial<UserEntity>);
       await queryRunner.commitTransaction();
-      this.logger.log(`User created: ${email} (id: ${userId})`);
+      this.logger.log(`User created: ${email} (id: ${userId}, verified=${skipVerification})`);
     } catch (err) {
       await queryRunner.rollbackTransaction();
       throw err;
@@ -203,46 +199,38 @@ export class AuthService {
       // Org creation may fail (e.g. slug collision); user already exists
     }
 
-    const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24);
-
-    await this.verificationTokenRepo.save({
-      id: generateUuid(),
-      userId,
-      token,
-      expiresAt,
-    } as Partial<EmailVerificationTokenEntity>);
-
-    const verifyUrl = `${resolveFrontendPublicUrl()}/verify-email?token=${token}`;
-    try {
-      await this.emailService.sendVerificationEmail({
-        to: email,
-        fullName: dto.fullName.trim(),
-        verifyUrl,
-      });
-    } catch (emailErr) {
-      this.logger.error(`Failed to send signup verification email to ${email}: ${emailErr}`);
+    if (skipVerification) {
       return {
-        message:
-          'Account created, but we could not send the verification email. Check SMTP settings in properties.env, or use "Resend verification" on the sign-in page.',
-        emailVerified: false,
+        message: 'Account created. You can sign in now.',
+        emailVerified: true,
       };
     }
 
-    return {
-      message: 'Verification email sent. Please check your inbox (and spam folder).',
-      emailVerified: false,
-    };
+    const sent = await this.issueAndSendVerificationEmail(userId, email, fullName);
+
+    return this.withDevVerificationCode(
+      {
+        message: 'Verification email sent. Please check your inbox (and spam folder).',
+        emailVerified: false,
+      },
+      sent,
+    );
   }
 
-  async verifyEmail(token: string): Promise<{ message: string }> {
+  async verifyEmail(tokenOrCode: string): Promise<{ message: string }> {
+    const trimmed = tokenOrCode.trim();
+    const isShortCode = /^\d{6}$/.test(trimmed);
+
     const record = await this.verificationTokenRepo.findOne({
-      where: { token },
+      where: isShortCode ? { shortCode: trimmed } : { token: trimmed },
       relations: ['user'],
     });
     if (!record || !record.user) {
-      throw new BadRequestException('Invalid or expired verification link.');
+      throw new BadRequestException(
+        isShortCode
+          ? 'Invalid or expired verification code.'
+          : 'Invalid or expired verification link.',
+      );
     }
     if (new Date() > record.expiresAt) {
       throw new BadRequestException('Verification link has expired. Please request a new one.');
@@ -254,7 +242,11 @@ export class AuthService {
     return { message: 'Email verified successfully. You can now sign in.' };
   }
 
-  async resendVerificationEmail(email: string): Promise<{ message: string }> {
+  async resendVerificationEmail(email: string): Promise<{
+    message: string;
+    devVerificationCode?: string;
+    verifyPageUrl?: string;
+  }> {
     const user = await this.usersService.findByEmail(email.toLowerCase().trim());
     if (!user) {
       return { message: 'If an account exists with this email, you will receive a verification link.' };
@@ -263,28 +255,12 @@ export class AuthService {
       return { message: 'Email is already verified. You can sign in.' };
     }
 
-    await this.verificationTokenRepo.delete({ userId: user.id });
+    const sent = await this.issueAndSendVerificationEmail(user.id, user.email, user.fullName);
 
-    const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24);
-
-    await this.verificationTokenRepo.save({
-      id: generateUuid(),
-      userId: user.id,
-      token,
-      expiresAt,
-    } as Partial<EmailVerificationTokenEntity>);
-
-    const verifyUrl = `${resolveFrontendPublicUrl()}/verify-email?token=${token}`;
-
-    await this.emailService.sendVerificationEmail({
-      to: user.email,
-      fullName: user.fullName,
-      verifyUrl,
-    });
-
-    return { message: 'Verification email sent. Please check your inbox (and spam folder).' };
+    return this.withDevVerificationCode(
+      { message: 'Verification email sent. Please check your inbox (and spam folder).' },
+      sent,
+    );
   }
 
   async requestPasswordReset(email: string): Promise<{ message: string }> {
@@ -304,7 +280,8 @@ export class AuthService {
       expiresAt,
     } as Partial<PasswordResetTokenEntity>);
 
-    const resetUrl = `${resolveFrontendPublicUrl()}/reset-password?token=${token}`;
+    const frontendUrl = getFrontendUrl();
+    const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
 
     await this.emailService.sendPasswordResetEmail({
       to: user.email,
@@ -447,7 +424,7 @@ export class AuthService {
         id: userId,
         email,
         fullName: dto.fullName,
-        passwordHash: dto.password,
+        passwordHash: toStoredPassword(dto.password),
         isEmailVerified: true,
       } as Partial<UserEntity>);
 
@@ -480,5 +457,67 @@ export class AuthService {
       },
       organizationId: invitation.organizationId,
     };
+  }
+
+  /** Create a fresh verification token and send the signup verification email. */
+  private async issueAndSendVerificationEmail(
+    userId: string,
+    email: string,
+    fullName: string,
+  ): Promise<{ shortCode: string; verifyPageUrl: string }> {
+    await this.verificationTokenRepo.delete({ userId });
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const shortCode = await this.generateUniqueVerificationShortCode();
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 24);
+
+    await this.verificationTokenRepo.save({
+      id: generateUuid(),
+      userId,
+      token,
+      shortCode,
+      expiresAt,
+    } as Partial<EmailVerificationTokenEntity>);
+
+    const verifyPageUrl = `${getFrontendUrl()}/verify-email`;
+    const verifyUrl = `${verifyPageUrl}?token=${encodeURIComponent(token)}`;
+    this.logger.log(`Sending signup verification email to ${email} (verifyUrl host=${new URL(verifyUrl).host})`);
+    if (process.env.NODE_ENV !== 'production') {
+      this.logger.log(`[dev] Verification code for ${email}: ${shortCode} — open ${verifyPageUrl}`);
+      this.logger.log(`[dev] Verification link for ${email}: ${verifyUrl}`);
+    }
+
+    await this.emailService.sendVerificationEmail({
+      to: email,
+      fullName,
+      verifyUrl,
+      verifyPageUrl,
+      shortCode,
+    });
+
+    return { shortCode, verifyPageUrl };
+  }
+
+  /** In local dev, return the code on the API response — Gmail often drops localhost emails silently. */
+  private withDevVerificationCode<T extends { message: string }>(
+    response: T,
+    sent?: { shortCode: string; verifyPageUrl: string },
+  ): T & { devVerificationCode?: string; verifyPageUrl?: string } {
+    if (process.env.NODE_ENV === 'production' || !sent) return response;
+    return {
+      ...response,
+      devVerificationCode: sent.shortCode,
+      verifyPageUrl: sent.verifyPageUrl,
+    };
+  }
+
+  private async generateUniqueVerificationShortCode(): Promise<string> {
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const code = String(crypto.randomInt(100000, 1000000));
+      const existing = await this.verificationTokenRepo.findOne({ where: { shortCode: code } });
+      if (!existing) return code;
+    }
+    throw new BadRequestException('Could not generate verification code. Please try again.');
   }
 }

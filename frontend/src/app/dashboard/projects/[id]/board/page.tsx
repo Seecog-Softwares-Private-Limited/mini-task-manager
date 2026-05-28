@@ -809,7 +809,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
         <CreateSprintModal
           open={createSprintModalOpen}
           onClose={() => setCreateSprintModalOpen(false)}
-          onSubmit={(data) => createSprintMutation.mutate(data)}
+          onSubmit={(data) => createSprintMutation.mutate({ projectId: id, ...data })}
           isSubmitting={createSprintMutation.isPending}
           error={createSprintMutation.error ? parseApiError(createSprintMutation.error) : null}
         />

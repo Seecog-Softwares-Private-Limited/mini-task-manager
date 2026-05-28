@@ -8,13 +8,14 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GoogleConfigGuard = void 0;
 const common_1 = require("@nestjs/common");
+const frontend_url_util_1 = require("../../../common/utils/frontend-url.util");
 let GoogleConfigGuard = class GoogleConfigGuard {
     canActivate(context) {
         if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
             return true;
         }
         const response = context.switchToHttp().getResponse();
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+        const frontendUrl = (0, frontend_url_util_1.getFrontendUrl)();
         response.redirect(302, `${frontendUrl}/login?error=google_not_configured`);
         return false;
     }

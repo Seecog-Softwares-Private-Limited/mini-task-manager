@@ -26,6 +26,7 @@ const notifications_service_1 = require("../notifications/notifications.service"
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const tenant_guard_1 = require("../auth/guards/tenant.guard");
 const tenant_decorator_1 = require("../../common/decorators/tenant.decorator");
+const frontend_url_util_1 = require("../../common/utils/frontend-url.util");
 const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
 const create_task_dto_1 = require("./dto/create-task.dto");
 const create_task_comment_dto_1 = require("./dto/create-task-comment.dto");
@@ -151,7 +152,7 @@ let TasksController = TasksController_1 = class TasksController {
         ]);
         const assignerName = assigner?.fullName || assigner?.email || 'Someone';
         const projectName = project?.name;
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+        const frontendUrl = (0, frontend_url_util_1.getFrontendUrl)();
         const taskUrl = `${frontendUrl}/dashboard/projects/${projectId}/board?task=${taskId}`;
         for (const assigneeId of assigneeIds) {
             if (assigneeId === assignerUserId)

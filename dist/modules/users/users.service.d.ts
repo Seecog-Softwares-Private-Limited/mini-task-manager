@@ -36,6 +36,7 @@ export declare class UsersService {
     }>;
     markOnboardingComplete(userId: string): Promise<void>;
     updateEmailVerified(userId: string, verified: boolean): Promise<void>;
+    updateFullName(userId: string, fullName: string): Promise<void>;
     updatePassword(userId: string, plainPassword: string): Promise<void>;
     linkGoogleId(userId: string, googleId: string): Promise<void>;
     private avatarPublicPath;

@@ -13,6 +13,7 @@ const auth_module_1 = require("../auth/auth.module");
 const billing_module_1 = require("../billing/billing.module");
 const organizations_module_1 = require("../organizations/organizations.module");
 const projects_module_1 = require("../projects/projects.module");
+const workflows_module_1 = require("../workflows/workflows.module");
 const invitations_module_1 = require("../invitations/invitations.module");
 const users_module_1 = require("../users/users.module");
 const notifications_module_1 = require("../notifications/notifications.module");
@@ -36,6 +37,7 @@ exports.TasksModule = TasksModule = __decorate([
             billing_module_1.BillingModule,
             organizations_module_1.OrganizationsModule,
             (0, common_1.forwardRef)(() => projects_module_1.ProjectsModule),
+            (0, common_1.forwardRef)(() => workflows_module_1.WorkflowsModule),
             invitations_module_1.InvitationsModule,
             users_module_1.UsersModule,
             notifications_module_1.NotificationsModule,

@@ -1,5 +1,6 @@
 import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { Response } from 'express';
+import { getFrontendUrl } from '../../../common/utils/frontend-url.util';
 
 @Injectable()
 export class GoogleConfigGuard implements CanActivate {
@@ -8,7 +9,7 @@ export class GoogleConfigGuard implements CanActivate {
       return true;
     }
     const response = context.switchToHttp().getResponse<Response>();
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+    const frontendUrl = getFrontendUrl();
     response.redirect(302, `${frontendUrl}/login?error=google_not_configured`);
     return false;
   }

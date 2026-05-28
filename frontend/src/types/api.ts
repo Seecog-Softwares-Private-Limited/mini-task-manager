@@ -96,6 +96,7 @@ export interface TaskSubtask {
   assigneeId?: string;
   dueDate?: string;
   priority?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  statusId?: string;
 }
 
 export interface Workflow {

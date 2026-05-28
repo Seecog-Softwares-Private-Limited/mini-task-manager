@@ -13,6 +13,9 @@ export class EmailVerificationTokenEntity {
   @Column({ type: 'varchar', length: 64 })
   token!: string;
 
+  @Column({ name: 'short_code', type: 'varchar', length: 6, nullable: true })
+  shortCode!: string | null;
+
   @Column({ name: 'expires_at', type: 'timestamp' })
   expiresAt!: Date;
 

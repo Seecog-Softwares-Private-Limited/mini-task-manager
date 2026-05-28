@@ -2,6 +2,15 @@ export declare const configuration: () => {
     nodeEnv: string;
     port: number;
     apiPrefix: string;
+    frontendUrl: string;
+    smtp: {
+        host: string;
+        port: number;
+        user: string;
+        pass: string;
+        from: string;
+        verifyOnStartup: boolean;
+    };
     uploadsPath: string;
     jwt: {
         secret: string;

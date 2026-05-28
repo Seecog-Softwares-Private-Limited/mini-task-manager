@@ -12,7 +12,7 @@ import {
 } from "@/hooks/use-invitations";
 import { useAuth } from "@/hooks/use-auth";
 import { signupWithInvite, logout } from "@/services/api/auth.api";
-import { parseApiError, isRateLimited } from "@/services/api/client";
+import { parseApiError, isRateLimited, clearAuth } from "@/services/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -129,16 +129,28 @@ export default function InviteAcceptPage() {
     router.push(`/login?${params.toString()}`);
   };
 
-  const handleSignOutAndLogin = async () => {
+  const signOutAndRedirect = async (redirectTo: string) => {
     try {
       await logout();
     } catch {
-      // Ignore 401 — token may already be expired; we still clear local state.
+      clearAuth();
     }
-    // Redirect back to this same invite page — once logged out the user
-    // will see the inline signup/login form for the invited email.
-    router.push(`/invite/${token}`);
-    router.refresh();
+    window.dispatchEvent(new CustomEvent("auth:logout"));
+    window.location.assign(redirectTo);
+  };
+
+  const handleSignInAsInvited = () => {
+    if (!token || !validation?.email) return;
+    const params = new URLSearchParams({
+      email: validation.email,
+      from: `/invite/${token}`,
+    });
+    void signOutAndRedirect(`/login?${params.toString()}`);
+  };
+
+  const handleCreateAccountForInvite = () => {
+    if (!token) return;
+    void signOutAndRedirect(`/invite/${token}`);
   };
 
   return (
@@ -204,24 +216,34 @@ export default function InviteAcceptPage() {
               </div>
             </div>
           ) : isAuthenticated && !emailMatches ? (
-            <div className="text-center space-y-4">
+            <div className="text-center space-y-5">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10">
                 <AlertTriangle className="h-7 w-7 text-amber-600 dark:text-amber-400" />
               </div>
-              <h1 className="text-2xl font-bold tracking-tight">Wrong account</h1>
-              <p className="text-muted-foreground">
-                This invitation was sent to <strong>{validation.email}</strong>.
-                You&apos;re signed in as <strong>{user?.email}</strong>. Please sign out
-                and use the invite link with the correct account, or create a new
-                account with the invited email.
-              </p>
-              <Button
-                className="w-full mt-4"
-                variant="outline"
-                onClick={handleSignOutAndLogin}
-              >
-                Sign out and use invite email
-              </Button>
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight">Wrong account</h1>
+                <p className="mt-2 text-muted-foreground text-sm leading-relaxed">
+                  This invitation was sent to{" "}
+                  <strong className="text-foreground">{validation.email}</strong>.
+                  You&apos;re signed in as{" "}
+                  <strong className="text-foreground">{user?.email}</strong>.
+                </p>
+              </div>
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-left text-sm text-muted-foreground">
+                Sign in with the invited email to accept, or create a new account for that address.
+              </div>
+              <div className="flex flex-col gap-2 pt-1">
+                <Button className="w-full h-11" onClick={handleSignInAsInvited}>
+                  Sign in as {validation.email}
+                </Button>
+                <Button
+                  className="w-full h-11"
+                  variant="outline"
+                  onClick={handleCreateAccountForInvite}
+                >
+                  Create account for {validation.email}
+                </Button>
+              </div>
             </div>
           ) : isAuthenticated && emailMatches ? (
             <div className="text-center space-y-6">
