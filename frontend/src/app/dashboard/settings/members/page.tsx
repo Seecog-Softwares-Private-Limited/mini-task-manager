@@ -28,7 +28,7 @@ import {
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { InviteMemberModal } from "@/components/members/invite-member-modal";
 import { InvitationList } from "@/components/members/invitation-list";
-import { useCreateInvitation } from "@/hooks/use-invitations";
+import { useCreateInvitation, useOrgInvitations, useResendInvitation, useCancelInvitation } from "@/hooks/use-invitations";
 import { useToast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -92,6 +92,21 @@ export default function SettingsMembersPage() {
   }, [members, search]);
 
   const { createInvite, isPending: invitePending, error: inviteError } = useCreateInvitation(orgId);
+  const { invitations } = useOrgInvitations(orgId);
+  const { resendAsync, isPending: resendPending } = useResendInvitation(orgId);
+  const { cancelAsync, isPending: cancelInvitePending } = useCancelInvitation(orgId);
+  const [resendingInviteId, setResendingInviteId] = React.useState<string | null>(null);
+  const [deleteInvite, setDeleteInvite] = React.useState<{ id: string; email: string } | null>(null);
+
+  const pendingInviteByEmail = React.useMemo(() => {
+    const map = new Map<string, { id: string; email: string }>();
+    for (const inv of invitations) {
+      if (inv.status === "PENDING" || inv.status === "EXPIRED") {
+        map.set(inv.email.toLowerCase(), { id: inv.id, email: inv.email });
+      }
+    }
+    return map;
+  }, [invitations]);
 
   const updateRoleMutation = useMutation({
     mutationFn: ({
@@ -147,6 +162,8 @@ export default function SettingsMembersPage() {
       });
     },
   });
+
+  const isActiveMember = (m: OrgMember) => m.status?.toLowerCase() === "active";
 
   const isOwner = (m: OrgMember) => org?.ownerId === m.userId;
 
@@ -288,21 +305,50 @@ export default function SettingsMembersPage() {
                         </SelectContent>
                       </Select>
                     )}
-                    <Badge
-                      variant={member.status === "active" ? "success" : "warning"}
-                    >
-                      {member.status === "active" ? "Active" : "Invited"}
+                    <Badge variant={isActiveMember(member) ? "success" : "warning"}>
+                      {isActiveMember(member) ? "Active" : "Invited"}
                     </Badge>
-                    {member.status !== "active" && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs"
-                        aria-label="Resend invite"
-                      >
-                        <Send className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
+                    {(() => {
+                      const email = member.user?.email?.toLowerCase();
+                      const pendingInvite = email ? pendingInviteByEmail.get(email) : undefined;
+                      if (!pendingInvite) return null;
+                      return (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            disabled={resendPending && resendingInviteId === pendingInvite.id}
+                            aria-label={`Resend invitation to ${pendingInvite.email}`}
+                            title="Resend invitation"
+                            onClick={async () => {
+                              setResendingInviteId(pendingInvite.id);
+                              try {
+                                await resendAsync(pendingInvite.id);
+                              } finally {
+                                setResendingInviteId(null);
+                              }
+                            }}
+                          >
+                            {resendPending && resendingInviteId === pendingInvite.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Send className="h-4 w-4" />
+                            )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            aria-label={`Delete invitation to ${pendingInvite.email}`}
+                            title="Delete invitation"
+                            onClick={() => setDeleteInvite(pendingInvite)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
+                      );
+                    })()}
                     {!isOwner(member) && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -392,6 +438,26 @@ export default function SettingsMembersPage() {
         }}
         isSubmitting={invitePending}
         error={inviteError ? parseApiError(inviteError) : null}
+      />
+
+      <ConfirmDialog
+        open={!!deleteInvite}
+        onOpenChange={(open) => !open && setDeleteInvite(null)}
+        title="Delete invitation"
+        description={
+          deleteInvite
+            ? `Remove the invitation to ${deleteInvite.email}? They will no longer be able to join this workspace.`
+            : ""
+        }
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={async () => {
+          if (deleteInvite) {
+            await cancelAsync(deleteInvite.id);
+            setDeleteInvite(null);
+          }
+        }}
+        loading={cancelInvitePending}
       />
 
       <ConfirmDialog

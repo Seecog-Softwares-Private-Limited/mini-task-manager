@@ -13,7 +13,7 @@ export const uuidBinaryTransformer: ValueTransformer = {
   to: (value: string | Buffer | null): Buffer | null => {
     if (value == null) return null;
     if (Buffer.isBuffer(value)) return value;
-    const hex = (value as string).replace(/-/g, '');
+    const hex = String(value).replace(/-/g, '');
     return Buffer.from(hex, 'hex');
   },
   from: (value: Buffer | null): string | null => {

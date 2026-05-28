@@ -44,6 +44,11 @@ __decorate([
     (0, class_validator_1.IsIn)(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
     __metadata("design:type", String)
 ], CreateTaskSubtaskDto.prototype, "priority", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)('4'),
+    __metadata("design:type", String)
+], CreateTaskSubtaskDto.prototype, "statusId", void 0);
 class CreateTaskTagDto {
 }
 __decorate([

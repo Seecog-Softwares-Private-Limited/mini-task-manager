@@ -84,6 +84,9 @@ export class InvitationsService {
     this.logger.log(
       `Sending workspace invitation to ${normalizedEmail} for org ${organizationId} (acceptUrl host=${new URL(acceptUrl).host})`,
     );
+    if (process.env.NODE_ENV !== 'production') {
+      this.logger.log(`[dev] Invitation accept link for ${normalizedEmail}: ${acceptUrl}`);
+    }
 
     await this.emailService.sendInvitation({
       to: normalizedEmail,

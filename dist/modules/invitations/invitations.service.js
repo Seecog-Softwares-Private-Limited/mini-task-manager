@@ -63,6 +63,9 @@ let InvitationsService = InvitationsService_1 = class InvitationsService {
         const inviter = await this.usersService.findById(invitedByUserId);
         const acceptUrl = `${(0, frontend_url_util_1.getFrontendUrl)()}/invite/${token}`;
         this.logger.log(`Sending workspace invitation to ${normalizedEmail} for org ${organizationId} (acceptUrl host=${new URL(acceptUrl).host})`);
+        if (process.env.NODE_ENV !== 'production') {
+            this.logger.log(`[dev] Invitation accept link for ${normalizedEmail}: ${acceptUrl}`);
+        }
         await this.emailService.sendInvitation({
             to: normalizedEmail,
             organizationName: org?.name ?? 'Unknown Organization',

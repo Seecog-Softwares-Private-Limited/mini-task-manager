@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -94,6 +95,11 @@ export function CreateTaskModal({
   defaultStatusId,
 }: CreateTaskModalProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const {
     register,
@@ -134,7 +140,12 @@ export function CreateTaskModal({
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", handler);
+      document.body.style.overflow = prevOverflow;
+    };
   }, [open, onClose]);
 
   useEffect(() => {
@@ -153,7 +164,7 @@ export function CreateTaskModal({
     }
   }, [open, defaultStatusId, statuses, reset]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
   function handleFormSubmit(data: CreateTaskFormData) {
     onSubmit(data);
@@ -161,15 +172,18 @@ export function CreateTaskModal({
 
   const statusColors = ["bg-blue-500", "bg-amber-500", "bg-purple-500", "bg-emerald-500", "bg-red-500"];
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="create-task-title"
       data-cy="create-task-modal"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
-      <div className="w-full max-w-xl rounded-2xl border bg-card shadow-premium-lg animate-scale-in overflow-hidden max-h-[90vh] flex flex-col">
+      <div className="my-auto w-full max-w-xl rounded-2xl border bg-card shadow-premium-lg animate-scale-in overflow-hidden max-h-[min(90vh,calc(100dvh-2rem))] flex flex-col">
         {/* Header */}
         <div className="gradient-bg p-5 text-white shrink-0">
           <div className="flex items-center justify-between">
@@ -392,6 +406,7 @@ export function CreateTaskModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

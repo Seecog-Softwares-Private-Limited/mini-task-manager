@@ -72,6 +72,12 @@ class PatchTaskSubtaskDto {
   @Transform(({ value }) => (typeof value === 'string' ? value.toUpperCase() : value))
   @IsIn(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'])
   priority?: string;
+
+  @IsOptional()
+  @Transform(emptyStrToUndef)
+  @ValidateIf((_o, v) => v != null && v !== '')
+  @IsUUID('4')
+  statusId?: string;
 }
 
 class PatchTaskTagDto {

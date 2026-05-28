@@ -5,6 +5,7 @@ declare class PatchTaskSubtaskDto {
     assigneeId?: string;
     dueDate?: string;
     priority?: string;
+    statusId?: string;
 }
 declare class PatchTaskTagDto {
     name: string;

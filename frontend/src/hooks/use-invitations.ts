@@ -87,7 +87,7 @@ export function useResendInvitation(orgId: string | null) {
     },
   });
 
-  return { resend: mutation.mutate, isPending: mutation.isPending };
+  return { resend: mutation.mutate, resendAsync: mutation.mutateAsync, isPending: mutation.isPending };
 }
 
 export function useCancelInvitation(orgId: string | null) {
@@ -102,6 +102,7 @@ export function useCancelInvitation(orgId: string | null) {
     onSuccess: () => {
       if (orgId) {
         queryClient.invalidateQueries({ queryKey: [INVITATIONS_KEY, orgId] });
+        queryClient.invalidateQueries({ queryKey: ["org-members", orgId] });
       }
       toast({ title: "Invitation cancelled", variant: "default" });
     },
@@ -114,7 +115,11 @@ export function useCancelInvitation(orgId: string | null) {
     },
   });
 
-  return { cancel: mutation.mutate, isPending: mutation.isPending };
+  return {
+    cancel: mutation.mutate,
+    cancelAsync: mutation.mutateAsync,
+    isPending: mutation.isPending,
+  };
 }
 
 export function useValidateInvitation(token: string | undefined) {

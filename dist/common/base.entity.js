@@ -17,7 +17,7 @@ exports.uuidBinaryTransformer = {
             return null;
         if (Buffer.isBuffer(value))
             return value;
-        const hex = value.replace(/-/g, '');
+        const hex = String(value).replace(/-/g, '');
         return Buffer.from(hex, 'hex');
     },
     from: (value) => {

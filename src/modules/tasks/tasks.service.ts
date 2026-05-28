@@ -1,9 +1,10 @@
-import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TasksRepository } from './repositories/tasks.repository';
 import { TaskCommentsRepository } from './repositories/task-comments.repository';
 import { TaskAttachmentsRepository } from './repositories/task-attachments.repository';
 import { ProjectsService } from '../projects/projects.service';
+import { WorkflowsService } from '../workflows/workflows.service';
 import { UsageService } from '../billing/usage.service';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
 import { TaskEntity } from './entities/task.entity';
@@ -40,6 +41,8 @@ export class TasksService {
     private readonly taskCommentsRepository: TaskCommentsRepository,
     private readonly taskAttachmentsRepository: TaskAttachmentsRepository,
     private readonly projectsService: ProjectsService,
+    @Inject(forwardRef(() => WorkflowsService))
+    private readonly workflowsService: WorkflowsService,
     private readonly usageService: UsageService,
     private readonly activityLogsService: ActivityLogsService,
     private readonly configService: ConfigService<Configuration>,
@@ -85,15 +88,19 @@ export class TasksService {
     const normalizedSubtasks = this.normalizeSubtasks(dto.subtasks);
     const tags = this.normalizeTags(dto.tags);
 
-    // Always use statusId: null on create to avoid FK constraint failure.
-    // Projects may lack workflows/statuses; status can be set via PATCH after creation.
+    const statusId = await this.resolveInitialStatusId(
+      projectId,
+      organizationId,
+      dto.statusId,
+    );
+
     const task = await this.tasksRepository.create({
       projectId,
       organizationId,
       reporterId,
       title: dto.title,
       description: dto.description ?? null,
-      statusId: null,
+      statusId,
       priority: dto.priority ?? 'MEDIUM',
       assigneeId: assigneeIds[0] ?? dto.assigneeId ?? null,
       assigneeIds: assigneeIds.length ? assigneeIds : null,
@@ -192,6 +199,7 @@ export class TasksService {
       assigneeId?: string;
       dueDate?: string;
       priority?: string;
+      statusId?: string;
     }>,
   ): Array<{
     id: string;
@@ -200,6 +208,7 @@ export class TasksService {
     assigneeId?: string;
     dueDate?: string;
     priority?: string;
+    statusId?: string;
   }> {
     if (!subtasks?.length) return [];
     return subtasks
@@ -208,8 +217,9 @@ export class TasksService {
         title: s.title?.trim() ?? '',
         completed: Boolean(s.completed),
         assigneeId: s.assigneeId || undefined,
-        dueDate: s.dueDate || undefined,
+        dueDate: s.dueDate ? String(s.dueDate).slice(0, 10) : undefined,
         priority: s.priority ?? 'MEDIUM',
+        statusId: s.statusId || undefined,
       }))
       .filter((s) => s.title.length > 0);
   }
@@ -321,5 +331,30 @@ export class TasksService {
     const fullPath = path.join(uploadsPath, attachment.fileUrl);
     await fs.unlink(fullPath).catch(() => {});
     await this.taskAttachmentsRepository.delete(attachmentId);
+  }
+
+  /** Pick a valid board column for new tasks (requested status, else first To Do). */
+  private async resolveInitialStatusId(
+    projectId: string,
+    organizationId: string,
+    requestedStatusId?: string,
+  ): Promise<string | null> {
+    const workflows = await this.workflowsService.findByProject(projectId, organizationId);
+    const defaultWorkflow = workflows.find((w) => w.isDefault) ?? workflows[0];
+    if (!defaultWorkflow) return null;
+
+    const statuses = await this.workflowsService.getStatuses(defaultWorkflow.id);
+    if (statuses.length === 0) return null;
+
+    if (requestedStatusId) {
+      const match = statuses.find((s) => s.id === requestedStatusId);
+      if (match) return match.id;
+    }
+
+    const todo =
+      statuses.find((s) => s.type === 'TODO') ??
+      statuses.find((s) => s.name.toLowerCase() === 'to do') ??
+      statuses[0];
+    return todo?.id ?? null;
   }
 }

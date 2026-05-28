@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchProjectMembers } from "@/services/api/members.api";
+import { fetchOrgMembers, fetchProjectMembers } from "@/services/api/members.api";
+import { useTenant } from "@/context/tenant-context";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,8 +15,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Check, Search, UserRoundX, Users } from "lucide-react";
+import { Check, Loader2, Search, UserRoundX, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+/** Above create-task modal overlay (z-[100]). */
+const DROPDOWN_Z = "z-[110]";
 
 interface AssigneeSelectorProps {
   projectId: string;
@@ -30,26 +34,55 @@ export function AssigneeSelector({
   onChange,
   disabled,
 }: AssigneeSelectorProps) {
+  const { orgId } = useTenant();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
-  const { data: members = [] } = useQuery({
+  const { data: projectMembers = [], isLoading: projectLoading } = useQuery({
     queryKey: ["project-members", projectId],
     queryFn: () => fetchProjectMembers(projectId),
-    enabled: open && !!projectId,
+    enabled: !!projectId,
     staleTime: 60_000,
   });
 
-  const list = useMemo(
-    () =>
-      members.map((m) => ({
+  const { data: orgMembers = [], isLoading: orgLoading } = useQuery({
+    queryKey: ["org-members", orgId ?? ""],
+    queryFn: () => fetchOrgMembers(orgId!),
+    enabled: !!orgId,
+    staleTime: 60_000,
+  });
+
+  const isLoading = projectLoading || orgLoading;
+
+  const list = useMemo(() => {
+    const byUserId = new Map<
+      string,
+      { id: string; name: string; email: string; avatarUrl?: string }
+    >();
+
+    for (const m of projectMembers) {
+      byUserId.set(m.userId, {
         id: m.userId,
         name: m.user?.fullName ?? m.user?.email ?? "User",
         email: m.user?.email ?? "",
         avatarUrl: m.user?.avatarUrl,
-      })),
-    [members]
-  );
+      });
+    }
+
+    if (byUserId.size === 0) {
+      for (const om of orgMembers) {
+        if (om.status?.toLowerCase() !== "active") continue;
+        byUserId.set(om.userId, {
+          id: om.userId,
+          name: om.user?.fullName ?? om.user?.email ?? "User",
+          email: om.user?.email ?? "",
+          avatarUrl: om.user?.avatarUrl,
+        });
+      }
+    }
+
+    return Array.from(byUserId.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [projectMembers, orgMembers]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -71,12 +104,12 @@ export function AssigneeSelector({
   }
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
+    <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
       <DropdownMenuTrigger asChild>
         <Button
           type="button"
           variant="outline"
-          disabled={disabled}
+          disabled={disabled || !projectId}
           className="h-10 w-full justify-start gap-2"
         >
           {selected.length > 0 ? (
@@ -91,9 +124,7 @@ export function AssigneeSelector({
                   </Avatar>
                 ))}
               </div>
-              <span className="truncate text-sm">
-                {selected.length} assigned
-              </span>
+              <span className="truncate text-sm">{selected.length} assigned</span>
             </>
           ) : (
             <>
@@ -105,7 +136,7 @@ export function AssigneeSelector({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
-        className="w-80 p-0"
+        className={cn("w-80 p-0", DROPDOWN_Z)}
         sideOffset={8}
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
@@ -138,49 +169,61 @@ export function AssigneeSelector({
             Clear assignment
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          {filtered.map((member) => {
-            const checked = value.includes(member.id);
-            return (
-              <DropdownMenuItem
-                key={member.id}
-                onSelect={(event) => {
-                  event.preventDefault(); // keep menu open for multi-select
-                  toggle(member.id);
-                }}
-                className="rounded-md py-2"
-              >
-                <div className="flex w-full items-center gap-2.5">
-                  <Avatar className="h-7 w-7">
-                    <AvatarImage src={member.avatarUrl} />
-                    <AvatarFallback className="text-[10px]">
-                      {member.name.slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-medium">{member.name}</p>
-                    <p className="truncate text-[11px] text-muted-foreground">{member.email}</p>
-                  </div>
-                  <span
-                    className={cn(
-                      "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
-                      checked
-                        ? "border-primary bg-primary text-white"
-                        : "border-border bg-background text-transparent"
-                    )}
-                    aria-label={checked ? "Selected" : "Not selected"}
+          {isLoading ? (
+            <div className="flex items-center justify-center gap-2 px-2 py-6 text-xs text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading members…
+            </div>
+          ) : (
+            <>
+              {filtered.map((member) => {
+                const checked = value.includes(member.id);
+                return (
+                  <DropdownMenuItem
+                    key={member.id}
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      toggle(member.id);
+                    }}
+                    className="rounded-md py-2"
                   >
-                    <Check className="h-3 w-3" />
-                  </span>
+                    <div className="flex w-full items-center gap-2.5">
+                      <Avatar className="h-7 w-7">
+                        <AvatarImage src={member.avatarUrl} />
+                        <AvatarFallback className="text-[10px]">
+                          {member.name.slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-medium">{member.name}</p>
+                        <p className="truncate text-[11px] text-muted-foreground">{member.email}</p>
+                      </div>
+                      <span
+                        className={cn(
+                          "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
+                          checked
+                            ? "border-primary bg-primary text-white"
+                            : "border-border bg-background text-transparent"
+                        )}
+                        aria-label={checked ? "Selected" : "Not selected"}
+                      >
+                        <Check className="h-3 w-3" />
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
+                );
+              })}
+              {!isLoading && filtered.length === 0 && (
+                <div className="px-2 py-3 text-center text-xs text-muted-foreground">
+                  {list.length === 0
+                    ? "No workspace members found. Invite someone from Settings → Members."
+                    : "No matching members"}
                 </div>
-              </DropdownMenuItem>
-            );
-          })}
-          {filtered.length === 0 && (
-            <div className="px-2 py-3 text-center text-xs text-muted-foreground">No matching members</div>
+              )}
+            </>
           )}
         </div>
       </DropdownMenuContent>
     </DropdownMenu>
   );
 }
-

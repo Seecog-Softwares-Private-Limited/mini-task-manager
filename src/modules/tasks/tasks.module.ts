@@ -4,6 +4,7 @@ import { AuthModule } from '../auth/auth.module';
 import { BillingModule } from '../billing/billing.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { ProjectsModule } from '../projects/projects.module';
+import { WorkflowsModule } from '../workflows/workflows.module';
 import { InvitationsModule } from '../invitations/invitations.module';
 import { UsersModule } from '../users/users.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -24,6 +25,7 @@ import { TasksController } from './tasks.controller';
     BillingModule,
     OrganizationsModule,
     forwardRef(() => ProjectsModule),
+    forwardRef(() => WorkflowsModule),
     InvitationsModule,
     UsersModule,
     NotificationsModule,

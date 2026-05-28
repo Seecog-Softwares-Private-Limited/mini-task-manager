@@ -3,6 +3,7 @@ import { TasksRepository } from './repositories/tasks.repository';
 import { TaskCommentsRepository } from './repositories/task-comments.repository';
 import { TaskAttachmentsRepository } from './repositories/task-attachments.repository';
 import { ProjectsService } from '../projects/projects.service';
+import { WorkflowsService } from '../workflows/workflows.service';
 import { UsageService } from '../billing/usage.service';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
 import { TaskEntity } from './entities/task.entity';
@@ -16,10 +17,11 @@ export declare class TasksService {
     private readonly taskCommentsRepository;
     private readonly taskAttachmentsRepository;
     private readonly projectsService;
+    private readonly workflowsService;
     private readonly usageService;
     private readonly activityLogsService;
     private readonly configService;
-    constructor(tasksRepository: TasksRepository, taskCommentsRepository: TaskCommentsRepository, taskAttachmentsRepository: TaskAttachmentsRepository, projectsService: ProjectsService, usageService: UsageService, activityLogsService: ActivityLogsService, configService: ConfigService<Configuration>);
+    constructor(tasksRepository: TasksRepository, taskCommentsRepository: TaskCommentsRepository, taskAttachmentsRepository: TaskAttachmentsRepository, projectsService: ProjectsService, workflowsService: WorkflowsService, usageService: UsageService, activityLogsService: ActivityLogsService, configService: ConfigService<Configuration>);
     findById(id: string): Promise<TaskEntity | null>;
     findByIdInOrganization(id: string, organizationId: string): Promise<TaskEntity | null>;
     findByProject(projectId: string, organizationId: string, query: PaginationQueryDto): Promise<PaginatedResult<TaskEntity>>;
@@ -42,4 +44,5 @@ export declare class TasksService {
         fileName: string | null;
     }>;
     deleteAttachment(taskId: string, attachmentId: string, organizationId: string): Promise<void>;
+    private resolveInitialStatusId;
 }

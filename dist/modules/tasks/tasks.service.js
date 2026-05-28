@@ -8,6 +8,9 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TasksService = void 0;
 const common_1 = require("@nestjs/common");
@@ -16,6 +19,7 @@ const tasks_repository_1 = require("./repositories/tasks.repository");
 const task_comments_repository_1 = require("./repositories/task-comments.repository");
 const task_attachments_repository_1 = require("./repositories/task-attachments.repository");
 const projects_service_1 = require("../projects/projects.service");
+const workflows_service_1 = require("../workflows/workflows.service");
 const usage_service_1 = require("../billing/usage.service");
 const activity_logs_service_1 = require("../activity-logs/activity-logs.service");
 const pagination_1 = require("../../common/pagination");
@@ -37,11 +41,12 @@ function sanitizeFileName(name) {
     return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 200) || 'file';
 }
 let TasksService = class TasksService {
-    constructor(tasksRepository, taskCommentsRepository, taskAttachmentsRepository, projectsService, usageService, activityLogsService, configService) {
+    constructor(tasksRepository, taskCommentsRepository, taskAttachmentsRepository, projectsService, workflowsService, usageService, activityLogsService, configService) {
         this.tasksRepository = tasksRepository;
         this.taskCommentsRepository = taskCommentsRepository;
         this.taskAttachmentsRepository = taskAttachmentsRepository;
         this.projectsService = projectsService;
+        this.workflowsService = workflowsService;
         this.usageService = usageService;
         this.activityLogsService = activityLogsService;
         this.configService = configService;
@@ -68,13 +73,14 @@ let TasksService = class TasksService {
                 : [];
         const normalizedSubtasks = this.normalizeSubtasks(dto.subtasks);
         const tags = this.normalizeTags(dto.tags);
+        const statusId = await this.resolveInitialStatusId(projectId, organizationId, dto.statusId);
         const task = await this.tasksRepository.create({
             projectId,
             organizationId,
             reporterId,
             title: dto.title,
             description: dto.description ?? null,
-            statusId: null,
+            statusId,
             priority: dto.priority ?? 'MEDIUM',
             assigneeId: assigneeIds[0] ?? dto.assigneeId ?? null,
             assigneeIds: assigneeIds.length ? assigneeIds : null,
@@ -169,8 +175,9 @@ let TasksService = class TasksService {
             title: s.title?.trim() ?? '',
             completed: Boolean(s.completed),
             assigneeId: s.assigneeId || undefined,
-            dueDate: s.dueDate || undefined,
+            dueDate: s.dueDate ? String(s.dueDate).slice(0, 10) : undefined,
             priority: s.priority ?? 'MEDIUM',
+            statusId: s.statusId || undefined,
         }))
             .filter((s) => s.title.length > 0);
     }
@@ -265,14 +272,34 @@ let TasksService = class TasksService {
         await fs.unlink(fullPath).catch(() => { });
         await this.taskAttachmentsRepository.delete(attachmentId);
     }
+    async resolveInitialStatusId(projectId, organizationId, requestedStatusId) {
+        const workflows = await this.workflowsService.findByProject(projectId, organizationId);
+        const defaultWorkflow = workflows.find((w) => w.isDefault) ?? workflows[0];
+        if (!defaultWorkflow)
+            return null;
+        const statuses = await this.workflowsService.getStatuses(defaultWorkflow.id);
+        if (statuses.length === 0)
+            return null;
+        if (requestedStatusId) {
+            const match = statuses.find((s) => s.id === requestedStatusId);
+            if (match)
+                return match.id;
+        }
+        const todo = statuses.find((s) => s.type === 'TODO') ??
+            statuses.find((s) => s.name.toLowerCase() === 'to do') ??
+            statuses[0];
+        return todo?.id ?? null;
+    }
 };
 exports.TasksService = TasksService;
 exports.TasksService = TasksService = __decorate([
     (0, common_1.Injectable)(),
+    __param(4, (0, common_1.Inject)((0, common_1.forwardRef)(() => workflows_service_1.WorkflowsService))),
     __metadata("design:paramtypes", [tasks_repository_1.TasksRepository,
         task_comments_repository_1.TaskCommentsRepository,
         task_attachments_repository_1.TaskAttachmentsRepository,
         projects_service_1.ProjectsService,
+        workflows_service_1.WorkflowsService,
         usage_service_1.UsageService,
         activity_logs_service_1.ActivityLogsService,
         config_1.ConfigService])
