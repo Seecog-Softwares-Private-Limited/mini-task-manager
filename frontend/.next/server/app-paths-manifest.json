@@ -1,7 +1,8 @@
 {
-  "/login/page": "app/login/page.js",
   "/api/v1/[...path]/route": "app/api/v1/[...path]/route.js",
-  "/verify-email/page": "app/verify-email/page.js",
+  "/login/page": "app/login/page.js",
   "/signup/page": "app/signup/page.js",
-  "/dashboard/page": "app/dashboard/page.js"
+  "/dashboard/analytics/page": "app/dashboard/analytics/page.js",
+  "/dashboard/workspaces/page": "app/dashboard/workspaces/page.js",
+  "/dashboard/projects/page": "app/dashboard/projects/page.js"
 }

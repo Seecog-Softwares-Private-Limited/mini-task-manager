@@ -45,15 +45,12 @@ let EmailService = EmailService_1 = class EmailService {
             to,
             subject: `You're invited to join ${organizationName}`,
             text: (0, email_template_util_1.emailPlainTextWithLink)(`${inviterName} has invited you to join ${organizationName} as ${role}.`, acceptUrl),
-            html: (0, email_template_util_1.emailLayout)(`
-  <h1 style="font-size:24px;font-weight:700;text-align:center;margin:0 0 8px;">You're invited!</h1>
-  <p style="text-align:center;color:#64748b;margin:0 0 32px;">
-    <strong>${(0, email_template_util_1.escapeHtml)(inviterName)}</strong> has invited you to join <strong>${(0, email_template_util_1.escapeHtml)(organizationName)}</strong> as <strong>${(0, email_template_util_1.escapeHtml)(role)}</strong>.
-  </p>
-  ${(0, email_template_util_1.emailActionSection)(acceptUrl, 'Accept Invitation')}
-  <p style="text-align:center;color:#94a3b8;font-size:13px;margin-top:32px;">
-    This invitation expires in 7 days. If you didn't expect this email, you can safely ignore it.
-  </p>`),
+            html: (0, email_template_util_1.emailLayout)((0, email_template_util_1.emailInvitationBody)({
+                inviterName,
+                organizationName,
+                role,
+                acceptUrl,
+            })),
         });
     }
     async sendTaskAssignment(payload) {
@@ -98,16 +95,12 @@ let EmailService = EmailService_1 = class EmailService {
             to,
             subject: 'Verify your email - Mini Task Manager',
             text: (0, email_template_util_1.emailPlainTextWithLink)(`Hi ${fullName}, thanks for signing up! Verify your email by visiting:`, verifyUrl, shortCode),
-            html: (0, email_template_util_1.emailLayout)(`
-  <h1 style="font-size:24px;font-weight:700;text-align:center;margin:0 0 8px;">Verify your email</h1>
-  <p style="text-align:center;color:#64748b;margin:0 0 24px;">
-    Hi <strong>${(0, email_template_util_1.escapeHtml)(fullName)}</strong>, thanks for signing up!
-  </p>
-  ${(0, email_template_util_1.emailVerificationCodeBlock)(shortCode, verifyPageUrl)}
-  ${(0, email_template_util_1.emailVerificationActions)(verifyUrl)}
-  <p style="text-align:center;color:#94a3b8;font-size:13px;margin-top:32px;">
-    This code expires in 24 hours. If you didn&apos;t create an account, you can safely ignore this email.
-  </p>`),
+            html: (0, email_template_util_1.emailLayout)((0, email_template_util_1.emailVerificationBody)({
+                fullName,
+                verifyUrl,
+                verifyPageUrl,
+                shortCode,
+            })),
         });
     }
     async sendPasswordResetEmail(payload) {
@@ -117,15 +110,7 @@ let EmailService = EmailService_1 = class EmailService {
             to,
             subject: 'Reset your password - Mini Task Manager',
             text: (0, email_template_util_1.emailPlainTextWithLink)(`Hi ${fullName}, reset your password by visiting:`, resetUrl),
-            html: (0, email_template_util_1.emailLayout)(`
-  <h1 style="font-size:24px;font-weight:700;text-align:center;margin:0 0 8px;">Reset your password</h1>
-  <p style="text-align:center;color:#64748b;margin:0 0 32px;">
-    Hi <strong>${(0, email_template_util_1.escapeHtml)(fullName)}</strong>, we received a request to reset your password. Click the button below to set a new password.
-  </p>
-  ${(0, email_template_util_1.emailActionSection)(resetUrl, 'Reset Password')}
-  <p style="text-align:center;color:#94a3b8;font-size:13px;margin-top:32px;">
-    This link expires in 1 hour. If you didn&apos;t request a password reset, you can safely ignore this email.
-  </p>`),
+            html: (0, email_template_util_1.emailLayout)((0, email_template_util_1.emailPasswordResetBody)({ fullName, resetUrl })),
         });
     }
     initTransport() {

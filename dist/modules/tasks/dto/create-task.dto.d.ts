@@ -5,6 +5,7 @@ declare class CreateTaskSubtaskDto {
     assigneeId?: string;
     dueDate?: string;
     priority?: string;
+    statusId?: string;
 }
 declare class CreateTaskTagDto {
     name: string;

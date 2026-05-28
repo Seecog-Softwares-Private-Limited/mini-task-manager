@@ -20,6 +20,7 @@ export declare class TaskEntity extends BaseEntity {
         assigneeId?: string;
         dueDate?: string;
         priority?: string;
+        statusId?: string;
     }> | null;
     reporterId: string;
     parentTaskId: string | null;

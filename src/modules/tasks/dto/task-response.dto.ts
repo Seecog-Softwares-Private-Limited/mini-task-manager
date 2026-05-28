@@ -5,6 +5,7 @@ export class TaskSubtaskResponseDto {
   assigneeId?: string;
   dueDate?: string;
   priority?: string;
+  statusId?: string;
 }
 
 export class TaskResponseDto {

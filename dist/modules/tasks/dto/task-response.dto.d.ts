@@ -5,6 +5,7 @@ export declare class TaskSubtaskResponseDto {
     assigneeId?: string;
     dueDate?: string;
     priority?: string;
+    statusId?: string;
 }
 export declare class TaskResponseDto {
     id: string;

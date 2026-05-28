@@ -22,11 +22,22 @@ const projects_service_1 = require("../projects/projects.service");
 const workflow_entity_1 = require("./entities/workflow.entity");
 const workflow_status_entity_1 = require("./entities/workflow-status.entity");
 const uuid_util_1 = require("../../common/utils/uuid.util");
+const base_entity_1 = require("../../common/base.entity");
+const task_entity_1 = require("../tasks/entities/task.entity");
 const DEFAULT_STATUSES = [
     { name: 'To Do', position: 0, type: 'TODO' },
     { name: 'In Progress', position: 1, type: 'IN_PROGRESS' },
     { name: 'Done', position: 2, type: 'DONE' },
 ];
+function asUuidString(value) {
+    if (value == null)
+        return null;
+    if (Buffer.isBuffer(value)) {
+        return base_entity_1.uuidBinaryTransformer.from(value);
+    }
+    const text = String(value).trim();
+    return text.length > 0 ? text : null;
+}
 let WorkflowsService = class WorkflowsService {
     constructor(workflowsRepository, workflowStatusesRepository, projectsService, dataSource) {
         this.workflowsRepository = workflowsRepository;
@@ -78,18 +89,25 @@ let WorkflowsService = class WorkflowsService {
             });
             let workflow = existing.find((w) => !!w.isDefault);
             if (!workflow) {
-                workflow = await wfRepo.save(wfRepo.create({
-                    id: (0, uuid_util_1.generateUuid)(),
+                const workflowId = (0, uuid_util_1.generateUuid)();
+                await wfRepo.insert({
+                    id: workflowId,
                     projectId,
                     name: 'Default',
                     isDefault: true,
-                }));
+                });
+                workflow = {
+                    id: workflowId,
+                    projectId,
+                    name: 'Default',
+                    isDefault: true,
+                };
             }
-            const persisted = await wfRepo.findOne({ where: { id: workflow.id } });
-            if (!persisted) {
-                throw new common_1.InternalServerErrorException('Default workflow could not be loaded after save');
+            const workflowId = asUuidString(workflow.id);
+            if (!workflowId) {
+                throw new common_1.InternalServerErrorException('Default workflow could not be created');
             }
-            workflow = persisted;
+            workflow = { ...workflow, id: workflowId, projectId: asUuidString(workflow.projectId) ?? projectId };
             const currentStatuses = await stRepo.find({
                 where: { workflowId: workflow.id },
                 order: { position: 'ASC' },
@@ -105,6 +123,21 @@ let WorkflowsService = class WorkflowsService {
                         color: null,
                     }));
                 }
+            }
+            const statusesAfterSetup = await stRepo.find({
+                where: { workflowId: workflow.id },
+                order: { position: 'ASC' },
+            });
+            const defaultStatus = statusesAfterSetup.find((s) => s.type === 'TODO') ?? statusesAfterSetup[0];
+            const defaultStatusId = asUuidString(defaultStatus?.id);
+            if (defaultStatusId) {
+                await manager
+                    .createQueryBuilder()
+                    .update(task_entity_1.TaskEntity)
+                    .set({ statusId: defaultStatusId })
+                    .where('project_id = :projectId', { projectId })
+                    .andWhere('status_id IS NULL')
+                    .execute();
             }
             return workflow;
         });

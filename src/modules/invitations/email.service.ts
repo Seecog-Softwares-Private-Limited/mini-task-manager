@@ -3,12 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import type { Configuration } from '../../config/configuration';
 import {
-  emailActionSection,
+  emailInvitationBody,
   emailLayout,
+  emailPasswordResetBody,
   emailPlainTextWithLink,
-  emailVerificationActions,
-  emailVerificationCodeBlock,
-  escapeHtml,
+  emailVerificationBody,
 } from './email-template.util';
 
 export interface InviteEmailPayload {
@@ -86,15 +85,14 @@ export class EmailService implements OnModuleInit {
         `${inviterName} has invited you to join ${organizationName} as ${role}.`,
         acceptUrl,
       ),
-      html: emailLayout(`
-  <h1 style="font-size:24px;font-weight:700;text-align:center;margin:0 0 8px;">You're invited!</h1>
-  <p style="text-align:center;color:#64748b;margin:0 0 32px;">
-    <strong>${escapeHtml(inviterName)}</strong> has invited you to join <strong>${escapeHtml(organizationName)}</strong> as <strong>${escapeHtml(role)}</strong>.
-  </p>
-  ${emailActionSection(acceptUrl, 'Accept Invitation')}
-  <p style="text-align:center;color:#94a3b8;font-size:13px;margin-top:32px;">
-    This invitation expires in 7 days. If you didn't expect this email, you can safely ignore it.
-  </p>`),
+      html: emailLayout(
+        emailInvitationBody({
+          inviterName,
+          organizationName,
+          role,
+          acceptUrl,
+        }),
+      ),
     });
   }
 
@@ -147,16 +145,14 @@ export class EmailService implements OnModuleInit {
         verifyUrl,
         shortCode,
       ),
-      html: emailLayout(`
-  <h1 style="font-size:24px;font-weight:700;text-align:center;margin:0 0 8px;">Verify your email</h1>
-  <p style="text-align:center;color:#64748b;margin:0 0 24px;">
-    Hi <strong>${escapeHtml(fullName)}</strong>, thanks for signing up!
-  </p>
-  ${emailVerificationCodeBlock(shortCode, verifyPageUrl)}
-  ${emailVerificationActions(verifyUrl)}
-  <p style="text-align:center;color:#94a3b8;font-size:13px;margin-top:32px;">
-    This code expires in 24 hours. If you didn&apos;t create an account, you can safely ignore this email.
-  </p>`),
+      html: emailLayout(
+        emailVerificationBody({
+          fullName,
+          verifyUrl,
+          verifyPageUrl,
+          shortCode,
+        }),
+      ),
     });
   }
 
@@ -168,15 +164,7 @@ export class EmailService implements OnModuleInit {
       to,
       subject: 'Reset your password - Mini Task Manager',
       text: emailPlainTextWithLink(`Hi ${fullName}, reset your password by visiting:`, resetUrl),
-      html: emailLayout(`
-  <h1 style="font-size:24px;font-weight:700;text-align:center;margin:0 0 8px;">Reset your password</h1>
-  <p style="text-align:center;color:#64748b;margin:0 0 32px;">
-    Hi <strong>${escapeHtml(fullName)}</strong>, we received a request to reset your password. Click the button below to set a new password.
-  </p>
-  ${emailActionSection(resetUrl, 'Reset Password')}
-  <p style="text-align:center;color:#94a3b8;font-size:13px;margin-top:32px;">
-    This link expires in 1 hour. If you didn&apos;t request a password reset, you can safely ignore this email.
-  </p>`),
+      html: emailLayout(emailPasswordResetBody({ fullName, resetUrl })),
     });
   }
 

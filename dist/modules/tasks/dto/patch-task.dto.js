@@ -72,6 +72,13 @@ __decorate([
     (0, class_validator_1.IsIn)(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
     __metadata("design:type", String)
 ], PatchTaskSubtaskDto.prototype, "priority", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Transform)(emptyStrToUndef),
+    (0, class_validator_1.ValidateIf)((_o, v) => v != null && v !== ''),
+    (0, class_validator_1.IsUUID)('4'),
+    __metadata("design:type", String)
+], PatchTaskSubtaskDto.prototype, "statusId", void 0);
 class PatchTaskTagDto {
 }
 __decorate([

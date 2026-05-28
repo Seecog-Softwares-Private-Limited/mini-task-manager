@@ -11,7 +11,7 @@ import {
   useCancelInvitation,
 } from "@/hooks/use-invitations";
 import type { OrgInvitation } from "@/types/api";
-import { Mail, Send, XCircle, Clock, Loader2 } from "lucide-react";
+import { Mail, Send, Trash2, Clock, Loader2 } from "lucide-react";
 
 function statusBadge(status: OrgInvitation["status"]) {
   switch (status) {
@@ -42,9 +42,9 @@ export interface InvitationListProps {
 
 export function InvitationList({ orgId }: InvitationListProps) {
   const { invitations, isLoading } = useOrgInvitations(orgId);
-  const { resend, isPending: resendPending } = useResendInvitation(orgId);
-  const { cancel, isPending: cancelPending } = useCancelInvitation(orgId);
-  const [cancelTarget, setCancelTarget] = React.useState<OrgInvitation | null>(null);
+  const { resendAsync, isPending: resendPending } = useResendInvitation(orgId);
+  const { cancelAsync, isPending: cancelPending } = useCancelInvitation(orgId);
+  const [deleteTarget, setDeleteTarget] = React.useState<OrgInvitation | null>(null);
   const [resendingId, setResendingId] = React.useState<string | null>(null);
 
   if (isLoading) {
@@ -57,16 +57,20 @@ export function InvitationList({ orgId }: InvitationListProps) {
     );
   }
 
-  if (invitations.length === 0) {
-    return null;
-  }
-
   const pendingOrExpired = invitations.filter(
     (inv) => inv.status === "PENDING" || inv.status === "EXPIRED"
   );
   const completed = invitations.filter(
     (inv) => inv.status === "ACCEPTED" || inv.status === "CANCELLED"
   );
+
+  if (invitations.length === 0) {
+    return (
+      <div className="px-6 py-10 text-center text-sm text-muted-foreground">
+        No pending invitations. Use Invite to add someone to this workspace.
+      </div>
+    );
+  }
 
   return (
     <>
@@ -85,42 +89,53 @@ export function InvitationList({ orgId }: InvitationListProps) {
                   {formatDate(inv.expiresAt)}
                 </p>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <Badge variant="outline" className="capitalize">
+              <div className="flex items-center gap-1 shrink-0">
+                <Badge variant="outline" className="capitalize hidden sm:inline-flex">
                   {inv.role}
                 </Badge>
                 {statusBadge(inv.status)}
                 <Button
                   variant="ghost"
-                  size="sm"
-                  className="text-xs gap-1"
+                  size="icon"
+                  className="h-8 w-8"
                   disabled={resendPending && resendingId === inv.id}
-                  onClick={() => {
+                  onClick={async () => {
                     setResendingId(inv.id);
-                    resend(inv.id);
+                    try {
+                      await resendAsync(inv.id);
+                    } finally {
+                      setResendingId(null);
+                    }
                   }}
                   aria-label={`Resend invitation to ${inv.email}`}
+                  title="Resend invitation"
                 >
                   {resendPending && resendingId === inv.id ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Send className="h-3.5 w-3.5" />
+                    <Send className="h-4 w-4" />
                   )}
-                  Resend
                 </Button>
                 <Button
                   variant="ghost"
-                  size="sm"
-                  className="text-xs text-destructive hover:text-destructive gap-1"
-                  onClick={() => setCancelTarget(inv)}
-                  aria-label={`Cancel invitation to ${inv.email}`}
+                  size="icon"
+                  className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => setDeleteTarget(inv)}
+                  aria-label={`Delete invitation to ${inv.email}`}
+                  title="Delete invitation"
                 >
-                  <XCircle className="h-3.5 w-3.5" /> Cancel
+                  <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
             </li>
           ))}
         </ul>
+      )}
+
+      {pendingOrExpired.length === 0 && completed.length > 0 && (
+        <div className="px-6 py-8 text-center text-sm text-muted-foreground">
+          No pending invitations.
+        </div>
       )}
 
       {completed.length > 0 && (
@@ -153,20 +168,20 @@ export function InvitationList({ orgId }: InvitationListProps) {
       )}
 
       <ConfirmDialog
-        open={!!cancelTarget}
-        onOpenChange={(open) => !open && setCancelTarget(null)}
-        title="Cancel invitation"
+        open={!!deleteTarget}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Delete invitation"
         description={
-          cancelTarget
-            ? `Cancel the invitation to ${cancelTarget.email}? They will no longer be able to join.`
+          deleteTarget
+            ? `Remove the invitation to ${deleteTarget.email}? They will no longer be able to join this workspace.`
             : ""
         }
-        confirmLabel="Cancel invitation"
+        confirmLabel="Delete"
         variant="destructive"
-        onConfirm={() => {
-          if (cancelTarget) {
-            cancel(cancelTarget.id);
-            setCancelTarget(null);
+        onConfirm={async () => {
+          if (deleteTarget) {
+            await cancelAsync(deleteTarget.id);
+            setDeleteTarget(null);
           }
         }}
         loading={cancelPending}

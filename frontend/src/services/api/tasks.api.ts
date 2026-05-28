@@ -24,7 +24,7 @@ export interface CreateTaskPayload {
   parentTaskId?: string;
   sprintId?: string;
   subtasks?: Array<
-    Pick<TaskSubtask, "title" | "completed" | "assigneeId" | "dueDate" | "priority"> & {
+    Pick<TaskSubtask, "title" | "completed" | "assigneeId" | "dueDate" | "priority" | "statusId"> & {
       id?: string;
     }
   >;
@@ -35,8 +35,30 @@ export interface CreateTaskPayload {
   dueDate?: string;
 }
 
+/** Backend PatchTaskSubtaskDto only accepts whitelisted fields with strict formats. */
+export function serializeSubtasksForApi(subtasks: TaskSubtask[]): TaskSubtask[] {
+  return subtasks.map((s) => {
+    const item: TaskSubtask = {
+      id: s.id,
+      title: s.title,
+      completed: Boolean(s.completed),
+    };
+    if (s.assigneeId) item.assigneeId = s.assigneeId;
+    if (s.priority) item.priority = s.priority;
+    if (s.statusId) item.statusId = s.statusId;
+    if (s.dueDate) {
+      const match = String(s.dueDate).match(/^(\d{4}-\d{2}-\d{2})/);
+      if (match) item.dueDate = match[1];
+    }
+    return item;
+  });
+}
+
 export async function createTask(payload: CreateTaskPayload): Promise<Task> {
   const { storyPoints: _sp, dueDate: _dd, ...body } = payload;
+  if (body.subtasks?.length) {
+    body.subtasks = serializeSubtasksForApi(body.subtasks as TaskSubtask[]);
+  }
   const { data } = await apiClient.post<Task>("/tasks", body);
   return data;
 }
@@ -99,7 +121,9 @@ export async function updateTask(
   if (payload.priority !== undefined) body.priority = payload.priority;
   if (payload.storyPoints !== undefined) body.storyPoints = payload.storyPoints;
   if (payload.tags !== undefined) body.tags = payload.tags;
-  if (payload.subtasks !== undefined) body.subtasks = payload.subtasks;
+  if (payload.subtasks !== undefined) {
+    body.subtasks = serializeSubtasksForApi(payload.subtasks);
+  }
   const { data } = await apiClient.patch<Task>(`/tasks/${taskId}`, body);
   return data;
 }

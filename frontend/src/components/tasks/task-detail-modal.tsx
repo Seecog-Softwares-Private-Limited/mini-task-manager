@@ -37,6 +37,13 @@ import { cn } from "@/lib/utils";
 import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-selector";
 import { SubtaskDueDatePicker } from "@/components/tasks/subtask-due-date-picker";
 import { SubtaskPrioritySelector } from "@/components/tasks/subtask-priority-selector";
+import {
+  SubtaskStatusSelector,
+  defaultDoneStatusId,
+  defaultTodoStatusId,
+  isDoneWorkflowStatus,
+  resolveSubtaskStatusId,
+} from "@/components/tasks/subtask-status-selector";
 import { CommentInputWithMentions } from "@/components/tasks/comment-input-with-mentions";
 import {
   normalizeDescriptionHtml,
@@ -463,11 +470,15 @@ export function TaskDetailModal({
       }
       return { previous };
     },
-    onError: (_err, _vars, ctx) => {
+    onError: (err, _vars, ctx) => {
       if (ctx?.previous) {
         queryClient.setQueryData(["task", taskId], ctx.previous);
       }
-      toast({ title: "Failed to update subtasks", variant: "error" });
+      toast({
+        title: "Failed to update subtasks",
+        description: parseApiError(err),
+        variant: "error",
+      });
     },
     onSuccess: (updated) => {
       queryClient.setQueryData(["task", taskId], updated);
@@ -869,13 +880,24 @@ export function TaskDetailModal({
                           <input
                             type="checkbox"
                             checked={item.completed}
-                            onChange={() =>
+                            onChange={() => {
+                              const nextCompleted = !item.completed;
+                              const doneId = defaultDoneStatusId(statuses);
+                              const todoId = defaultTodoStatusId(statuses);
                               updateSubtasksMutation.mutate(
                                 checklist.map((i) =>
-                                  i.id === item.id ? { ...i, completed: !i.completed } : i
+                                  i.id === item.id
+                                    ? {
+                                        ...i,
+                                        completed: nextCompleted,
+                                        statusId: nextCompleted
+                                          ? (doneId ?? i.statusId)
+                                          : (todoId ?? i.statusId),
+                                      }
+                                    : i
                                 )
-                              )
-                            }
+                              );
+                            }}
                             className="h-4 w-4 shrink-0 rounded border-input accent-primary"
                           />
                           {editingSubtaskId === item.id ? (
@@ -928,6 +950,26 @@ export function TaskDetailModal({
                               updateSubtasksMutation.mutate(
                                 checklist.map((i) =>
                                   i.id === item.id ? { ...i, assigneeId } : i
+                                )
+                              );
+                            }}
+                            disabled={updateSubtasksMutation.isPending}
+                          />
+                          <SubtaskStatusSelector
+                            statuses={statuses}
+                            value={resolveSubtaskStatusId(item, statuses)}
+                            completed={item.completed}
+                            onChange={(statusId) => {
+                              const status = statuses.find((s) => s.id === statusId);
+                              updateSubtasksMutation.mutate(
+                                checklist.map((i) =>
+                                  i.id === item.id
+                                    ? {
+                                        ...i,
+                                        statusId,
+                                        completed: status ? isDoneWorkflowStatus(status) : i.completed,
+                                      }
+                                    : i
                                 )
                               );
                             }}
@@ -986,6 +1028,7 @@ export function TaskDetailModal({
                                     title: newCheckItem.trim(),
                                     completed: false,
                                     priority: "MEDIUM",
+                                    statusId: defaultTodoStatusId(statuses),
                                     dueDate: undefined,
                                   },
                                 ]);
@@ -1009,6 +1052,7 @@ export function TaskDetailModal({
                                   title: newCheckItem.trim(),
                                   completed: false,
                                   priority: "MEDIUM",
+                                  statusId: defaultTodoStatusId(statuses),
                                   dueDate: undefined,
                                 },
                               ]);

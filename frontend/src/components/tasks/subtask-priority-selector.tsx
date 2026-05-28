@@ -11,6 +11,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
+/** Above create-task modal overlay (z-[100]). */
+const DROPDOWN_Z = "z-[110]";
+
 type SubtaskPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 const PRIORITY_OPTIONS: Array<{
@@ -38,7 +41,7 @@ export function SubtaskPrioritySelector({
   const selected = PRIORITY_OPTIONS.find((p) => p.value === value) ?? PRIORITY_OPTIONS[1];
 
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <Button
           type="button"
@@ -53,7 +56,7 @@ export function SubtaskPrioritySelector({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="w-44 p-1"
+        className={cn("w-44 p-1", DROPDOWN_Z)}
         sideOffset={8}
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}

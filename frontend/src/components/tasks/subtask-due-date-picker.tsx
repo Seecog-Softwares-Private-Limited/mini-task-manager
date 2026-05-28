@@ -12,6 +12,9 @@ import {
 import { CalendarDays, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+/** Above create-task modal overlay (z-[100]). */
+const DROPDOWN_Z = "z-[110]";
+
 interface SubtaskDueDatePickerProps {
   value?: string;
   onChange: (date?: string) => void;
@@ -44,7 +47,7 @@ export function SubtaskDueDatePicker({
   const overdue = isOverdue(value, completed);
 
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <Button
           type="button"
@@ -64,7 +67,7 @@ export function SubtaskDueDatePicker({
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="w-64 p-3"
+        className={cn("w-64 p-3", DROPDOWN_Z)}
         sideOffset={8}
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
