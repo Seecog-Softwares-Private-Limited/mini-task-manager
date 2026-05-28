@@ -147,6 +147,7 @@ Full step-by-step (browser → Next → Nest → DB) and past failure modes: **`
 | **DB connection refused / ECONNREFUSED** | Ensure MySQL is running; check `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE` in `properties.env`. Create the database if it does not exist: `CREATE DATABASE mini_task_manager ...`. |
 | **"Table doesn't exist" or migration errors** | Run migrations: `npm run migration:run`. On a fresh DB, create the database first, then run migrations, then seed. |
 | **JWT_SECRET must be set in production** | Set `JWT_SECRET` in `properties.env` to a non-default value when `NODE_ENV=production`. |
+| **Invite / reset / verify emails link to localhost** | Set `FRONTEND_URL` on the **API server** to your public app URL (e.g. `http://3.110.214.243:3000`). See `properties.env.production.example`. Restart the API after changing. |
 | **Port 3000 already in use** | Stop the process using port 3000 or set `PORT` in `properties.env`. |
 | **Login never succeeds / "HTML instead of JSON"** | Next **middleware must not protect `/api/*`**. Those paths are rewritten to Nest; redirecting them to `/login` breaks `POST /api/v1/auth/login` (fixed in `frontend/src/middleware.ts`). Restart Next after pulling. |
 | **Login shows "Network Error" (0 B in DevTools)** | Ensure the **API** is running on `PORT` from `properties.env` (same port Next rewrites to). Restart the API so it loads `properties.env`. |

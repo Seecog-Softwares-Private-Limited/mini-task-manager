@@ -34,6 +34,8 @@ Use this checklist for the first (and subsequent) manual Docker production deplo
 | `DB_DATABASE` | Yes | Database name (e.g. `mini_task_manager`). |
 | `PORT` | No | Default `3000`; set if container port differs. |
 | `API_PREFIX` | No | Default `api/v1`. |
+| `FRONTEND_URL` | Yes | Public URL where users open the app in a browser (e.g. `http://3.110.214.243:3000`). Used for invite, verification, and password-reset links in emails. Must **not** be `localhost` in production — API refuses to start otherwise. |
+| `CORS_ORIGIN` | Recommended | Same origin as the frontend (e.g. `http://3.110.214.243:3000`). |
 | `THROTTLE_*` | No | Override defaults if needed (see 1.5). |
 
 ---
