@@ -1,9 +1,17 @@
-node_modules
-uploads
+node_modules/
+frontend/node_modules/
 
-# Config: repo-root properties.env only (copy from properties.env.example).
-# Do not use .env / .env.local / .env.* — Nest, Next, seeds, and Cypress load properties.env.
-properties.env
+# Build output
+dist/
+.next/
+frontend/.next/
+
+logs/
+uploads/
+
+*.zip
+
+# Do not use .env / .env.local / .env.* — Nest, Next, seeds, and Cypress load properties.env at repo root.
 .env
 .env.*
 **/.env
