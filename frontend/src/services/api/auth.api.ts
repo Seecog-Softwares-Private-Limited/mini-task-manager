@@ -32,6 +32,15 @@ export interface SignupResponse {
   message: string;
   /** When true, user can sign in immediately (no inbox verification step). */
   emailVerified?: boolean;
+  /** Local dev only — shown when Gmail drops verification emails. */
+  devVerificationCode?: string;
+  verifyPageUrl?: string;
+}
+
+export interface ResendVerificationResponse {
+  message: string;
+  devVerificationCode?: string;
+  verifyPageUrl?: string;
 }
 
 export async function signup(payload: PublicSignupPayload): Promise<SignupResponse> {
@@ -44,8 +53,8 @@ export async function verifyEmail(token: string): Promise<{ message: string }> {
   return data;
 }
 
-export async function resendVerificationEmail(email: string): Promise<{ message: string }> {
-  const { data } = await apiClient.post<{ message: string }>("auth/resend-verification", { email });
+export async function resendVerificationEmail(email: string): Promise<ResendVerificationResponse> {
+  const { data } = await apiClient.post<ResendVerificationResponse>("auth/resend-verification", { email });
   return data;
 }
 

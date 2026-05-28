@@ -3,6 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { randomBytes } from 'crypto';
@@ -14,7 +15,7 @@ import { OrganizationMembersRepository } from '../organizations/repositories/org
 import { UserEntity } from '../users/entities/user.entity';
 import { OrganizationInvitationEntity } from './entities/organization-invitation.entity';
 import { generateUuid } from '../../common/utils/uuid.util';
-import { resolveFrontendPublicUrl } from '../../common/utils/frontend-url.util';
+import { getFrontendUrl } from '../../common/utils/frontend-url.util';
 
 const INVITE_EXPIRY_DAYS = 7;
 
@@ -30,6 +31,8 @@ function expiresAt(): Date {
 
 @Injectable()
 export class InvitationsService {
+  private readonly logger = new Logger(InvitationsService.name);
+
   constructor(
     private readonly invitationsRepo: InvitationsRepository,
     private readonly emailService: EmailService,
@@ -76,7 +79,11 @@ export class InvitationsService {
     const org = await this.orgsService.findById(organizationId);
     const inviter = await this.usersService.findById(invitedByUserId);
 
-    const acceptUrl = `${resolveFrontendPublicUrl()}/invite/${token}`;
+    const acceptUrl = `${getFrontendUrl()}/invite/${token}`;
+
+    this.logger.log(
+      `Sending workspace invitation to ${normalizedEmail} for org ${organizationId} (acceptUrl host=${new URL(acceptUrl).host})`,
+    );
 
     await this.emailService.sendInvitation({
       to: normalizedEmail,
@@ -85,6 +92,8 @@ export class InvitationsService {
       role,
       acceptUrl,
     });
+
+    this.logger.log(`Workspace invitation email dispatched to ${normalizedEmail} (invitationId=${invitation.id})`);
 
     return invitation;
   }
@@ -248,7 +257,9 @@ export class InvitationsService {
     const org = await this.orgsService.findById(organizationId);
     const inviter = await this.usersService.findById(invitation.invitedBy);
 
-    const acceptUrl = `${resolveFrontendPublicUrl()}/invite/${newToken}`;
+    const acceptUrl = `${getFrontendUrl()}/invite/${newToken}`;
+
+    this.logger.log(`Resending workspace invitation to ${invitation.email} (invitationId=${invitationId})`);
 
     await this.emailService.sendInvitation({
       to: invitation.email,
@@ -257,6 +268,8 @@ export class InvitationsService {
       role: invitation.role,
       acceptUrl,
     });
+
+    this.logger.log(`Workspace invitation resent to ${invitation.email}`);
 
     return (await this.invitationsRepo.findById(invitationId))!;
   }

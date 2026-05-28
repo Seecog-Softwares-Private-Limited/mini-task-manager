@@ -745,7 +745,7 @@ export default function TasksPage() {
         <CreateSprintModal
           open={createSprintModalOpen}
           onClose={() => setCreateSprintModalOpen(false)}
-          onSubmit={(data) => createSprintMutation.mutate(data)}
+          onSubmit={(data) => createSprintMutation.mutate({ projectId: selectedProjectId, ...data })}
           isSubmitting={createSprintMutation.isPending}
           error={createSprintMutation.error ? parseApiError(createSprintMutation.error) : null}
         />

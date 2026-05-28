@@ -11,6 +11,7 @@ export declare class InvitationsService {
     private readonly orgsService;
     private readonly usersService;
     private readonly orgMembersRepo;
+    private readonly logger;
     constructor(invitationsRepo: InvitationsRepository, emailService: EmailService, orgsService: OrganizationsService, usersService: UsersService, orgMembersRepo: OrganizationMembersRepository);
     createInvitation(organizationId: string, email: string, role: string, invitedByUserId: string): Promise<OrganizationInvitationEntity>;
     listByOrganization(organizationId: string): Promise<OrganizationInvitationEntity[]>;

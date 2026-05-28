@@ -57,7 +57,7 @@ let UsersService = class UsersService {
         return this.usersRepository.create({
             email: data.email.toLowerCase(),
             fullName: data.fullName,
-            passwordHash: data.password,
+            passwordHash: (0, password_storage_util_1.toStoredPassword)(data.password),
         });
     }
     async deleteById(id) {
@@ -81,8 +81,11 @@ let UsersService = class UsersService {
     async updateEmailVerified(userId, verified) {
         await this.usersRepository.update(userId, { isEmailVerified: verified });
     }
+    async updateFullName(userId, fullName) {
+        await this.usersRepository.update(userId, { fullName });
+    }
     async updatePassword(userId, plainPassword) {
-        await this.usersRepository.update(userId, { passwordHash: plainPassword });
+        await this.usersRepository.update(userId, { passwordHash: (0, password_storage_util_1.toStoredPassword)(plainPassword) });
     }
     async linkGoogleId(userId, googleId) {
         await this.usersRepository.update(userId, { googleId, isEmailVerified: true });

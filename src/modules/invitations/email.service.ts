@@ -1,5 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
+import type { Configuration } from '../../config/configuration';
+import {
+  emailActionSection,
+  emailLayout,
+  emailPlainTextWithLink,
+  emailVerificationActions,
+  emailVerificationCodeBlock,
+  escapeHtml,
+} from './email-template.util';
 
 export interface InviteEmailPayload {
   to: string;
@@ -22,6 +32,8 @@ export interface VerificationEmailPayload {
   to: string;
   fullName: string;
   verifyUrl: string;
+  verifyPageUrl: string;
+  shortCode: string;
 }
 
 export interface PasswordResetEmailPayload {
@@ -30,95 +42,72 @@ export interface PasswordResetEmailPayload {
   resetUrl: string;
 }
 
+type SmtpConfig = Configuration['smtp'];
+
 @Injectable()
-export class EmailService {
+export class EmailService implements OnModuleInit {
   private readonly logger = new Logger(EmailService.name);
-  private transporter: nodemailer.Transporter;
+  private transporter!: nodemailer.Transporter;
+  private smtp!: SmtpConfig;
+  private readonly nodeEnv: string;
 
-  constructor() {
-    const host = process.env.SMTP_HOST || 'localhost';
-    const port = parseInt(process.env.SMTP_PORT || '1025', 10);
-    const user = process.env.SMTP_USER || '';
-    const pass = process.env.SMTP_PASS || '';
+  constructor(private readonly configService: ConfigService<Configuration>) {
+    this.nodeEnv = this.configService.get('nodeEnv', { infer: true }) ?? 'development';
+    this.initTransport();
+  }
 
-    const isGmail = host.includes('gmail.com');
+  async onModuleInit(): Promise<void> {
+    if (!this.smtp.verifyOnStartup) {
+      this.logger.warn('SMTP_VERIFY_ON_STARTUP=false — skipping startup SMTP verification');
+      return;
+    }
 
-    this.transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      ...(port === 587 ? { requireTLS: true } : {}),
-      ...(user ? { auth: { user, pass } } : {}),
-      // Gmail-specific: increase timeouts for reliability
-      ...(isGmail ? {
-        connectionTimeout: 10000,
-        greetingTimeout: 10000,
-        socketTimeout: 15000,
-      } : {}),
-      tls: {
-        // Don't fail on self-signed certs in dev
-        rejectUnauthorized: process.env.NODE_ENV === 'production',
-      },
-    });
-
-    const mode = host === 'localhost' && port === 1025
-      ? ' (MailHog — emails captured locally, not sent to inbox)'
-      : '';
-    this.logger.log(`Email transport configured: ${host}:${port}${mode}`);
+    try {
+      await this.transporter.verify();
+      this.logger.log(`SMTP connection verified (${this.smtp.host}:${this.smtp.port})`);
+    } catch (err) {
+      const detail = this.formatError(err);
+      this.logger.error(
+        `SMTP verification failed (${this.smtp.host}:${this.smtp.port}): ${detail}. ` +
+          'Emails will not deliver until SMTP is reachable. ' +
+          'For local dev run MailHog (docker compose up -d mailhog) or configure SMTP_* in properties.env.',
+      );
+    }
   }
 
   async sendInvitation(payload: InviteEmailPayload): Promise<void> {
     const { to, organizationName, inviterName, role, acceptUrl } = payload;
-    const fromRaw = process.env.SMTP_FROM || 'noreply@minitaskmanager.local';
-    const from = fromRaw.includes('<') ? fromRaw : `"Mini Task Manager" <${fromRaw}>`;
 
-    const html = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;padding:40px 20px;color:#1a1a2e;">
-  <div style="text-align:center;margin-bottom:32px;">
-    <div style="display:inline-block;width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#6366f1,#8b5cf6);line-height:48px;color:#fff;font-weight:700;font-size:20px;">M</div>
-  </div>
+    await this.deliver({
+      kind: 'invitation',
+      to,
+      subject: `You're invited to join ${organizationName}`,
+      text: emailPlainTextWithLink(
+        `${inviterName} has invited you to join ${organizationName} as ${role}.`,
+        acceptUrl,
+      ),
+      html: emailLayout(`
   <h1 style="font-size:24px;font-weight:700;text-align:center;margin:0 0 8px;">You're invited!</h1>
   <p style="text-align:center;color:#64748b;margin:0 0 32px;">
-    <strong>${inviterName}</strong> has invited you to join <strong>${organizationName}</strong> as <strong>${role}</strong>.
+    <strong>${escapeHtml(inviterName)}</strong> has invited you to join <strong>${escapeHtml(organizationName)}</strong> as <strong>${escapeHtml(role)}</strong>.
   </p>
-  <div style="text-align:center;margin:32px 0;">
-    <a href="${acceptUrl}" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;text-decoration:none;border-radius:10px;font-weight:600;font-size:16px;">
-      Accept Invitation
-    </a>
-  </div>
+  ${emailActionSection(acceptUrl, 'Accept Invitation')}
   <p style="text-align:center;color:#94a3b8;font-size:13px;margin-top:32px;">
     This invitation expires in 7 days. If you didn't expect this email, you can safely ignore it.
-  </p>
-  <hr style="border:none;border-top:1px solid #e2e8f0;margin:32px 0;" />
-  <p style="text-align:center;color:#cbd5e1;font-size:12px;">Mini Task Manager</p>
-</body>
-</html>`.trim();
-
-    try {
-      const info = await this.transporter.sendMail({
-        from,
-        to,
-        subject: `You're invited to join ${organizationName}`,
-        html,
-        text: `${inviterName} has invited you to join ${organizationName} as ${role}. Accept here: ${acceptUrl}`,
-      });
-      this.logger.log(`Invite email sent to ${to} (messageId=${info.messageId})`);
-    } catch (err) {
-      this.logger.error(`Failed to send invite email to ${to}: ${err}`);
-    }
+  </p>`),
+    });
   }
 
   async sendTaskAssignment(payload: TaskAssignmentEmailPayload): Promise<void> {
     const { to, assigneeName, taskTitle, projectName, assignerName, taskUrl } = payload;
-    const fromRaw = process.env.SMTP_FROM || 'noreply@minitaskmanager.local';
-    const from = fromRaw.includes('<') ? fromRaw : `"Mini Task Manager" <${fromRaw}>`;
-
     const projectLine = projectName ? ` in <strong>${projectName}</strong>` : '';
 
-    const html = `
+    await this.deliver({
+      kind: 'task-assignment',
+      to,
+      subject: `Task assigned: ${taskTitle}`,
+      text: `Hi ${assigneeName}, ${assignerName} has assigned you a task${projectName ? ` in ${projectName}` : ''}: "${taskTitle}". View it here: ${taskUrl}`,
+      html: `
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
@@ -142,109 +131,152 @@ export class EmailService {
   <hr style="border:none;border-top:1px solid #e2e8f0;margin:32px 0;" />
   <p style="text-align:center;color:#cbd5e1;font-size:12px;">Mini Task Manager</p>
 </body>
-</html>`.trim();
-
-    try {
-      const info = await this.transporter.sendMail({
-        from,
-        to,
-        subject: `Task assigned: ${taskTitle}`,
-        html,
-        text: `Hi ${assigneeName}, ${assignerName} has assigned you a task${projectName ? ` in ${projectName}` : ''}: "${taskTitle}". View it here: ${taskUrl}`,
-      });
-      this.logger.log(`Task assignment email sent to ${to} (messageId=${info.messageId})`);
-    } catch (err) {
-      this.logger.error(`Failed to send task assignment email to ${to}: ${err}`);
-    }
+</html>`.trim(),
+    });
   }
 
   async sendVerificationEmail(payload: VerificationEmailPayload): Promise<void> {
-    const { to, fullName, verifyUrl } = payload;
-    const fromRaw = process.env.SMTP_FROM || 'noreply@minitaskmanager.local';
-    const from = fromRaw.includes('<') ? fromRaw : `"Mini Task Manager" <${fromRaw}>`;
+    const { to, fullName, verifyUrl, verifyPageUrl, shortCode } = payload;
 
-    const html = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;padding:40px 20px;color:#1a1a2e;">
-  <div style="text-align:center;margin-bottom:32px;">
-    <div style="display:inline-block;width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#6366f1,#8b5cf6);line-height:48px;color:#fff;font-weight:700;font-size:20px;">M</div>
-  </div>
+    await this.deliver({
+      kind: 'verification',
+      to,
+      subject: 'Verify your email - Mini Task Manager',
+      text: emailPlainTextWithLink(
+        `Hi ${fullName}, thanks for signing up! Verify your email by visiting:`,
+        verifyUrl,
+        shortCode,
+      ),
+      html: emailLayout(`
   <h1 style="font-size:24px;font-weight:700;text-align:center;margin:0 0 8px;">Verify your email</h1>
-  <p style="text-align:center;color:#64748b;margin:0 0 32px;">
-    Hi <strong>${fullName}</strong>, thanks for signing up! Click the button below to verify your email and get started.
+  <p style="text-align:center;color:#64748b;margin:0 0 24px;">
+    Hi <strong>${escapeHtml(fullName)}</strong>, thanks for signing up!
   </p>
-  <div style="text-align:center;margin:32px 0;">
-    <a href="${verifyUrl}" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;text-decoration:none;border-radius:10px;font-weight:600;font-size:16px;">
-      Verify Email
-    </a>
-  </div>
+  ${emailVerificationCodeBlock(shortCode, verifyPageUrl)}
+  ${emailVerificationActions(verifyUrl)}
   <p style="text-align:center;color:#94a3b8;font-size:13px;margin-top:32px;">
-    This link expires in 24 hours. If you didn&apos;t create an account, you can safely ignore this email.
-  </p>
-  <hr style="border:none;border-top:1px solid #e2e8f0;margin:32px 0;" />
-  <p style="text-align:center;color:#cbd5e1;font-size:12px;">Mini Task Manager</p>
-</body>
-</html>`.trim();
-
-    try {
-      const info = await this.transporter.sendMail({
-        from,
-        to,
-        subject: 'Verify your email - Mini Task Manager',
-        html,
-        text: `Hi ${fullName}, verify your email by visiting: ${verifyUrl}`,
-      });
-      this.logger.log(`Verification email sent to ${to} (messageId=${info.messageId})`);
-    } catch (err) {
-      this.logger.error(`Failed to send verification email to ${to}: ${err}`);
-      throw err;
-    }
+    This code expires in 24 hours. If you didn&apos;t create an account, you can safely ignore this email.
+  </p>`),
+    });
   }
 
   async sendPasswordResetEmail(payload: PasswordResetEmailPayload): Promise<void> {
     const { to, fullName, resetUrl } = payload;
-    const fromRaw = process.env.SMTP_FROM || 'noreply@minitaskmanager.local';
-    const from = fromRaw.includes('<') ? fromRaw : `"Mini Task Manager" <${fromRaw}>`;
 
-    const html = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;padding:40px 20px;color:#1a1a2e;">
-  <div style="text-align:center;margin-bottom:32px;">
-    <div style="display:inline-block;width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#6366f1,#8b5cf6);line-height:48px;color:#fff;font-weight:700;font-size:20px;">M</div>
-  </div>
+    await this.deliver({
+      kind: 'password-reset',
+      to,
+      subject: 'Reset your password - Mini Task Manager',
+      text: emailPlainTextWithLink(`Hi ${fullName}, reset your password by visiting:`, resetUrl),
+      html: emailLayout(`
   <h1 style="font-size:24px;font-weight:700;text-align:center;margin:0 0 8px;">Reset your password</h1>
   <p style="text-align:center;color:#64748b;margin:0 0 32px;">
-    Hi <strong>${fullName}</strong>, we received a request to reset your password. Click the button below to set a new password.
+    Hi <strong>${escapeHtml(fullName)}</strong>, we received a request to reset your password. Click the button below to set a new password.
   </p>
-  <div style="text-align:center;margin:32px 0;">
-    <a href="${resetUrl}" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;text-decoration:none;border-radius:10px;font-weight:600;font-size:16px;">
-      Reset Password
-    </a>
-  </div>
+  ${emailActionSection(resetUrl, 'Reset Password')}
   <p style="text-align:center;color:#94a3b8;font-size:13px;margin-top:32px;">
     This link expires in 1 hour. If you didn&apos;t request a password reset, you can safely ignore this email.
-  </p>
-  <hr style="border:none;border-top:1px solid #e2e8f0;margin:32px 0;" />
-  <p style="text-align:center;color:#cbd5e1;font-size:12px;">Mini Task Manager</p>
-</body>
-</html>`.trim();
+  </p>`),
+    });
+  }
+
+  private initTransport(): void {
+    this.smtp = this.configService.get('smtp', { infer: true })!;
+    const { host, port, user, pass } = this.smtp;
+    const isGmail = host.includes('gmail.com');
+
+    this.transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      ...(port === 587 ? { requireTLS: true } : {}),
+      ...(user ? { auth: { user, pass } } : {}),
+      ...(isGmail
+        ? {
+            connectionTimeout: 10000,
+            greetingTimeout: 10000,
+            socketTimeout: 15000,
+          }
+        : {}),
+      tls: {
+        rejectUnauthorized: this.nodeEnv === 'production',
+      },
+    });
+
+    const mode =
+      host === 'localhost' && port === 1025
+        ? ' (MailHog — view at http://localhost:8025)'
+        : user
+          ? ' (authenticated)'
+          : ' (no SMTP auth — suitable for local MailHog)';
+    this.logger.log(`Email transport configured: ${host}:${port}${mode}`);
+  }
+
+  private formatFromAddress(): string {
+    const fromRaw = this.smtp.from;
+    return fromRaw.includes('<') ? fromRaw : `"Mini Task Manager" <${fromRaw}>`;
+  }
+
+  private async deliver(params: {
+    kind: string;
+    to: string;
+    subject: string;
+    html: string;
+    text: string;
+  }): Promise<void> {
+    const { kind, to, subject, html, text } = params;
+    const from = this.formatFromAddress();
+
+    this.logger.log(`Sending ${kind} email to ${to} via ${this.smtp.host}:${this.smtp.port}`);
 
     try {
       const info = await this.transporter.sendMail({
         from,
         to,
-        subject: 'Reset your password - Mini Task Manager',
+        subject,
         html,
-        text: `Hi ${fullName}, reset your password by visiting: ${resetUrl}`,
+        text,
       });
-      this.logger.log(`Password reset email sent to ${to} (messageId=${info.messageId})`);
+      this.logger.log(
+        `${kind} email sent to ${to} (messageId=${info.messageId ?? 'n/a'}, response=${info.response ?? 'n/a'})`,
+      );
     } catch (err) {
-      this.logger.error(`Failed to send password reset email to ${to}: ${err}`);
-      throw err;
+      const detail = this.formatError(err);
+      this.logger.error(
+        `Failed to send ${kind} email to ${to} via ${this.smtp.host}:${this.smtp.port}: ${detail}`,
+        err instanceof Error ? err.stack : undefined,
+      );
+      throw new ServiceUnavailableException(this.userFacingEmailError(detail));
     }
+  }
+
+  private userFacingEmailError(detail: string): string {
+    const isGmail = this.smtp.host.includes('gmail.com');
+    const badCredentials =
+      /535|BadCredentials|Username and Password not accepted|Invalid login/i.test(detail);
+
+    if (isGmail && badCredentials) {
+      return (
+        'Gmail rejected the SMTP credentials. Use a Google App Password (not your normal Gmail password): ' +
+        'Google Account → Security → 2-Step Verification → App passwords. ' +
+        'Set SMTP_USER to your Gmail address and SMTP_PASS to the 16-character app password in properties.env, then restart the API.'
+      );
+    }
+
+    if (this.smtp.host === 'localhost' && this.smtp.port === 1025) {
+      return (
+        'Could not send email. MailHog is not running. Start it with: docker compose up -d mailhog ' +
+        'then open http://localhost:8025 to view captured mail.'
+      );
+    }
+
+    return (
+      `Could not send email (${detail}). Check SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASS in properties.env and restart the API.`
+    );
+  }
+
+  private formatError(err: unknown): string {
+    if (err instanceof Error) return err.message;
+    return String(err);
   }
 }

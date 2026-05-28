@@ -26,6 +26,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
 import { TenantId } from '../../common/decorators/tenant.decorator';
+import { getFrontendUrl } from '../../common/utils/frontend-url.util';
 import { CurrentUserId } from '../../common/decorators/current-user.decorator';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { CreateTaskCommentDto } from './dto/create-task-comment.dto';
@@ -258,7 +259,7 @@ export class TasksController {
     ]);
     const assignerName = assigner?.fullName || assigner?.email || 'Someone';
     const projectName = project?.name;
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+    const frontendUrl = getFrontendUrl();
     const taskUrl = `${frontendUrl}/dashboard/projects/${projectId}/board?task=${taskId}`;
 
     for (const assigneeId of assigneeIds) {

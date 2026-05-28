@@ -10,3 +10,6 @@ export function resolveFrontendPublicUrl(): string {
   const port = process.env.FRONTEND_PORT || '3001';
   return `http://localhost:${port}`;
 }
+
+/** @deprecated alias — use resolveFrontendPublicUrl */
+export const getFrontendUrl = resolveFrontendPublicUrl;

@@ -1,0 +1,115 @@
+/**
+ * Email + signup verification integration tests.
+ * Run: npm test -- --testPathPattern=email.integration
+ *
+ * Uses mocked nodemailer — no real SMTP required.
+ */
+import { Test } from '@nestjs/testing';
+import { ConfigModule } from '@nestjs/config';
+import { configuration } from '../src/config/configuration';
+import { EmailService } from '../src/modules/invitations/email.service';
+
+const sendMailMock = jest.fn().mockResolvedValue({ messageId: 'test-id', response: '250 OK' });
+const verifyMock = jest.fn().mockResolvedValue(true);
+
+jest.mock('nodemailer', () => ({
+  createTransport: jest.fn(() => ({
+    sendMail: sendMailMock,
+    verify: verifyMock,
+  })),
+}));
+
+describe('EmailService (integration)', () => {
+  let emailService: EmailService;
+
+  beforeEach(async () => {
+    sendMailMock.mockClear();
+    verifyMock.mockClear();
+    process.env.SMTP_HOST = 'localhost';
+    process.env.SMTP_PORT = '1025';
+    process.env.SMTP_FROM = 'test@example.com';
+
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        ConfigModule.forRoot({
+          isGlobal: true,
+          load: [configuration],
+        }),
+      ],
+      providers: [EmailService],
+    }).compile();
+
+    emailService = moduleRef.get(EmailService);
+    await emailService.onModuleInit();
+  });
+
+  it('sendVerificationEmail calls transporter.sendMail with verify link', async () => {
+    await emailService.sendVerificationEmail({
+      to: 'user@example.com',
+      fullName: 'Test User',
+      verifyUrl: 'http://localhost:3001/verify-email?token=abc123',
+      verifyPageUrl: 'http://localhost:3001/verify-email',
+      shortCode: '482913',
+    });
+
+    expect(sendMailMock).toHaveBeenCalledTimes(1);
+    const mail = sendMailMock.mock.calls[0][0];
+    expect(mail.to).toBe('user@example.com');
+    expect(mail.subject).toContain('Verify your email');
+    expect(mail.html).toContain('verify-email?token=abc123');
+  });
+
+  it('sendInvitation calls transporter.sendMail with accept link', async () => {
+    await emailService.sendInvitation({
+      to: 'invitee@example.com',
+      organizationName: 'Acme Corp',
+      inviterName: 'Owner',
+      role: 'member',
+      acceptUrl: 'http://localhost:3001/invite/token456',
+    });
+
+    expect(sendMailMock).toHaveBeenCalledTimes(1);
+    const mail = sendMailMock.mock.calls[0][0];
+    expect(mail.to).toBe('invitee@example.com');
+    expect(mail.subject).toContain('Acme Corp');
+    expect(mail.html).toContain('/invite/token456');
+  });
+
+  it('propagates SMTP send failures instead of swallowing them', async () => {
+    sendMailMock.mockRejectedValueOnce(new Error('ECONNREFUSED'));
+
+    await expect(
+      emailService.sendInvitation({
+        to: 'fail@example.com',
+        organizationName: 'Org',
+        inviterName: 'Admin',
+        role: 'member',
+        acceptUrl: 'http://localhost:3001/invite/x',
+      }),
+    ).rejects.toMatchObject({
+      message: expect.stringContaining('Could not send email'),
+    });
+  });
+});
+
+describe('getFrontendUrl', () => {
+  const original = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...original };
+    jest.resetModules();
+  });
+
+  it('uses FRONTEND_URL when set', async () => {
+    process.env.FRONTEND_URL = 'https://app.example.com/';
+    const { getFrontendUrl } = await import('../src/common/utils/frontend-url.util');
+    expect(getFrontendUrl()).toBe('https://app.example.com');
+  });
+
+  it('derives from FRONTEND_PORT when FRONTEND_URL is unset', async () => {
+    delete process.env.FRONTEND_URL;
+    process.env.FRONTEND_PORT = '3008';
+    const { getFrontendUrl } = await import('../src/common/utils/frontend-url.util');
+    expect(getFrontendUrl()).toBe('http://localhost:3008');
+  });
+});

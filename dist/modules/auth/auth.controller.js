@@ -29,6 +29,7 @@ const verify_otp_dto_1 = require("./dto/verify-otp.dto");
 const jwt_auth_guard_1 = require("./guards/jwt-auth.guard");
 const google_config_guard_1 = require("./guards/google-config.guard");
 const public_decorator_1 = require("../../common/decorators/public.decorator");
+const frontend_url_util_1 = require("../../common/utils/frontend-url.util");
 let AuthController = AuthController_1 = class AuthController {
     constructor(authService) {
         this.authService = authService;
@@ -69,7 +70,7 @@ let AuthController = AuthController_1 = class AuthController {
     }
     async googleAuthCallback(req, res) {
         const token = await this.authService.loginWithGoogleUser(req.user);
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+        const frontendUrl = (0, frontend_url_util_1.getFrontendUrl)();
         res.redirect(`${frontendUrl}/auth/callback?token=${encodeURIComponent(token)}`);
     }
 };

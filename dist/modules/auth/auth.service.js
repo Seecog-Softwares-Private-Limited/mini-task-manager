@@ -20,6 +20,7 @@ const jwt_1 = require("@nestjs/jwt");
 const typeorm_2 = require("typeorm");
 const crypto = require("crypto");
 const users_service_1 = require("../users/users.service");
+const password_storage_util_1 = require("../users/password-storage.util");
 const invitations_service_1 = require("../invitations/invitations.service");
 const email_service_1 = require("../invitations/email.service");
 const user_entity_1 = require("../users/entities/user.entity");
@@ -111,35 +112,22 @@ let AuthService = AuthService_1 = class AuthService {
     }
     async signup(dto) {
         const email = dto.email.toLowerCase().trim();
+        const skipVerification = String(process.env.SKIP_EMAIL_VERIFICATION ?? '').toLowerCase() === 'true';
         const existingUser = await this.usersService.findByEmail(email);
         if (existingUser) {
             if (!existingUser.isEmailVerified) {
-                await this.verificationTokenRepo.delete({ userId: existingUser.id });
-                const token = crypto.randomBytes(32).toString('hex');
-                const expiresAt = new Date();
-                expiresAt.setHours(expiresAt.getHours() + 24);
-                await this.verificationTokenRepo.save({
-                    id: (0, uuid_util_1.generateUuid)(),
-                    userId: existingUser.id,
-                    token,
-                    expiresAt,
-                });
-                const verifyUrl = `${(0, frontend_url_util_1.resolveFrontendPublicUrl)()}/verify-email?token=${token}`;
-                try {
-                    await this.emailService.sendVerificationEmail({
-                        to: email,
-                        fullName: existingUser.fullName,
-                        verifyUrl,
-                    });
+                await this.usersService.updatePassword(existingUser.id, dto.password);
+                const fullName = dto.fullName.trim();
+                if (fullName && fullName !== existingUser.fullName) {
+                    await this.usersService.updateFullName(existingUser.id, fullName);
                 }
-                catch (emailErr) {
-                    this.logger.error(`Failed to resend verification email to ${email}: ${emailErr}`);
-                }
-                return { message: 'Verification email sent. Please check your inbox.' };
+                const sent = await this.issueAndSendVerificationEmail(existingUser.id, email, fullName || existingUser.fullName);
+                return this.withDevVerificationCode({ message: 'Verification email sent. Please check your inbox.', emailVerified: false }, sent);
             }
             throw new common_1.ConflictException('An account with this email already exists. Please sign in instead.');
         }
         const userId = (0, uuid_util_1.generateUuid)();
+        const fullName = dto.fullName.trim();
         const queryRunner = this.dataSource.createQueryRunner();
         await queryRunner.connect();
         await queryRunner.startTransaction();
@@ -147,12 +135,12 @@ let AuthService = AuthService_1 = class AuthService {
             await queryRunner.manager.save(user_entity_1.UserEntity, {
                 id: userId,
                 email,
-                fullName: dto.fullName.trim(),
-                passwordHash: dto.password,
-                isEmailVerified: false,
+                fullName,
+                passwordHash: (0, password_storage_util_1.toStoredPassword)(dto.password),
+                isEmailVerified: skipVerification,
             });
             await queryRunner.commitTransaction();
-            this.logger.log(`User created: ${email} (id: ${userId})`);
+            this.logger.log(`User created: ${email} (id: ${userId}, verified=${skipVerification})`);
         }
         catch (err) {
             await queryRunner.rollbackTransaction();
@@ -169,42 +157,29 @@ let AuthService = AuthService_1 = class AuthService {
         }
         catch {
         }
-        const token = crypto.randomBytes(32).toString('hex');
-        const expiresAt = new Date();
-        expiresAt.setHours(expiresAt.getHours() + 24);
-        await this.verificationTokenRepo.save({
-            id: (0, uuid_util_1.generateUuid)(),
-            userId,
-            token,
-            expiresAt,
-        });
-        const verifyUrl = `${(0, frontend_url_util_1.resolveFrontendPublicUrl)()}/verify-email?token=${token}`;
-        try {
-            await this.emailService.sendVerificationEmail({
-                to: email,
-                fullName: dto.fullName.trim(),
-                verifyUrl,
-            });
-        }
-        catch (emailErr) {
-            this.logger.error(`Failed to send signup verification email to ${email}: ${emailErr}`);
+        if (skipVerification) {
             return {
-                message: 'Account created, but we could not send the verification email. Check SMTP settings in properties.env, or use "Resend verification" on the sign-in page.',
-                emailVerified: false,
+                message: 'Account created. You can sign in now.',
+                emailVerified: true,
             };
         }
-        return {
+        const sent = await this.issueAndSendVerificationEmail(userId, email, fullName);
+        return this.withDevVerificationCode({
             message: 'Verification email sent. Please check your inbox (and spam folder).',
             emailVerified: false,
-        };
+        }, sent);
     }
-    async verifyEmail(token) {
+    async verifyEmail(tokenOrCode) {
+        const trimmed = tokenOrCode.trim();
+        const isShortCode = /^\d{6}$/.test(trimmed);
         const record = await this.verificationTokenRepo.findOne({
-            where: { token },
+            where: isShortCode ? { shortCode: trimmed } : { token: trimmed },
             relations: ['user'],
         });
         if (!record || !record.user) {
-            throw new common_1.BadRequestException('Invalid or expired verification link.');
+            throw new common_1.BadRequestException(isShortCode
+                ? 'Invalid or expired verification code.'
+                : 'Invalid or expired verification link.');
         }
         if (new Date() > record.expiresAt) {
             throw new common_1.BadRequestException('Verification link has expired. Please request a new one.');
@@ -221,23 +196,8 @@ let AuthService = AuthService_1 = class AuthService {
         if (user.isEmailVerified) {
             return { message: 'Email is already verified. You can sign in.' };
         }
-        await this.verificationTokenRepo.delete({ userId: user.id });
-        const token = crypto.randomBytes(32).toString('hex');
-        const expiresAt = new Date();
-        expiresAt.setHours(expiresAt.getHours() + 24);
-        await this.verificationTokenRepo.save({
-            id: (0, uuid_util_1.generateUuid)(),
-            userId: user.id,
-            token,
-            expiresAt,
-        });
-        const verifyUrl = `${(0, frontend_url_util_1.resolveFrontendPublicUrl)()}/verify-email?token=${token}`;
-        await this.emailService.sendVerificationEmail({
-            to: user.email,
-            fullName: user.fullName,
-            verifyUrl,
-        });
-        return { message: 'Verification email sent. Please check your inbox (and spam folder).' };
+        const sent = await this.issueAndSendVerificationEmail(user.id, user.email, user.fullName);
+        return this.withDevVerificationCode({ message: 'Verification email sent. Please check your inbox (and spam folder).' }, sent);
     }
     async requestPasswordReset(email) {
         const user = await this.usersService.findByEmail(email.toLowerCase().trim());
@@ -253,7 +213,8 @@ let AuthService = AuthService_1 = class AuthService {
             token,
             expiresAt,
         });
-        const resetUrl = `${(0, frontend_url_util_1.resolveFrontendPublicUrl)()}/reset-password?token=${token}`;
+        const frontendUrl = (0, frontend_url_util_1.getFrontendUrl)();
+        const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
         await this.emailService.sendPasswordResetEmail({
             to: user.email,
             fullName: user.fullName,
@@ -371,7 +332,7 @@ let AuthService = AuthService_1 = class AuthService {
                 id: userId,
                 email,
                 fullName: dto.fullName,
-                passwordHash: dto.password,
+                passwordHash: (0, password_storage_util_1.toStoredPassword)(dto.password),
                 isEmailVerified: true,
             });
             await mgr.save(organization_member_entity_1.OrganizationMemberEntity, {
@@ -402,6 +363,53 @@ let AuthService = AuthService_1 = class AuthService {
             },
             organizationId: invitation.organizationId,
         };
+    }
+    async issueAndSendVerificationEmail(userId, email, fullName) {
+        await this.verificationTokenRepo.delete({ userId });
+        const token = crypto.randomBytes(32).toString('hex');
+        const shortCode = await this.generateUniqueVerificationShortCode();
+        const expiresAt = new Date();
+        expiresAt.setHours(expiresAt.getHours() + 24);
+        await this.verificationTokenRepo.save({
+            id: (0, uuid_util_1.generateUuid)(),
+            userId,
+            token,
+            shortCode,
+            expiresAt,
+        });
+        const verifyPageUrl = `${(0, frontend_url_util_1.getFrontendUrl)()}/verify-email`;
+        const verifyUrl = `${verifyPageUrl}?token=${encodeURIComponent(token)}`;
+        this.logger.log(`Sending signup verification email to ${email} (verifyUrl host=${new URL(verifyUrl).host})`);
+        if (process.env.NODE_ENV !== 'production') {
+            this.logger.log(`[dev] Verification code for ${email}: ${shortCode} — open ${verifyPageUrl}`);
+            this.logger.log(`[dev] Verification link for ${email}: ${verifyUrl}`);
+        }
+        await this.emailService.sendVerificationEmail({
+            to: email,
+            fullName,
+            verifyUrl,
+            verifyPageUrl,
+            shortCode,
+        });
+        return { shortCode, verifyPageUrl };
+    }
+    withDevVerificationCode(response, sent) {
+        if (process.env.NODE_ENV === 'production' || !sent)
+            return response;
+        return {
+            ...response,
+            devVerificationCode: sent.shortCode,
+            verifyPageUrl: sent.verifyPageUrl,
+        };
+    }
+    async generateUniqueVerificationShortCode() {
+        for (let attempt = 0; attempt < 8; attempt++) {
+            const code = String(crypto.randomInt(100000, 1000000));
+            const existing = await this.verificationTokenRepo.findOne({ where: { shortCode: code } });
+            if (!existing)
+                return code;
+        }
+        throw new common_1.BadRequestException('Could not generate verification code. Please try again.');
     }
 };
 exports.AuthService = AuthService;

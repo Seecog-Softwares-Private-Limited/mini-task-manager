@@ -828,9 +828,9 @@ export default function WorkspacesPage() {
         confirmLabel="Delete permanently"
         variant="destructive"
         loading={deleteMutation.isPending}
-        onConfirm={async () => {
-          if (orgPendingDelete) await deleteMutation.mutateAsync(orgPendingDelete.id);
-        }}
+        onConfirm={() =>
+          orgPendingDelete ? deleteMutation.mutateAsync(orgPendingDelete.id) : Promise.resolve()
+        }
       />
 
       {/* Create / edit workspace — same modal */}
@@ -989,7 +989,7 @@ export default function WorkspacesPage() {
                   createOrgMutation.isPending ||
                   updateOrgMutation.isPending ||
                   isSlugTaken ||
-                  (editingOrg != null && (!hasEditChanges || !watchedName.trim()))
+                  (editingOrg && (!hasEditChanges || !watchedName.trim()))
                 }
               >
                 {createOrgMutation.isPending || updateOrgMutation.isPending ? (
