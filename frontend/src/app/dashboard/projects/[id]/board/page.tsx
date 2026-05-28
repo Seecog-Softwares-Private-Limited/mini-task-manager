@@ -28,7 +28,7 @@ import { BoardSkeleton } from "@/components/kanban/board-skeleton";
 import { BulkActionBar } from "@/components/kanban/bulk-action-bar";
 import { CreateTaskModal, type CreateTaskFormData } from "@/components/tasks/create-task-modal";
 import { useTaskCreatedCelebration } from "@/components/tasks/task-create-celebration";
-import { CreateSprintModal } from "@/components/sprints/create-sprint-modal";
+import { CreateSprintModal, type CreateSprintFormData } from "@/components/sprints/create-sprint-modal";
 import { TaskDetailModal } from "@/components/tasks/task-detail-modal";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
@@ -344,7 +344,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
   });
 
   const createSprintMutation = useMutation({
-    mutationFn: (payload: { name: string; startDate?: string; endDate?: string }) =>
+    mutationFn: (payload: CreateSprintFormData) =>
       createSprint({ projectId: id, ...payload }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sprints", id] });
@@ -809,7 +809,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
         <CreateSprintModal
           open={createSprintModalOpen}
           onClose={() => setCreateSprintModalOpen(false)}
-          onSubmit={(data) => createSprintMutation.mutate({ projectId: id, ...data })}
+          onSubmit={(data) => createSprintMutation.mutate(data)}
           isSubmitting={createSprintMutation.isPending}
           error={createSprintMutation.error ? parseApiError(createSprintMutation.error) : null}
         />

@@ -60,7 +60,7 @@ import {
   CreateTaskModal,
   type CreateTaskFormData,
 } from "@/components/tasks/create-task-modal";
-import { CreateSprintModal } from "@/components/sprints/create-sprint-modal";
+import { CreateSprintModal, type CreateSprintFormData } from "@/components/sprints/create-sprint-modal";
 import { TaskDetailModal } from "@/components/tasks/task-detail-modal";
 import { useTaskCreatedCelebration } from "@/components/tasks/task-create-celebration";
 import { ProjectSwitcher } from "@/components/tasks/project-switcher";
@@ -385,7 +385,7 @@ export default function TasksPage() {
   });
 
   const createSprintMutation = useMutation({
-    mutationFn: (payload: { name: string; startDate?: string; endDate?: string }) =>
+    mutationFn: (payload: CreateSprintFormData) =>
       createSprint({ projectId: selectedProjectId!, ...payload }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sprints", selectedProjectId] });
@@ -791,7 +791,7 @@ export default function TasksPage() {
         <CreateSprintModal
           open={createSprintModalOpen}
           onClose={() => setCreateSprintModalOpen(false)}
-          onSubmit={(data) => createSprintMutation.mutate({ projectId: selectedProjectId, ...data })}
+          onSubmit={(data) => createSprintMutation.mutate(data)}
           isSubmitting={createSprintMutation.isPending}
           error={createSprintMutation.error ? parseApiError(createSprintMutation.error) : null}
         />
