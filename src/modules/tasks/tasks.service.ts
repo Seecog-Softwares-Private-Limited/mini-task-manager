@@ -7,6 +7,7 @@ import { ProjectsService } from '../projects/projects.service';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { UsageService } from '../billing/usage.service';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
+import { OrganizationsService } from '../organizations/organizations.service';
 import { TaskEntity } from './entities/task.entity';
 import { TaskAttachmentEntity } from './entities/task-attachment.entity';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -34,6 +35,21 @@ function sanitizeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 200) || 'file';
 }
 
+/** Fields assignees may update on tasks assigned to them (owner can update all). */
+const ASSIGNEE_PATCH_FIELDS = new Set(['statusId', 'priority', 'subtasks']);
+
+function taskAssigneeUserIds(task: TaskEntity): string[] {
+  const fromList = task.assigneeIds?.length ? task.assigneeIds : [];
+  if (task.assigneeId && !fromList.includes(task.assigneeId)) {
+    return [...fromList, task.assigneeId];
+  }
+  return fromList;
+}
+
+function patchDtoKeys(dto: PatchTaskDto): string[] {
+  return (Object.keys(dto) as (keyof PatchTaskDto)[]).filter((k) => dto[k] !== undefined);
+}
+
 @Injectable()
 export class TasksService {
   constructor(
@@ -46,6 +62,7 @@ export class TasksService {
     private readonly usageService: UsageService,
     private readonly activityLogsService: ActivityLogsService,
     private readonly configService: ConfigService<Configuration>,
+    private readonly organizationsService: OrganizationsService,
   ) {}
 
   async findById(id: string): Promise<TaskEntity | null> {
@@ -125,6 +142,11 @@ export class TasksService {
   ): Promise<TaskEntity | null> {
     const task = await this.tasksRepository.findByIdAndOrganization(taskId, organizationId);
     if (!task) return null;
+
+    if (userId) {
+      await this.assertCanUpdateTask(task, organizationId, userId, dto);
+    }
+
     const patch: Partial<TaskEntity> = {};
     if (dto.title !== undefined) {
       const trimmedTitle = dto.title.trim();
@@ -172,6 +194,31 @@ export class TasksService {
         .catch(() => {});
     }
     return this.tasksRepository.findById(taskId);
+  }
+
+  private async assertCanUpdateTask(
+    task: TaskEntity,
+    organizationId: string,
+    userId: string,
+    dto: PatchTaskDto,
+  ): Promise<void> {
+    const membership = await this.organizationsService.getMembership(organizationId, userId);
+    const role = membership?.role?.toLowerCase() ?? '';
+    if (role === 'owner') return;
+
+    const assigneeIds = taskAssigneeUserIds(task);
+    const isAssignee = assigneeIds.includes(userId);
+    if (!isAssignee) {
+      throw new ForbiddenException('Only the workspace owner or task assignee can update this task');
+    }
+
+    const keys = patchDtoKeys(dto);
+    const disallowed = keys.filter((k) => !ASSIGNEE_PATCH_FIELDS.has(k));
+    if (disallowed.length > 0) {
+      throw new ForbiddenException(
+        'Assignees can only update task status, priority, and subtasks',
+      );
+    }
   }
 
   private normalizeTags(
