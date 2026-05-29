@@ -20,11 +20,20 @@ import { cn } from "@/lib/utils";
 
 const DROPDOWN_Z = "z-[110]";
 
+interface MemberHint {
+  id: string;
+  name: string;
+  email?: string;
+  avatarUrl?: string;
+}
+
 interface SubtaskAssigneeSelectorProps {
   projectId: string;
   value?: string;
   onChange: (assigneeId?: string) => void;
   disabled?: boolean;
+  /** Pre-resolved members from the task modal (project + org + task assignee). */
+  knownMembers?: MemberHint[];
 }
 
 export function SubtaskAssigneeSelector({
@@ -32,6 +41,7 @@ export function SubtaskAssigneeSelector({
   value,
   onChange,
   disabled,
+  knownMembers = [],
 }: SubtaskAssigneeSelectorProps) {
   const { orgId } = useTenant();
   const [open, setOpen] = useState(false);
@@ -54,10 +64,11 @@ export function SubtaskAssigneeSelector({
   const isLoading = projectLoading || orgLoading;
 
   const options = useMemo(() => {
-    const byUserId = new Map<
-      string,
-      { id: string; name: string; email: string; avatarUrl?: string }
-    >();
+    const byUserId = new Map<string, MemberHint>();
+
+    for (const hint of knownMembers) {
+      byUserId.set(hint.id, hint);
+    }
 
     for (const m of projectMembers) {
       byUserId.set(m.userId, {
@@ -68,9 +79,9 @@ export function SubtaskAssigneeSelector({
       });
     }
 
-    if (byUserId.size === 0) {
-      for (const om of orgMembers) {
-        if (om.status?.toLowerCase() !== "active") continue;
+    for (const om of orgMembers) {
+      if (om.status?.toLowerCase() !== "active") continue;
+      if (!byUserId.has(om.userId)) {
         byUserId.set(om.userId, {
           id: om.userId,
           name: om.user?.fullName ?? om.user?.email ?? "User",
@@ -81,15 +92,15 @@ export function SubtaskAssigneeSelector({
     }
 
     return Array.from(byUserId.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [projectMembers, orgMembers]);
+  }, [projectMembers, orgMembers, knownMembers]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return options;
-    return options.filter((m) => m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q));
+    return options.filter((m) => m.name.toLowerCase().includes(q) || (m.email ?? "").toLowerCase().includes(q));
   }, [options, search]);
 
-  const selected = options.find((m) => m.id === value);
+  const selected = value ? options.find((m) => m.id === value) : undefined;
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
@@ -99,19 +110,19 @@ export function SubtaskAssigneeSelector({
           variant="ghost"
           size="icon"
           disabled={disabled}
-          className="h-7 w-7 rounded-full p-0"
+          className="h-7 w-7 shrink-0 rounded-full p-0"
           aria-label={selected ? `Assignee ${selected.name}` : "Assign subtask"}
         >
           {selected ? (
-            <Avatar className="h-7 w-7">
+            <Avatar className="h-7 w-7 ring-1 ring-border/60">
               <AvatarImage src={selected.avatarUrl} />
-              <AvatarFallback className="text-[10px]">
+              <AvatarFallback className="bg-muted text-[10px] font-semibold text-foreground">
                 {selected.name.slice(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
           ) : (
-            <span className="flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-muted-foreground/40 bg-muted/30">
-              <UserRoundPlus className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-foreground/35 bg-muted/50">
+              <UserRoundPlus className="h-3.5 w-3.5 text-foreground/75" aria-hidden />
             </span>
           )}
         </Button>
@@ -205,4 +216,3 @@ export function SubtaskAssigneeSelector({
     </DropdownMenu>
   );
 }
-

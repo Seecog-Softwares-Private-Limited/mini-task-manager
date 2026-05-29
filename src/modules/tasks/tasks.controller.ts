@@ -212,8 +212,6 @@ export class TasksController {
     return this.toResponse(task);
   }
 
-  @UseGuards(RolesGuard)
-  @Roles('owner')
   @Patch(':id')
   async update(
     @Param('id') id: string,

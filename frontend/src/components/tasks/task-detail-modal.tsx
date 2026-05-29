@@ -203,6 +203,7 @@ export interface TaskDetailModalProps {
   onOpenChange: (open: boolean) => void;
   onTaskUpdated?: (task: Task) => void;
   /** When true, task fields cannot be edited (non-owner members). */
+  /** @deprecated Modal computes permissions from org role + assignee; kept for API compat. */
   readOnly?: boolean;
 }
 
@@ -214,7 +215,7 @@ export function TaskDetailModal({
   open,
   onOpenChange,
   onTaskUpdated,
-  readOnly = false,
+  readOnly: _readOnly = false,
 }: TaskDetailModalProps) {
   const queryClient = useQueryClient();
   const syncTaskIntoListCache = React.useCallback(
@@ -364,6 +365,53 @@ export function TaskDetailModal({
     return { name: "User", avatarUrl: undefined, lastSeenAt: undefined };
   }, [task?.assigneeId, task?.assignee, assignableMembers]);
 
+  const isOwner = React.useMemo(
+    () => orgMembers.find((m) => m.userId === currentUserId)?.role?.toUpperCase() === "OWNER",
+    [orgMembers, currentUserId]
+  );
+
+  const isAssignee = React.useMemo(() => {
+    if (!task || !currentUserId) return false;
+    const ids = task.assigneeIds?.length
+      ? task.assigneeIds
+      : task.assigneeId
+        ? [task.assigneeId]
+        : [];
+    return ids.includes(currentUserId);
+  }, [task, currentUserId]);
+
+  /** Owner can edit every field; assignees can update status, priority, and subtasks only. */
+  const canEditAll = isOwner;
+  const canEditWorkflowFields = isOwner || isAssignee;
+  const isViewOnly = !canEditWorkflowFields;
+
+  const subtaskMemberHints = React.useMemo(() => {
+    const byId = new Map<
+      string,
+      { id: string; name: string; email?: string; avatarUrl?: string }
+    >();
+    for (const m of assignableMembers) {
+      byId.set(m.userId, {
+        id: m.userId,
+        name: m.user?.fullName ?? m.user?.email ?? "User",
+        email: m.user?.email,
+        avatarUrl: m.user?.avatarUrl,
+      });
+    }
+    if (task?.assignee) {
+      const a = task.assignee;
+      if (!byId.has(a.id)) {
+        byId.set(a.id, {
+          id: a.id,
+          name: a.fullName ?? a.email ?? "User",
+          email: a.email,
+          avatarUrl: a.avatarUrl,
+        });
+      }
+    }
+    return Array.from(byId.values());
+  }, [assignableMembers, task?.assignee]);
+
   const { data: comments = [], isLoading: commentsLoading } = useQuery({
     queryKey: ["task-comments", taskId],
     queryFn: () => fetchComments(taskId!),
@@ -444,8 +492,15 @@ export function TaskDetailModal({
 
   const updateMutation = useMutation({
     mutationFn: (payload: Parameters<typeof updateTask>[1]) => {
-      if (readOnly) {
-        return Promise.reject(new Error("Only the workspace owner can edit tasks"));
+      const keys = Object.keys(payload);
+      const assigneeAllowed = new Set(["statusId", "priority"]);
+      if (!canEditAll) {
+        if (!canEditWorkflowFields) {
+          return Promise.reject(new Error("You do not have permission to edit this task"));
+        }
+        if (keys.some((k) => !assigneeAllowed.has(k))) {
+          return Promise.reject(new Error("Only the workspace owner can edit this field"));
+        }
       }
       return updateTask(taskId!, payload);
     },
@@ -474,8 +529,8 @@ export function TaskDetailModal({
 
   const assigneeMutation = useMutation({
     mutationFn: (assigneeId: string | null) => {
-      if (readOnly) {
-        return Promise.reject(new Error("Only the workspace owner can edit tasks"));
+      if (!canEditAll) {
+        return Promise.reject(new Error("Only the workspace owner can change the assignee"));
       }
       return updateTaskAssignee(taskId!, assigneeId);
     },
@@ -516,7 +571,12 @@ export function TaskDetailModal({
   });
 
   const updateSubtasksMutation = useMutation({
-    mutationFn: (subtasks: TaskSubtask[]) => updateTask(taskId!, { subtasks }),
+    mutationFn: (subtasks: TaskSubtask[]) => {
+      if (!canEditWorkflowFields) {
+        return Promise.reject(new Error("You do not have permission to update subtasks"));
+      }
+      return updateTask(taskId!, { subtasks });
+    },
     onMutate: async (subtasks) => {
       await queryClient.cancelQueries({ queryKey: ["task", taskId] });
       const previous = queryClient.getQueryData<Task>(["task", taskId]);
@@ -739,9 +799,14 @@ export function TaskDetailModal({
           </div>
         ) : (
           <>
-            {readOnly && (
+            {isViewOnly && (
               <div className="mx-6 mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-900 dark:text-amber-100 sm:mx-8">
-                View only — only the workspace <strong>owner</strong> can edit this task. You can still read details and add comments.
+                View only — only the workspace <strong>owner</strong> or task <strong>assignee</strong> can edit this task. You can still read details and add comments.
+              </div>
+            )}
+            {canEditWorkflowFields && !canEditAll && (
+              <div className="mx-6 mt-4 rounded-lg border border-sky-500/30 bg-sky-500/10 px-4 py-2.5 text-sm text-sky-950 dark:text-sky-100 sm:mx-8">
+                Assigned to you — you can update <strong>status</strong>, <strong>priority</strong>, and <strong>subtasks</strong>. Other fields are owner-only.
               </div>
             )}
             <DialogHeader className="td-modal-header-shade shrink-0 border-b border-[#E7EAF0]/60 px-6 pb-6 pt-7 shadow-[0_1px_0_rgba(255,255,255,0.7)_inset] dark:border-border/40 sm:px-8 sm:pb-7 sm:pt-8">
@@ -772,13 +837,13 @@ export function TaskDetailModal({
                       id="task-detail-title"
                       className={cn(
                         "flex max-w-full items-start gap-3 rounded-xl px-1 py-1 text-left",
-                        !readOnly && "group cursor-pointer transition-colors hover:bg-background/50"
+                        canEditAll && "group cursor-pointer transition-colors hover:bg-background/50"
                       )}
-                      role={readOnly ? undefined : "button"}
-                      tabIndex={readOnly ? undefined : 0}
-                      onClick={readOnly ? undefined : () => setIsEditingTitle(true)}
+                      role={canEditAll ? "button" : undefined}
+                      tabIndex={canEditAll ? 0 : undefined}
+                      onClick={canEditAll ? () => setIsEditingTitle(true) : undefined}
                       onKeyDown={
-                        readOnly
+                        canEditAll
                           ? undefined
                           : (e) => {
                               if (e.key === "Enter") setIsEditingTitle(true);
@@ -788,7 +853,7 @@ export function TaskDetailModal({
                       <span className="min-w-0 text-balance text-2xl font-semibold leading-[1.2] tracking-[-0.025em] text-foreground md:text-[1.875rem] md:leading-[1.12]">
                         {task.title}
                       </span>
-                      {!readOnly && (
+                      {canEditAll && (
                         <Pencil className="mt-2 h-4 w-4 shrink-0 text-muted-foreground/50 opacity-0 transition-opacity group-hover:opacity-100" />
                       )}
                     </div>
@@ -797,7 +862,7 @@ export function TaskDetailModal({
                     {task.dueDate && (
                       <span
                         className={cn(
-                          "inline-flex items-center gap-1.5 rounded-full border border-[#E7EAF0] bg-[#FCFCFD] px-2.5 py-1 text-[11px] font-medium text-muted-foreground dark:border-border dark:bg-muted/20",
+                          "inline-flex items-center gap-1.5 rounded-full border border-[#E7EAF0] bg-[#FCFCFD] px-2.5 py-1 text-[11px] font-semibold text-foreground dark:border-border dark:bg-muted/20",
                           isOverdue && "border-destructive/30 bg-destructive/5 text-destructive"
                         )}
                       >
@@ -850,16 +915,24 @@ export function TaskDetailModal({
                       />
                     ) : (
                       <div
-                        onClick={() => setIsEditingDescription(true)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            setIsEditingDescription(true);
-                          }
-                        }}
-                        role="button"
-                        tabIndex={0}
-                        className="group -mx-1 min-h-[7.5rem] w-full rounded-xl border border-dashed border-transparent px-4 py-4 text-left transition-all hover:border-[#E7EAF0]/80 hover:bg-white/60 dark:hover:border-border/50 dark:hover:bg-muted/20"
+                        onClick={canEditAll ? () => setIsEditingDescription(true) : undefined}
+                        onKeyDown={
+                          canEditAll
+                            ? (e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  setIsEditingDescription(true);
+                                }
+                              }
+                            : undefined
+                        }
+                        role={canEditAll ? "button" : undefined}
+                        tabIndex={canEditAll ? 0 : undefined}
+                        className={cn(
+                          "group -mx-1 min-h-[7.5rem] w-full rounded-xl border border-dashed border-transparent px-4 py-4 text-left transition-all",
+                          canEditAll &&
+                            "hover:border-[#E7EAF0]/80 hover:bg-white/60 dark:hover:border-border/50 dark:hover:bg-muted/20"
+                        )}
                       >
                         {(() => {
                           const raw = task.description ?? "";
@@ -908,8 +981,12 @@ export function TaskDetailModal({
                             </>
                           );
                         })()}
-                        <span className="mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground/60 opacity-0 transition-opacity group-hover:opacity-100">
-                          <Pencil className="h-3.5 w-3.5" /> Click to edit
+                        <span className={cn("mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground/60 transition-opacity", canEditAll && "opacity-0 group-hover:opacity-100")}>
+                          {canEditAll ? (
+                            <>
+                              <Pencil className="h-3.5 w-3.5" /> Click to edit
+                            </>
+                          ) : null}
                         </span>
                       </div>
                     )}
@@ -958,6 +1035,7 @@ export function TaskDetailModal({
                           <input
                             type="checkbox"
                             checked={item.completed}
+                            disabled={!canEditWorkflowFields || updateSubtasksMutation.isPending}
                             onChange={() => {
                               const nextCompleted = !item.completed;
                               const doneId = defaultDoneStatusId(statuses);
@@ -1005,6 +1083,7 @@ export function TaskDetailModal({
                           ) : (
                             <button
                               type="button"
+                              disabled={!canEditWorkflowFields}
                               onClick={() => startSubtaskInlineEdit(item.id, item.title)}
                               className={cn(
                                 "min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left text-sm font-medium transition-colors duration-200 hover:bg-background/80",
@@ -1024,6 +1103,7 @@ export function TaskDetailModal({
                           <SubtaskAssigneeSelector
                             projectId={projectId}
                             value={item.assigneeId}
+                            knownMembers={subtaskMemberHints}
                             onChange={(assigneeId) => {
                               updateSubtasksMutation.mutate(
                                 checklist.map((i) =>
@@ -1031,7 +1111,7 @@ export function TaskDetailModal({
                                 )
                               );
                             }}
-                            disabled={updateSubtasksMutation.isPending}
+                            disabled={!canEditWorkflowFields || updateSubtasksMutation.isPending}
                           />
                           <SubtaskStatusSelector
                             statuses={statuses}
@@ -1051,7 +1131,7 @@ export function TaskDetailModal({
                                 )
                               );
                             }}
-                            disabled={updateSubtasksMutation.isPending}
+                            disabled={!canEditWorkflowFields || updateSubtasksMutation.isPending}
                           />
                           <SubtaskPrioritySelector
                             value={item.priority ?? "MEDIUM"}
@@ -1062,7 +1142,7 @@ export function TaskDetailModal({
                                 )
                               );
                             }}
-                            disabled={updateSubtasksMutation.isPending}
+                            disabled={!canEditWorkflowFields || updateSubtasksMutation.isPending}
                           />
                           <SubtaskDueDatePicker
                             value={item.dueDate}
@@ -1074,13 +1154,14 @@ export function TaskDetailModal({
                                 )
                               );
                             }}
-                            disabled={updateSubtasksMutation.isPending}
+                            disabled={!canEditWorkflowFields || updateSubtasksMutation.isPending}
                           />
                           <Button
                             type="button"
                             variant="ghost"
                             size="icon"
                             className="ml-auto h-8 w-8 shrink-0 rounded-lg text-muted-foreground opacity-0 transition-all duration-200 hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+                            disabled={!canEditWorkflowFields || updateSubtasksMutation.isPending}
                             onClick={() =>
                               updateSubtasksMutation.mutate(checklist.filter((i) => i.id !== item.id))
                             }
@@ -1096,6 +1177,7 @@ export function TaskDetailModal({
                           <Input
                             placeholder="Add an item…"
                             value={newCheckItem}
+                            disabled={!canEditWorkflowFields || updateSubtasksMutation.isPending}
                             onChange={(e) => setNewCheckItem(e.target.value)}
                             onKeyDown={(e) => {
                               if (e.key === "Enter" && newCheckItem.trim()) {
@@ -1120,7 +1202,7 @@ export function TaskDetailModal({
                           type="button"
                           size="default"
                           className="h-11 shrink-0 rounded-xl px-6 font-semibold shadow-[0_4px_14px_-2px_hsl(var(--primary)/0.45)] transition-[transform,box-shadow] hover:shadow-[0_8px_22px_-4px_hsl(var(--primary)/0.5)] active:scale-[0.98]"
-                          disabled={!newCheckItem.trim()}
+                          disabled={!canEditWorkflowFields || !newCheckItem.trim() || updateSubtasksMutation.isPending}
                           onClick={() => {
                             if (newCheckItem.trim()) {
                               updateSubtasksMutation.mutate([
@@ -1329,7 +1411,7 @@ export function TaskDetailModal({
                       <DropdownMenuTrigger asChild>
                         <button
                           type="button"
-                          disabled={readOnly}
+                          disabled={!canEditAll}
                           className="flex w-full items-center gap-3 rounded-xl bg-white/85 px-4 py-3.5 text-left text-sm font-medium outline-none shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)] transition-[box-shadow,background-color] hover:bg-white hover:shadow-[inset_0_0_0_1px_rgba(15,23,42,0.09),0_4px_14px_-6px_rgba(15,23,42,0.1)] focus-visible:ring-2 focus-visible:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white/[0.06] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)] dark:hover:bg-white/[0.1]"
                           aria-label="Change assignee"
                         >
@@ -1437,7 +1519,7 @@ export function TaskDetailModal({
                       <Input
                         id="task-detail-due-date"
                         type="date"
-                        disabled={readOnly || updateMutation.isPending}
+                        disabled={!canEditAll || updateMutation.isPending}
                         value={taskDueDateToInputValue(task.dueDate)}
                         onChange={(e) => {
                           const v = e.target.value;
@@ -1445,6 +1527,7 @@ export function TaskDetailModal({
                         }}
                         className={cn(
                           "h-12 rounded-xl border-0 bg-white/90 px-4 text-sm shadow-[inset_0_1px_2px_rgba(15,23,42,0.04),inset_0_0_0_1px_rgba(15,23,42,0.08)] transition-shadow focus-visible:shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.35),0_0_0_3px_hsl(var(--primary)/0.12)] focus-visible:ring-0 dark:bg-white/[0.06] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]",
+                          !canEditAll && "text-foreground font-semibold disabled:cursor-default disabled:opacity-100",
                           isOverdue && task.dueDate && "shadow-[inset_0_0_0_1px_hsl(var(--destructive)/0.45)]"
                         )}
                         aria-label="Due date"
@@ -1452,7 +1535,8 @@ export function TaskDetailModal({
                       <div className="flex items-center justify-between gap-2 pt-1">
                         <p
                           className={cn(
-                            "text-xs text-muted-foreground",
+                            "text-xs",
+                            !canEditAll ? "font-medium text-foreground/90" : "text-muted-foreground",
                             isOverdue && task.dueDate && "font-medium text-destructive"
                           )}
                         >
@@ -1465,7 +1549,7 @@ export function TaskDetailModal({
                               })
                             : "No date selected"}
                         </p>
-                        {task.dueDate ? (
+                        {task.dueDate && canEditAll ? (
                           <Button
                             type="button"
                             variant="ghost"
@@ -1494,7 +1578,7 @@ export function TaskDetailModal({
                             <Button
                               type="button"
                               variant="outline"
-                              disabled={updateMutation.isPending}
+                              disabled={!canEditWorkflowFields || updateMutation.isPending}
                               className="h-11 w-full justify-between rounded-xl border-0 bg-white/85 px-4 text-sm font-semibold tracking-tight text-foreground shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08)] transition-[background-color,box-shadow] hover:bg-white hover:shadow-[inset_0_0_0_1px_rgba(15,23,42,0.12),0_4px_12px_-6px_rgba(15,23,42,0.12)] dark:bg-white/[0.06] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)] dark:hover:bg-white/[0.1]"
                               aria-label="Change task status"
                             >
@@ -1552,7 +1636,7 @@ export function TaskDetailModal({
                           <Button
                             type="button"
                             variant="outline"
-                            disabled={updateMutation.isPending}
+                            disabled={!canEditWorkflowFields || updateMutation.isPending}
                             className={cn(
                               "h-11 w-full justify-between rounded-xl border-0 px-4 text-sm font-semibold tracking-tight text-foreground transition-[background-color,box-shadow]",
                               PRIORITY_SIDEBAR_SHELL[selectedPriority.value] ?? PRIORITY_SIDEBAR_SHELL.MEDIUM
@@ -1633,7 +1717,8 @@ export function TaskDetailModal({
                     ) : (
                       <button
                         type="button"
-                        onClick={startStoryPointsEdit}
+                        onClick={canEditAll ? startStoryPointsEdit : undefined}
+                        disabled={!canEditAll}
                         className="group mt-1 flex w-full items-center justify-between gap-2 rounded-xl bg-white/70 px-4 py-3 text-left shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)] transition-all hover:bg-white hover:shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08),0_4px_14px_-8px_rgba(15,23,42,0.08)] dark:bg-white/[0.05] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07)] dark:hover:bg-white/[0.09]"
                       >
                         <span className="flex items-center gap-2">
@@ -1669,7 +1754,7 @@ export function TaskDetailModal({
                           <button
                             type="button"
                             onClick={() => removeTag(tag.name)}
-                            disabled={updateMutation.isPending}
+                            disabled={!canEditAll || updateMutation.isPending}
                             className="shrink-0 rounded-full p-0.5 hover:bg-black/10 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-transparent focus:ring-primary"
                             aria-label={`Remove tag ${tag.name}`}
                           >
@@ -1683,7 +1768,7 @@ export function TaskDetailModal({
                             type="button"
                             variant="outline"
                             size="sm"
-                            disabled={updateMutation.isPending}
+                            disabled={!canEditAll || updateMutation.isPending}
                             className="h-8 gap-1.5 rounded-full border-dashed text-xs"
                           >
                             <Plus className="h-3.5 w-3.5" /> Add tag
