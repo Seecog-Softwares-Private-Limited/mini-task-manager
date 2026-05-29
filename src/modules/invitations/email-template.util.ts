@@ -109,6 +109,28 @@ export function emailActionSection(actionUrl: string, label: string): string {
   return `${emailPrimaryButton(actionUrl, label)}\n${emailLinkFallback(actionUrl)}`;
 }
 
+/**
+ * Invitation CTA — always includes a visible copy-paste URL.
+ * Gmail often disables button links in Spam; localhost links never work from inboxes.
+ */
+export function emailInvitationActionSection(acceptUrl: string): string {
+  if (isLocalhostUrl(acceptUrl)) {
+    return emailLocalLinkBlock(acceptUrl, 'Accept Invitation');
+  }
+
+  const href = escapeHtml(acceptUrl);
+  return `
+${emailPrimaryButton(acceptUrl, 'Accept Invitation')}
+<div style="margin:24px 0 0;padding:20px;background:${BRAND.footerBg};border:1px solid ${BRAND.cardBorder};border-radius:12px;">
+  <p style="margin:0 0 10px;font-size:13px;line-height:1.55;color:${BRAND.textMuted};text-align:center;">
+    If the button does not work, mark this email as <strong>Not spam</strong>, then copy this link into your browser:
+  </p>
+  <p style="margin:0;padding:12px 14px;background:#ffffff;border:1px solid ${BRAND.cardBorder};border-radius:8px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;line-height:1.55;word-break:break-all;text-align:left;">
+    <a href="${href}" target="_blank" rel="noopener noreferrer" style="color:${BRAND.violet};text-decoration:underline;">${href}</a>
+  </p>
+</div>`.trim();
+}
+
 export function emailPlainTextWithLink(intro: string, actionUrl: string, shortCode?: string): string {
   const verifyPage = actionUrl.replace(/\?token=.*$/, '');
   if (shortCode && isLocalhostUrl(actionUrl)) {
@@ -177,7 +199,7 @@ export function emailInvitationBody(params: {
     </span>
   </p>
 </div>
-${emailActionSection(acceptUrl, 'Accept Invitation')}
+${emailInvitationActionSection(acceptUrl)}
 ${emailExpiryNote('7 days')}`.trim();
 }
 

@@ -16,6 +16,7 @@ import { UserEntity } from '../users/entities/user.entity';
 import { OrganizationInvitationEntity } from './entities/organization-invitation.entity';
 import { generateUuid } from '../../common/utils/uuid.util';
 import { getFrontendUrl } from '../../common/utils/frontend-url.util';
+import { isLocalhostUrl } from './email-template.util';
 
 const INVITE_EXPIRY_DAYS = 7;
 
@@ -82,10 +83,13 @@ export class InvitationsService {
     const acceptUrl = `${getFrontendUrl()}/invite/${token}`;
 
     this.logger.log(
-      `Sending workspace invitation to ${normalizedEmail} for org ${organizationId} (acceptUrl host=${new URL(acceptUrl).host})`,
+      `Sending workspace invitation to ${normalizedEmail} for org ${organizationId} (acceptUrl=${acceptUrl})`,
     );
-    if (process.env.NODE_ENV !== 'production') {
-      this.logger.log(`[dev] Invitation accept link for ${normalizedEmail}: ${acceptUrl}`);
+    if (isLocalhostUrl(acceptUrl)) {
+      this.logger.warn(
+        `Invitation link uses localhost — invitees cannot open it from Gmail. ` +
+          `Set FRONTEND_URL in properties.env to your public app URL (e.g. http://3.110.214.243:3000) and restart the API.`,
+      );
     }
 
     await this.emailService.sendInvitation({
@@ -262,7 +266,12 @@ export class InvitationsService {
 
     const acceptUrl = `${getFrontendUrl()}/invite/${newToken}`;
 
-    this.logger.log(`Resending workspace invitation to ${invitation.email} (invitationId=${invitationId})`);
+    this.logger.log(`Resending workspace invitation to ${invitation.email} (acceptUrl=${acceptUrl})`);
+    if (isLocalhostUrl(acceptUrl)) {
+      this.logger.warn(
+        `Invitation resend uses localhost — set FRONTEND_URL to your public app URL and restart the API.`,
+      );
+    }
 
     await this.emailService.sendInvitation({
       to: invitation.email,

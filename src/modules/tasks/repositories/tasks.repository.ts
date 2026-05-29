@@ -13,16 +13,17 @@ export class TasksRepository {
   ) {}
 
   async findById(id: string): Promise<TaskEntity | null> {
-    return this.repo.findOne({ where: { id } });
+    return this.repo.findOne({ where: { id }, relations: ['assignee'] });
   }
 
   async findByIdAndOrganization(id: string, organizationId: string): Promise<TaskEntity | null> {
-    return this.repo.findOne({ where: { id, organizationId } });
+    return this.repo.findOne({ where: { id, organizationId }, relations: ['assignee'] });
   }
 
   async findByProject(projectId: string, page: number, limit: number): Promise<[TaskEntity[], number]> {
     return this.repo.findAndCount({
       where: { projectId },
+      relations: ['assignee'],
       order: { createdAt: 'DESC' },
       skip: getSkip(page, limit),
       take: limit,
