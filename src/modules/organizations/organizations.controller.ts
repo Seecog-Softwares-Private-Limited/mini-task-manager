@@ -89,8 +89,7 @@ export class OrganizationsController {
     return { count };
   }
 
-  @UseGuards(TenantGuard, RolesGuard)
-  @Roles('owner', 'admin')
+  @UseGuards(TenantGuard)
   @Get(':id/members')
   async getMembers(
     @Param('id') id: string,

@@ -22,19 +22,36 @@ interface SubtaskDueDatePickerProps {
   completed?: boolean;
 }
 
+function parseDueDateLocal(value?: string): Date | null {
+  if (!value) return null;
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function dueDateInputValue(value?: string): string {
+  if (!value) return "";
+  const match = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : "";
+}
+
 function isOverdue(value?: string, completed?: boolean): boolean {
   if (!value || completed) return false;
+  const current = parseDueDateLocal(value);
+  if (!current) return false;
   const today = new Date();
-  const current = new Date(value);
   today.setHours(0, 0, 0, 0);
   current.setHours(0, 0, 0, 0);
   return current < today;
 }
 
 function formatDateLabel(value?: string): string {
-  if (!value) return "Due";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Due";
+  const date = parseDueDateLocal(value);
+  if (!date) return "Due";
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
@@ -79,7 +96,7 @@ export function SubtaskDueDatePicker({
         <div className="space-y-3 pt-2">
           <Input
             type="date"
-            value={value ?? ""}
+            value={dueDateInputValue(value)}
             onChange={(e) => onChange(e.target.value || undefined)}
             className="h-9 text-xs"
           />

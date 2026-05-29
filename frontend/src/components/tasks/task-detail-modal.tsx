@@ -34,6 +34,22 @@ import {
 } from "@/services/api/attachments.api";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
+
+/** UUID v4 — crypto.randomUUID fails on HTTP (non-localhost), e.g. production IP deploy. */
+function newSubtaskId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    try {
+      return crypto.randomUUID();
+    } catch {
+      /* non-secure context */
+    }
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (char) => {
+    const random = (Math.random() * 16) | 0;
+    const value = char === "x" ? random : (random & 0x3) | 0x8;
+    return value.toString(16);
+  });
+}
 import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-selector";
 import { SubtaskDueDatePicker } from "@/components/tasks/subtask-due-date-picker";
 import { SubtaskPrioritySelector } from "@/components/tasks/subtask-priority-selector";
@@ -520,6 +536,26 @@ export function TaskDetailModal({
     [taskId, uploadAttachmentMutation]
   );
 
+  const appendSubtask = React.useCallback(
+    (title: string) => {
+      const trimmed = title.trim();
+      if (!trimmed) return;
+      updateSubtasksMutation.mutate([
+        ...checklist,
+        {
+          id: newSubtaskId(),
+          title: trimmed,
+          completed: false,
+          priority: "MEDIUM",
+          statusId: defaultTodoStatusId(statuses),
+          dueDate: undefined,
+        },
+      ]);
+      setNewCheckItem("");
+    },
+    [checklist, statuses, updateSubtasksMutation]
+  );
+
   const handleFieldChange = (field: keyof Task, value: unknown) => {
     if (!task) return;
     if (field === "statusId") {
@@ -872,7 +908,7 @@ export function TaskDetailModal({
                         <div
                           key={item.id}
                           className={cn(
-                            "group flex flex-wrap items-center gap-2 rounded-2xl px-4 py-3.5 transition-all duration-200 sm:flex-nowrap sm:gap-3",
+                            "group flex flex-col gap-2 rounded-2xl px-4 py-3.5 transition-all duration-200 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 lg:flex-nowrap",
                             "bg-white/70 shadow-sm ring-1 ring-black/[0.04] hover:bg-white hover:shadow-md dark:bg-white/[0.04] dark:ring-white/[0.08] dark:hover:bg-white/[0.07]",
                             item.completed && "opacity-[0.72]"
                           )}
@@ -943,8 +979,11 @@ export function TaskDetailModal({
                               )}
                             </button>
                           )}
+                          <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
                           <SubtaskAssigneeSelector
                             projectId={projectId}
+                            organizationId={organizationId}
+                            prefetchedOrgMembers={orgMembers}
                             value={item.assigneeId}
                             onChange={(assigneeId) => {
                               updateSubtasksMutation.mutate(
@@ -1002,7 +1041,7 @@ export function TaskDetailModal({
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="ml-auto h-8 w-8 shrink-0 rounded-lg text-muted-foreground opacity-0 transition-all duration-200 hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+                            className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground opacity-0 transition-all duration-200 hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
                             onClick={() =>
                               updateSubtasksMutation.mutate(checklist.filter((i) => i.id !== item.id))
                             }
@@ -1010,6 +1049,7 @@ export function TaskDetailModal({
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
+                          </div>
                         </div>
                       ))}
                       <div className="flex gap-2 pt-4">
@@ -1021,18 +1061,8 @@ export function TaskDetailModal({
                             onChange={(e) => setNewCheckItem(e.target.value)}
                             onKeyDown={(e) => {
                               if (e.key === "Enter" && newCheckItem.trim()) {
-                                updateSubtasksMutation.mutate([
-                                  ...checklist,
-                                  {
-                                    id: crypto.randomUUID(),
-                                    title: newCheckItem.trim(),
-                                    completed: false,
-                                    priority: "MEDIUM",
-                                    statusId: defaultTodoStatusId(statuses),
-                                    dueDate: undefined,
-                                  },
-                                ]);
-                                setNewCheckItem("");
+                                e.preventDefault();
+                                appendSubtask(newCheckItem);
                               }
                             }}
                             className="h-10 flex-1 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
@@ -1042,23 +1072,8 @@ export function TaskDetailModal({
                           type="button"
                           size="default"
                           className="h-11 shrink-0 rounded-xl px-6 font-semibold shadow-[0_4px_14px_-2px_hsl(var(--primary)/0.45)] transition-[transform,box-shadow] hover:shadow-[0_8px_22px_-4px_hsl(var(--primary)/0.5)] active:scale-[0.98]"
-                          disabled={!newCheckItem.trim()}
-                          onClick={() => {
-                            if (newCheckItem.trim()) {
-                              updateSubtasksMutation.mutate([
-                                ...checklist,
-                                {
-                                  id: crypto.randomUUID(),
-                                  title: newCheckItem.trim(),
-                                  completed: false,
-                                  priority: "MEDIUM",
-                                  statusId: defaultTodoStatusId(statuses),
-                                  dueDate: undefined,
-                                },
-                              ]);
-                              setNewCheckItem("");
-                            }
-                          }}
+                          disabled={!newCheckItem.trim() || updateSubtasksMutation.isPending}
+                          onClick={() => appendSubtask(newCheckItem)}
                         >
                           Add
                         </Button>
