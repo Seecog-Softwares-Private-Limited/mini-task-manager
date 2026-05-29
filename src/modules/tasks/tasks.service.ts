@@ -39,11 +39,13 @@ function sanitizeFileName(name: string): string {
 const ASSIGNEE_PATCH_FIELDS = new Set(['statusId', 'priority', 'subtasks']);
 
 function taskAssigneeUserIds(task: TaskEntity): string[] {
+  const normalize = (id: string) => String(id).trim().toLowerCase();
   const fromList = task.assigneeIds?.length ? task.assigneeIds : [];
-  if (task.assigneeId && !fromList.includes(task.assigneeId)) {
-    return [...fromList, task.assigneeId];
+  const ids = [...fromList];
+  if (task.assigneeId && !ids.some((id) => normalize(id) === normalize(task.assigneeId!))) {
+    ids.push(task.assigneeId);
   }
-  return fromList;
+  return ids.map(normalize);
 }
 
 function patchDtoKeys(dto: PatchTaskDto): string[] {
@@ -207,7 +209,7 @@ export class TasksService {
     if (role === 'owner') return;
 
     const assigneeIds = taskAssigneeUserIds(task);
-    const isAssignee = assigneeIds.includes(userId);
+    const isAssignee = assigneeIds.includes(String(userId).trim().toLowerCase());
     if (!isAssignee) {
       throw new ForbiddenException('Only the workspace owner or task assignee can update this task');
     }

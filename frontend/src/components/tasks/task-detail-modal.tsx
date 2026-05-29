@@ -118,6 +118,9 @@ const PRIORITIES = [
   { value: "CRITICAL", label: "Critical", color: "bg-purple-500", border: "border-l-purple-400/50" },
 ];
 
+/** Dropdowns inside task detail dialog must sit above the modal (z-50). */
+const TASK_MODAL_DROPDOWN_Z = "z-[110]";
+
 /** Sidebar priority row — warm tint per level (visually distinct from status / primary actions). */
 const PRIORITY_SIDEBAR_SHELL: Record<string, string> = {
   LOW: "bg-emerald-500/[0.07] ring-1 ring-emerald-600/15 dark:bg-emerald-500/[0.11] dark:ring-emerald-400/22",
@@ -372,12 +375,16 @@ export function TaskDetailModal({
 
   const isAssignee = React.useMemo(() => {
     if (!task || !currentUserId) return false;
-    const ids = task.assigneeIds?.length
-      ? task.assigneeIds
-      : task.assigneeId
-        ? [task.assigneeId]
-        : [];
-    return ids.includes(currentUserId);
+    const uid = currentUserId.toLowerCase();
+    const ids = (
+      task.assigneeIds?.length
+        ? task.assigneeIds
+        : task.assigneeId
+          ? [task.assigneeId]
+          : []
+    ).map((id) => id.toLowerCase());
+    if (ids.includes(uid)) return true;
+    return (task.assignee?.id?.toLowerCase() ?? "") === uid;
   }, [task, currentUserId]);
 
   /** Owner can edit every field; assignees can update status, priority, and subtasks only. */
@@ -504,6 +511,17 @@ export function TaskDetailModal({
       }
       return updateTask(taskId!, payload);
     },
+    onMutate: async (payload) => {
+      if (payload.priority === undefined && payload.statusId === undefined) return undefined;
+      await queryClient.cancelQueries({ queryKey: ["task", taskId] });
+      const previous = queryClient.getQueryData<Task>(["task", taskId]);
+      if (previous) {
+        const optimistic = { ...previous, ...payload } as Task;
+        queryClient.setQueryData(["task", taskId], optimistic);
+        syncTaskIntoListCache(optimistic);
+      }
+      return { previous };
+    },
     onSuccess: (updated) => {
       if (!updated?.id) {
         toast({
@@ -518,7 +536,10 @@ export function TaskDetailModal({
       onTaskUpdated?.(updated);
       toast({ title: "Task updated", variant: "success" });
     },
-    onError: (err) => {
+    onError: (err, _payload, ctx) => {
+      if (ctx?.previous) {
+        queryClient.setQueryData(["task", taskId], ctx.previous);
+      }
       toast({
         title: "Failed to update task",
         description: parseApiError(err),
@@ -641,15 +662,24 @@ export function TaskDetailModal({
   );
 
   const handleFieldChange = (field: keyof Task, value: unknown) => {
-    if (!task) return;
+    if (!task || !canEditWorkflowFields) return;
     if (field === "statusId") {
       updateMutation.mutate({ statusId: value as string | null });
     }
   };
 
+  const handlePriorityChange = React.useCallback(
+    (priority: string) => {
+      if (!canEditWorkflowFields) return;
+      updateMutation.mutate({ priority });
+    },
+    [canEditWorkflowFields, updateMutation]
+  );
+
   const isOverdue =
     task?.dueDate && new Date(task.dueDate) < new Date() && task.statusId !== statuses.find((s) => s.type === "DONE")?.id;
-  const selectedPriority = PRIORITIES.find((pr) => pr.value === task?.priority) ?? PRIORITIES[1];
+  const selectedPriority =
+    PRIORITIES.find((pr) => pr.value === (task?.priority ?? "").toUpperCase()) ?? PRIORITIES[1];
   const selectedStatus =
     statuses.find((s) => s.id === (task?.statusId ?? statuses[0]?.id)) ?? statuses[0] ?? null;
   const statusColorById = React.useMemo(() => {
@@ -1573,7 +1603,7 @@ export function TaskDetailModal({
                     <div className="space-y-2">
                       <span className="block text-xs font-medium text-muted-foreground/75">Task status</span>
                       {selectedStatus ? (
-                        <DropdownMenu>
+                        <DropdownMenu modal={false}>
                           <DropdownMenuTrigger asChild>
                             <Button
                               type="button"
@@ -1596,7 +1626,10 @@ export function TaskDetailModal({
                           </DropdownMenuTrigger>
                           <DropdownMenuContent
                             align="start"
-                            className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px] p-1"
+                            className={cn(
+                              "w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px] p-1",
+                              TASK_MODAL_DROPDOWN_Z
+                            )}
                             sideOffset={6}
                             onClick={(e) => e.stopPropagation()}
                             onPointerDown={(e) => e.stopPropagation()}
@@ -1607,7 +1640,10 @@ export function TaskDetailModal({
                                 <DropdownMenuItem
                                   key={s.id}
                                   disabled={updateMutation.isPending}
-                                  onSelect={() => handleFieldChange("statusId", s.id)}
+                                  onSelect={(event) => {
+                                    event.preventDefault();
+                                    handleFieldChange("statusId", s.id);
+                                  }}
                                   className="rounded-lg text-sm"
                                 >
                                   <span
@@ -1631,7 +1667,7 @@ export function TaskDetailModal({
 
                     <div className="space-y-2">
                       <span className="block text-xs font-medium text-muted-foreground/75">Priority</span>
-                      <DropdownMenu>
+                      <DropdownMenu modal={false}>
                         <DropdownMenuTrigger asChild>
                           <Button
                             type="button"
@@ -1657,7 +1693,10 @@ export function TaskDetailModal({
                         </DropdownMenuTrigger>
                         <DropdownMenuContent
                           align="start"
-                          className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px] p-1 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 duration-150"
+                          className={cn(
+                            "w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px] p-1 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 duration-150",
+                            TASK_MODAL_DROPDOWN_Z
+                          )}
                           sideOffset={6}
                           onClick={(e) => e.stopPropagation()}
                           onPointerDown={(e) => e.stopPropagation()}
@@ -1668,7 +1707,10 @@ export function TaskDetailModal({
                               <DropdownMenuItem
                                 key={p.value}
                                 disabled={updateMutation.isPending}
-                                onSelect={() => updateMutation.mutate({ priority: p.value })}
+                                onSelect={(event) => {
+                                  event.preventDefault();
+                                  handlePriorityChange(p.value);
+                                }}
                                 className="rounded-lg text-sm"
                               >
                                 <span
