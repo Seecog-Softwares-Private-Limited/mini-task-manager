@@ -318,6 +318,14 @@ export class TasksController {
       priority: t.priority,
       assigneeId: t.assigneeId ?? undefined,
       assigneeIds: t.assigneeIds ?? (t.assigneeId ? [t.assigneeId] : undefined),
+      assignee: t.assignee
+        ? {
+            id: t.assignee.id,
+            fullName: t.assignee.fullName,
+            email: t.assignee.email,
+            avatarUrl: t.assignee.avatarUrl ?? undefined,
+          }
+        : undefined,
       reporterId: t.reporterId,
       parentTaskId: t.parentTaskId ?? undefined,
       storyPoints: t.storyPoints ?? undefined,

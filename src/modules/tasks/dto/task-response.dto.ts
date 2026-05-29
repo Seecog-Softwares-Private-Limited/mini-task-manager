@@ -1,3 +1,10 @@
+export class TaskAssigneeResponseDto {
+  id!: string;
+  fullName!: string;
+  email!: string;
+  avatarUrl?: string;
+}
+
 export class TaskSubtaskResponseDto {
   id!: string;
   title!: string;
@@ -18,6 +25,7 @@ export class TaskResponseDto {
   priority!: string;
   assigneeId?: string;
   assigneeIds?: string[];
+  assignee?: TaskAssigneeResponseDto;
   reporterId!: string;
   parentTaskId?: string;
   storyPoints?: number;

@@ -104,6 +104,8 @@ export class TasksService {
       priority: dto.priority ?? 'MEDIUM',
       assigneeId: assigneeIds[0] ?? dto.assigneeId ?? null,
       assigneeIds: assigneeIds.length ? assigneeIds : null,
+      dueDate: dto.dueDate ? (String(dto.dueDate).slice(0, 10) as unknown as Date) : null,
+      storyPoints: dto.storyPoints ?? null,
       subtasks: normalizedSubtasks.length ? normalizedSubtasks : null,
       parentTaskId: dto.parentTaskId ?? null,
       sprintId: dto.sprintId ?? null,

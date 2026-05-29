@@ -24,7 +24,7 @@ import {
 import { getStoredToken, parseApiError } from "@/services/api/client";
 import { fetchTask, updateTask, updateTaskAssignee } from "@/services/api/tasks.api";
 import { fetchComments, addComment, deleteComment } from "@/services/api/comments.api";
-import { fetchOrgMembers } from "@/services/api/members.api";
+import { fetchOrgMembers, fetchProjectMembers } from "@/services/api/members.api";
 import { fetchActivityLogs } from "@/services/api/activity-logs.api";
 import {
   fetchAttachments,
@@ -295,6 +295,13 @@ export function TaskDetailModal({
 
   // task data is rendered directly — no local editing state needed for read-only fields
 
+  const { data: projectMembers = [] } = useQuery({
+    queryKey: ["project-members", projectId],
+    queryFn: () => fetchProjectMembers(projectId),
+    enabled: open && !!projectId,
+    staleTime: 60_000,
+  });
+
   const { data: orgMembers = [] } = useQuery({
     queryKey: ["org-members", organizationId],
     queryFn: () => fetchOrgMembers(organizationId),
@@ -302,15 +309,57 @@ export function TaskDetailModal({
     refetchInterval: 30_000,
   });
 
+  /** Project members first; org roster as fallback (all roles can list teammates). */
+  const assignableMembers = React.useMemo(() => {
+    const byUserId = new Map<
+      string,
+      {
+        id: string;
+        userId: string;
+        user?: { fullName?: string; email?: string; avatarUrl?: string; lastSeenAt?: string };
+      }
+    >();
+    for (const m of projectMembers) {
+      byUserId.set(m.userId, { id: m.id, userId: m.userId, user: m.user });
+    }
+    if (byUserId.size === 0) {
+      for (const m of orgMembers) {
+        if (m.status?.toLowerCase() !== "active") continue;
+        byUserId.set(m.userId, { id: m.id, userId: m.userId, user: m.user });
+      }
+    }
+    return Array.from(byUserId.values());
+  }, [projectMembers, orgMembers]);
+
   const assigneeFilteredMembers = React.useMemo(() => {
     const q = assigneeSearch.trim().toLowerCase();
-    if (!q) return orgMembers;
-    return orgMembers.filter(
+    if (!q) return assignableMembers;
+    return assignableMembers.filter(
       (m) =>
         (m.user?.fullName ?? "").toLowerCase().includes(q) ||
         (m.user?.email ?? "").toLowerCase().includes(q)
     );
-  }, [orgMembers, assigneeSearch]);
+  }, [assignableMembers, assigneeSearch]);
+
+  const resolvedAssignee = React.useMemo(() => {
+    if (!task?.assigneeId) return null;
+    const member = assignableMembers.find((m) => m.userId === task.assigneeId);
+    if (member?.user) {
+      return {
+        name: member.user.fullName ?? member.user.email ?? "User",
+        avatarUrl: member.user.avatarUrl,
+        lastSeenAt: member.user.lastSeenAt,
+      };
+    }
+    if (task.assignee) {
+      return {
+        name: task.assignee.fullName ?? task.assignee.email ?? "User",
+        avatarUrl: task.assignee.avatarUrl,
+        lastSeenAt: undefined as string | undefined,
+      };
+    }
+    return { name: "User", avatarUrl: undefined, lastSeenAt: undefined };
+  }, [task?.assigneeId, task?.assignee, assignableMembers]);
 
   const { data: comments = [], isLoading: commentsLoading } = useQuery({
     queryKey: ["task-comments", taskId],
@@ -1255,16 +1304,15 @@ export function TaskDetailModal({
                           aria-label="Change assignee"
                         >
                           {(() => {
-                            const member = orgMembers.find((m) => m.userId === task.assigneeId);
-                            const name = member?.user?.fullName ?? member?.user?.email ?? (task.assigneeId ? "Assigned" : "Unassigned");
-                            const online = member?.user?.lastSeenAt ? isOnline(member.user.lastSeenAt) : false;
+                            const name = resolvedAssignee?.name ?? (task.assigneeId ? "User" : "Unassigned");
+                            const online = resolvedAssignee?.lastSeenAt ? isOnline(resolvedAssignee.lastSeenAt) : false;
                             return (
                               <>
                                 <div className="relative shrink-0">
                                   <Avatar className="h-10 w-10 ring-2 ring-background shadow-sm">
-                                    <AvatarImage src={member?.user?.avatarUrl} />
+                                    <AvatarImage src={resolvedAssignee?.avatarUrl} />
                                     <AvatarFallback className="text-xs">
-                                      {(member?.user?.fullName ?? member?.user?.email ?? "?").slice(0, 2).toUpperCase()}
+                                      {name.slice(0, 2).toUpperCase()}
                                     </AvatarFallback>
                                   </Avatar>
                                   <span

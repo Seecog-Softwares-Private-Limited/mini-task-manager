@@ -17,7 +17,7 @@ import {
   updateTaskStatusAndSprint,
 } from "@/services/api/tasks.api";
 import { fetchSprintsByProject, createSprint } from "@/services/api/sprints.api";
-import { fetchOrgMembers } from "@/services/api/members.api";
+import { fetchOrgMembers, fetchProjectMembers } from "@/services/api/members.api";
 import { fetchCommentCounts } from "@/services/api/comments.api";
 import { parseApiError, isRateLimited, getStoredToken } from "@/services/api/client";
 import { useTenant } from "@/context/tenant-context";
@@ -187,6 +187,13 @@ export default function TasksPage() {
     enabled: !!selectedProjectId && !!orgId,
   });
 
+  const { data: projectMembers = [] } = useQuery({
+    queryKey: ["project-members", selectedProjectId ?? ""],
+    queryFn: () => fetchProjectMembers(selectedProjectId!),
+    enabled: !!selectedProjectId && !!orgId,
+    staleTime: 60_000,
+  });
+
   const { data: orgMembers = [] } = useQuery({
     queryKey: ["org-members", orgId ?? ""],
     queryFn: () => fetchOrgMembers(orgId!),
@@ -212,14 +219,26 @@ export default function TasksPage() {
 
   const assigneeMap: AssigneeMap = useMemo(() => {
     const map: AssigneeMap = {};
-    for (const m of orgMembers) {
+    const members =
+      projectMembers.length > 0
+        ? projectMembers
+        : orgMembers.filter((m) => m.status?.toLowerCase() === "active");
+    for (const m of members) {
       map[m.userId] = {
         name: m.user?.fullName ?? m.user?.email ?? m.userId,
         avatarUrl: m.user?.avatarUrl,
       };
     }
+    for (const t of tasks) {
+      if (t.assigneeId && t.assignee && !map[t.assigneeId]) {
+        map[t.assigneeId] = {
+          name: t.assignee.fullName ?? t.assignee.email ?? t.assigneeId,
+          avatarUrl: t.assignee.avatarUrl,
+        };
+      }
+    }
     return map;
-  }, [orgMembers]);
+  }, [projectMembers, orgMembers, tasks]);
 
   const projectTasks = useMemo(
     () => tasks.filter((task) => task.projectId === selectedProjectId),
