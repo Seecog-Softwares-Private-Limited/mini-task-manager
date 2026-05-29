@@ -1437,14 +1437,12 @@ export function TaskDetailModal({
                       <Input
                         id="task-detail-due-date"
                         type="date"
-                        disabled={readOnly}
+                        disabled={readOnly || updateMutation.isPending}
                         value={taskDueDateToInputValue(task.dueDate)}
                         onChange={(e) => {
-                          if (readOnly) return;
                           const v = e.target.value;
                           updateMutation.mutate({ dueDate: v ? v : null });
                         }}
-                        disabled={updateMutation.isPending}
                         className={cn(
                           "h-12 rounded-xl border-0 bg-white/90 px-4 text-sm shadow-[inset_0_1px_2px_rgba(15,23,42,0.04),inset_0_0_0_1px_rgba(15,23,42,0.08)] transition-shadow focus-visible:shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.35),0_0_0_3px_hsl(var(--primary)/0.12)] focus-visible:ring-0 dark:bg-white/[0.06] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]",
                           isOverdue && task.dueDate && "shadow-[inset_0_0_0_1px_hsl(var(--destructive)/0.45)]"
