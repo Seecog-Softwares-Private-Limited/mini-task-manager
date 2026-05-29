@@ -202,6 +202,8 @@ export interface TaskDetailModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onTaskUpdated?: (task: Task) => void;
+  /** When true, task fields cannot be edited (non-owner members). */
+  readOnly?: boolean;
 }
 
 export function TaskDetailModal({
@@ -212,6 +214,7 @@ export function TaskDetailModal({
   open,
   onOpenChange,
   onTaskUpdated,
+  readOnly = false,
 }: TaskDetailModalProps) {
   const queryClient = useQueryClient();
   const syncTaskIntoListCache = React.useCallback(
@@ -440,8 +443,12 @@ export function TaskDetailModal({
   }, [activityLogs, checklist, orgMembers]);
 
   const updateMutation = useMutation({
-    mutationFn: (payload: Parameters<typeof updateTask>[1]) =>
-      updateTask(taskId!, payload),
+    mutationFn: (payload: Parameters<typeof updateTask>[1]) => {
+      if (readOnly) {
+        return Promise.reject(new Error("Only the workspace owner can edit tasks"));
+      }
+      return updateTask(taskId!, payload);
+    },
     onSuccess: (updated) => {
       if (!updated?.id) {
         toast({
@@ -466,8 +473,12 @@ export function TaskDetailModal({
   });
 
   const assigneeMutation = useMutation({
-    mutationFn: (assigneeId: string | null) =>
-      updateTaskAssignee(taskId!, assigneeId),
+    mutationFn: (assigneeId: string | null) => {
+      if (readOnly) {
+        return Promise.reject(new Error("Only the workspace owner can edit tasks"));
+      }
+      return updateTaskAssignee(taskId!, assigneeId);
+    },
     onSuccess: (updated) => {
       queryClient.setQueryData(["task", taskId], updated);
       syncTaskIntoListCache(updated);
@@ -728,6 +739,11 @@ export function TaskDetailModal({
           </div>
         ) : (
           <>
+            {readOnly && (
+              <div className="mx-6 mt-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-900 dark:text-amber-100 sm:mx-8">
+                View only — only the workspace <strong>owner</strong> can edit this task. You can still read details and add comments.
+              </div>
+            )}
             <DialogHeader className="td-modal-header-shade shrink-0 border-b border-[#E7EAF0]/60 px-6 pb-6 pt-7 shadow-[0_1px_0_rgba(255,255,255,0.7)_inset] dark:border-border/40 sm:px-8 sm:pb-7 sm:pt-8">
               <div className="flex items-start gap-4 pr-12">
                 <div className="flex min-w-0 flex-1 flex-col gap-3">
@@ -752,17 +768,30 @@ export function TaskDetailModal({
                       aria-label="Edit task title"
                     />
                   ) : (
-                    <button
+                    <div
                       id="task-detail-title"
-                      type="button"
-                      onClick={() => setIsEditingTitle(true)}
-                      className="group flex max-w-full items-start gap-3 rounded-xl px-1 py-1 text-left transition-colors hover:bg-background/50"
+                      className={cn(
+                        "flex max-w-full items-start gap-3 rounded-xl px-1 py-1 text-left",
+                        !readOnly && "group cursor-pointer transition-colors hover:bg-background/50"
+                      )}
+                      role={readOnly ? undefined : "button"}
+                      tabIndex={readOnly ? undefined : 0}
+                      onClick={readOnly ? undefined : () => setIsEditingTitle(true)}
+                      onKeyDown={
+                        readOnly
+                          ? undefined
+                          : (e) => {
+                              if (e.key === "Enter") setIsEditingTitle(true);
+                            }
+                      }
                     >
                       <span className="min-w-0 text-balance text-2xl font-semibold leading-[1.2] tracking-[-0.025em] text-foreground md:text-[1.875rem] md:leading-[1.12]">
                         {task.title}
                       </span>
-                      <Pencil className="mt-2 h-4 w-4 shrink-0 text-muted-foreground/50 opacity-0 transition-opacity group-hover:opacity-100" />
-                    </button>
+                      {!readOnly && (
+                        <Pencil className="mt-2 h-4 w-4 shrink-0 text-muted-foreground/50 opacity-0 transition-opacity group-hover:opacity-100" />
+                      )}
+                    </div>
                   )}
                   <div className="flex flex-wrap items-center gap-2">
                     {task.dueDate && (
@@ -1300,7 +1329,8 @@ export function TaskDetailModal({
                       <DropdownMenuTrigger asChild>
                         <button
                           type="button"
-                          className="flex w-full items-center gap-3 rounded-xl bg-white/85 px-4 py-3.5 text-left text-sm font-medium outline-none shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)] transition-[box-shadow,background-color] hover:bg-white hover:shadow-[inset_0_0_0_1px_rgba(15,23,42,0.09),0_4px_14px_-6px_rgba(15,23,42,0.1)] focus-visible:ring-2 focus-visible:ring-primary/25 dark:bg-white/[0.06] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)] dark:hover:bg-white/[0.1]"
+                          disabled={readOnly}
+                          className="flex w-full items-center gap-3 rounded-xl bg-white/85 px-4 py-3.5 text-left text-sm font-medium outline-none shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)] transition-[box-shadow,background-color] hover:bg-white hover:shadow-[inset_0_0_0_1px_rgba(15,23,42,0.09),0_4px_14px_-6px_rgba(15,23,42,0.1)] focus-visible:ring-2 focus-visible:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white/[0.06] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)] dark:hover:bg-white/[0.1]"
                           aria-label="Change assignee"
                         >
                           {(() => {
@@ -1407,8 +1437,10 @@ export function TaskDetailModal({
                       <Input
                         id="task-detail-due-date"
                         type="date"
+                        disabled={readOnly}
                         value={taskDueDateToInputValue(task.dueDate)}
                         onChange={(e) => {
+                          if (readOnly) return;
                           const v = e.target.value;
                           updateMutation.mutate({ dueDate: v ? v : null });
                         }}

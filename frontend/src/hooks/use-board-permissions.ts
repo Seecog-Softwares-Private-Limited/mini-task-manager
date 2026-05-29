@@ -15,10 +15,9 @@ export interface BoardPermissions {
 }
 
 /**
- * Derives board-level permissions from the current user's org membership.
- * VIEWER: read-only, no drag/edit/create
- * CONTRIBUTOR: can create, edit own, move tasks
- * ADMIN / OWNER: full access
+ * Board permissions from org membership.
+ * Task create/update/delete/move is limited to workspace OWNER.
+ * ADMIN can create tasks; MEMBER / VIEWER are read-only on the board.
  */
 export function useBoardPermissions(
   orgMembers: OrgMember[],
@@ -43,7 +42,6 @@ export function useBoardPermissions(
 
     switch (role) {
       case "OWNER":
-      case "ADMIN":
         return {
           canCreateTask: true,
           canEditTask: true,
@@ -54,18 +52,19 @@ export function useBoardPermissions(
           role,
           isViewer: false,
         };
-      case "CONTRIBUTOR":
-      case "MEMBER":
+      case "ADMIN":
         return {
           canCreateTask: true,
-          canEditTask: true,
-          canMoveTask: true,
+          canEditTask: false,
+          canMoveTask: false,
           canDeleteTask: false,
           canManageBoard: false,
-          canBulkSelect: true,
+          canBulkSelect: false,
           role,
           isViewer: false,
         };
+      case "CONTRIBUTOR":
+      case "MEMBER":
       case "VIEWER":
       default:
         return {

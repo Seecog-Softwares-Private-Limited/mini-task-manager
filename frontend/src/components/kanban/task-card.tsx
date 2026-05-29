@@ -354,7 +354,7 @@ export function TaskCard({
   onTaskClick,
   onToggleSelect,
 }: TaskCardProps) {
-  const readOnly = permissions?.isViewer;
+  const readOnly = !permissions?.canEditTask;
   const dueTone = getDueDateTone(task.dueDate);
   const labels = task.labels ?? (task.sprintId ? [{ id: "sprint", name: "Sprint", color: "#6366f1" }] : []);
   const activityComments = task.commentsCount ?? commentCount;

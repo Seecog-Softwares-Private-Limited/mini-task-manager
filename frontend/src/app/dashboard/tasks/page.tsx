@@ -599,9 +599,9 @@ export default function TasksPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {permissions.isViewer && (
+            {!permissions.canEditTask && (
               <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                <Shield className="h-3 w-3" /> View only
+                <Shield className="h-3 w-3" /> View only — workspace owner can edit tasks
               </span>
             )}
           </div>
@@ -795,6 +795,7 @@ export default function TasksPage() {
           statuses={statuses}
           open={selectedTaskId !== null}
           onOpenChange={(open) => !open && setSelectedTaskId(null)}
+          readOnly={!permissions.canEditTask}
         />
       )}
 

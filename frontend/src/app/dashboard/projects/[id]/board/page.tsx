@@ -589,15 +589,15 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
         <div>
           <h2 className="text-lg font-bold tracking-tight flex items-center gap-2">
             Board
-            {permissions.isViewer && (
+            {!permissions.canEditTask && (
               <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                <Shield className="h-3 w-3" /> View only
+                <Shield className="h-3 w-3" /> View only — owner can edit
               </span>
             )}
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {permissions.isViewer
-              ? "You have read-only access to this board."
+            {!permissions.canEditTask
+              ? "You can view tasks; only the workspace owner can edit or move them."
               : "Drag tasks between columns, use filters to find what you need."}
           </p>
         </div>
@@ -813,6 +813,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
           statuses={statuses}
           open={selectedTaskId !== null}
           onOpenChange={(open) => !open && setSelectedTaskId(null)}
+          readOnly={!permissions.canEditTask}
         />
       )}
 
