@@ -170,7 +170,7 @@ function DraggableCard(props: {
   onToggleSelect?: (taskId: string) => void;
   permissions?: BoardPermissions;
 }) {
-  const canDrag = !props.permissions?.isViewer && !props.isSelectionMode;
+  const canDrag = !!props.permissions?.canMoveTask && !props.isSelectionMode;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: props.task.id,
     data: { task: props.task, statusId: props.statusId },
@@ -663,7 +663,7 @@ export function KanbanBoard({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overColumnId, setOverColumnId] = useState<string | null>(null);
 
-  const canDrag = !permissions?.isViewer && !isSelectionMode;
+  const canDrag = !!permissions?.canMoveTask && !isSelectionMode;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),

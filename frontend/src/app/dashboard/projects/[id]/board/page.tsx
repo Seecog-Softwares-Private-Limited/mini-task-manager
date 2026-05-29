@@ -6,7 +6,7 @@ import { fetchProject } from "@/services/api/projects.api";
 import { fetchWorkflowsByProject, fetchWorkflowStatuses, createDefaultWorkflow } from "@/services/api/workflows.api";
 import { fetchTasksByProject, updateTaskStatus, updateTaskStatusAndSprint, createTask } from "@/services/api/tasks.api";
 import { fetchSprintsByProject, createSprint } from "@/services/api/sprints.api";
-import { fetchOrgMembers } from "@/services/api/members.api";
+import { fetchOrgMembers, fetchProjectMembers } from "@/services/api/members.api";
 import { fetchCommentCounts } from "@/services/api/comments.api";
 import { fetchSubscription } from "@/services/api/billing.api";
 import { parseApiError, isRateLimited, getStoredToken } from "@/services/api/client";
@@ -116,6 +116,13 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
     enabled: !!id && !!orgId,
   });
 
+  const { data: projectMembers = [] } = useQuery({
+    queryKey: ["project-members", id],
+    queryFn: () => fetchProjectMembers(id),
+    enabled: !!id && !!orgId,
+    staleTime: 60_000,
+  });
+
   const { data: orgMembers = [] } = useQuery({
     queryKey: ["org-members", orgId ?? ""],
     queryFn: () => fetchOrgMembers(orgId!),
@@ -156,14 +163,26 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
 
   const assigneeMap: AssigneeMap = useMemo(() => {
     const map: AssigneeMap = {};
-    for (const m of orgMembers) {
+    const members =
+      projectMembers.length > 0
+        ? projectMembers
+        : orgMembers.filter((m) => m.status?.toLowerCase() === "active");
+    for (const m of members) {
       map[m.userId] = {
         name: m.user?.fullName ?? m.user?.email ?? m.userId,
         avatarUrl: m.user?.avatarUrl,
       };
     }
+    for (const t of tasks) {
+      if (t.assigneeId && t.assignee && !map[t.assigneeId]) {
+        map[t.assigneeId] = {
+          name: t.assignee.fullName ?? t.assignee.email ?? t.assigneeId,
+          avatarUrl: t.assignee.avatarUrl,
+        };
+      }
+    }
     return map;
-  }, [orgMembers]);
+  }, [projectMembers, orgMembers, tasks]);
 
   const tasksByStatus = useMemo(() => {
     const map: Record<string, Task[]> = {};
@@ -570,15 +589,15 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
         <div>
           <h2 className="text-lg font-bold tracking-tight flex items-center gap-2">
             Board
-            {permissions.isViewer && (
+            {!permissions.canEditTask && (
               <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                <Shield className="h-3 w-3" /> View only
+                <Shield className="h-3 w-3" /> View only — owner can edit
               </span>
             )}
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {permissions.isViewer
-              ? "You have read-only access to this board."
+            {!permissions.canEditTask
+              ? "You can view tasks; only the workspace owner can edit or move them."
               : "Drag tasks between columns, use filters to find what you need."}
           </p>
         </div>
@@ -794,6 +813,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
           statuses={statuses}
           open={selectedTaskId !== null}
           onOpenChange={(open) => !open && setSelectedTaskId(null)}
+          readOnly={!permissions.canEditTask}
         />
       )}
 

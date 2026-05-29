@@ -3,15 +3,7 @@ import type { Task } from "@/types/api";
 import type { PaginatedResult } from "@/types/api";
 import type { TaskSubtask } from "@/types/api";
 
-/**
- * Backend CreateTaskDto accepted fields:
- *   projectId, organizationId, title, description, statusId, priority,
- *   assigneeId, assigneeIds, parentTaskId, sprintId, subtasks
- *
- * storyPoints and dueDate are NOT accepted on create or update
- * by the current backend. They are kept in the payload type for
- * forward-compatibility but silently stripped before sending.
- */
+/** Fields accepted by backend CreateTaskDto. */
 export interface CreateTaskPayload {
   projectId: string;
   organizationId: string;
@@ -29,9 +21,7 @@ export interface CreateTaskPayload {
     }
   >;
   tags?: Array<{ name: string; color: string }>;
-  /** Not supported by backend yet — kept for UI, stripped before send */
   storyPoints?: number;
-  /** Not supported by backend yet — kept for UI, stripped before send */
   dueDate?: string;
 }
 
@@ -55,7 +45,17 @@ export function serializeSubtasksForApi(subtasks: TaskSubtask[]): TaskSubtask[] 
 }
 
 export async function createTask(payload: CreateTaskPayload): Promise<Task> {
-  const { storyPoints: _sp, dueDate: _dd, ...body } = payload;
+  const body = { ...payload };
+  if (body.dueDate) {
+    const match = String(body.dueDate).match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) body.dueDate = match[1];
+    else delete body.dueDate;
+  } else {
+    delete body.dueDate;
+  }
+  if (body.storyPoints === undefined || body.storyPoints === null) {
+    delete body.storyPoints;
+  }
   if (body.subtasks?.length) {
     body.subtasks = serializeSubtasksForApi(body.subtasks as TaskSubtask[]);
   }

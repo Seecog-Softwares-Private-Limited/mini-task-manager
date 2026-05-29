@@ -25,6 +25,8 @@ import { ProjectsService } from '../projects/projects.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { TenantId } from '../../common/decorators/tenant.decorator';
 import { getFrontendUrl } from '../../common/utils/frontend-url.util';
 import { CurrentUserId } from '../../common/decorators/current-user.decorator';
@@ -58,6 +60,8 @@ export class TasksController {
     private readonly notificationsService: NotificationsService,
   ) {}
 
+  @UseGuards(RolesGuard)
+  @Roles('owner', 'admin')
   @Post()
   async create(
     @Body() dto: CreateTaskDto,
@@ -109,6 +113,8 @@ export class TasksController {
     return this.tasksService.getAttachments(taskId);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('owner')
   @Post(':id/attachments')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
   async uploadAttachment(
@@ -121,6 +127,8 @@ export class TasksController {
     return this.tasksService.addAttachment(taskId, tenantId, userId, file);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('owner')
   @Delete(':id/attachments/:attachmentId')
   async deleteAttachment(
     @Param('id') taskId: string,
@@ -182,6 +190,8 @@ export class TasksController {
     return this.toResponse(task);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('owner')
   @Patch(':id/assignee')
   async updateAssignee(
     @Param('id') id: string,
@@ -318,6 +328,14 @@ export class TasksController {
       priority: t.priority,
       assigneeId: t.assigneeId ?? undefined,
       assigneeIds: t.assigneeIds ?? (t.assigneeId ? [t.assigneeId] : undefined),
+      assignee: t.assignee
+        ? {
+            id: t.assignee.id,
+            fullName: t.assignee.fullName,
+            email: t.assignee.email,
+            avatarUrl: t.assignee.avatarUrl ?? undefined,
+          }
+        : undefined,
       reporterId: t.reporterId,
       parentTaskId: t.parentTaskId ?? undefined,
       storyPoints: t.storyPoints ?? undefined,

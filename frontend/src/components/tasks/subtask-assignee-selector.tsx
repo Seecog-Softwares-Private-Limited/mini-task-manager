@@ -24,7 +24,7 @@ const DROPDOWN_Z = "z-[110]";
 type MemberOption = {
   id: string;
   name: string;
-  email: string;
+  email?: string;
   avatarUrl?: string;
 };
 
@@ -36,13 +36,20 @@ interface SubtaskAssigneeSelectorProps {
   value?: string;
   onChange: (assigneeId?: string) => void;
   disabled?: boolean;
+  /** Pre-resolved members from the task modal (project + org + task assignee). */
+  knownMembers?: MemberOption[];
 }
 
 function mergeMemberOptions(
   projectMembers: Awaited<ReturnType<typeof fetchProjectMembers>>,
-  orgMembers: OrgMember[]
+  orgMembers: OrgMember[],
+  knownMembers: MemberOption[] = []
 ): MemberOption[] {
   const byUserId = new Map<string, MemberOption>();
+
+  for (const hint of knownMembers) {
+    byUserId.set(hint.id, hint);
+  }
 
   for (const m of projectMembers) {
     byUserId.set(m.userId, {
@@ -74,6 +81,7 @@ export function SubtaskAssigneeSelector({
   value,
   onChange,
   disabled,
+  knownMembers = [],
 }: SubtaskAssigneeSelectorProps) {
   const { orgId: tenantOrgId } = useTenant();
   const orgId = organizationId ?? tenantOrgId ?? "";
@@ -98,17 +106,17 @@ export function SubtaskAssigneeSelector({
   const isLoading = projectLoading || (prefetchedOrgMembers === undefined && orgLoading);
 
   const options = useMemo(
-    () => mergeMemberOptions(projectMembers, orgMembers),
-    [projectMembers, orgMembers]
+    () => mergeMemberOptions(projectMembers, orgMembers, knownMembers),
+    [projectMembers, orgMembers, knownMembers]
   );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return options;
-    return options.filter((m) => m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q));
+    return options.filter((m) => m.name.toLowerCase().includes(q) || (m.email ?? "").toLowerCase().includes(q));
   }, [options, search]);
 
-  const selected = options.find((m) => m.id === value);
+  const selected = value ? options.find((m) => m.id === value) : undefined;
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
@@ -122,9 +130,9 @@ export function SubtaskAssigneeSelector({
           aria-label={selected ? `Assignee ${selected.name}` : value ? "Assigned member" : "Assign subtask"}
         >
           {selected ? (
-            <Avatar className="h-7 w-7">
+            <Avatar className="h-7 w-7 ring-1 ring-border/60">
               <AvatarImage src={selected.avatarUrl} />
-              <AvatarFallback className="text-[10px]">
+              <AvatarFallback className="bg-muted text-[10px] font-semibold text-foreground">
                 {selected.name.slice(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
@@ -133,8 +141,8 @@ export function SubtaskAssigneeSelector({
               <UserRound className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
             </span>
           ) : (
-            <span className="flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-muted-foreground/40 bg-muted/30">
-              <UserRoundPlus className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-foreground/35 bg-muted/50">
+              <UserRoundPlus className="h-3.5 w-3.5 text-foreground/75" aria-hidden />
             </span>
           )}
         </Button>

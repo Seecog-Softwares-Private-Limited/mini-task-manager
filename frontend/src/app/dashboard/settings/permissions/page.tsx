@@ -16,7 +16,8 @@ const CAPABILITIES = [
   { id: "webhooks", label: "Manage webhooks", owner: true, admin: true, member: false },
   { id: "invite", label: "Invite members", owner: true, admin: true, member: false },
   { id: "projects", label: "Create / edit projects", owner: true, admin: true, member: true },
-  { id: "tasks", label: "Create / edit tasks", owner: true, admin: true, member: true },
+  { id: "tasks_create", label: "Create tasks", owner: true, admin: true, member: false },
+  { id: "tasks_edit", label: "Edit / move / delete tasks", owner: true, admin: false, member: false },
   { id: "export", label: "Export data", owner: true, admin: true, member: true },
 ];
 

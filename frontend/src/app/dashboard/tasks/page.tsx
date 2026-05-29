@@ -17,7 +17,7 @@ import {
   updateTaskStatusAndSprint,
 } from "@/services/api/tasks.api";
 import { fetchSprintsByProject, createSprint } from "@/services/api/sprints.api";
-import { fetchOrgMembers } from "@/services/api/members.api";
+import { fetchOrgMembers, fetchProjectMembers } from "@/services/api/members.api";
 import { fetchCommentCounts } from "@/services/api/comments.api";
 import { parseApiError, isRateLimited, getStoredToken } from "@/services/api/client";
 import { useTenant } from "@/context/tenant-context";
@@ -187,6 +187,13 @@ export default function TasksPage() {
     enabled: !!selectedProjectId && !!orgId,
   });
 
+  const { data: projectMembers = [] } = useQuery({
+    queryKey: ["project-members", selectedProjectId ?? ""],
+    queryFn: () => fetchProjectMembers(selectedProjectId!),
+    enabled: !!selectedProjectId && !!orgId,
+    staleTime: 60_000,
+  });
+
   const { data: orgMembers = [] } = useQuery({
     queryKey: ["org-members", orgId ?? ""],
     queryFn: () => fetchOrgMembers(orgId!),
@@ -212,14 +219,26 @@ export default function TasksPage() {
 
   const assigneeMap: AssigneeMap = useMemo(() => {
     const map: AssigneeMap = {};
-    for (const m of orgMembers) {
+    const members =
+      projectMembers.length > 0
+        ? projectMembers
+        : orgMembers.filter((m) => m.status?.toLowerCase() === "active");
+    for (const m of members) {
       map[m.userId] = {
         name: m.user?.fullName ?? m.user?.email ?? m.userId,
         avatarUrl: m.user?.avatarUrl,
       };
     }
+    for (const t of tasks) {
+      if (t.assigneeId && t.assignee && !map[t.assigneeId]) {
+        map[t.assigneeId] = {
+          name: t.assignee.fullName ?? t.assignee.email ?? t.assigneeId,
+          avatarUrl: t.assignee.avatarUrl,
+        };
+      }
+    }
     return map;
-  }, [orgMembers]);
+  }, [projectMembers, orgMembers, tasks]);
 
   const projectTasks = useMemo(
     () => tasks.filter((task) => task.projectId === selectedProjectId),
@@ -580,9 +599,9 @@ export default function TasksPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {permissions.isViewer && (
+            {!permissions.canEditTask && (
               <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                <Shield className="h-3 w-3" /> View only
+                <Shield className="h-3 w-3" /> View only — workspace owner can edit tasks
               </span>
             )}
           </div>
@@ -776,6 +795,7 @@ export default function TasksPage() {
           statuses={statuses}
           open={selectedTaskId !== null}
           onOpenChange={(open) => !open && setSelectedTaskId(null)}
+          readOnly={!permissions.canEditTask}
         />
       )}
 

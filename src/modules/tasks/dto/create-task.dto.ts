@@ -1,15 +1,29 @@
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import {
   IsArray,
   IsBoolean,
   IsDateString,
   IsIn,
+  IsInt,
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
+  Max,
   MaxLength,
+  Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
+
+const normalizeCreateDueDate = ({ value }: { value: unknown }) => {
+  if (value === '' || value === null || value === undefined) return undefined;
+  if (typeof value === 'string') {
+    const m = value.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (m) return m[1];
+  }
+  return value;
+};
 
 class CreateTaskSubtaskDto {
   @IsOptional()
@@ -85,6 +99,19 @@ export class CreateTaskDto {
 
   @IsOptional()
   sprintId?: string;
+
+  @IsOptional()
+  @Transform(normalizeCreateDueDate)
+  @ValidateIf((_o, v) => v !== undefined)
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'dueDate must be YYYY-MM-DD' })
+  dueDate?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  storyPoints?: number;
 
   @IsOptional()
   @IsArray()

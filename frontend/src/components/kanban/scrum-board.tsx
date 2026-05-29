@@ -138,7 +138,7 @@ function ScrumDraggableCard(props: {
   onToggleSelect?: (taskId: string) => void;
   permissions?: BoardPermissions;
 }) {
-  const canDrag = !props.permissions?.isViewer && !props.isSelectionMode;
+  const canDrag = !!props.permissions?.canMoveTask && !props.isSelectionMode;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: props.task.id,
     data: {
@@ -339,7 +339,7 @@ export function ScrumBoard({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overCellId, setOverCellId] = useState<string | null>(null);
 
-  const canDrag = !permissions?.isViewer && !isSelectionMode;
+  const canDrag = !!permissions?.canMoveTask && !isSelectionMode;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),

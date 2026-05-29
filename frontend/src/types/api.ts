@@ -76,6 +76,7 @@ export interface Task {
   priority: string;
   assigneeId?: string;
   assigneeIds?: string[];
+  assignee?: Pick<User, "id" | "fullName" | "email" | "avatarUrl">;
   reporterId: string;
   parentTaskId?: string;
   storyPoints?: number;
