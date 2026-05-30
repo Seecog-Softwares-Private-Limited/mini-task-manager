@@ -151,28 +151,17 @@ const tdEyebrow =
   "text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/48";
 const tdMainSectionHeading =
   "text-[0.9375rem] font-semibold tracking-[-0.01em] text-foreground/95";
-/** Enterprise off-white panel — matches board cards */
-const tdMainSurface = cn(
-  "td-main-card rounded-2xl border border-[#E7EAF0] bg-[#FCFCFD] p-6 sm:p-8",
-  "shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_40px_-16px_rgba(15,23,42,0.08)]",
-  "dark:border-border dark:bg-card/40 dark:shadow-none"
-);
-/** Description + checklist unified shell */
-const tdWorkUnified = cn(
-  "td-main-card overflow-hidden rounded-2xl border border-[#E7EAF0] bg-[#FCFCFD]",
-  "shadow-[0_1px_2px_rgba(15,23,42,0.04),0_16px_48px_-18px_rgba(15,23,42,0.1)]",
-  "dark:border-border dark:bg-card/40 dark:shadow-none"
-);
+const tdMainSurface = cn("td-main-card rounded-2xl p-6 sm:p-8");
+const tdWorkUnified = cn("td-main-card overflow-hidden rounded-2xl");
 const tdWorkSection = "px-6 py-6 sm:px-8 sm:py-7";
-const tdWorkSectionDivider = "h-px bg-gradient-to-r from-transparent via-[#E7EAF0] to-transparent dark:via-border";
+const tdWorkSectionDivider = "h-px bg-[#E5E7EB] dark:bg-border";
 const tdSidebarSurface = cn(
-  "td-sidebar-card rounded-2xl border border-[#E7EAF0]/80 bg-[#FAFBFC] p-5",
-  "shadow-[0_1px_2px_rgba(15,23,42,0.03),inset_0_1px_0_rgba(255,255,255,0.9)]",
-  "transition-[box-shadow,transform] duration-200 hover:shadow-[0_4px_24px_-12px_rgba(15,23,42,0.12)]",
-  "dark:border-border/60 dark:bg-muted/20 dark:shadow-none dark:hover:bg-muted/25"
+  "td-sidebar-card rounded-2xl p-5",
+  "transition-[box-shadow] duration-200 hover:shadow-[0_4px_20px_-8px_rgba(15,23,42,0.1)]",
+  "dark:hover:bg-muted/25"
 );
 const tdSidebarHeading = cn(tdEyebrow, "mb-3 block");
-const tdSubtleDivider = "my-5 h-px bg-gradient-to-r from-transparent via-border/35 to-transparent";
+const tdSubtleDivider = "my-5 h-px bg-[#E5E7EB] dark:bg-border/35";
 
 /** `YYYY-MM-DD` for native date input from API ISO / Date-only strings. */
 function taskDueDateToInputValue(iso?: string | null): string {
@@ -183,6 +172,31 @@ function taskDueDateToInputValue(iso?: string | null): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+function parseTaskDueDate(iso?: string | null): Date | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Primary due date label, e.g. `30 May 2026`. */
+function formatTaskDueDatePrimary(iso?: string | null): string {
+  const d = parseTaskDueDate(iso);
+  if (!d) return "Select a date";
+  return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
+/** Helper line with weekday, e.g. `Sat, 30 May 2026`. */
+function formatTaskDueDateHelper(iso?: string | null): string | null {
+  const d = parseTaskDueDate(iso);
+  if (!d) return null;
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 function formatRelativeTime(input: string | Date): string {
@@ -882,8 +896,9 @@ export function TaskDetailModal({
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
+        overlayClassName="td-modal-overlay"
         showClose={!updateMutation.isPending}
-        closeButtonClassName="h-10 w-10 rounded-xl bg-background/80 text-muted-foreground shadow-sm ring-1 ring-black/[0.05] backdrop-blur-sm transition-all hover:bg-muted hover:text-foreground hover:shadow-md dark:ring-white/10"
+        closeButtonClassName="h-10 w-10 rounded-xl bg-white/90 text-muted-foreground shadow-sm ring-1 ring-[#E5E7EB] backdrop-blur-sm transition-all hover:bg-white hover:text-foreground hover:shadow-md dark:bg-card/90 dark:ring-border"
         onEscapeKeyDown={() => onOpenChange(false)}
         onFocusOutside={(event) => {
           if (isTinyMceUiTarget(event.target)) {
@@ -896,7 +911,7 @@ export function TaskDetailModal({
           }
         }}
         className={cn(
-          "td-modal-shell max-w-6xl max-h-[92vh] overflow-hidden flex flex-col gap-0 border-0 bg-background p-0 sm:rounded-2xl",
+          "td-modal-shell max-w-6xl max-h-[92vh] overflow-hidden flex flex-col gap-0 border-0 p-0 rounded-[18px]",
           "duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-[0.98] data-[state=closed]:zoom-out-95",
           "border-l-[5px]",
           selectedPriority.border
@@ -921,7 +936,7 @@ export function TaskDetailModal({
                 Assigned to you — you can update <strong>status</strong>, <strong>priority</strong>, and <strong>subtasks</strong>. Other fields are owner-only.
               </div>
             )}
-            <DialogHeader className="td-modal-header-shade shrink-0 border-b border-[#E7EAF0]/60 px-6 pb-6 pt-7 shadow-[0_1px_0_rgba(255,255,255,0.7)_inset] dark:border-border/40 sm:px-8 sm:pb-7 sm:pt-8">
+            <DialogHeader className="td-modal-header-shade shrink-0 px-6 pb-6 pt-7 sm:px-8 sm:pb-7 sm:pt-8">
               <div className="flex items-start gap-4 pr-12">
                 <div className="flex min-w-0 flex-1 flex-col gap-3">
                   {isEditingTitle ? (
@@ -974,7 +989,7 @@ export function TaskDetailModal({
                     {task.dueDate && (
                       <span
                         className={cn(
-                          "inline-flex items-center gap-1.5 rounded-full border border-[#E7EAF0] bg-[#FCFCFD] px-2.5 py-1 text-[11px] font-semibold text-foreground dark:border-border dark:bg-muted/20",
+                          "td-meta-chip inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold text-foreground",
                           isOverdue && "border-destructive/30 bg-destructive/5 text-destructive"
                         )}
                       >
@@ -986,7 +1001,7 @@ export function TaskDetailModal({
                         })}
                       </span>
                     )}
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#E7EAF0] bg-[#FCFCFD] px-2.5 py-1 text-[11px] font-medium text-muted-foreground dark:border-border dark:bg-muted/20">
+                    <span className="td-meta-chip inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
                       <span
                         className={cn("h-1.5 w-1.5 shrink-0 rounded-full", selectedPriority.color)}
                         aria-hidden
@@ -1004,7 +1019,7 @@ export function TaskDetailModal({
               </div>
             </DialogHeader>
 
-            <div className="min-h-0 flex-1 overflow-y-auto bg-gradient-to-b from-[#F4F6FA]/90 via-background to-background dark:from-muted/10">
+            <div className="td-modal-body-scroll min-h-0 flex-1 overflow-y-auto">
               <div className="grid grid-cols-1 gap-6 p-5 pb-10 lg:grid-cols-[minmax(0,1fr),minmax(280px,320px)] lg:gap-x-8 lg:gap-y-6 lg:p-8">
                 {/* Left: unified work + comments + activity */}
                 <div className="flex min-w-0 flex-col gap-6">
@@ -1056,7 +1071,7 @@ export function TaskDetailModal({
                         className={cn(
                           "group -mx-1 min-h-[7.5rem] w-full rounded-xl border border-dashed border-transparent px-4 py-4 text-left transition-all",
                           canEditAll &&
-                            "hover:border-[#E7EAF0]/80 hover:bg-white/60 dark:hover:border-border/50 dark:hover:bg-muted/20"
+                            "hover:border-[#E5E7EB] hover:bg-white dark:hover:border-border/50 dark:hover:bg-muted/20"
                         )}
                       >
                         {(() => {
@@ -1160,7 +1175,7 @@ export function TaskDetailModal({
                           key={item.id}
                           className={cn(
                             "group flex flex-col gap-2 rounded-2xl px-4 py-3.5 transition-all duration-200 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 lg:flex-nowrap",
-                            "bg-white/70 shadow-sm ring-1 ring-black/[0.04] hover:bg-white hover:shadow-md dark:bg-white/[0.04] dark:ring-white/[0.08] dark:hover:bg-white/[0.07]",
+                            "td-inner-surface hover:shadow-[0_2px_8px_-2px_rgba(15,23,42,0.08)] dark:hover:bg-muted/20",
                             item.completed && "opacity-[0.72]"
                           )}
                         >
@@ -1308,7 +1323,7 @@ export function TaskDetailModal({
                         </div>
                       ))}
                       <div className="flex gap-2 pt-4">
-                        <div className="flex min-h-11 flex-1 items-center gap-2 rounded-2xl bg-muted/30 px-1 pl-3 ring-1 ring-border/20 transition-[box-shadow,ring-color] focus-within:bg-background/80 focus-within:ring-primary/25 dark:bg-muted/15">
+                        <div className="td-input-shell flex min-h-11 flex-1 items-center gap-2 rounded-2xl px-1 pl-3 transition-[box-shadow,ring-color] focus-within:ring-2 focus-within:ring-primary/20">
                           <Plus className="h-4 w-4 shrink-0 text-muted-foreground/50" aria-hidden />
                           <Input
                             placeholder="Add an item…"
@@ -1351,7 +1366,7 @@ export function TaskDetailModal({
                       </div>
                     </div>
                     <div className="flex gap-3 sm:gap-4">
-                      <div className="min-w-0 flex-1 rounded-2xl bg-muted/25 p-1 ring-1 ring-border/20 transition-[box-shadow,ring-color] focus-within:bg-background/60 focus-within:ring-primary/20 dark:bg-muted/15">
+                      <div className="td-input-shell min-w-0 flex-1 rounded-2xl p-1 transition-[box-shadow,ring-color] focus-within:ring-2 focus-within:ring-primary/20">
                         <CommentInputWithMentions
                           value={commentText}
                           onChange={(v, ids) => {
@@ -1396,7 +1411,7 @@ export function TaskDetailModal({
                         <Loader2 className="h-4 w-4 animate-spin" /> Loading comments…
                       </div>
                     ) : comments.length === 0 ? (
-                      <p className="mt-6 flex min-h-[6.5rem] items-center justify-center rounded-xl border border-dashed border-[#E7EAF0] bg-white/50 px-5 py-6 text-center text-sm leading-relaxed text-muted-foreground dark:border-border/50 dark:bg-muted/10">
+                      <p className="td-inner-surface mt-6 flex min-h-[6.5rem] items-center justify-center rounded-xl border-dashed px-5 py-6 text-center text-sm leading-relaxed text-muted-foreground">
                         No comments yet. Be the first to share an update.
                       </p>
                     ) : (
@@ -1404,7 +1419,7 @@ export function TaskDetailModal({
                         {comments.map((c: TaskComment) => (
                           <li
                             key={c.id}
-                            className="flex gap-4 rounded-2xl bg-muted/[0.28] px-4 py-4 ring-1 ring-border/12 transition-colors duration-200 hover:bg-muted/40 dark:bg-muted/10 dark:ring-border/10"
+                            className="td-inner-surface flex gap-4 rounded-2xl px-4 py-4 transition-shadow duration-200 hover:shadow-[0_2px_8px_-2px_rgba(15,23,42,0.08)] dark:hover:bg-muted/20"
                           >
                             <Avatar className="h-10 w-10 shrink-0 ring-2 ring-background/80 shadow-sm">
                               <AvatarImage src={c.user?.avatarUrl} alt="" />
@@ -1475,7 +1490,7 @@ export function TaskDetailModal({
                       className={cn(!activityExpanded && "hidden")}
                     >
                       {activityLogs.length === 0 ? (
-                        <div className="flex min-h-[5rem] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[#E7EAF0]/90 bg-white/40 px-4 py-6 text-center dark:border-border/50 dark:bg-muted/10">
+                        <div className="td-inner-surface flex min-h-[5rem] flex-col items-center justify-center gap-2 rounded-xl border-dashed px-4 py-6 text-center">
                           <Activity className="h-8 w-8 text-muted-foreground/25" aria-hidden />
                           <p className="text-sm text-muted-foreground">No activity logged yet</p>
                         </div>
@@ -1485,7 +1500,7 @@ export function TaskDetailModal({
                           {paginatedActivityLogs.map((log: ActivityLog) => (
                             <li
                               key={log.id}
-                              className="flex items-start gap-3 rounded-xl border border-[#E7EAF0]/60 bg-white/50 px-3 py-2.5 text-sm transition-colors hover:border-primary/15 hover:bg-white dark:border-border/40 dark:bg-muted/10 dark:hover:bg-muted/20"
+                              className="td-inner-surface flex items-start gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors hover:border-primary/20 hover:shadow-[0_2px_8px_-2px_rgba(15,23,42,0.08)] dark:hover:bg-muted/20"
                             >
                               <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted/40 text-muted-foreground">
                                 <Activity className="h-3.5 w-3.5" aria-hidden />
@@ -1511,7 +1526,7 @@ export function TaskDetailModal({
                           ))}
                         </ul>
                         {activityLogs.length > ACTIVITY_PAGE_SIZE ? (
-                          <div className="mt-4 flex items-center justify-between gap-3 border-t border-[#E7EAF0]/60 pt-3 dark:border-border/40">
+                          <div className="mt-4 flex items-center justify-between gap-3 border-t border-[#E5E7EB] pt-3 dark:border-border/40">
                             <p className="text-xs text-muted-foreground">
                               Showing {(activityPage - 1) * ACTIVITY_PAGE_SIZE + 1}–
                               {Math.min(activityPage * ACTIVITY_PAGE_SIZE, activityLogs.length)} of{" "}
@@ -1557,7 +1572,7 @@ export function TaskDetailModal({
                 </div>
 
                 {/* Right column: metadata modules */}
-                <aside className="flex min-w-0 flex-col gap-3 lg:sticky lg:top-0 lg:self-start lg:border-l lg:border-[#E7EAF0]/50 lg:pl-8 dark:lg:border-border/40">
+                <aside className="flex min-w-0 flex-col gap-3 lg:sticky lg:top-0 lg:self-start lg:border-l lg:border-[#E5E7EB] lg:pl-8 dark:lg:border-border/40">
                   <div className={tdSidebarSurface}>
                     <span className={tdSidebarHeading}>Assignee</span>
                     <DropdownMenu open={assigneeDropdownOpen} onOpenChange={(o) => { setAssigneeDropdownOpen(o); if (!o) setAssigneeSearch(""); }}>
@@ -1665,60 +1680,92 @@ export function TaskDetailModal({
 
                   <div className={tdSidebarSurface}>
                     <span className={tdSidebarHeading}>Schedule</span>
-                    <div className="space-y-2">
-                      <Label className="mb-1 block text-xs font-medium text-muted-foreground/75" htmlFor="task-detail-due-date">
+                    <div className="space-y-3">
+                      <Label className="mb-0 block text-xs font-medium text-[#6B7280]" htmlFor="task-detail-due-date">
                         Due date
                       </Label>
-                      <Input
-                        id="task-detail-due-date"
-                        type="date"
-                        disabled={!canEditAll || updateMutation.isPending}
-                        value={taskDueDateToInputValue(task.dueDate)}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          updateMutation.mutate({ dueDate: v ? v : null });
-                        }}
-                        className={cn(
-                          "h-12 rounded-xl border-0 bg-white/90 px-4 text-sm shadow-[inset_0_1px_2px_rgba(15,23,42,0.04),inset_0_0_0_1px_rgba(15,23,42,0.08)] transition-shadow focus-visible:shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.35),0_0_0_3px_hsl(var(--primary)/0.12)] focus-visible:ring-0 dark:bg-white/[0.06] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]",
-                          !canEditAll && "text-foreground font-semibold disabled:cursor-default disabled:opacity-100",
-                          isOverdue && task.dueDate && "shadow-[inset_0_0_0_1px_hsl(var(--destructive)/0.45)]"
-                        )}
-                        aria-label="Due date"
-                      />
-                      <div className="flex items-center justify-between gap-2 pt-1">
-                        <p
+
+                      {canEditAll ? (
+                        <label
+                          htmlFor="task-detail-due-date"
                           className={cn(
-                            "text-xs",
-                            !canEditAll ? "font-medium text-foreground/90" : "text-muted-foreground",
-                            isOverdue && task.dueDate && "font-medium text-destructive"
+                            "relative block cursor-pointer",
+                            (updateMutation.isPending || !canEditAll) && "cursor-default"
                           )}
                         >
-                          {task.dueDate
-                            ? new Date(task.dueDate).toLocaleDateString(undefined, {
-                                weekday: "short",
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })
-                            : "No date selected"}
-                        </p>
-                        {task.dueDate && canEditAll ? (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 shrink-0 rounded-lg px-2 text-xs text-muted-foreground hover:text-foreground"
+                          <Input
+                            id="task-detail-due-date"
+                            type="date"
                             disabled={updateMutation.isPending}
-                            onClick={() => updateMutation.mutate({ dueDate: null })}
+                            value={taskDueDateToInputValue(task.dueDate)}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              updateMutation.mutate({ dueDate: v ? v : null });
+                            }}
+                            className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+                            aria-label="Due date"
+                          />
+                          <div
+                            className={cn(
+                              "pointer-events-none flex h-11 w-full items-center gap-3 rounded-xl border px-3.5 transition-colors",
+                              isOverdue && task.dueDate
+                                ? "border-[#FECACA] bg-[#FEF2F2]"
+                                : "border-[#E5E7EB] bg-white dark:border-border dark:bg-white/[0.06]"
+                            )}
                           >
-                            <X className="mr-1 h-3 w-3" />
-                            Clear
-                          </Button>
-                        ) : null}
-                      </div>
-                      {isOverdue && (
-                        <p className="text-xs font-medium text-destructive">Overdue</p>
+                            <Calendar className="h-4 w-4 shrink-0 text-[#6B7280]" aria-hidden />
+                            <span
+                              className={cn(
+                                "min-w-0 flex-1 truncate text-sm font-medium",
+                                task.dueDate ? "text-[#111827] dark:text-foreground" : "text-[#6B7280]"
+                              )}
+                            >
+                              {formatTaskDueDatePrimary(task.dueDate)}
+                            </span>
+                            <Calendar className="h-4 w-4 shrink-0 text-[#6B7280]/70" aria-hidden />
+                          </div>
+                        </label>
+                      ) : (
+                        <div
+                          className={cn(
+                            "flex h-11 w-full items-center gap-3 rounded-xl border px-3.5",
+                            isOverdue && task.dueDate
+                              ? "border-[#FECACA] bg-[#FEF2F2]"
+                              : "border-[#E5E7EB] bg-white dark:border-border dark:bg-white/[0.06]"
+                          )}
+                        >
+                          <Calendar className="h-4 w-4 shrink-0 text-[#6B7280]" aria-hidden />
+                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#111827] dark:text-foreground">
+                            {task.dueDate ? formatTaskDueDatePrimary(task.dueDate) : "No date selected"}
+                          </span>
+                        </div>
                       )}
+
+                      {task.dueDate ? (
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-xs text-[#6B7280]">{formatTaskDueDateHelper(task.dueDate)}</p>
+                          {canEditAll ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 shrink-0 rounded-lg px-2 text-xs font-normal text-[#6B7280] hover:text-[#111827]"
+                              disabled={updateMutation.isPending}
+                              onClick={() => updateMutation.mutate({ dueDate: null })}
+                            >
+                              Clear
+                            </Button>
+                          ) : null}
+                        </div>
+                      ) : !canEditAll ? (
+                        <p className="text-xs text-[#6B7280]">No date selected</p>
+                      ) : null}
+
+                      {isOverdue && task.dueDate ? (
+                        <span className="inline-flex w-fit items-center rounded-full bg-[#FEE2E2] px-2.5 py-0.5 text-[11px] font-semibold text-[#DC2626]">
+                          Overdue
+                        </span>
+                      ) : null}
                     </div>
 
                     <div className={tdSubtleDivider} />
@@ -2029,8 +2076,8 @@ export function TaskDetailModal({
                           }
                         }}
                         className={cn(
-                          "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl bg-background/40 p-6 text-center text-sm text-muted-foreground ring-1 ring-dashed ring-border/35 transition-all duration-200 hover:bg-muted/25 hover:ring-border/50",
-                          dragOver && "bg-primary/[0.06] ring-2 ring-primary/35 ring-offset-0"
+                          "td-inner-surface flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-dashed p-6 text-center text-sm text-muted-foreground transition-all duration-200 hover:shadow-[0_2px_8px_-2px_rgba(15,23,42,0.08)]",
+                          dragOver && "border-primary/35 bg-primary/[0.04] ring-2 ring-primary/25"
                         )}
                         aria-label="Upload files by drop or click"
                       >
@@ -2070,7 +2117,7 @@ export function TaskDetailModal({
                           {attachments.map((att: TaskAttachment) => (
                             <li
                               key={att.id}
-                              className="flex items-center gap-2 rounded-xl bg-background/50 px-3 py-2.5 text-sm ring-1 ring-border/15 transition-colors hover:bg-background/80 dark:bg-background/20"
+                              className="td-inner-surface flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm transition-shadow hover:shadow-[0_2px_8px_-2px_rgba(15,23,42,0.08)]"
                             >
                               <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                               <button
@@ -2117,7 +2164,7 @@ export function TaskDetailModal({
               </div>
             </div>
 
-            <div className="flex shrink-0 flex-wrap justify-end gap-x-8 gap-y-1 border-t border-[#E7EAF0]/70 bg-[#FAFBFC]/90 px-6 py-3.5 text-[11px] font-medium tracking-wide text-muted-foreground/60 dark:border-border/40 dark:bg-muted/15 sm:px-8">
+            <div className="td-modal-footer flex shrink-0 flex-wrap justify-end gap-x-8 gap-y-1 px-6 py-3.5 text-[11px] font-medium tracking-wide text-muted-foreground/60 sm:px-8">
               {task.createdAt && (
                 <span>Created {formatRelativeTime(task.createdAt) || new Date(task.createdAt).toLocaleString()}</span>
               )}
