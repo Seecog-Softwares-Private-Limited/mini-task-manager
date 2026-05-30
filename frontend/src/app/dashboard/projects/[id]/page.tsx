@@ -68,10 +68,18 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
   const createMutation = useMutation({
     mutationFn: ({ payload, imageFiles }: { payload: Parameters<typeof createTask>[0]; imageFiles?: File[] }) =>
       createTaskWithDescriptionImages(payload, imageFiles),
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["tasks", id] });
       setCreateModalOpen(false);
-      toast({ title: "Task created", variant: "success" });
+      if (result.imageUploadWarning) {
+        toast({
+          title: "Task created",
+          description: result.imageUploadWarning,
+          variant: "error",
+        });
+      } else {
+        toast({ title: "Task created", variant: "success" });
+      }
       trackFirstTaskCreated();
       triggerTaskCreatedCelebration();
     },
