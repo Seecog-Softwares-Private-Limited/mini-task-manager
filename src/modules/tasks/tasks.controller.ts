@@ -92,6 +92,7 @@ export class TasksController {
   }
 
   @Get('attachments/:attachmentId/file')
+  @SkipThrottle({ default: true, auth: true })
   async getAttachmentFile(
     @Param('attachmentId') attachmentId: string,
     @TenantId() tenantId: string,

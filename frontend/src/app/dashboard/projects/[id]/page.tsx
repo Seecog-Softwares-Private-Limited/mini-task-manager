@@ -13,6 +13,7 @@ import { CreateTaskModal, type CreateTaskFormData } from "@/components/tasks/cre
 import { useTaskCreatedCelebration } from "@/components/tasks/task-create-celebration";
 import { useToast } from "@/components/ui/use-toast";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { createTaskWithDescriptionImages } from "@/lib/upload-task-description-images";
 import { createTask } from "@/services/api/tasks.api";
 import { parseApiError, isRateLimited } from "@/services/api/client";
 import { useRetentionTracking } from "@/hooks/use-retention-tracking";
@@ -65,7 +66,8 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
   const { createInvite, isPending: invitePending, error: inviteError } = useCreateProjectInvitation(orgId);
 
   const createMutation = useMutation({
-    mutationFn: (payload: Parameters<typeof createTask>[0]) => createTask(payload),
+    mutationFn: ({ payload, imageFiles }: { payload: Parameters<typeof createTask>[0]; imageFiles?: File[] }) =>
+      createTaskWithDescriptionImages(payload, imageFiles),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks", id] });
       setCreateModalOpen(false);
@@ -76,29 +78,32 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
     onError: (err) => toast({ title: "Failed to create task", description: parseApiError(err), variant: "error" }),
   });
 
-  const handleCreateTask = (data: CreateTaskFormData) => {
+  const handleCreateTask = (data: CreateTaskFormData, descriptionImageFiles?: File[]) => {
     if (!orgId) return;
     createMutation.mutate({
-      tags: data.labels?.length ? data.labels.map((l: { name: string; color: string }) => ({ name: l.name, color: l.color })) : undefined,
-      projectId: id,
-      organizationId: orgId,
-      title: data.title,
-      description: data.description,
-      statusId: data.statusId ?? statuses[0]?.id,
-      priority: data.priority ?? "MEDIUM",
-      assigneeIds: data.assigneeIds?.length ? data.assigneeIds : undefined,
-      assigneeId: data.assigneeIds?.[0] || undefined,
-      storyPoints: data.storyPoints,
-      dueDate: data.dueDate,
-      subtasks: data.subtasks
-        .map((s) => ({
-          title: s.title.trim(),
-          completed: s.completed,
-          assigneeId: s.assigneeId || undefined,
-          dueDate: s.dueDate || undefined,
-          priority: s.priority ?? "MEDIUM",
-        }))
-        .filter((s) => s.title.length > 0),
+      payload: {
+        tags: data.labels?.length ? data.labels.map((l: { name: string; color: string }) => ({ name: l.name, color: l.color })) : undefined,
+        projectId: id,
+        organizationId: orgId,
+        title: data.title,
+        description: data.description,
+        statusId: data.statusId ?? statuses[0]?.id,
+        priority: data.priority ?? "MEDIUM",
+        assigneeIds: data.assigneeIds?.length ? data.assigneeIds : undefined,
+        assigneeId: data.assigneeIds?.[0] || undefined,
+        storyPoints: data.storyPoints,
+        dueDate: data.dueDate,
+        subtasks: data.subtasks
+          .map((s) => ({
+            title: s.title.trim(),
+            completed: s.completed,
+            assigneeId: s.assigneeId || undefined,
+            dueDate: s.dueDate || undefined,
+            priority: s.priority ?? "MEDIUM",
+          }))
+          .filter((s) => s.title.length > 0),
+      },
+      imageFiles: descriptionImageFiles,
     });
   };
 

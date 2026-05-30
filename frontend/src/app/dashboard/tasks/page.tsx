@@ -20,6 +20,7 @@ import { fetchSprintsByProject, createSprint } from "@/services/api/sprints.api"
 import { fetchOrgMembers, fetchProjectMembers } from "@/services/api/members.api";
 import { fetchCommentCounts } from "@/services/api/comments.api";
 import { parseApiError, isRateLimited, getStoredToken } from "@/services/api/client";
+import { createTaskWithDescriptionImages } from "@/lib/upload-task-description-images";
 import { useTenant } from "@/context/tenant-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -381,7 +382,8 @@ export default function TasksPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (payload: Parameters<typeof createTask>[0]) => createTask(payload),
+    mutationFn: ({ payload, imageFiles }: { payload: Parameters<typeof createTask>[0]; imageFiles?: File[] }) =>
+      createTaskWithDescriptionImages(payload, imageFiles),
     onSettled: () => {
       if (!selectedProjectId) return;
       queryClient.invalidateQueries({ queryKey: ["tasks", selectedProjectId] });
@@ -470,47 +472,54 @@ export default function TasksPage() {
 
   const handleQuickAdd = useCallback((title: string, statusId: string) => {
     if (!orgId || !selectedProjectId) return;
-    createMutation.mutate({ projectId: selectedProjectId, organizationId: orgId, title, statusId, priority: "MEDIUM" });
+    createMutation.mutate({
+      payload: { projectId: selectedProjectId, organizationId: orgId, title, statusId, priority: "MEDIUM" },
+    });
   }, [orgId, selectedProjectId, createMutation]);
 
   const handleScrumQuickAdd = useCallback(
     (title: string, statusId: string, sprintId: string | null) => {
       if (!orgId || !selectedProjectId) return;
       createMutation.mutate({
-        projectId: selectedProjectId,
-        organizationId: orgId,
-        title,
-        statusId,
-        sprintId: sprintId ?? undefined,
-        priority: "MEDIUM",
+        payload: {
+          projectId: selectedProjectId,
+          organizationId: orgId,
+          title,
+          statusId,
+          sprintId: sprintId ?? undefined,
+          priority: "MEDIUM",
+        },
       });
     },
     [orgId, selectedProjectId, createMutation]
   );
 
-  const handleCreateFromModal = useCallback((data: CreateTaskFormData) => {
+  const handleCreateFromModal = useCallback((data: CreateTaskFormData, descriptionImageFiles?: File[]) => {
     if (!orgId || !selectedProjectId) return;
     createMutation.mutate({
-      projectId: selectedProjectId,
-      organizationId: orgId,
-      title: data.title,
-      description: data.description || undefined,
-      statusId: data.statusId || statuses[0]?.id || undefined,
-      priority: data.priority,
-      assigneeIds: data.assigneeIds?.length ? data.assigneeIds : undefined,
-      assigneeId: data.assigneeIds?.[0] || undefined,
-      storyPoints: data.storyPoints,
-      dueDate: data.dueDate || undefined,
-      tags: data.labels?.length ? data.labels.map((l) => ({ name: l.name, color: l.color })) : undefined,
-      subtasks: data.subtasks
-        .map((s) => ({
-          title: s.title.trim(),
-          completed: s.completed,
-          assigneeId: s.assigneeId || undefined,
-          dueDate: s.dueDate || undefined,
-          priority: s.priority ?? "MEDIUM",
-        }))
-        .filter((s) => s.title.length > 0),
+      payload: {
+        projectId: selectedProjectId,
+        organizationId: orgId,
+        title: data.title,
+        description: data.description || undefined,
+        statusId: data.statusId || statuses[0]?.id || undefined,
+        priority: data.priority,
+        assigneeIds: data.assigneeIds?.length ? data.assigneeIds : undefined,
+        assigneeId: data.assigneeIds?.[0] || undefined,
+        storyPoints: data.storyPoints,
+        dueDate: data.dueDate || undefined,
+        tags: data.labels?.length ? data.labels.map((l) => ({ name: l.name, color: l.color })) : undefined,
+        subtasks: data.subtasks
+          .map((s) => ({
+            title: s.title.trim(),
+            completed: s.completed,
+            assigneeId: s.assigneeId || undefined,
+            dueDate: s.dueDate || undefined,
+            priority: s.priority ?? "MEDIUM",
+          }))
+          .filter((s) => s.title.length > 0),
+      },
+      imageFiles: descriptionImageFiles,
     });
   }, [orgId, selectedProjectId, createMutation, statuses]);
 

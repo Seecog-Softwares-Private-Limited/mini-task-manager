@@ -67,6 +67,9 @@ import {
   taskDescriptionLooksLikeHtml,
   taskDescriptionPlainLength,
 } from "@/lib/task-description-html";
+import { filterTaskImageAttachments } from "@/lib/task-image-attachments";
+import { isTinyMceUiTarget } from "@/lib/tinymce-dialog";
+import { TaskDescriptionAttachmentPreviews } from "@/components/tasks/task-description-attachment-previews";
 
 const TaskDescriptionEditor = dynamic(
   () =>
@@ -109,6 +112,8 @@ import {
   CheckSquare,
   Pencil,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Plus,
   Tag,
   X,
@@ -136,6 +141,7 @@ const PRIORITIES = [
 
 /** Dropdowns inside task detail dialog must sit above the modal (z-50). */
 const TASK_MODAL_DROPDOWN_Z = "z-[110]";
+const ACTIVITY_PAGE_SIZE = 5;
 
 /** Sidebar priority row — warm tint per level (visually distinct from status / primary actions). */
 const PRIORITY_SIDEBAR_SHELL: Record<string, string> = {
@@ -288,6 +294,7 @@ export function TaskDetailModal({
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const commentTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
   const [activityExpanded, setActivityExpanded] = React.useState(true);
+  const [activityPage, setActivityPage] = React.useState(1);
   const [assigneeDropdownOpen, setAssigneeDropdownOpen] = React.useState(false);
   const [assigneeSearch, setAssigneeSearch] = React.useState("");
 
@@ -461,12 +468,34 @@ export function TaskDetailModal({
     enabled: open && !!taskId,
   });
 
+  const imageAttachments = React.useMemo(
+    () => filterTaskImageAttachments(attachments),
+    [attachments]
+  );
+
   const activityLogs = React.useMemo(() => {
     const list = activityData?.data ?? [];
     return list.filter(
       (log: ActivityLog) => log.entityType === "task" && log.entityId === taskId
     );
   }, [activityData?.data, taskId]);
+
+  const activityPageCount = Math.max(1, Math.ceil(activityLogs.length / ACTIVITY_PAGE_SIZE));
+  const paginatedActivityLogs = React.useMemo(() => {
+    const start = (activityPage - 1) * ACTIVITY_PAGE_SIZE;
+    return activityLogs.slice(start, start + ACTIVITY_PAGE_SIZE);
+  }, [activityLogs, activityPage]);
+
+  React.useEffect(() => {
+    setActivityPage(1);
+  }, [taskId]);
+
+  React.useEffect(() => {
+    if (activityPage > activityPageCount) {
+      setActivityPage(activityPageCount);
+    }
+  }, [activityPage, activityPageCount]);
+
   const checklist = task?.subtasks ?? [];
   const checklistStats = React.useMemo(() => {
     const total = checklist.length;
@@ -849,6 +878,16 @@ export function TaskDetailModal({
         showClose={!updateMutation.isPending}
         closeButtonClassName="h-10 w-10 rounded-xl bg-background/80 text-muted-foreground shadow-sm ring-1 ring-black/[0.05] backdrop-blur-sm transition-all hover:bg-muted hover:text-foreground hover:shadow-md dark:ring-white/10"
         onEscapeKeyDown={() => onOpenChange(false)}
+        onFocusOutside={(event) => {
+          if (isTinyMceUiTarget(event.target)) {
+            event.preventDefault();
+          }
+        }}
+        onPointerDownOutside={(event) => {
+          if (isTinyMceUiTarget(event.target)) {
+            event.preventDefault();
+          }
+        }}
         className={cn(
           "td-modal-shell max-w-6xl max-h-[92vh] overflow-hidden flex flex-col gap-0 border-0 bg-background p-0 sm:rounded-2xl",
           "duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-[0.98] data-[state=closed]:zoom-out-95",
@@ -978,8 +1017,21 @@ export function TaskDetailModal({
                         onCommit={commitDescriptionEdit}
                         onCancel={cancelDescriptionEdit}
                         disabled={updateMutation.isPending}
+                        taskId={task.id}
+                        existingImageAttachments={imageAttachments}
+                        onAttachmentUploaded={() => {
+                          queryClient.invalidateQueries({ queryKey: ["task-attachments", taskId] });
+                        }}
+                        onPasteError={(message) =>
+                          toast({
+                            title: "Could not paste image",
+                            description: message,
+                            variant: "error",
+                          })
+                        }
                       />
                     ) : (
+                      <>
                       <div
                         onClick={canEditAll ? () => setIsEditingDescription(true) : undefined}
                         onKeyDown={
@@ -1055,6 +1107,13 @@ export function TaskDetailModal({
                           ) : null}
                         </span>
                       </div>
+                      {imageAttachments.length > 0 ? (
+                        <TaskDescriptionAttachmentPreviews
+                          attachments={attachments}
+                          className="mt-4 px-1"
+                        />
+                      ) : null}
+                      </>
                     )}
                     </div>
 
@@ -1414,8 +1473,9 @@ export function TaskDetailModal({
                           <p className="text-sm text-muted-foreground">No activity logged yet</p>
                         </div>
                       ) : (
+                        <>
                         <ul className="grid gap-2 lg:grid-cols-2" role="list">
-                          {activityLogs.slice(0, 12).map((log: ActivityLog) => (
+                          {paginatedActivityLogs.map((log: ActivityLog) => (
                             <li
                               key={log.id}
                               className="flex items-start gap-3 rounded-xl border border-[#E7EAF0]/60 bg-white/50 px-3 py-2.5 text-sm transition-colors hover:border-primary/15 hover:bg-white dark:border-border/40 dark:bg-muted/10 dark:hover:bg-muted/20"
@@ -1443,6 +1503,47 @@ export function TaskDetailModal({
                             </li>
                           ))}
                         </ul>
+                        {activityLogs.length > ACTIVITY_PAGE_SIZE ? (
+                          <div className="mt-4 flex items-center justify-between gap-3 border-t border-[#E7EAF0]/60 pt-3 dark:border-border/40">
+                            <p className="text-xs text-muted-foreground">
+                              Showing {(activityPage - 1) * ACTIVITY_PAGE_SIZE + 1}–
+                              {Math.min(activityPage * ACTIVITY_PAGE_SIZE, activityLogs.length)} of{" "}
+                              {activityLogs.length}
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1 rounded-lg px-2.5 text-xs"
+                                disabled={activityPage <= 1}
+                                onClick={() => setActivityPage((p) => Math.max(1, p - 1))}
+                                aria-label="Previous activity page"
+                              >
+                                <ChevronLeft className="h-3.5 w-3.5" />
+                                Previous
+                              </Button>
+                              <span className="min-w-[4.5rem] text-center text-xs tabular-nums text-muted-foreground">
+                                {activityPage} / {activityPageCount}
+                              </span>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1 rounded-lg px-2.5 text-xs"
+                                disabled={activityPage >= activityPageCount}
+                                onClick={() =>
+                                  setActivityPage((p) => Math.min(activityPageCount, p + 1))
+                                }
+                                aria-label="Next activity page"
+                              >
+                                Next
+                                <ChevronRight className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </div>
+                        ) : null}
+                        </>
                       )}
                     </div>
                   </div>
