@@ -34,22 +34,8 @@ import {
 } from "@/services/api/attachments.api";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
+import { generateClientId } from "@/lib/generate-client-id";
 
-/** UUID v4 — crypto.randomUUID fails on HTTP (non-localhost), e.g. production IP deploy. */
-function newSubtaskId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    try {
-      return crypto.randomUUID();
-    } catch {
-      /* non-secure context */
-    }
-  }
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (char) => {
-    const random = (Math.random() * 16) | 0;
-    const value = char === "x" ? random : (random & 0x3) | 0x8;
-    return value.toString(16);
-  });
-}
 import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-selector";
 import { SubtaskDueDatePicker } from "@/components/tasks/subtask-due-date-picker";
 import { SubtaskPrioritySelector } from "@/components/tasks/subtask-priority-selector";
@@ -713,7 +699,7 @@ export function TaskDetailModal({
       updateSubtasksMutation.mutate([
         ...checklist,
         {
-          id: newSubtaskId(),
+          id: generateClientId(),
           title: trimmed,
           completed: false,
           priority: "MEDIUM",

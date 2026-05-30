@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import type { BoardFilters } from "@/components/kanban/kanban-board";
+import { generateClientId } from "@/lib/generate-client-id";
 
 export interface SavedView {
   id: string;
@@ -37,7 +38,7 @@ export function useSavedViews(projectId: string) {
   const saveView = useCallback(
     (name: string, filters: BoardFilters) => {
       const newView: SavedView = {
-        id: crypto.randomUUID(),
+        id: generateClientId(),
         name,
         filters: { ...filters },
         createdAt: new Date().toISOString(),
