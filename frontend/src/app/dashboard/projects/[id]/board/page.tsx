@@ -10,6 +10,7 @@ import { fetchOrgMembers, fetchProjectMembers } from "@/services/api/members.api
 import { fetchCommentCounts } from "@/services/api/comments.api";
 import { fetchSubscription } from "@/services/api/billing.api";
 import { parseApiError, isRateLimited, getStoredToken } from "@/services/api/client";
+import { createTaskWithDescriptionImages } from "@/lib/upload-task-description-images";
 import { useTenant } from "@/context/tenant-context";
 import {
   KanbanBoard,
@@ -295,8 +296,9 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
   });
 
   const createMutation = useMutation({
-    mutationFn: (payload: Parameters<typeof createTask>[0]) => createTask(payload),
-    onMutate: async (payload) => {
+    mutationFn: ({ payload, imageFiles }: { payload: Parameters<typeof createTask>[0]; imageFiles?: File[] }) =>
+      createTaskWithDescriptionImages(payload, imageFiles),
+    onMutate: async ({ payload }) => {
       await queryClient.cancelQueries({ queryKey: ["tasks", id] });
       const prev = queryClient.getQueryData<{ data: Task[]; meta?: unknown }>(["tasks", id]);
       const optimistic: Task = {
@@ -397,35 +399,40 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
   const handleQuickAdd = useCallback(
     (title: string, statusId: string) => {
       if (!orgId) return;
-      createMutation.mutate({ projectId: id, organizationId: orgId, title, statusId, priority: "MEDIUM" });
+      createMutation.mutate({
+        payload: { projectId: id, organizationId: orgId, title, statusId, priority: "MEDIUM" },
+      });
     },
     [orgId, id, createMutation]
   );
 
   const handleCreateFromModal = useCallback(
-    (data: CreateTaskFormData) => {
+    (data: CreateTaskFormData, descriptionImageFiles?: File[]) => {
       if (!orgId) return;
       createMutation.mutate({
-        projectId: id,
-        organizationId: orgId,
-        title: data.title,
-        description: data.description,
-        statusId: data.statusId ?? statuses[0]?.id,
-        priority: data.priority,
-        assigneeIds: data.assigneeIds?.length ? data.assigneeIds : undefined,
-        assigneeId: data.assigneeIds?.[0] || undefined,
-        storyPoints: data.storyPoints,
-        dueDate: data.dueDate,
-        tags: data.labels?.length ? data.labels.map((l) => ({ name: l.name, color: l.color })) : undefined,
-        subtasks: data.subtasks
-          .map((s) => ({
-            title: s.title.trim(),
-            completed: s.completed,
-            assigneeId: s.assigneeId || undefined,
-            dueDate: s.dueDate || undefined,
-            priority: s.priority ?? "MEDIUM",
-          }))
-          .filter((s) => s.title.length > 0),
+        payload: {
+          projectId: id,
+          organizationId: orgId,
+          title: data.title,
+          description: data.description,
+          statusId: data.statusId ?? statuses[0]?.id,
+          priority: data.priority,
+          assigneeIds: data.assigneeIds?.length ? data.assigneeIds : undefined,
+          assigneeId: data.assigneeIds?.[0] || undefined,
+          storyPoints: data.storyPoints,
+          dueDate: data.dueDate,
+          tags: data.labels?.length ? data.labels.map((l) => ({ name: l.name, color: l.color })) : undefined,
+          subtasks: data.subtasks
+            .map((s) => ({
+              title: s.title.trim(),
+              completed: s.completed,
+              assigneeId: s.assigneeId || undefined,
+              dueDate: s.dueDate || undefined,
+              priority: s.priority ?? "MEDIUM",
+            }))
+            .filter((s) => s.title.length > 0),
+        },
+        imageFiles: descriptionImageFiles,
       });
     },
     [orgId, id, statuses, createMutation]

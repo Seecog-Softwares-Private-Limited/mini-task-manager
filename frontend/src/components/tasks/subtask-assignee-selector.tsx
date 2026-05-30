@@ -15,35 +15,76 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Check, Loader2, Search, UserRoundPlus, UserRoundX } from "lucide-react";
+import { Check, Loader2, Search, UserRound, UserRoundPlus, UserRoundX } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { OrgMember } from "@/types/api";
 
 const DROPDOWN_Z = "z-[110]";
 
-interface MemberHint {
+type MemberOption = {
   id: string;
   name: string;
   email?: string;
   avatarUrl?: string;
-}
+};
 
 interface SubtaskAssigneeSelectorProps {
   projectId: string;
+  organizationId?: string;
+  /** Reuse members already loaded by the task modal (avoids duplicate fetches). */
+  prefetchedOrgMembers?: OrgMember[];
   value?: string;
   onChange: (assigneeId?: string) => void;
   disabled?: boolean;
   /** Pre-resolved members from the task modal (project + org + task assignee). */
-  knownMembers?: MemberHint[];
+  knownMembers?: MemberOption[];
+}
+
+function mergeMemberOptions(
+  projectMembers: Awaited<ReturnType<typeof fetchProjectMembers>>,
+  orgMembers: OrgMember[],
+  knownMembers: MemberOption[] = []
+): MemberOption[] {
+  const byUserId = new Map<string, MemberOption>();
+
+  for (const hint of knownMembers) {
+    byUserId.set(hint.id, hint);
+  }
+
+  for (const m of projectMembers) {
+    byUserId.set(m.userId, {
+      id: m.userId,
+      name: m.user?.fullName ?? m.user?.email ?? "User",
+      email: m.user?.email ?? "",
+      avatarUrl: m.user?.avatarUrl,
+    });
+  }
+
+  for (const om of orgMembers) {
+    if (om.status?.toLowerCase() !== "active") continue;
+    if (byUserId.has(om.userId)) continue;
+    byUserId.set(om.userId, {
+      id: om.userId,
+      name: om.user?.fullName ?? om.user?.email ?? "User",
+      email: om.user?.email ?? "",
+      avatarUrl: om.user?.avatarUrl,
+    });
+  }
+
+  return Array.from(byUserId.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export function SubtaskAssigneeSelector({
   projectId,
+  organizationId,
+  prefetchedOrgMembers,
   value,
   onChange,
   disabled,
   knownMembers = [],
 }: SubtaskAssigneeSelectorProps) {
-  const { orgId } = useTenant();
+  const { orgId: tenantOrgId } = useTenant();
+  const orgId = organizationId ?? tenantOrgId ?? "";
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
@@ -54,45 +95,20 @@ export function SubtaskAssigneeSelector({
     staleTime: 60_000,
   });
 
-  const { data: orgMembers = [], isLoading: orgLoading } = useQuery({
-    queryKey: ["org-members", orgId ?? ""],
-    queryFn: () => fetchOrgMembers(orgId!),
-    enabled: !!orgId,
+  const { data: fetchedOrgMembers = [], isLoading: orgLoading } = useQuery({
+    queryKey: ["org-members", orgId],
+    queryFn: () => fetchOrgMembers(orgId),
+    enabled: !!orgId && prefetchedOrgMembers === undefined,
     staleTime: 60_000,
   });
 
-  const isLoading = projectLoading || orgLoading;
+  const orgMembers = prefetchedOrgMembers ?? fetchedOrgMembers;
+  const isLoading = projectLoading || (prefetchedOrgMembers === undefined && orgLoading);
 
-  const options = useMemo(() => {
-    const byUserId = new Map<string, MemberHint>();
-
-    for (const hint of knownMembers) {
-      byUserId.set(hint.id, hint);
-    }
-
-    for (const m of projectMembers) {
-      byUserId.set(m.userId, {
-        id: m.userId,
-        name: m.user?.fullName ?? m.user?.email ?? "User",
-        email: m.user?.email ?? "",
-        avatarUrl: m.user?.avatarUrl,
-      });
-    }
-
-    for (const om of orgMembers) {
-      if (om.status?.toLowerCase() !== "active") continue;
-      if (!byUserId.has(om.userId)) {
-        byUserId.set(om.userId, {
-          id: om.userId,
-          name: om.user?.fullName ?? om.user?.email ?? "User",
-          email: om.user?.email ?? "",
-          avatarUrl: om.user?.avatarUrl,
-        });
-      }
-    }
-
-    return Array.from(byUserId.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [projectMembers, orgMembers, knownMembers]);
+  const options = useMemo(
+    () => mergeMemberOptions(projectMembers, orgMembers, knownMembers),
+    [projectMembers, orgMembers, knownMembers]
+  );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -111,7 +127,7 @@ export function SubtaskAssigneeSelector({
           size="icon"
           disabled={disabled}
           className="h-7 w-7 shrink-0 rounded-full p-0"
-          aria-label={selected ? `Assignee ${selected.name}` : "Assign subtask"}
+          aria-label={selected ? `Assignee ${selected.name}` : value ? "Assigned member" : "Assign subtask"}
         >
           {selected ? (
             <Avatar className="h-7 w-7 ring-1 ring-border/60">
@@ -120,6 +136,10 @@ export function SubtaskAssigneeSelector({
                 {selected.name.slice(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
+          ) : value ? (
+            <span className="flex h-7 w-7 items-center justify-center rounded-full border border-border/40 bg-muted/40">
+              <UserRound className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+            </span>
           ) : (
             <span className="flex h-7 w-7 items-center justify-center rounded-full border border-dashed border-foreground/35 bg-muted/50">
               <UserRoundPlus className="h-3.5 w-3.5 text-foreground/75" aria-hidden />

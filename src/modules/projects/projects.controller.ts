@@ -79,18 +79,18 @@ export class ProjectsController {
     @Param('id') projectId: string,
     @TenantId() tenantId?: string,
   ) {
-    // First try explicit project members
-    const projectMembers = await this.projectsService.getProjectMembers(projectId);
-    if (projectMembers.length > 0) {
-      return projectMembers.map((m) => this.toMemberResponse(m));
+    const byUserId = new Map<string, ReturnType<ProjectsController['toMemberResponse']>>();
+
+    for (const m of await this.projectsService.getProjectMembers(projectId)) {
+      byUserId.set(m.userId, this.toMemberResponse(m));
     }
 
-    // Fall back to all ACTIVE organization members so any org member can be assigned
     if (tenantId) {
       const orgMembers = await this.organizationsService.getMembers(tenantId);
-      return orgMembers
-        .filter((om) => om.status === 'ACTIVE')
-        .map((om) => ({
+      for (const om of orgMembers) {
+        if (om.status !== 'ACTIVE') continue;
+        if (byUserId.has(om.userId)) continue;
+        byUserId.set(om.userId, {
           id: om.id,
           projectId,
           userId: om.userId,
@@ -103,10 +103,11 @@ export class ProjectsController {
                 avatarUrl: om.user.avatarUrl ?? undefined,
               }
             : undefined,
-        }));
+        });
+      }
     }
 
-    return [];
+    return Array.from(byUserId.values());
   }
 
   @Post(':id/members')

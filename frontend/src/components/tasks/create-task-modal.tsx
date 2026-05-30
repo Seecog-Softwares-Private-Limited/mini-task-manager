@@ -21,6 +21,11 @@ import {
 } from "@/components/tasks/create-task/subtasks-editor";
 import { DueDateField } from "@/components/tasks/create-task/due-date-field";
 import {
+  TaskDescriptionField,
+  type TaskDescriptionFieldHandle,
+} from "@/components/tasks/task-description-field";
+import { useToast } from "@/components/ui/use-toast";
+import {
   X, Sparkles, ArrowRight, Flag, AlignLeft,
   Layers, AlertCircle,
 } from "lucide-react";
@@ -76,7 +81,7 @@ export type CreateTaskFormData = z.infer<typeof schema>;
 interface CreateTaskModalProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (data: CreateTaskFormData) => void;
+  onSubmit: (data: CreateTaskFormData, descriptionImageFiles?: File[]) => void;
   isSubmitting: boolean;
   error?: string | null;
   projectId: string;
@@ -95,6 +100,8 @@ export function CreateTaskModal({
   defaultStatusId,
 }: CreateTaskModalProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const descriptionFieldRef = useRef<TaskDescriptionFieldHandle>(null);
+  const { toast } = useToast();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -161,13 +168,15 @@ export function CreateTaskModal({
         labels: [],
         subtasks: [],
       });
+      descriptionFieldRef.current?.resetPendingImages();
     }
   }, [open, defaultStatusId, statuses, reset]);
 
   if (!open || !mounted) return null;
 
   function handleFormSubmit(data: CreateTaskFormData) {
-    onSubmit(data);
+    const imageFiles = descriptionFieldRef.current?.getPendingImageFiles() ?? [];
+    onSubmit(data, imageFiles.length ? imageFiles : undefined);
   }
 
   const statusColors = ["bg-blue-500", "bg-amber-500", "bg-purple-500", "bg-emerald-500", "bg-red-500"];
@@ -236,13 +245,26 @@ export function CreateTaskModal({
             <Label htmlFor="task-desc" className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               <AlignLeft className="h-3 w-3" /> Description
             </Label>
-            <textarea
-              id="task-desc"
-              placeholder="Add a detailed description of what needs to be done..."
-              {...register("description")}
-              rows={3}
-              className="flex w-full rounded-lg border border-input bg-background px-4 py-2.5 text-sm shadow-sm transition-all duration-200 placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:border-primary/50 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-              data-cy="task-desc-input"
+            <Controller
+              control={control}
+              name="description"
+              render={({ field }) => (
+                <TaskDescriptionField
+                  ref={descriptionFieldRef}
+                  id="task-desc"
+                  value={field.value ?? ""}
+                  onChange={field.onChange}
+                  disabled={isSubmitting}
+                  data-cy="task-desc-input"
+                  onPasteError={(message) =>
+                    toast({
+                      title: "Could not paste image",
+                      description: message,
+                      variant: "error",
+                    })
+                  }
+                />
+              )}
             />
           </div>
 
