@@ -32,10 +32,17 @@ const DialogContent = React.forwardRef<
     showClose?: boolean;
     /** Merged onto the default close control (e.g. task modals). */
     closeButtonClassName?: string;
+    /** Override overlay backdrop (e.g. task detail modal). */
+    overlayClassName?: string;
   }
->(({ className, children, showClose = true, closeButtonClassName, ...props }, ref) => (
+>(({ className, children, showClose = true, closeButtonClassName, overlayClassName, ...props }, ref) => (
   <DialogPortal>
-    <DialogOverlay />
+    <DialogOverlay
+      className={cn(
+        "fixed inset-0 z-50 duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+        overlayClassName ?? "bg-black/60 backdrop-blur-sm"
+      )}
+    />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
