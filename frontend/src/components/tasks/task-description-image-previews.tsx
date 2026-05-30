@@ -208,10 +208,15 @@ export function TaskDescriptionImagePreviews({
                     <Loader2 className="h-5 w-5 animate-spin text-primary" aria-hidden />
                   </div>
                 )}
-                {(item.status === "uploading" || item.status === "pending") && item.previewUrl && (
+                {(item.status === "uploading" && item.previewUrl) && (
                   <div className="absolute inset-0 flex items-center justify-center bg-background/70">
                     <Loader2 className="h-5 w-5 animate-spin text-primary" aria-hidden />
                   </div>
+                )}
+                {item.status === "pending" && item.previewUrl && (
+                  <span className="pointer-events-none absolute bottom-0 left-0 right-0 bg-primary/85 px-1 py-0.5 text-center text-[9px] font-medium text-primary-foreground">
+                    Queued
+                  </span>
                 )}
                 {item.status === "error" && (
                   <div

@@ -115,7 +115,7 @@ export class TasksController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles('owner')
+  @Roles('owner', 'admin')
   @Post(':id/attachments')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
   async uploadAttachment(
@@ -129,7 +129,7 @@ export class TasksController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles('owner')
+  @Roles('owner', 'admin')
   @Delete(':id/attachments/:attachmentId')
   async deleteAttachment(
     @Param('id') taskId: string,

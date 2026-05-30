@@ -347,9 +347,17 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
       toast({ title: "Failed to create task", variant: "error" });
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ["tasks", id] }),
-    onSuccess: () => {
+    onSuccess: (result) => {
       setCreateModalOpen(false);
-      toast({ title: "Task created", variant: "success" });
+      if (result.imageUploadWarning) {
+        toast({
+          title: "Task created",
+          description: result.imageUploadWarning,
+          variant: "error",
+        });
+      } else {
+        toast({ title: "Task created", variant: "success" });
+      }
       trackFirstTaskCreated();
       triggerTaskCreatedCelebration();
     },

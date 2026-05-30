@@ -9,6 +9,7 @@ import {
   validateTaskPasteImageFile,
 } from "@/lib/task-clipboard-image";
 import { generateClientId } from "@/lib/generate-client-id";
+import { isValidTaskId } from "@/lib/task-id";
 import { filterTaskImageAttachments } from "@/lib/task-image-attachments";
 import { useAttachmentImagePreviews } from "@/hooks/use-attachment-image-previews";
 import type { DescriptionImagePreviewItem } from "@/components/tasks/task-description-image-previews";
@@ -94,7 +95,20 @@ export function useTaskDescriptionImagePaste(options: {
 
   const uploadForEdit = React.useCallback(
     async (file: File, previewId: string) => {
-      if (!taskId) return;
+      if (!taskId || !isValidTaskId(taskId)) {
+        setSessionItems((prev) =>
+          prev.map((item) =>
+            item.id === previewId
+              ? {
+                  ...item,
+                  status: "error" as const,
+                  error: "Save the task before uploading images.",
+                }
+              : item
+          )
+        );
+        return;
+      }
       setSessionItems((prev) =>
         prev.map((item) =>
           item.id === previewId ? { ...item, status: "uploading" as const } : item
