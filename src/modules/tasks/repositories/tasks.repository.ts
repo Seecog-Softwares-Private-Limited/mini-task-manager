@@ -52,4 +52,12 @@ export class TasksRepository {
   async update(id: string, data: Partial<TaskEntity>): Promise<void> {
     await this.repo.update(id, data);
   }
+
+  async clearParentReferences(parentTaskId: string): Promise<void> {
+    await this.repo.update({ parentTaskId }, { parentTaskId: null });
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.repo.delete(id);
+  }
 }

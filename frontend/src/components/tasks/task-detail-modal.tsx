@@ -22,7 +22,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getStoredToken, parseApiError } from "@/services/api/client";
-import { fetchTask, updateTask, updateTaskAssignee } from "@/services/api/tasks.api";
+import { fetchTask, updateTask, updateTaskAssignee, deleteTask } from "@/services/api/tasks.api";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { fetchComments, addComment, deleteComment } from "@/services/api/comments.api";
 import { fetchOrgMembers, fetchProjectMembers } from "@/services/api/members.api";
 import { fetchActivityLogs } from "@/services/api/activity-logs.api";
@@ -34,22 +35,8 @@ import {
 } from "@/services/api/attachments.api";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
+import { generateClientId } from "@/lib/generate-client-id";
 
-/** UUID v4 — crypto.randomUUID fails on HTTP (non-localhost), e.g. production IP deploy. */
-function newSubtaskId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    try {
-      return crypto.randomUUID();
-    } catch {
-      /* non-secure context */
-    }
-  }
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (char) => {
-    const random = (Math.random() * 16) | 0;
-    const value = char === "x" ? random : (random & 0x3) | 0x8;
-    return value.toString(16);
-  });
-}
 import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-selector";
 import { SubtaskDueDatePicker } from "@/components/tasks/subtask-due-date-picker";
 import { SubtaskPrioritySelector } from "@/components/tasks/subtask-priority-selector";
@@ -297,6 +284,7 @@ export function TaskDetailModal({
   const [activityPage, setActivityPage] = React.useState(1);
   const [assigneeDropdownOpen, setAssigneeDropdownOpen] = React.useState(false);
   const [assigneeSearch, setAssigneeSearch] = React.useState("");
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false);
 
   const isOnline = React.useCallback((lastSeenAt: string | undefined) => {
     if (!lastSeenAt) return false;
@@ -611,6 +599,24 @@ export function TaskDetailModal({
     },
   });
 
+  const deleteTaskMutation = useMutation({
+    mutationFn: () => deleteTask(taskId!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
+      queryClient.removeQueries({ queryKey: ["task", taskId] });
+      setDeleteConfirmOpen(false);
+      onOpenChange(false);
+      toast({ title: "Task deleted", variant: "success" });
+    },
+    onError: (err) => {
+      toast({
+        title: "Failed to delete task",
+        description: parseApiError(err),
+        variant: "error",
+      });
+    },
+  });
+
   const addCommentMutation = useMutation({
     mutationFn: ({ text, mentionedUserIds }: { text: string; mentionedUserIds: string[] }) =>
       addComment(taskId!, text, mentionedUserIds),
@@ -713,7 +719,7 @@ export function TaskDetailModal({
       updateSubtasksMutation.mutate([
         ...checklist,
         {
-          id: newSubtaskId(),
+          id: generateClientId(),
           title: trimmed,
           completed: false,
           priority: "MEDIUM",
@@ -873,6 +879,7 @@ export function TaskDetailModal({
   }, [task]);
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         showClose={!updateMutation.isPending}
@@ -2090,6 +2097,22 @@ export function TaskDetailModal({
                       ) : null}
                     </div>
                   </div>
+
+                  {isOwner && (
+                    <div className={tdSidebarSurface}>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-full gap-2 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        disabled={deleteTaskMutation.isPending}
+                        onClick={() => setDeleteConfirmOpen(true)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete task
+                      </Button>
+                    </div>
+                  )}
                 </aside>
               </div>
             </div>
@@ -2106,5 +2129,21 @@ export function TaskDetailModal({
         )}
       </DialogContent>
     </Dialog>
+
+    <ConfirmDialog
+      open={deleteConfirmOpen}
+      onOpenChange={setDeleteConfirmOpen}
+      title="Delete task"
+      description={
+        task
+          ? `Permanently delete "${task.title}"? This cannot be undone.`
+          : undefined
+      }
+      confirmLabel="Delete"
+      variant="destructive"
+      loading={deleteTaskMutation.isPending}
+      onConfirm={() => deleteTaskMutation.mutate()}
+    />
+    </>
   );
 }

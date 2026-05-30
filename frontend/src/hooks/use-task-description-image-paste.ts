@@ -8,20 +8,14 @@ import {
   normalizePastedImageFile,
   validateTaskPasteImageFile,
 } from "@/lib/task-clipboard-image";
+import { generateClientId } from "@/lib/generate-client-id";
 import { filterTaskImageAttachments } from "@/lib/task-image-attachments";
 import { useAttachmentImagePreviews } from "@/hooks/use-attachment-image-previews";
 import type { DescriptionImagePreviewItem } from "@/components/tasks/task-description-image-previews";
 import type { TaskAttachment } from "@/types/api";
 
 function newPreviewId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    try {
-      return crypto.randomUUID();
-    } catch {
-      /* non-secure context */
-    }
-  }
-  return `paste-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  return generateClientId("paste-");
 }
 
 function mergeDescriptionImageItems(

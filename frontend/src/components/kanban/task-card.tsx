@@ -23,7 +23,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   AlertCircle,
-  Archive,
   ArrowRight,
   BookOpen,
   Bug,
@@ -36,6 +35,7 @@ import {
   Paperclip,
   Rocket,
   SquarePen,
+  Trash2,
   UserPlus,
   Wrench,
 } from "lucide-react";
@@ -509,20 +509,22 @@ export function TaskCard({
           >
             <Calendar className="h-3.5 w-3.5" />
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="h-7 w-7 rounded-lg border-[#E7EAF0] bg-[#FCFCFD]/95 shadow-sm hover:bg-white dark:border-border dark:bg-card/95"
-            data-quick-action
-            aria-label="Archive task"
-            onClick={(e) => {
-              e.stopPropagation();
-              quickActions?.onDelete?.(task);
-            }}
-          >
-            <Archive className="h-3.5 w-3.5" />
-          </Button>
+          {permissions?.canDeleteTask && quickActions?.onDelete && (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-7 w-7 rounded-lg border-[#E7EAF0] bg-[#FCFCFD]/95 shadow-sm hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive dark:border-border dark:bg-card/95"
+              data-quick-action
+              aria-label="Delete task"
+              onClick={(e) => {
+                e.stopPropagation();
+                quickActions.onDelete?.(task);
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
           {!!quickActions?.onChangeStatus && statuses && statuses.length > 0 && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

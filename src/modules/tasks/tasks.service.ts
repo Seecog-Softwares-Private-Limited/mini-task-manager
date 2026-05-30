@@ -198,6 +198,32 @@ export class TasksService {
     return this.tasksRepository.findById(taskId);
   }
 
+  async delete(taskId: string, organizationId: string, userId?: string): Promise<void> {
+    const task = await this.tasksRepository.findByIdAndOrganization(taskId, organizationId);
+    if (!task) throw new NotFoundException('Task not found');
+
+    const attachments = await this.taskAttachmentsRepository.findByTask(taskId);
+    const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
+    for (const attachment of attachments) {
+      const fullPath = path.join(uploadsPath, attachment.fileUrl);
+      await fs.unlink(fullPath).catch(() => {});
+    }
+
+    await this.tasksRepository.clearParentReferences(taskId);
+    await this.tasksRepository.delete(taskId);
+
+    this.activityLogsService
+      .log({
+        organizationId,
+        userId,
+        entityType: 'task',
+        entityId: taskId,
+        action: 'delete',
+        metadata: { name: task.title },
+      })
+      .catch(() => {});
+  }
+
   private async assertCanUpdateTask(
     task: TaskEntity,
     organizationId: string,
