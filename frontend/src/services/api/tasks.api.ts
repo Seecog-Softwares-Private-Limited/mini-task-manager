@@ -161,3 +161,7 @@ export async function fetchTask(taskId: string): Promise<Task> {
   const { data } = await apiClient.get<Task>(`/tasks/${taskId}`);
   return data;
 }
+
+export async function deleteTask(taskId: string): Promise<void> {
+  await apiClient.delete(`/tasks/${taskId}`);
+}

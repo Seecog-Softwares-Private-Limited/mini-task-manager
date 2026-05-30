@@ -15,6 +15,7 @@ import {
   createTask,
   updateTaskStatus,
   updateTaskStatusAndSprint,
+  deleteTask,
 } from "@/services/api/tasks.api";
 import { fetchSprintsByProject, createSprint } from "@/services/api/sprints.api";
 import { fetchOrgMembers, fetchProjectMembers } from "@/services/api/members.api";
@@ -63,6 +64,7 @@ import {
 } from "@/components/tasks/create-task-modal";
 import { CreateSprintModal, type CreateSprintFormData } from "@/components/sprints/create-sprint-modal";
 import { TaskDetailModal } from "@/components/tasks/task-detail-modal";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useTaskCreatedCelebration } from "@/components/tasks/task-create-celebration";
 import { ProjectSwitcher } from "@/components/tasks/project-switcher";
 import { OrgSwitcher } from "@/components/dashboard/org-switcher";
@@ -103,6 +105,7 @@ export default function TasksPage() {
   const [createSprintModalOpen, setCreateSprintModalOpen] = useState(false);
   const [defaultStatusId, setDefaultStatusId] = useState<string | undefined>();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
   const [filters, setFilters] = useState<BoardFilters>(DEFAULT_FILTERS);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -352,6 +355,23 @@ export default function TasksPage() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (taskId: string) => deleteTask(taskId),
+    onSuccess: (_data, taskId) => {
+      queryClient.invalidateQueries({ queryKey: ["tasks", selectedProjectId] });
+      if (selectedTaskId === taskId) setSelectedTaskId(null);
+      setDeleteTarget(null);
+      toast({ title: "Task deleted" });
+    },
+    onError: (err) => {
+      toast({
+        title: "Failed to delete task",
+        description: isRateLimited(err) ? "Too many requests. Try again later." : parseApiError(err),
+        variant: "error",
+      });
+    },
+  });
+
   const scrumMoveMutation = useMutation({
     mutationFn: ({ taskId, statusId, sprintId }: { taskId: string; statusId: string; sprintId: string | null }) =>
       updateTaskStatusAndSprint(taskId, statusId, sprintId),
@@ -526,7 +546,10 @@ export default function TasksPage() {
   const quickActions = useMemo(() => ({
     onEdit: (task: Task) => setSelectedTaskId(task.id),
     onChangeStatus: (task: Task, statusId: string) => updateMutation.mutate({ taskId: task.id, statusId }),
-  }), [updateMutation]);
+    ...(permissions.canDeleteTask && {
+      onDelete: (task: Task) => setDeleteTarget(task),
+    }),
+  }), [updateMutation, permissions.canDeleteTask]);
 
   const handleToggleSelectionMode = useCallback(() => {
     if (bulk.state.isSelectionMode) bulk.exitSelectionMode();
@@ -825,6 +848,23 @@ export default function TasksPage() {
           error={createSprintMutation.error ? parseApiError(createSprintMutation.error) : null}
         />
       )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Delete task"
+        description={
+          deleteTarget
+            ? `Permanently delete "${deleteTarget.title}"? This cannot be undone.`
+            : undefined
+        }
+        confirmLabel="Delete"
+        variant="destructive"
+        loading={deleteMutation.isPending}
+        onConfirm={() => {
+          if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
+        }}
+      />
     </div>
   );
 }

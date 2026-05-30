@@ -227,6 +227,18 @@ export class TasksController {
     return this.toResponse(task);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('owner')
+  @Delete(':id')
+  async remove(
+    @Param('id') id: string,
+    @TenantId() tenantId: string,
+    @CurrentUserId() userId: string,
+  ): Promise<{ success: boolean }> {
+    await this.tasksService.delete(id, tenantId, userId);
+    return { success: true };
+  }
+
   private async notifyCommentObservers(
     task: import('./entities/task.entity').TaskEntity,
     commenterUserId: string,

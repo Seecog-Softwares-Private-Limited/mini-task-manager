@@ -4,7 +4,7 @@ import { useMemo, useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchProject } from "@/services/api/projects.api";
 import { fetchWorkflowsByProject, fetchWorkflowStatuses, createDefaultWorkflow } from "@/services/api/workflows.api";
-import { fetchTasksByProject, updateTaskStatus, updateTaskStatusAndSprint, createTask } from "@/services/api/tasks.api";
+import { fetchTasksByProject, updateTaskStatus, updateTaskStatusAndSprint, createTask, deleteTask } from "@/services/api/tasks.api";
 import { fetchSprintsByProject, createSprint } from "@/services/api/sprints.api";
 import { fetchOrgMembers, fetchProjectMembers } from "@/services/api/members.api";
 import { fetchCommentCounts } from "@/services/api/comments.api";
@@ -31,6 +31,7 @@ import { CreateTaskModal, type CreateTaskFormData } from "@/components/tasks/cre
 import { useTaskCreatedCelebration } from "@/components/tasks/task-create-celebration";
 import { CreateSprintModal, type CreateSprintFormData } from "@/components/sprints/create-sprint-modal";
 import { TaskDetailModal } from "@/components/tasks/task-detail-modal";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
@@ -74,6 +75,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [defaultStatusId, setDefaultStatusId] = useState<string | undefined>();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
   const [filters, setFilters] = useState<BoardFilters>(DEFAULT_FILTERS);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -295,6 +297,23 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (taskId: string) => deleteTask(taskId),
+    onSuccess: (_data, taskId) => {
+      queryClient.invalidateQueries({ queryKey: ["tasks", id] });
+      if (selectedTaskId === taskId) setSelectedTaskId(null);
+      setDeleteTarget(null);
+      toast({ title: "Task deleted", variant: "success" });
+    },
+    onError: (err) => {
+      toast({
+        title: "Failed to delete task",
+        description: isRateLimited(err) ? "Too many requests." : parseApiError(err),
+        variant: "error",
+      });
+    },
+  });
+
   const createMutation = useMutation({
     mutationFn: ({ payload, imageFiles }: { payload: Parameters<typeof createTask>[0]; imageFiles?: File[] }) =>
       createTaskWithDescriptionImages(payload, imageFiles),
@@ -443,7 +462,10 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
     onChangeStatus: (task: Task, statusId: string) => {
       updateStatusMutation.mutate({ taskId: task.id, statusId });
     },
-  }), [updateStatusMutation]);
+    ...(permissions.canDeleteTask && {
+      onDelete: (task: Task) => setDeleteTarget(task),
+    }),
+  }), [updateStatusMutation, permissions.canDeleteTask]);
 
   const toggleColumnCollapse = useCallback((statusId: string) => {
     setCollapsedColumns((prev) => ({ ...prev, [statusId]: !prev[statusId] }));
@@ -841,6 +863,23 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
           error={createSprintMutation.error ? parseApiError(createSprintMutation.error) : null}
         />
       )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Delete task"
+        description={
+          deleteTarget
+            ? `Permanently delete "${deleteTarget.title}"? This cannot be undone.`
+            : undefined
+        }
+        confirmLabel="Delete"
+        variant="destructive"
+        loading={deleteMutation.isPending}
+        onConfirm={() => {
+          if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
+        }}
+      />
     </div>
   );
 }
