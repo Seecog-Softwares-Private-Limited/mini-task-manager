@@ -6,6 +6,7 @@ import {
   emailInvitationBody,
   emailLayout,
   emailPasswordResetBody,
+  emailPlainTextInvite,
   emailPlainTextWithLink,
   emailVerificationBody,
 } from './email-template.util';
@@ -15,7 +16,10 @@ export interface InviteEmailPayload {
   organizationName: string;
   inviterName: string;
   role: string;
+  /** Button / primary link (may be API redirect when PUBLIC_API_URL is set). */
   acceptUrl: string;
+  /** Direct app URL — always included as copy-paste fallback in the email. */
+  directAppUrl: string;
 }
 
 export interface TaskAssignmentEmailPayload {
@@ -75,15 +79,18 @@ export class EmailService implements OnModuleInit {
   }
 
   async sendInvitation(payload: InviteEmailPayload): Promise<void> {
-    const { to, organizationName, inviterName, role, acceptUrl } = payload;
+    const { to, organizationName, inviterName, role, acceptUrl, directAppUrl } = payload;
 
     await this.deliver({
       kind: 'invitation',
       to,
       subject: `You're invited to join ${organizationName}`,
-      text: emailPlainTextWithLink(
-        `${inviterName} has invited you to join ${organizationName} as ${role}.`,
+      text: emailPlainTextInvite(
+        inviterName,
+        organizationName,
+        role,
         acceptUrl,
+        directAppUrl,
       ),
       html: emailLayout(
         emailInvitationBody({
@@ -91,6 +98,7 @@ export class EmailService implements OnModuleInit {
           organizationName,
           role,
           acceptUrl,
+          directAppUrl,
         }),
       ),
     });
@@ -218,12 +226,18 @@ export class EmailService implements OnModuleInit {
     this.logger.log(`Sending ${kind} email to ${to} via ${this.smtp.host}:${this.smtp.port}`);
 
     try {
+      const replyTo = this.smtp.user?.trim() || undefined;
       const info = await this.transporter.sendMail({
         from,
         to,
         subject,
         html,
         text,
+        ...(replyTo ? { replyTo } : {}),
+        headers: {
+          'X-Mailer': 'Mini Task Manager',
+          'X-Priority': '3',
+        },
       });
       this.logger.log(
         `${kind} email sent to ${to} (messageId=${info.messageId ?? 'n/a'}, response=${info.response ?? 'n/a'})`,

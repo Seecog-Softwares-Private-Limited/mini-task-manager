@@ -40,7 +40,8 @@ import { useBulkSelection } from "@/hooks/use-bulk-selection";
 import { useBoardPermissions } from "@/hooks/use-board-permissions";
 import { useRetentionTracking } from "@/hooks/use-retention-tracking";
 import type { Task } from "@/types/api";
-import { Plus, Columns3, Settings, Sparkles, Keyboard, Shield, Crown, Rocket } from "lucide-react";
+import { exportTasksToCsvFile } from "@/lib/export-tasks-csv";
+import { Plus, Columns3, Settings, Sparkles, Keyboard, Shield, Crown, Rocket, Download } from "lucide-react";
 import Link from "next/link";
 import {
   Tooltip,
@@ -433,6 +434,35 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
     [orgId, id, createMutation]
   );
 
+  const handleExportCsv = useCallback(() => {
+    if (tasks.length === 0) {
+      toast({
+        title: "Nothing to export",
+        description: "Create at least one task in this project first.",
+        variant: "error",
+      });
+      return;
+    }
+    const assigneeNameById: Record<string, string> = {};
+    for (const [userId, info] of Object.entries(assigneeMap)) {
+      assigneeNameById[userId] = info.name;
+    }
+    const hasActiveFilters =
+      filters.search.length > 0 || filters.priority.length > 0 || filters.assignee.length > 0;
+    const { count, filename } = exportTasksToCsvFile(tasks, {
+      projectName: project?.name,
+      statuses,
+      assigneeNameById,
+      filters,
+      onlyFiltered: hasActiveFilters,
+    });
+    toast({
+      title: "CSV exported",
+      description: `Downloaded ${filename} (${count} task${count === 1 ? "" : "s"}). Share the file with anyone.`,
+      variant: "success",
+    });
+  }, [tasks, assigneeMap, statuses, filters, project?.name, toast]);
+
   const handleCreateFromModal = useCallback(
     (data: CreateTaskFormData, descriptionImageFiles?: File[]) => {
       if (!orgId) return;
@@ -667,6 +697,17 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
               Settings
             </Button>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5"
+            disabled={tasks.length === 0}
+            onClick={handleExportCsv}
+            data-cy="export-tasks-csv"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
           {permissions.canCreateTask && (
             <Button
               onClick={() => {
@@ -840,6 +881,8 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
         projectId={id}
         statuses={statuses}
         defaultStatusId={defaultStatusId ?? statuses[0]?.id}
+        onExportCsv={handleExportCsv}
+        exportCsvDisabled={tasks.length === 0}
       />
 
       {orgId && (

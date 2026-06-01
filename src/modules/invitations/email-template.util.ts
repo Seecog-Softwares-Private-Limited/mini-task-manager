@@ -26,15 +26,9 @@ export function escapeHtml(text: string): string {
     .replace(/"/g, '&quot;');
 }
 
-/** True when the URL points at local dev — Gmail disables these links in real inboxes. */
-export function isLocalhostUrl(url: string): boolean {
-  try {
-    const host = new URL(url).hostname;
-    return host === 'localhost' || host === '127.0.0.1';
-  } catch {
-    return /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(url);
-  }
-}
+import { isLocalhostUrl } from '../../common/utils/frontend-url.util';
+
+export { isLocalhostUrl };
 
 function emailLogo(): string {
   return `
@@ -125,32 +119,83 @@ export function emailActionSection(actionUrl: string, label: string): string {
   return `${emailPrimaryButton(actionUrl, label)}\n${emailLinkFallback(actionUrl)}`;
 }
 
-/**
- * Invitation CTA — always includes a visible copy-paste URL.
- * Gmail often disables button links in Spam; localhost links never work from inboxes.
- */
-export function emailInvitationActionSection(acceptUrl: string): string {
-  if (isLocalhostUrl(acceptUrl)) {
-    return emailLocalLinkBlock(acceptUrl, 'Accept Invitation');
-  }
-
-  const href = escapeHtml(acceptUrl);
+function emailSpamNotice(): string {
   return `
-${emailPrimaryButton(acceptUrl, 'Accept Invitation')}
-<p style="margin:16px 0 0;text-align:center;">
-  <a href="${href}" target="_blank"
-     style="color:${BRAND.emeraldDark};font-size:15px;font-weight:600;text-decoration:underline;">
-    Accept invitation (direct link)
-  </a>
-</p>
-<div style="margin:24px 0 0;padding:20px;background:${BRAND.footerBg};border:1px solid ${BRAND.cardBorder};border-radius:12px;">
-  <p style="margin:0 0 10px;font-size:13px;line-height:1.55;color:${BRAND.textMuted};text-align:center;">
-    If links are disabled, mark this email as <strong>Not spam</strong>, then copy this URL into your browser:
+<div style="margin:0 0 24px;padding:16px 18px;background:#fffbeb;border:1px solid #fcd34d;border-radius:12px;">
+  <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#92400e;">
+    Link not working?
   </p>
-  <p style="margin:0;padding:12px 14px;background:#ffffff;border:1px solid ${BRAND.cardBorder};border-radius:8px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;line-height:1.55;word-break:break-all;text-align:left;color:${BRAND.text};">
-    ${href}
+  <p style="margin:0;font-size:13px;line-height:1.6;color:#78350f;">
+    If this message is in <strong>Spam</strong>, Gmail blocks buttons until you tap
+    <strong>Not spam</strong>. Then use the green button below or copy the invitation link.
   </p>
 </div>`.trim();
+}
+
+function emailInvitationLinkBox(directAppUrl: string): string {
+  const href = escapeHtml(directAppUrl);
+  return `
+<div style="margin:0 0 24px;padding:18px;background:${BRAND.emeraldSoft};border:1px solid ${BRAND.emeraldBorder};border-radius:12px;">
+  <p style="margin:0 0 10px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#166534;text-align:center;">
+    Your invitation link
+  </p>
+  <p style="margin:0;padding:12px 14px;background:#ffffff;border:1px solid ${BRAND.emeraldBorder};border-radius:8px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;line-height:1.55;word-break:break-all;text-align:left;color:${BRAND.text};">
+    <a href="${href}" target="_blank" rel="noopener noreferrer" style="color:${BRAND.violet};text-decoration:underline;">${href}</a>
+  </p>
+</div>`.trim();
+}
+
+/**
+ * Invitation CTA — spam notice, copy-paste URL, then button.
+ */
+export function emailInvitationActionSection(acceptUrl: string, directAppUrl: string): string {
+  const direct = directAppUrl || acceptUrl;
+  if (isLocalhostUrl(direct)) {
+    return `${emailSpamNotice()}\n${emailLocalLinkBlock(direct, 'Accept Invitation')}`;
+  }
+
+  const buttonHref = escapeHtml(acceptUrl);
+  const directHref = escapeHtml(direct);
+
+  return `
+${emailSpamNotice()}
+${emailInvitationLinkBox(direct)}
+${emailPrimaryButton(acceptUrl, 'Accept Invitation')}
+<p style="margin:16px 0 0;text-align:center;">
+  <a href="${buttonHref}" target="_blank" rel="noopener noreferrer"
+     style="color:${BRAND.emeraldDark};font-size:15px;font-weight:600;text-decoration:underline;">
+    Open invitation in browser
+  </a>
+</p>
+${
+  acceptUrl !== direct
+    ? `<p style="margin:12px 0 0;text-align:center;font-size:12px;color:${BRAND.textMuted};">
+  Or open the app directly:
+  <a href="${directHref}" target="_blank" rel="noopener noreferrer" style="color:${BRAND.violet};word-break:break-all;">${directHref}</a>
+</p>`
+    : ''
+}`.trim();
+}
+
+export function emailPlainTextInvite(
+  inviterName: string,
+  organizationName: string,
+  role: string,
+  acceptUrl: string,
+  directAppUrl: string,
+): string {
+  const direct = directAppUrl || acceptUrl;
+  return `${inviterName} invited you to join ${organizationName} as ${role} on Mini Task Manager.
+
+If this email is in Spam, mark it as "Not spam" first — then open:
+
+${direct}
+
+If the link above does not work, copy and paste it into your browser.
+
+Button link: ${acceptUrl}
+
+This invitation expires in 7 days.`;
 }
 
 export function emailPlainTextWithLink(intro: string, actionUrl: string, shortCode?: string): string {
@@ -193,8 +238,9 @@ export function emailInvitationBody(params: {
   organizationName: string;
   role: string;
   acceptUrl: string;
+  directAppUrl: string;
 }): string {
-  const { inviterName, organizationName, role, acceptUrl } = params;
+  const { inviterName, organizationName, role, acceptUrl, directAppUrl } = params;
   const roleLabel = escapeHtml(role.charAt(0).toUpperCase() + role.slice(1).toLowerCase());
 
   return `
@@ -221,7 +267,7 @@ export function emailInvitationBody(params: {
     </span>
   </p>
 </div>
-${emailInvitationActionSection(acceptUrl)}
+${emailInvitationActionSection(acceptUrl, directAppUrl)}
 ${emailExpiryNote('7 days')}`.trim();
 }
 

@@ -15,7 +15,7 @@ import { OrganizationMembersRepository } from '../organizations/repositories/org
 import { UserEntity } from '../users/entities/user.entity';
 import { OrganizationInvitationEntity } from './entities/organization-invitation.entity';
 import { generateUuid } from '../../common/utils/uuid.util';
-import { getFrontendUrl } from '../../common/utils/frontend-url.util';
+import { buildInviteAcceptUrls } from '../../common/utils/frontend-url.util';
 import { isLocalhostUrl } from './email-template.util';
 
 const INVITE_EXPIRY_DAYS = 7;
@@ -87,15 +87,15 @@ export class InvitationsService {
     const org = await this.orgsService.findById(organizationId);
     const inviter = await this.usersService.findById(invitedByUserId);
 
-    const acceptUrl = `${getFrontendUrl()}/invite/${token}`;
+    const { acceptUrl, directAppUrl } = buildInviteAcceptUrls(token);
 
     this.logger.log(
-      `Sending workspace invitation to ${normalizedEmail} for org ${organizationId} (acceptUrl=${acceptUrl})`,
+      `Sending workspace invitation to ${normalizedEmail} for org ${organizationId} (acceptUrl=${acceptUrl}, direct=${directAppUrl})`,
     );
-    if (isLocalhostUrl(acceptUrl)) {
+    if (isLocalhostUrl(directAppUrl)) {
       this.logger.warn(
         `Invitation link uses localhost — invitees cannot open it from Gmail. ` +
-          `Set FRONTEND_URL in properties.env to your public app URL (e.g. http://3.110.214.243:3000) and restart the API.`,
+          `Set APP_MODE=production and FRONTEND_URL_PRODUCTION=http://YOUR_SERVER:3000 in properties.env, then restart the API.`,
       );
     }
 
@@ -105,6 +105,7 @@ export class InvitationsService {
       inviterName: inviter?.fullName ?? inviter?.email ?? 'A team member',
       role,
       acceptUrl,
+      directAppUrl,
     });
 
     this.logger.log(`Workspace invitation email dispatched to ${normalizedEmail} (invitationId=${invitation.id})`);
@@ -282,12 +283,12 @@ export class InvitationsService {
     const org = await this.orgsService.findById(organizationId);
     const inviter = await this.usersService.findById(invitation.invitedBy);
 
-    const acceptUrl = `${getFrontendUrl()}/invite/${newToken}`;
+    const { acceptUrl, directAppUrl } = buildInviteAcceptUrls(newToken);
 
     this.logger.log(`Resending workspace invitation to ${invitation.email} (acceptUrl=${acceptUrl})`);
-    if (isLocalhostUrl(acceptUrl)) {
+    if (isLocalhostUrl(directAppUrl)) {
       this.logger.warn(
-        `Invitation resend uses localhost — set FRONTEND_URL to your public app URL and restart the API.`,
+        `Invitation resend uses localhost — set APP_MODE=production and FRONTEND_URL_PRODUCTION, then restart the API.`,
       );
     }
 
@@ -297,6 +298,7 @@ export class InvitationsService {
       inviterName: inviter?.fullName ?? inviter?.email ?? 'A team member',
       role: invitation.role,
       acceptUrl,
+      directAppUrl,
     });
 
     this.logger.log(`Workspace invitation resent to ${invitation.email}`);

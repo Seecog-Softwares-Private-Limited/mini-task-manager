@@ -29,6 +29,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { TenantId } from '../../common/decorators/tenant.decorator';
 import { getFrontendUrl } from '../../common/utils/frontend-url.util';
+import { formatUuid } from '../../common/utils/uuid.util';
 import { CurrentUserId } from '../../common/decorators/current-user.decorator';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { CreateTaskCommentDto } from './dto/create-task-comment.dto';
@@ -331,31 +332,40 @@ export class TasksController {
   }
 
   private toResponse(t: import('./entities/task.entity').TaskEntity): TaskResponseDto {
+    const id = formatUuid(t.id as string | Buffer) ?? String(t.id);
+    const projectId = formatUuid(t.projectId as string | Buffer) ?? String(t.projectId);
+    const organizationId = formatUuid(t.organizationId as string | Buffer) ?? String(t.organizationId);
+    const statusId = t.statusId ? formatUuid(t.statusId as string | Buffer) : undefined;
+    const assigneeId = t.assigneeId ? formatUuid(t.assigneeId as string | Buffer) : undefined;
+    const assigneeIdsRaw = t.assigneeIds ?? (assigneeId ? [assigneeId] : undefined);
+    const assigneeIds = assigneeIdsRaw
+      ?.map((aid) => formatUuid(aid as string | Buffer))
+      .filter((aid): aid is string => !!aid);
     return {
-      id: t.id,
-      projectId: t.projectId,
-      organizationId: t.organizationId,
+      id,
+      projectId,
+      organizationId,
       title: t.title,
       description: t.description ?? undefined,
-      statusId: t.statusId ?? undefined,
+      statusId: statusId ?? undefined,
       priority: t.priority,
-      assigneeId: t.assigneeId ?? undefined,
-      assigneeIds: t.assigneeIds ?? (t.assigneeId ? [t.assigneeId] : undefined),
+      assigneeId: assigneeId ?? undefined,
+      assigneeIds: assigneeIds?.length ? assigneeIds : undefined,
       assignee: t.assignee
         ? {
-            id: t.assignee.id,
+            id: formatUuid(t.assignee.id as string | Buffer) ?? String(t.assignee.id),
             fullName: t.assignee.fullName,
             email: t.assignee.email,
             avatarUrl: t.assignee.avatarUrl ?? undefined,
           }
         : undefined,
-      reporterId: t.reporterId,
-      parentTaskId: t.parentTaskId ?? undefined,
+      reporterId: formatUuid(t.reporterId as string | Buffer) ?? String(t.reporterId),
+      parentTaskId: t.parentTaskId ? formatUuid(t.parentTaskId as string | Buffer) : undefined,
       storyPoints: t.storyPoints ?? undefined,
       dueDate: t.dueDate ?? undefined,
       estimatedMinutes: t.estimatedMinutes ?? undefined,
       loggedMinutes: t.loggedMinutes,
-      sprintId: t.sprintId ?? undefined,
+      sprintId: t.sprintId ? formatUuid(t.sprintId as string | Buffer) : undefined,
       tags: t.tags ?? undefined,
       subtasks: t.subtasks ?? undefined,
       createdAt: t.createdAt,

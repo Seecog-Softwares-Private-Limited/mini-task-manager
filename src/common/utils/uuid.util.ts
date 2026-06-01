@@ -7,3 +7,24 @@ import { v4 as uuidv4 } from 'uuid';
 export function generateUuid(): string {
   return uuidv4();
 }
+
+/** BINARY(16) columns may surface as Buffer on freshly saved entities before a reload. */
+export function formatUuid(value: string | Buffer | null | undefined): string | undefined {
+  if (value == null) return undefined;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+  if (Buffer.isBuffer(value)) {
+    const hex = value.toString('hex');
+    if (hex.length !== 32) return undefined;
+    return [
+      hex.slice(0, 8),
+      hex.slice(8, 12),
+      hex.slice(12, 16),
+      hex.slice(16, 20),
+      hex.slice(20, 32),
+    ].join('-');
+  }
+  return undefined;
+}

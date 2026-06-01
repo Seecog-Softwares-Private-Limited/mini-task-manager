@@ -1,7 +1,7 @@
 import { uploadAttachment } from "@/services/api/attachments.api";
 import type { CreateTaskPayload } from "@/services/api/tasks.api";
 import { createTask } from "@/services/api/tasks.api";
-import { isValidTaskId } from "@/lib/task-id";
+import { isValidTaskId, normalizeTaskId } from "@/lib/task-id";
 import { parseApiError } from "@/services/api/client";
 import type { Task } from "@/types/api";
 
@@ -31,7 +31,9 @@ export async function createTaskWithDescriptionImages(
   payload: CreateTaskPayload,
   imageFiles?: File[]
 ): Promise<CreateTaskWithImagesResult> {
-  const task = await createTask(payload);
+  const created = await createTask(payload);
+  const taskId = normalizeTaskId(created?.id) ?? created?.id;
+  const task = taskId && taskId !== created?.id ? { ...created, id: taskId } : created;
 
   if (!isValidTaskId(task?.id)) {
     throw new Error("Task was created but the server returned an invalid task id.");

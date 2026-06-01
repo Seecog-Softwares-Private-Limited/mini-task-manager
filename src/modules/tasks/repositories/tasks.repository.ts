@@ -46,7 +46,8 @@ export class TasksRepository {
       payload.statusId = null;
     }
     const entity = this.repo.create(payload);
-    return this.repo.save(entity);
+    await this.repo.save(entity);
+    return (await this.findById(id)) ?? entity;
   }
 
   async update(id: string, data: Partial<TaskEntity>): Promise<void> {

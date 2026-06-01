@@ -37,6 +37,11 @@ function applyEnvironmentUrls() {
   if (isProduction) {
     if (prodFrontend) {
       process.env.FRONTEND_URL = stripTrailingSlash(prodFrontend);
+    } else if (process.env.FRONTEND_URL_LOCAL && !process.env.FRONTEND_URL) {
+      console.warn(
+        '[resolve-env-urls] APP_MODE=production but FRONTEND_URL_PRODUCTION is missing — ' +
+          'invitation emails may use localhost links. Set FRONTEND_URL_PRODUCTION in properties.env.',
+      );
     }
     if (prodCors) {
       process.env.CORS_ORIGIN = stripTrailingSlash(prodCors);

@@ -27,7 +27,7 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import {
   X, Sparkles, ArrowRight, Flag, AlignLeft,
-  Layers, AlertCircle,
+  Layers, AlertCircle, Download,
 } from "lucide-react";
 
 const PRIORITIES = [
@@ -87,6 +87,9 @@ interface CreateTaskModalProps {
   projectId: string;
   statuses: WorkflowStatus[];
   defaultStatusId?: string;
+  /** Export current project tasks as a shareable CSV file. */
+  onExportCsv?: () => void;
+  exportCsvDisabled?: boolean;
 }
 
 export function CreateTaskModal({
@@ -98,6 +101,8 @@ export function CreateTaskModal({
   projectId,
   statuses,
   defaultStatusId,
+  onExportCsv,
+  exportCsvDisabled = false,
 }: CreateTaskModalProps) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const descriptionFieldRef = useRef<TaskDescriptionFieldHandle>(null);
@@ -398,10 +403,25 @@ export function CreateTaskModal({
         </form>
 
         {/* Footer */}
-        <div className="border-t p-4 flex items-center justify-between gap-3 shrink-0 bg-muted/20">
-          <p className="text-[11px] text-muted-foreground">
-            Press <kbd className="rounded border bg-background px-1 py-0.5 text-[10px] font-mono">Ctrl+Enter</kbd> to submit
-          </p>
+        <div className="border-t p-4 flex flex-wrap items-center justify-between gap-3 shrink-0 bg-muted/20">
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-[11px] text-muted-foreground">
+              Press <kbd className="rounded border bg-background px-1 py-0.5 text-[10px] font-mono">Ctrl+Enter</kbd> to submit
+            </p>
+            {onExportCsv ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                disabled={exportCsvDisabled || isSubmitting}
+                onClick={onExportCsv}
+              >
+                <Download className="h-3.5 w-3.5" />
+                Export tasks as CSV
+              </Button>
+            ) : null}
+          </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose} type="button">
               Cancel
