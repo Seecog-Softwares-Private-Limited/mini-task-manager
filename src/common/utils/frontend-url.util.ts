@@ -58,17 +58,48 @@ export function resolvePublicApiBaseUrl(): string | undefined {
   return stripTrailingSlash(raw);
 }
 
+function apiPrefix(): string {
+  return (process.env.API_PREFIX || 'api/v1').replace(/^\/+|\/+$/g, '');
+}
+
+function buildApiJoinUrl(base: string, token: string): string {
+  const root = stripTrailingSlash(base);
+  return `${root}/${apiPrefix()}/invitations/join/${encodeURIComponent(token)}`;
+}
+
+/**
+ * When the API runs on an internal port (e.g. 3007) but only the frontend port
+ * (e.g. 3000) is open on the firewall, use the Next.js /api/v1 proxy for the
+ * email button so invite links do not time out.
+ */
+function resolveInviteAcceptUrl(token: string, apiBase: string, frontendBase: string): string {
+  try {
+    const api = new URL(apiBase);
+    const fe = new URL(frontendBase);
+    if (
+      api.protocol === fe.protocol &&
+      api.hostname === fe.hostname &&
+      api.port !== fe.port
+    ) {
+      return buildApiJoinUrl(frontendBase, token);
+    }
+  } catch {
+    /* use apiBase below */
+  }
+  return buildApiJoinUrl(apiBase, token);
+}
+
 export function buildInviteAcceptUrls(token: string): {
   /** Link in the email button (API redirect when PUBLIC_API_URL is set). */
   acceptUrl: string;
   /** Direct app URL — always shown as copy-paste fallback. */
   directAppUrl: string;
 } {
-  const directAppUrl = `${resolveFrontendPublicUrl()}/invite/${encodeURIComponent(token)}`;
+  const frontendBase = resolveFrontendPublicUrl();
+  const directAppUrl = `${frontendBase}/invite/${encodeURIComponent(token)}`;
   const apiBase = resolvePublicApiBaseUrl();
   if (apiBase) {
-    const prefix = (process.env.API_PREFIX || 'api/v1').replace(/^\/+|\/+$/g, '');
-    const acceptUrl = `${apiBase}/${prefix}/invitations/join/${encodeURIComponent(token)}`;
+    const acceptUrl = resolveInviteAcceptUrl(token, apiBase, frontendBase);
     return { acceptUrl, directAppUrl };
   }
   return { acceptUrl: directAppUrl, directAppUrl };
