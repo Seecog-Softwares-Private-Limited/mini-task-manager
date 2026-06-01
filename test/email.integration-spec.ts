@@ -106,7 +106,7 @@ describe('buildInviteAcceptUrls', () => {
     jest.resetModules();
   });
 
-  it('uses frontend /api/v1 proxy when API and app share host but different ports', async () => {
+  it('uses frontend /invite for button and copy-paste (ignores PUBLIC_API_URL)', async () => {
     process.env.APP_MODE = 'production';
     process.env.FRONTEND_URL_PRODUCTION = 'http://3.110.214.243:3000';
     process.env.PUBLIC_API_URL = 'http://3.110.214.243:3007';
@@ -114,22 +114,9 @@ describe('buildInviteAcceptUrls', () => {
       '../src/common/utils/frontend-url.util'
     );
     const { acceptUrl, directAppUrl } = buildInviteAcceptUrls('abc');
-    expect(acceptUrl).toBe(
-      'http://3.110.214.243:3000/api/v1/invitations/join/abc',
-    );
-    expect(directAppUrl).toBe('http://3.110.214.243:3000/invite/abc');
-  });
-
-  it('uses PUBLIC_API_URL when API host differs from frontend', async () => {
-    process.env.APP_MODE = 'production';
-    process.env.FRONTEND_URL_PRODUCTION = 'https://app.example.com';
-    process.env.PUBLIC_API_URL = 'https://api.example.com';
-    const { buildInviteAcceptUrls } = await import(
-      '../src/common/utils/frontend-url.util'
-    );
-    expect(buildInviteAcceptUrls('tok').acceptUrl).toBe(
-      'https://api.example.com/api/v1/invitations/join/tok',
-    );
+    const expected = 'http://3.110.214.243:3000/invite/abc';
+    expect(acceptUrl).toBe(expected);
+    expect(directAppUrl).toBe(expected);
   });
 });
 

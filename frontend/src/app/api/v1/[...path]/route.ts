@@ -74,6 +74,8 @@ async function proxy(request: NextRequest, pathSegments: string[] | undefined) {
   const init: RequestInit = {
     method: request.method,
     headers,
+    // Pass 3xx Location to the browser (do not follow redirects server-side).
+    redirect: "manual",
   };
 
   if (request.method !== "GET" && request.method !== "HEAD") {
