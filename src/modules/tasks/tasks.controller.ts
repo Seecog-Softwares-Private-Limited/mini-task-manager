@@ -362,7 +362,9 @@ export class TasksController {
       reporterId: formatUuid(t.reporterId as string | Buffer) ?? String(t.reporterId),
       parentTaskId: t.parentTaskId ? formatUuid(t.parentTaskId as string | Buffer) : undefined,
       storyPoints: t.storyPoints ?? undefined,
-      dueDate: t.dueDate ?? undefined,
+      dueDate: t.dueDate
+        ? String(t.dueDate).replace(/T.*$/, '').slice(0, 10)
+        : undefined,
       estimatedMinutes: t.estimatedMinutes ?? undefined,
       loggedMinutes: t.loggedMinutes,
       sprintId: t.sprintId ? formatUuid(t.sprintId as string | Buffer) : undefined,

@@ -75,7 +75,8 @@ import { useBoardPermissions } from "@/hooks/use-board-permissions";
 import { useRetentionTracking } from "@/hooks/use-retention-tracking";
 import type { Task } from "@/types/api";
 import { exportTasksToCsvFile } from "@/lib/export-tasks-csv";
-import { Building2, Plus, Sparkles, Columns3, Keyboard, Shield, Rocket, Download } from "lucide-react";
+import { ImportTasksCsvModal } from "@/components/tasks/import-tasks-csv-modal";
+import { Building2, Plus, Sparkles, Columns3, Keyboard, Shield, Rocket, Download, Upload } from "lucide-react";
 
 function getCurrentUserId(): string | null {
   const token = getStoredToken();
@@ -104,6 +105,7 @@ export default function TasksPage() {
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createSprintModalOpen, setCreateSprintModalOpen] = useState(false);
+  const [importCsvOpen, setImportCsvOpen] = useState(false);
   const [defaultStatusId, setDefaultStatusId] = useState<string | undefined>();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
@@ -704,6 +706,18 @@ export default function TasksPage() {
             <Download className="h-4 w-4" />
             Export CSV
           </Button>
+          {permissions.canCreateTask && selectedProjectId && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 gap-1.5"
+              onClick={() => setImportCsvOpen(true)}
+              data-cy="import-tasks-csv"
+            >
+              <Upload className="h-4 w-4" />
+              Import CSV
+            </Button>
+          )}
           {permissions.canCreateTask && (
             <Button onClick={() => { setDefaultStatusId(statuses[0]?.id); setCreateModalOpen(true); }} data-cy="create-task-button" className="shadow-lg shadow-primary/20">
               <Plus className="mr-1.5 h-4 w-4" /> New Task
@@ -916,6 +930,23 @@ export default function TasksPage() {
           if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
         }}
       />
+
+      {orgId && selectedProjectId && permissions.canCreateTask && (
+        <ImportTasksCsvModal
+          open={importCsvOpen}
+          onOpenChange={setImportCsvOpen}
+          projectId={selectedProjectId}
+          organizationId={orgId}
+          projectName={selectedProject.name}
+          statuses={statuses}
+          assigneeNameById={Object.fromEntries(
+            Object.entries(assigneeMap).map(([uid, info]) => [uid, info.name]),
+          )}
+          onImported={() => {
+            queryClient.invalidateQueries({ queryKey: ["tasks", selectedProjectId] });
+          }}
+        />
+      )}
     </div>
   );
 }

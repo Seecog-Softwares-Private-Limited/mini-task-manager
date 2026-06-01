@@ -1,5 +1,6 @@
 import type { BoardFilters } from "@/components/kanban/kanban-board";
 import type { Task, WorkflowStatus } from "@/types/api";
+import { TASKS_CSV_HEADERS } from "@/lib/tasks-csv";
 
 function escapeCsvCell(value: string | number | null | undefined): string {
   if (value == null) return "";
@@ -18,11 +19,43 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 }
 
-function formatDate(value: string | undefined | null): string {
-  if (!value) return "";
+const MONTH_SHORT = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+] as const;
+
+/** Parse API / DB date strings without UTC day shift (YYYY-MM-DD prefix first). */
+function parseDateParts(value: string): { day: number; month: number; year: number } | null {
+  const ymd = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (ymd) {
+    return { year: Number(ymd[1]), month: Number(ymd[2]), day: Number(ymd[3]) };
+  }
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return value;
-  return d.toISOString().slice(0, 10);
+  if (Number.isNaN(d.getTime())) return null;
+  return { day: d.getDate(), month: d.getMonth() + 1, year: d.getFullYear() };
+}
+
+/** Human-readable date for CSV (Excel shows `########` on narrow ISO date columns). */
+function formatCsvDate(value: string | undefined | null): string {
+  if (!value) return "";
+  const parts = parseDateParts(String(value));
+  if (!parts) return "";
+  const { day, month, year } = parts;
+  const mon = MONTH_SHORT[month - 1];
+  if (!mon) return "";
+  return `${day} ${mon} ${year}`;
+}
+
+/** Created / updated — include time, still plain text for Excel. */
+function formatCsvDateTime(value: string | undefined | null): string {
+  if (!value) return "";
+  const raw = String(value);
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return formatCsvDate(raw);
+  const datePart = formatCsvDate(raw);
+  const h = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${datePart} ${h}:${min}`;
 }
 
 export function filterTasksByBoardFilters(tasks: Task[], filters: BoardFilters): Task[] {
@@ -49,22 +82,7 @@ export function buildTasksCsv(
     assigneeNameById: Record<string, string>;
   }
 ): string {
-  const headers = [
-    "Task ID",
-    "Title",
-    "Description",
-    "Status",
-    "Priority",
-    "Assignee",
-    "Due Date",
-    "Story Points",
-    "Tags",
-    "Subtasks",
-    "Subtasks Done",
-    "Created",
-    "Updated",
-    "Project",
-  ];
+  const headers = [...TASKS_CSV_HEADERS];
 
   const rows = tasks.map((t) => {
     const assigneeIds = t.assigneeIds?.length ? t.assigneeIds : t.assigneeId ? [t.assigneeId] : [];
@@ -84,13 +102,13 @@ export function buildTasksCsv(
       t.statusId ? options.statusNameById[t.statusId] ?? t.statusId : "",
       t.priority,
       assigneeNames,
-      formatDate(t.dueDate),
+      formatCsvDate(t.dueDate),
       t.storyPoints ?? "",
       tagNames,
       subtaskTitles,
       subtasks.length ? `${subtasksDone}/${subtasks.length}` : "",
-      formatDate(t.createdAt),
-      formatDate(t.updatedAt),
+      formatCsvDateTime(t.createdAt),
+      formatCsvDateTime(t.updatedAt),
       options.projectName ?? t.projectId,
     ]
       .map(escapeCsvCell)
