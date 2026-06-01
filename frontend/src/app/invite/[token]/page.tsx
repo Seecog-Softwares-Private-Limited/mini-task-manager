@@ -148,11 +148,6 @@ export default function InviteAcceptPage() {
     void signOutAndRedirect(`/login?${params.toString()}`);
   };
 
-  const handleCreateAccountForInvite = () => {
-    if (!token) return;
-    void signOutAndRedirect(`/invite/${token}`);
-  };
-
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden p-4">
       <div className="fixed inset-0 -z-10">
@@ -230,18 +225,11 @@ export default function InviteAcceptPage() {
                 </p>
               </div>
               <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-left text-sm text-muted-foreground">
-                Sign in with the invited email to accept, or create a new account for that address.
+                Sign in with the invited email to accept this invitation.
               </div>
               <div className="flex flex-col gap-2 pt-1">
                 <Button className="w-full h-11" onClick={handleSignInAsInvited}>
                   Sign in as {validation.email}
-                </Button>
-                <Button
-                  className="w-full h-11"
-                  variant="outline"
-                  onClick={handleCreateAccountForInvite}
-                >
-                  Create account for {validation.email}
                 </Button>
               </div>
             </div>
@@ -288,6 +276,36 @@ export default function InviteAcceptPage() {
                     Accept Invitation
                   </span>
                 )}
+              </Button>
+            </div>
+          ) : validation.account_exists ? (
+            <div className="text-center space-y-6">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl gradient-bg shadow-lg shadow-primary/25">
+                <Building2 className="h-7 w-7 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold tracking-tight">You&apos;re invited!</h1>
+                <p className="mt-2 text-muted-foreground">
+                  Sign in to join {validation.organization?.name ?? "the workspace"} as {validation.role}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-center gap-3">
+                <Badge variant="secondary" className="text-sm px-3 py-1">
+                  {validation.email}
+                </Badge>
+                <Badge variant="outline" className="text-sm px-3 py-1 capitalize">
+                  {validation.role}
+                </Badge>
+              </div>
+
+              <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-left text-sm text-muted-foreground">
+                An account already exists for this email. Sign in to accept the invitation — you don&apos;t
+                need to create a new account.
+              </div>
+
+              <Button className="w-full h-12 text-base" size="lg" onClick={handleSignInAsInvited}>
+                Sign in to accept invitation
               </Button>
             </div>
           ) : (

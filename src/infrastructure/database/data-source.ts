@@ -1,5 +1,6 @@
 // Load properties.env before any other imports that read process.env
 require('dotenv').config({ path: require('path').join(process.cwd(), 'properties.env') });
+require(require('path').join(process.cwd(), 'scripts/resolve-env-urls.cjs')).applyEnvironmentUrls();
 
 import { DataSource } from 'typeorm';
 import { configuration } from '../../config/configuration';

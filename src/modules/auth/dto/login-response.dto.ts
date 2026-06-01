@@ -4,6 +4,7 @@ export class LoginResponseDto {
     id: string;
     email: string;
     fullName: string;
+    isPlatformAdmin?: boolean;
   };
   organizationId?: string;
 }

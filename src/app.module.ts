@@ -21,6 +21,7 @@ import { ActivityLogsModule } from './modules/activity-logs/activity-logs.module
 import { InvitationsModule } from './modules/invitations/invitations.module';
 import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { AdminModule } from './modules/admin/admin.module';
 import { RootController } from './root.controller';
 
 @Module({
@@ -49,6 +50,7 @@ import { RootController } from './root.controller';
     InvitationsModule,
     ApiKeysModule,
     AnalyticsModule,
+    AdminModule,
   ],
 })
 export class AppModule {}

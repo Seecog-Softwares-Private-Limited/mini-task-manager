@@ -359,6 +359,59 @@ export class BillingService {
     return this.downgradeToFree(organizationId);
   }
 
+  /** Platform admin: assign plan without payment (comp / support override). */
+  async adminSetOrganizationPlan(
+    organizationId: string,
+    planId: string,
+    options?: { billingCycle?: BillingCycle; status?: SubscriptionEntity['status'] },
+  ): Promise<SubscriptionEntity> {
+    const plan = await this.plansRepository.findById(planId);
+    if (!plan) throw new NotFoundException('Plan not found');
+
+    const now = new Date();
+    const billingCycle = options?.billingCycle ?? 'monthly';
+    const targetStatus = options?.status ?? (plan.slug === 'free' ? 'ACTIVE' : 'ACTIVE');
+
+    let subscription = await this.subscriptionsRepository.findByOrganization(organizationId);
+    if (subscription) {
+      subscription.plan = undefined;
+      subscription.planId = plan.id;
+      subscription.billingCycle = billingCycle;
+      subscription.status = targetStatus;
+      subscription.startDate = now;
+      subscription.trialEndsAt = null;
+      subscription.cancelledAt = null;
+      if (plan.slug === 'free') {
+        subscription.endDate = null;
+      } else {
+        const endDate = new Date(now);
+        if (billingCycle === 'yearly') {
+          endDate.setFullYear(endDate.getFullYear() + 1);
+        } else {
+          endDate.setMonth(endDate.getMonth() + 1);
+        }
+        subscription.endDate = endDate;
+      }
+      return this.subscriptionsRepository.save(subscription);
+    }
+
+    const endDate = plan.slug === 'free' ? null : new Date(now);
+    if (endDate && billingCycle === 'yearly') {
+      endDate.setFullYear(endDate.getFullYear() + 1);
+    } else if (endDate) {
+      endDate.setMonth(endDate.getMonth() + 1);
+    }
+
+    return this.subscriptionsRepository.create({
+      organizationId,
+      planId: plan.id,
+      billingCycle,
+      status: targetStatus,
+      startDate: now,
+      endDate: endDate ?? undefined,
+    });
+  }
+
   // ── Invoices ──
 
   async getInvoicesForOrganization(organizationId: string) {

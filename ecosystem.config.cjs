@@ -18,6 +18,7 @@ const ROOT = __dirname;
 const envPath = path.join(ROOT, 'properties.env');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath });
+  require(path.join(ROOT, 'scripts/resolve-env-urls.cjs')).applyEnvironmentUrls();
 }
 
 const apiPort = process.env.PORT || '3000';
@@ -33,6 +34,7 @@ const baseEnv = { ...process.env };
 const localEnv = {
   ...baseEnv,
   NODE_ENV: 'development',
+  APP_MODE: 'development',
   PORT: apiPort,
   MINI_TM_BACKEND_URL: backendUrl,
 };
@@ -40,6 +42,7 @@ const localEnv = {
 const productionEnv = {
   ...baseEnv,
   NODE_ENV: 'production',
+  APP_MODE: 'production',
   PORT: apiPort,
   MINI_TM_BACKEND_URL: backendUrl,
 };

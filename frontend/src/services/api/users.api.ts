@@ -4,7 +4,7 @@ import type { User } from "@/types/api";
 /** Current user profile (includes avatarUrl when set). */
 export type CurrentUserProfile = Pick<
   User,
-  "id" | "fullName" | "email" | "avatarUrl" | "isEmailVerified" | "isActive"
+  "id" | "fullName" | "email" | "avatarUrl" | "isEmailVerified" | "isActive" | "isPlatformAdmin"
 >;
 
 export async function fetchCurrentUserProfile(): Promise<CurrentUserProfile | null> {

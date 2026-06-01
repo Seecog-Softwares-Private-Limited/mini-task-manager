@@ -5,4 +5,5 @@ export class UserResponseDto {
   avatarUrl?: string;
   isEmailVerified!: boolean;
   isActive!: boolean;
+  isPlatformAdmin!: boolean;
 }

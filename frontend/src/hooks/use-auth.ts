@@ -61,12 +61,14 @@ export function useAuth() {
                 fullName: p.fullName,
                 email: p.email,
                 avatarUrl: p.avatarUrl,
+                isPlatformAdmin: p.isPlatformAdmin,
               }
             : {
                 id: p.id,
                 email: p.email,
                 fullName: p.fullName,
                 avatarUrl: p.avatarUrl,
+                isPlatformAdmin: p.isPlatformAdmin,
               }
         );
       }

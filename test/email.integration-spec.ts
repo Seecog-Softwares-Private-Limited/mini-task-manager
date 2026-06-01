@@ -60,12 +60,13 @@ describe('EmailService (integration)', () => {
   });
 
   it('sendInvitation calls transporter.sendMail with accept link', async () => {
+    const acceptUrl = 'http://3.110.214.243:3000/invite/token456';
     await emailService.sendInvitation({
       to: 'invitee@example.com',
       organizationName: 'Acme Corp',
       inviterName: 'Owner',
       role: 'member',
-      acceptUrl: 'http://localhost:3001/invite/token456',
+      acceptUrl,
     });
 
     expect(sendMailMock).toHaveBeenCalledTimes(1);
@@ -73,6 +74,9 @@ describe('EmailService (integration)', () => {
     expect(mail.to).toBe('invitee@example.com');
     expect(mail.subject).toContain('Acme Corp');
     expect(mail.html).toContain('/invite/token456');
+    expect(mail.html).toContain(`href="${acceptUrl}"`);
+    expect(mail.html).toContain('display:block');
+    expect(mail.html).toContain('Accept invitation (direct link)');
   });
 
   it('propagates SMTP send failures instead of swallowing them', async () => {
