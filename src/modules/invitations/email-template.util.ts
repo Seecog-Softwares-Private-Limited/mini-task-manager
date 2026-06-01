@@ -46,8 +46,8 @@ function emailLogo(): string {
 }
 
 /**
- * Bulletproof email button — background + border on the anchor (not just the cell),
- * display:block, and MSO fallback so Gmail/Outlook register the full tap target.
+ * Gmail-safe CTA: bgcolor on &lt;td&gt;, inline-block &lt;a&gt; (no MSO conditionals).
+ * MSO/v:roundrect + display:block anchors are often stripped or made non-clickable in Gmail.
  */
 function emailPrimaryButton(actionUrl: string, label: string): string {
   const href = escapeHtml(actionUrl);
@@ -55,23 +55,12 @@ function emailPrimaryButton(actionUrl: string, label: string): string {
   return `
 <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:28px auto;">
   <tr>
-    <td align="center">
-      <!--[if mso]>
-      <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word"
-        href="${href}" style="height:48px;v-text-anchor:middle;width:260px;" arcsize="25%"
-        strokecolor="${BRAND.emeraldDark}" fillcolor="${BRAND.emeraldDark}">
-        <w:anchorlock/>
-        <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">
-          ${text} &rarr;
-        </center>
-      </v:roundrect>
-      <![endif]-->
-      <!--[if !mso]><!-->
-      <a href="${href}" target="_blank"
-         style="background-color:${BRAND.emeraldDark};border:1px solid ${BRAND.emeraldDark};border-radius:12px;color:#ffffff;display:block;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:16px;font-weight:600;line-height:48px;text-align:center;text-decoration:none;min-width:220px;padding:0 28px;-webkit-text-size-adjust:none;mso-hide:all;">
+    <td align="center" bgcolor="${BRAND.emeraldDark}"
+        style="border-radius:12px;background-color:${BRAND.emeraldDark};mso-padding-alt:0;">
+      <a href="${href}" target="_blank" rel="noopener noreferrer"
+         style="display:inline-block;padding:14px 32px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:700;line-height:1.25;color:#ffffff;text-decoration:none;border-radius:12px;background-color:${BRAND.emeraldDark};border:1px solid ${BRAND.emeraldDark};-webkit-text-size-adjust:none;">
         ${text} &rarr;
       </a>
-      <!--<![endif]-->
     </td>
   </tr>
 </table>`.trim();
@@ -126,27 +115,28 @@ function emailSpamNotice(): string {
     Link not working?
   </p>
   <p style="margin:0;font-size:13px;line-height:1.6;color:#78350f;">
-    If this message is in <strong>Spam</strong>, Gmail blocks buttons until you tap
-    <strong>Not spam</strong>. Then use the green button below or copy the invitation link.
+    If this message is in <strong>Spam</strong>, tap <strong>Not spam</strong> first.
+    Then tap the green <strong>Accept Invitation</strong> button, or copy the link below it.
   </p>
 </div>`.trim();
 }
 
-function emailInvitationLinkBox(directAppUrl: string): string {
-  const href = escapeHtml(directAppUrl);
+/** Plain URL for copy-paste — no second href (Gmail often allows only one active link). */
+function emailInvitationCopyLink(directAppUrl: string): string {
+  const url = escapeHtml(directAppUrl);
   return `
-<div style="margin:0 0 24px;padding:18px;background:${BRAND.emeraldSoft};border:1px solid ${BRAND.emeraldBorder};border-radius:12px;">
+<div style="margin:0 0 8px;padding:18px;background:${BRAND.emeraldSoft};border:1px solid ${BRAND.emeraldBorder};border-radius:12px;">
   <p style="margin:0 0 10px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#166534;text-align:center;">
-    Your invitation link
+    Or copy this link
   </p>
   <p style="margin:0;padding:12px 14px;background:#ffffff;border:1px solid ${BRAND.emeraldBorder};border-radius:8px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;line-height:1.55;word-break:break-all;text-align:left;color:${BRAND.text};">
-    <a href="${href}" target="_blank" rel="noopener noreferrer" style="color:${BRAND.violet};text-decoration:underline;">${href}</a>
+    ${url}
   </p>
 </div>`.trim();
 }
 
 /**
- * Invitation CTA — spam notice, copy-paste URL, then button.
+ * Invitation CTA — one clickable button, then plain-text URL to copy (avoids Gmail multi-link stripping).
  */
 export function emailInvitationActionSection(acceptUrl: string, directAppUrl: string): string {
   const direct = directAppUrl || acceptUrl;
@@ -154,27 +144,10 @@ export function emailInvitationActionSection(acceptUrl: string, directAppUrl: st
     return `${emailSpamNotice()}\n${emailLocalLinkBlock(direct, 'Accept Invitation')}`;
   }
 
-  const buttonHref = escapeHtml(acceptUrl);
-  const directHref = escapeHtml(direct);
-
   return `
 ${emailSpamNotice()}
-${emailInvitationLinkBox(direct)}
 ${emailPrimaryButton(acceptUrl, 'Accept Invitation')}
-<p style="margin:16px 0 0;text-align:center;">
-  <a href="${buttonHref}" target="_blank" rel="noopener noreferrer"
-     style="color:${BRAND.emeraldDark};font-size:15px;font-weight:600;text-decoration:underline;">
-    Open invitation in browser
-  </a>
-</p>
-${
-  acceptUrl !== direct
-    ? `<p style="margin:12px 0 0;text-align:center;font-size:12px;color:${BRAND.textMuted};">
-  Or open the app directly:
-  <a href="${directHref}" target="_blank" rel="noopener noreferrer" style="color:${BRAND.violet};word-break:break-all;">${directHref}</a>
-</p>`
-    : ''
-}`.trim();
+${emailInvitationCopyLink(direct)}`.trim();
 }
 
 export function emailPlainTextInvite(
