@@ -66,6 +66,13 @@ export class InvitationsService {
       throw new ConflictException('A pending invitation already exists for this email');
     }
 
+    const existingUser = await this.usersService.findByEmail(normalizedEmail);
+    if (existingUser) {
+      throw new ConflictException(
+        'An account with this email already exists. Ask them to sign in to accept the invitation.',
+      );
+    }
+
     const token = generateToken();
     const invitation = await this.invitationsRepo.create({
       organizationId,
@@ -137,6 +144,7 @@ export class InvitationsService {
     email?: string;
     expires_at?: string;
     status?: string;
+    account_exists?: boolean;
   }> {
     const invitation = await this.invitationsRepo.findByToken(token);
     if (!invitation) {
@@ -169,8 +177,12 @@ export class InvitationsService {
         email: invitation.email,
         expires_at: invitation.expiresAt?.toISOString(),
         status: 'EXPIRED',
+        account_exists: await this.emailHasExistingAccount(invitation.email),
       };
     }
+
+    const accountExists = await this.emailHasExistingAccount(invitation.email);
+
     return {
       valid: true,
       organization: invitation.organization
@@ -181,7 +193,13 @@ export class InvitationsService {
       email: invitation.email,
       expires_at: invitation.expiresAt?.toISOString(),
       status: invitation.status,
+      account_exists: accountExists,
     };
+  }
+
+  private async emailHasExistingAccount(email: string): Promise<boolean> {
+    const user = await this.usersService.findByEmail(email);
+    return !!user;
   }
 
   async acceptInvitation(

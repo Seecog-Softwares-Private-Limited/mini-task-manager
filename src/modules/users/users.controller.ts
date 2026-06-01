@@ -23,6 +23,7 @@ function toUserDto(user: {
   avatarUrl: string | null;
   isEmailVerified: boolean;
   isActive: boolean;
+  isPlatformAdmin: boolean;
 }): UserResponseDto {
   return {
     id: user.id,
@@ -31,6 +32,7 @@ function toUserDto(user: {
     avatarUrl: user.avatarUrl ?? undefined,
     isEmailVerified: user.isEmailVerified,
     isActive: user.isActive,
+    isPlatformAdmin: user.isPlatformAdmin,
   };
 }
 

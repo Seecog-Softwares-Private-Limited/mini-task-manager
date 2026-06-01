@@ -7,3 +7,5 @@ import { config as loadEnv } from 'dotenv';
  * (not only `node app.js`).
  */
 loadEnv({ path: join(process.cwd(), 'properties.env') });
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+require(join(process.cwd(), 'scripts/resolve-env-urls.cjs')).applyEnvironmentUrls();

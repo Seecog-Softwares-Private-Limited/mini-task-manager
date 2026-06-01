@@ -37,6 +37,9 @@ export class UserEntity extends BaseEntity {
   @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive!: boolean;
 
+  @Column({ name: 'is_platform_admin', type: 'boolean', default: false })
+  isPlatformAdmin!: boolean;
+
   @Column({ name: 'last_seen_at', type: 'timestamp', nullable: true })
   lastSeenAt!: Date | null;
 

@@ -29,6 +29,11 @@ import { BillingModule } from '../billing/billing.module';
     OrganizationsService,
     SSOService,
   ],
-  exports: [OrganizationsService, OrganizationMembersRepository, ORGANIZATION_MEMBERS_REPOSITORY],
+  exports: [
+    OrganizationsService,
+    OrganizationsRepository,
+    OrganizationMembersRepository,
+    ORGANIZATION_MEMBERS_REPOSITORY,
+  ],
 })
 export class OrganizationsModule {}

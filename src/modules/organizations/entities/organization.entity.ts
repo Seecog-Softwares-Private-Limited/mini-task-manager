@@ -23,6 +23,15 @@ export class OrganizationEntity extends BaseEntity {
   @Column({ name: 'is_archived', type: 'boolean', default: false })
   isArchived!: boolean;
 
+  @Column({ type: 'varchar', length: 20, default: 'ACTIVE' })
+  status!: 'ACTIVE' | 'SUSPENDED' | 'DELETED';
+
+  @Column({ name: 'suspended_at', type: 'timestamp', nullable: true })
+  suspendedAt!: Date | null;
+
+  @Column({ name: 'suspension_reason', type: 'text', nullable: true })
+  suspensionReason!: string | null;
+
   @ManyToOne(() => UserEntity, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'owner_id' })
   owner?: UserEntity;

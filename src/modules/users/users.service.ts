@@ -54,10 +54,19 @@ export class UsersService {
     return this.usersRepository.findByPhone(phone);
   }
 
-  async findByIdForAuth(id: string): Promise<{ id: string; email: string } | null> {
+  async findByIdForAuth(id: string): Promise<{ id: string; email: string; isActive: boolean } | null> {
     const user = await this.usersRepository.findById(id);
-    if (!user) return null;
-    return { id: user.id, email: user.email };
+    if (!user || !user.isActive) return null;
+    return { id: user.id, email: user.email, isActive: user.isActive };
+  }
+
+  async isPlatformAdmin(userId: string): Promise<boolean> {
+    const user = await this.usersRepository.findById(userId);
+    return Boolean(user?.isPlatformAdmin && user.isActive);
+  }
+
+  async setActive(userId: string, active: boolean): Promise<void> {
+    await this.usersRepository.update(userId, { isActive: active });
   }
 
   async validatePassword(userId: string, plainPassword: string): Promise<boolean> {
@@ -75,6 +84,12 @@ export class UsersService {
 
   async deleteById(id: string): Promise<void> {
     await this.usersRepository.deleteById(id);
+  }
+
+  /** True when user owns no org and is not a member of any org. */
+  async isOrphanUser(userId: string): Promise<boolean> {
+    const orgs = await this.organizationsService.findOrganizationsForUser(userId);
+    return orgs.length === 0;
   }
 
   /** Returns onboarding status for first-time setup flow. */

@@ -60,6 +60,9 @@ export class AuthService {
     if (!user || !(await this.usersService.validatePassword(user.id, dto.password))) {
       throw new UnauthorizedException('Invalid credentials');
     }
+    if (!user.isActive) {
+      throw new UnauthorizedException('Your account has been deactivated. Contact support.');
+    }
     // Email verification: strict only if REQUIRE_EMAIL_VERIFIED_FOR_LOGIN=true (e.g. production).
     // By default, successful password login auto-verifies so legacy / seed users are not stuck.
     const strictEmailVerification =
@@ -80,6 +83,7 @@ export class AuthService {
         id: user.id,
         email: user.email,
         fullName: user.fullName,
+        isPlatformAdmin: user.isPlatformAdmin,
       },
     };
   }
@@ -162,7 +166,12 @@ export class AuthService {
           sent,
         );
       }
-      throw new ConflictException('An account with this email already exists. Please sign in instead.');
+      // Verified but no workspaces left (e.g. super-admin deleted all tenants) — allow fresh signup.
+      if (!existingUser.isPlatformAdmin && (await this.usersService.isOrphanUser(existingUser.id))) {
+        await this.usersService.deleteById(existingUser.id);
+      } else {
+        throw new ConflictException('An account with this email already exists. Please sign in instead.');
+      }
     }
 
     const userId = generateUuid();

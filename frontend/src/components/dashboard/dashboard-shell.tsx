@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
+import { usePlatformAdmin } from "@/hooks/use-platform-admin";
 import { usePermissions } from "@/hooks/use-permissions";
 import { usePlanOptional } from "@/context/plan-context";
 import { logout } from "@/services/api/auth.api";
@@ -22,7 +23,7 @@ import type { AppRole } from "@/hooks/use-auth";
 import {
   LayoutDashboard, Building2, FolderKanban, ListTodo, Bell,
   CreditCard, Activity, BarChart3, ClipboardList, Settings,
-  Menu, PanelLeftClose, PanelLeft, LogOut, Sparkles,
+  Menu, PanelLeftClose, PanelLeft, LogOut, Sparkles, Shield,
 } from "lucide-react";
 
 const nav: {
@@ -32,6 +33,7 @@ const nav: {
   requiredRole?: AppRole;
   billingOnly?: boolean;
   adminOnly?: boolean;
+  platformAdminOnly?: boolean;
   section?: string;
 }[] = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
@@ -46,11 +48,13 @@ const nav: {
   // Billing section
   { href: "/dashboard/plans", label: "Plans & Pricing", icon: Sparkles, section: "billing" },
   { href: "/dashboard/billing", label: "Billing", icon: CreditCard, section: "billing", billingOnly: true },
+  { href: "/admin", label: "Platform Admin", icon: Shield, platformAdminOnly: true },
 ];
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { hasRole } = useAuth();
+  const { isPlatformAdmin } = usePlatformAdmin();
   const { canManageBilling, canViewAudit } = usePermissions();
   const planContext = usePlanOptional();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -58,6 +62,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
   const visibleNav = nav
     .filter((item) => {
+      if (item.platformAdminOnly) return isPlatformAdmin;
       if (item.billingOnly) return canManageBilling;
       if (item.adminOnly) return canViewAudit; // audit + analytics: owner/admin only
       if (item.requiredRole) return hasRole(item.requiredRole);

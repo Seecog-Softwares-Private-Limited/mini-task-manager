@@ -8,6 +8,8 @@ const { spawn } = require('child_process');
 
 // Load ports (and other vars) from properties.env so they're available before Nest loads
 require('dotenv').config({ path: path.join(__dirname, 'properties.env') });
+const { applyEnvironmentUrls, getAppMode } = require('./scripts/resolve-env-urls.cjs');
+const resolvedUrls = applyEnvironmentUrls();
 
 const ROOT = path.resolve(__dirname);
 const FRONTEND_DIR = path.join(ROOT, 'frontend');
@@ -172,6 +174,14 @@ function startFrontend() {
 
 function main() {
   const mode = getMode();
+  console.log(
+    '[app.js] Environment URLs (APP_MODE=' +
+      getAppMode() +
+      '): FRONTEND_URL=' +
+      process.env.FRONTEND_URL +
+      ', CORS_ORIGIN=' +
+      process.env.CORS_ORIGIN,
+  );
   checkNodeVersion();
   checkEnvFile();
   checkDbEnv();

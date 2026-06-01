@@ -6,6 +6,7 @@ import {
   ORGANIZATION_MEMBERS_REPOSITORY,
   IOrganizationMembersRepository,
 } from '../../organizations/repositories/organization-members.repository.interface';
+import { OrganizationsRepository } from '../../organizations/repositories/organizations.repository';
 
 /**
  * Resolves tenant (organization) from header (e.g. X-Organization-Id) and sets request.tenantId.
@@ -18,6 +19,7 @@ export class TenantGuard implements CanActivate {
     private reflector: Reflector,
     @Inject(ORGANIZATION_MEMBERS_REPOSITORY)
     private readonly orgMembersRepo: IOrganizationMembersRepository,
+    private readonly organizationsRepository: OrganizationsRepository,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -34,6 +36,19 @@ export class TenantGuard implements CanActivate {
     if (!orgId) {
       throw new ForbiddenException('Organization context required. Select an organization in the app.');
     }
+
+    const org = await this.organizationsRepository.findById(orgId);
+    if (!org || org.status === 'DELETED') {
+      throw new ForbiddenException('This organization is no longer available.');
+    }
+    if (org.status === 'SUSPENDED') {
+      throw new ForbiddenException(
+        org.suspensionReason
+          ? `This organization has been suspended: ${org.suspensionReason}`
+          : 'This organization has been suspended. Contact support.',
+      );
+    }
+
     const membership = await this.orgMembersRepo.findByOrganizationAndUser(orgId, userId!);
     if (!membership) {
       throw new ForbiddenException('You are not a member of this organization.');

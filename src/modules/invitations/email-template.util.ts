@@ -51,17 +51,33 @@ function emailLogo(): string {
 </p>`.trim();
 }
 
+/**
+ * Bulletproof email button — background + border on the anchor (not just the cell),
+ * display:block, and MSO fallback so Gmail/Outlook register the full tap target.
+ */
 function emailPrimaryButton(actionUrl: string, label: string): string {
   const href = escapeHtml(actionUrl);
+  const text = escapeHtml(label);
   return `
 <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:28px auto;">
   <tr>
-    <td align="center" bgcolor="${BRAND.emeraldDark}"
-        style="border-radius:12px;background-color:${BRAND.emeraldDark};box-shadow:0 8px 20px -8px rgba(16,185,129,0.55);">
-      <a href="${href}" target="_blank" rel="noopener noreferrer"
-         style="display:inline-block;padding:14px 36px;font-size:16px;font-weight:600;line-height:1.2;color:#ffffff !important;text-decoration:none;border-radius:12px;background-color:${BRAND.emeraldDark};">
-        ${escapeHtml(label)} &rarr;
+    <td align="center">
+      <!--[if mso]>
+      <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word"
+        href="${href}" style="height:48px;v-text-anchor:middle;width:260px;" arcsize="25%"
+        strokecolor="${BRAND.emeraldDark}" fillcolor="${BRAND.emeraldDark}">
+        <w:anchorlock/>
+        <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">
+          ${text} &rarr;
+        </center>
+      </v:roundrect>
+      <![endif]-->
+      <!--[if !mso]><!-->
+      <a href="${href}" target="_blank"
+         style="background-color:${BRAND.emeraldDark};border:1px solid ${BRAND.emeraldDark};border-radius:12px;color:#ffffff;display:block;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:16px;font-weight:600;line-height:48px;text-align:center;text-decoration:none;min-width:220px;padding:0 28px;-webkit-text-size-adjust:none;mso-hide:all;">
+        ${text} &rarr;
       </a>
+      <!--<![endif]-->
     </td>
   </tr>
 </table>`.trim();
@@ -121,12 +137,18 @@ export function emailInvitationActionSection(acceptUrl: string): string {
   const href = escapeHtml(acceptUrl);
   return `
 ${emailPrimaryButton(acceptUrl, 'Accept Invitation')}
+<p style="margin:16px 0 0;text-align:center;">
+  <a href="${href}" target="_blank"
+     style="color:${BRAND.emeraldDark};font-size:15px;font-weight:600;text-decoration:underline;">
+    Accept invitation (direct link)
+  </a>
+</p>
 <div style="margin:24px 0 0;padding:20px;background:${BRAND.footerBg};border:1px solid ${BRAND.cardBorder};border-radius:12px;">
   <p style="margin:0 0 10px;font-size:13px;line-height:1.55;color:${BRAND.textMuted};text-align:center;">
-    If the button does not work, mark this email as <strong>Not spam</strong>, then copy this link into your browser:
+    If links are disabled, mark this email as <strong>Not spam</strong>, then copy this URL into your browser:
   </p>
-  <p style="margin:0;padding:12px 14px;background:#ffffff;border:1px solid ${BRAND.cardBorder};border-radius:8px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;line-height:1.55;word-break:break-all;text-align:left;">
-    <a href="${href}" target="_blank" rel="noopener noreferrer" style="color:${BRAND.violet};text-decoration:underline;">${href}</a>
+  <p style="margin:0;padding:12px 14px;background:#ffffff;border:1px solid ${BRAND.cardBorder};border-radius:8px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;line-height:1.55;word-break:break-all;text-align:left;color:${BRAND.text};">
+    ${href}
   </p>
 </div>`.trim();
 }

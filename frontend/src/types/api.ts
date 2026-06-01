@@ -23,7 +23,13 @@ export interface ApiErrorBody {
 
 export interface LoginResponse {
   accessToken: string;
-  user: { id: string; email: string; fullName: string; avatarUrl?: string };
+  user: {
+    id: string;
+    email: string;
+    fullName: string;
+    avatarUrl?: string;
+    isPlatformAdmin?: boolean;
+  };
   organizationId?: string;
 }
 
@@ -34,6 +40,7 @@ export interface User {
   avatarUrl?: string;
   isEmailVerified: boolean;
   isActive: boolean;
+  isPlatformAdmin?: boolean;
   /** ISO date string; used for presence (online if within last few minutes). */
   lastSeenAt?: string;
 }
@@ -297,6 +304,7 @@ export interface InvitationValidationEnriched {
   email?: string;
   expires_at?: string;
   status?: string;
+  account_exists?: boolean;
 }
 
 export interface TaskComment {
