@@ -9,7 +9,9 @@ import {
   UseGuards,
   ForbiddenException,
   Headers,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { SkipThrottle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
@@ -24,6 +26,7 @@ import { OrganizationsService } from '../organizations/organizations.service';
 import { CreateInvitationDto } from './dto/create-invitation.dto';
 import { AcceptInvitationDto } from './dto/accept-invitation.dto';
 import { OrganizationInvitationEntity } from './entities/organization-invitation.entity';
+import { resolveFrontendPublicUrl } from '../../common/utils/frontend-url.util';
 
 @Controller()
 @SkipThrottle({ auth: true })
@@ -128,6 +131,21 @@ export class InvitationsController {
 
     await this.invitationsService.cancelInvitation(invId, orgId);
     return { success: true };
+  }
+
+  /**
+   * GET /invitations/join/:token — public redirect to the Next.js accept-invite page.
+   * Use PUBLIC_API_URL in invitation emails when the app runs on a different host/port.
+   */
+  @Public()
+  @Get('invitations/join/:token')
+  joinInvite(
+    @Param('token') token: string,
+    @Res() res: Response,
+  ): void {
+    const base = resolveFrontendPublicUrl();
+    const target = `${base}/invite/${encodeURIComponent(token)}`;
+    res.redirect(302, target);
   }
 
   /** GET /invitations/validate?token= — public token validation (legacy query param) */

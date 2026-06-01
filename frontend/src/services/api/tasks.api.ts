@@ -1,4 +1,5 @@
 import { apiClient } from "@/services/api/client";
+import { normalizeTaskId } from "@/lib/task-id";
 import type { Task } from "@/types/api";
 import type { PaginatedResult } from "@/types/api";
 import type { TaskSubtask } from "@/types/api";
@@ -60,7 +61,9 @@ export async function createTask(payload: CreateTaskPayload): Promise<Task> {
     body.subtasks = serializeSubtasksForApi(body.subtasks as TaskSubtask[]);
   }
   const { data } = await apiClient.post<Task>("/tasks", body);
-  return data;
+  const id = normalizeTaskId(data?.id);
+  if (!id) return data;
+  return { ...data, id };
 }
 
 export interface FetchTasksByProjectOptions {

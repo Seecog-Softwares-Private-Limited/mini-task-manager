@@ -74,7 +74,8 @@ import { useBulkSelection } from "@/hooks/use-bulk-selection";
 import { useBoardPermissions } from "@/hooks/use-board-permissions";
 import { useRetentionTracking } from "@/hooks/use-retention-tracking";
 import type { Task } from "@/types/api";
-import { Building2, Plus, Sparkles, Columns3, Keyboard, Shield, Rocket } from "lucide-react";
+import { exportTasksToCsvFile } from "@/lib/export-tasks-csv";
+import { Building2, Plus, Sparkles, Columns3, Keyboard, Shield, Rocket, Download } from "lucide-react";
 
 function getCurrentUserId(): string | null {
   const token = getStoredToken();
@@ -522,6 +523,35 @@ export default function TasksPage() {
     [orgId, selectedProjectId, createMutation]
   );
 
+  const handleExportCsv = useCallback(() => {
+    if (!selectedProject || projectTasks.length === 0) {
+      toast({
+        title: "Nothing to export",
+        description: "Create at least one task in this project, or select a project with tasks.",
+        variant: "error",
+      });
+      return;
+    }
+    const assigneeNameById: Record<string, string> = {};
+    for (const [id, info] of Object.entries(assigneeMap)) {
+      assigneeNameById[id] = info.name;
+    }
+    const hasActiveFilters =
+      filters.search.length > 0 || filters.priority.length > 0 || filters.assignee.length > 0;
+    const { count, filename } = exportTasksToCsvFile(projectTasks, {
+      projectName: selectedProject.name,
+      statuses,
+      assigneeNameById,
+      filters,
+      onlyFiltered: hasActiveFilters,
+    });
+    toast({
+      title: "CSV exported",
+      description: `Downloaded ${filename} (${count} task${count === 1 ? "" : "s"}). Share the file with anyone.`,
+      variant: "success",
+    });
+  }, [selectedProject, projectTasks, assigneeMap, statuses, filters, toast]);
+
   const handleCreateFromModal = useCallback((data: CreateTaskFormData, descriptionImageFiles?: File[]) => {
     if (!orgId || !selectedProjectId) return;
     createMutation.mutate({
@@ -663,6 +693,17 @@ export default function TasksPage() {
               <Rocket className="h-4 w-4" /> New Sprint
             </Button>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5"
+            disabled={!selectedProjectId || projectTasks.length === 0}
+            onClick={handleExportCsv}
+            data-cy="export-tasks-csv"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
           {permissions.canCreateTask && (
             <Button onClick={() => { setDefaultStatusId(statuses[0]?.id); setCreateModalOpen(true); }} data-cy="create-task-button" className="shadow-lg shadow-primary/20">
               <Plus className="mr-1.5 h-4 w-4" /> New Task
@@ -825,6 +866,8 @@ export default function TasksPage() {
         projectId={selectedProjectId ?? ""}
         statuses={statuses}
         defaultStatusId={defaultStatusId}
+        onExportCsv={handleExportCsv}
+        exportCsvDisabled={!selectedProjectId || projectTasks.length === 0}
       />
 
       {orgId && selectedProjectId && (

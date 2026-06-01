@@ -67,6 +67,7 @@ describe('EmailService (integration)', () => {
       inviterName: 'Owner',
       role: 'member',
       acceptUrl,
+      directAppUrl: acceptUrl,
     });
 
     expect(sendMailMock).toHaveBeenCalledTimes(1);
@@ -76,7 +77,7 @@ describe('EmailService (integration)', () => {
     expect(mail.html).toContain('/invite/token456');
     expect(mail.html).toContain(`href="${acceptUrl}"`);
     expect(mail.html).toContain('display:block');
-    expect(mail.html).toContain('Accept invitation (direct link)');
+    expect(mail.html).toContain('Not spam');
   });
 
   it('propagates SMTP send failures instead of swallowing them', async () => {
@@ -89,6 +90,7 @@ describe('EmailService (integration)', () => {
         inviterName: 'Admin',
         role: 'member',
         acceptUrl: 'http://localhost:3001/invite/x',
+        directAppUrl: 'http://localhost:3001/invite/x',
       }),
     ).rejects.toMatchObject({
       message: expect.stringContaining('Could not send email'),
@@ -110,10 +112,19 @@ describe('getFrontendUrl', () => {
     expect(getFrontendUrl()).toBe('https://app.example.com');
   });
 
-  it('derives from FRONTEND_PORT when FRONTEND_URL is unset', async () => {
+  it('uses FRONTEND_URL_LOCAL in development mode', async () => {
     delete process.env.FRONTEND_URL;
-    process.env.FRONTEND_PORT = '3008';
+    process.env.APP_MODE = 'development';
+    process.env.FRONTEND_URL_LOCAL = 'http://localhost:3008';
     const { getFrontendUrl } = await import('../src/common/utils/frontend-url.util');
     expect(getFrontendUrl()).toBe('http://localhost:3008');
+  });
+
+  it('uses FRONTEND_URL_PRODUCTION in production mode', async () => {
+    delete process.env.FRONTEND_URL;
+    process.env.APP_MODE = 'production';
+    process.env.FRONTEND_URL_PRODUCTION = 'http://3.110.214.243:3000';
+    const { getFrontendUrl } = await import('../src/common/utils/frontend-url.util');
+    expect(getFrontendUrl()).toBe('http://3.110.214.243:3000');
   });
 });

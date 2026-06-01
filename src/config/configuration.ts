@@ -1,5 +1,6 @@
 const DEFAULT_JWT_SECRET = 'change-me-in-production';
 import { join } from 'path';
+import { resolveFrontendPublicUrl } from '../common/utils/frontend-url.util';
 
 export const configuration = () => {
   const nodeEnv = process.env.NODE_ENV || 'development';
@@ -13,11 +14,7 @@ export const configuration = () => {
     }
   }
 
-  const frontendPort = process.env.FRONTEND_PORT || '3001';
-  const frontendUrlExplicit = process.env.FRONTEND_URL?.trim();
-  const frontendUrl = frontendUrlExplicit
-    ? frontendUrlExplicit.replace(/\/+$/, '')
-    : `http://localhost:${frontendPort}`;
+  const frontendUrl = resolveFrontendPublicUrl();
 
   const smtpHost = process.env.SMTP_HOST || 'localhost';
   const smtpPort = parseInt(process.env.SMTP_PORT || '1025', 10);
