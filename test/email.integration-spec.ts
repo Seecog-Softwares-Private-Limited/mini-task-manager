@@ -76,7 +76,9 @@ describe('EmailService (integration)', () => {
     expect(mail.subject).toContain('Acme Corp');
     expect(mail.html).toContain('/invite/token456');
     expect(mail.html).toContain(`href="${acceptUrl}"`);
-    expect(mail.html).toContain('display:block');
+    expect(mail.html).toContain('Accept Invitation');
+    expect(mail.html).toContain('display:inline-block');
+    expect(mail.html).not.toContain('display:block');
     expect(mail.html).toContain('Not spam');
   });
 
