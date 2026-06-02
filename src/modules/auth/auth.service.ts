@@ -75,7 +75,11 @@ export class AuthService {
       }
       await this.usersService.updateEmailVerified(user.id, true);
     }
-    const payload = { sub: user.id, email: user.email };
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      roles: user.isPlatformAdmin ? ['SUPER_ADMIN'] : [],
+    };
     const accessToken = this.jwtService.sign(payload);
     return {
       accessToken,
@@ -86,6 +90,14 @@ export class AuthService {
         isPlatformAdmin: user.isPlatformAdmin,
       },
     };
+  }
+
+  async superAdminLogin(dto: LoginDto): Promise<LoginResponseDto> {
+    const res = await this.login(dto);
+    if (!res.user.isPlatformAdmin) {
+      throw new UnauthorizedException('Super admin access required');
+    }
+    return res;
   }
 
   async validateUserById(userId: string): Promise<{ id: string; email: string } | null> {
@@ -321,6 +333,10 @@ export class AuthService {
 
   async loginWithGoogleUser(user: { id: string; email: string; fullName: string }): Promise<string> {
     const payload = { sub: user.id, email: user.email };
+    return this.jwtService.sign(payload);
+  }
+
+  async issueCustomToken(payload: Record<string, unknown>): Promise<string> {
     return this.jwtService.sign(payload);
   }
 

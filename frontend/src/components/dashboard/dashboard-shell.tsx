@@ -48,7 +48,7 @@ const nav: {
   // Billing section
   { href: "/dashboard/plans", label: "Plans & Pricing", icon: Sparkles, section: "billing" },
   { href: "/dashboard/billing", label: "Billing", icon: CreditCard, section: "billing", billingOnly: true },
-  { href: "/admin", label: "Platform Admin", icon: Shield, platformAdminOnly: true },
+  { href: "/super-admin", label: "Platform Admin", icon: Shield, platformAdminOnly: true },
 ];
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {

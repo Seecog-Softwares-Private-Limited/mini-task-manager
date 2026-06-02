@@ -73,6 +73,7 @@ apiClient.interceptors.response.use(
 
     const isPublicAuthRequest =
       url.includes("/auth/login") ||
+      url.includes("/auth/super-admin/login") ||
       url.includes("/auth/logout") ||
       url.includes("/auth/signup") ||
       url.includes("/auth/verify-email") ||

@@ -31,8 +31,14 @@ export class PlanEntity {
   @Column({ name: 'max_projects', type: 'int', nullable: true })
   maxProjects!: number | null;
 
+  @Column({ name: 'max_tasks', type: 'int', nullable: true })
+  maxTasks!: number | null;
+
   @Column({ name: 'storage_limit_gb', type: 'int', nullable: true })
   storageLimitGb!: number | null;
+
+  @Column({ name: 'trial_days', type: 'int', default: 0 })
+  trialDays!: number;
 
   @Column({ name: 'automation_limit', type: 'int', nullable: true })
   automationLimit!: number | null;
