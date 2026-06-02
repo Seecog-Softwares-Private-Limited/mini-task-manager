@@ -1,6 +1,6 @@
 /**
  * Adds admin user and project ADMIN role to existing seed data.
- * Run when you already have seed data and need admin@example.com to send invites.
+ * Run when you already have seed data and need superadmin@example.com to send invites.
  * Usage: npx ts-node -r tsconfig-paths/register src/infrastructure/database/seed/add-admin.ts
  * Loads env from properties.env at repo root.
  */
@@ -18,7 +18,7 @@ import { ProjectMemberEntity } from '../../../modules/projects/entities/project-
 import { OrganizationEntity } from '../../../modules/organizations/entities/organization.entity';
 import { ProjectEntity } from '../../../modules/projects/entities/project.entity';
 
-const ADMIN_EMAIL = 'admin@example.com';
+const ADMIN_EMAIL = 'superadmin@example.com';
 const PASSWORD = process.env.SEED_USER_PASSWORD || 'Password123!';
 
 async function addAdmin() {
@@ -63,10 +63,10 @@ async function addAdmin() {
           passwordHash: PASSWORD,
         }),
       );
-      console.log('  Created user: admin@example.com');
+      console.log('  Created user: superadmin@example.com');
     } else {
       adminId = admin.id;
-      console.log('  User admin@example.com already exists');
+      console.log('  User superadmin@example.com already exists');
     }
 
     const orgs = await orgRepo.find({ take: 20 });
@@ -116,7 +116,7 @@ async function addAdmin() {
   });
 
   await dataSource.destroy();
-  console.log('\nDone. Login with admin@example.com / Password123!');
+  console.log('\nDone. Login with superadmin@example.com / Password123!');
   console.log('Select "Seed Org" and open a project to see the Invite button.');
 }
 

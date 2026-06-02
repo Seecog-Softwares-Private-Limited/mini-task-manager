@@ -1,0 +1,180 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { PlatformAdminGuard } from './guards/platform-admin.guard';
+import { SuperAdminService } from './super-admin.service';
+import {
+  SuperAdminImpersonateDto,
+  SuperAdminPlanUpsertDto,
+  SuperAdminSendNotificationDto,
+  SuperAdminSetTenantStatusDto,
+  SuperAdminSettingsUpdateDto,
+  SuperAdminStopImpersonationDto,
+  SuperAdminSubscriptionActionDto,
+  SuperAdminTenantQueryDto,
+  SuperAdminUserQueryDto,
+} from './dto/super-admin.dto';
+import { UpdatePlanConfigurationDto } from '../../plans/dto/update-plan-configuration.dto';
+import { PlanConfigurationsService } from '../../plans/plan-configurations.service';
+import { normalizePlanSlug } from '../../config/plans.config';
+
+@Controller('super-admin')
+@UseGuards(JwtAuthGuard, PlatformAdminGuard)
+export class SuperAdminController {
+  constructor(
+    private readonly superAdminService: SuperAdminService,
+    private readonly planConfigurationsService: PlanConfigurationsService,
+  ) {}
+
+  @Get('dashboard')
+  dashboard() {
+    return this.superAdminService.dashboard();
+  }
+
+  @Get('tenants')
+  tenants(@Query() query: SuperAdminTenantQueryDto) {
+    return this.superAdminService.tenants(query);
+  }
+
+  @Get('tenants/:id')
+  tenantById(@Param('id') id: string) {
+    return this.superAdminService.tenantById(id);
+  }
+
+  @Patch('tenants/:id/status')
+  setTenantStatus(@Param('id') id: string, @Body() dto: SuperAdminSetTenantStatusDto) {
+    return this.superAdminService.setTenantStatus(id, dto.status, dto.reason);
+  }
+
+  @Delete('tenants/:id')
+  deleteTenant(@Param('id') id: string) {
+    return this.superAdminService.deleteTenant(id);
+  }
+
+  @Get('users')
+  users(@Query() query: SuperAdminUserQueryDto) {
+    return this.superAdminService.users(query);
+  }
+
+  @Patch('users/:id/active')
+  setUserActive(@Param('id') id: string, @Body() dto: { active: boolean }) {
+    return this.superAdminService.setUserActive(id, dto.active);
+  }
+
+  @Delete('users/:id')
+  deleteUser(@Param('id') id: string) {
+    return this.superAdminService.deleteUser(id);
+  }
+
+  @Get('plans')
+  plans() {
+    return this.superAdminService.plans();
+  }
+
+  @Post('plans')
+  upsertPlan(@Body() dto: SuperAdminPlanUpsertDto) {
+    return this.superAdminService.upsertPlan(dto);
+  }
+
+  @Delete('plans/:id')
+  deletePlan(@Param('id') id: string) {
+    return this.superAdminService.deletePlan(id);
+  }
+
+  @Get('plan-configurations')
+  planConfigurations() {
+    return this.planConfigurationsService.getAll();
+  }
+
+  @Put('plan-configurations/:planName')
+  updatePlanConfiguration(
+    @Param('planName') planName: string,
+    @Body() dto: UpdatePlanConfigurationDto,
+  ) {
+    return this.planConfigurationsService.updatePlan(normalizePlanSlug(planName), dto);
+  }
+
+  @Get('subscriptions')
+  subscriptions() {
+    return this.superAdminService.subscriptions();
+  }
+
+  @Post('subscriptions/action')
+  subscriptionAction(@Body() dto: SuperAdminSubscriptionActionDto) {
+    return this.superAdminService.subscriptionAction(dto);
+  }
+
+  @Get('audit-logs')
+  auditLogs(
+    @Query('userId') userId?: string,
+    @Query('organizationId') organizationId?: string,
+    @Query('entity') entity?: string,
+    @Query('action') action?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.superAdminService.globalAuditLogs({
+      userId,
+      organizationId,
+      entity,
+      action,
+      from,
+      to,
+      page,
+      limit,
+    });
+  }
+
+  @Get('analytics')
+  analytics() {
+    return this.superAdminService.analytics();
+  }
+
+  @Get('settings')
+  settings() {
+    return this.superAdminService.listSettings();
+  }
+
+  @Post('settings')
+  upsertSetting(@Body() dto: SuperAdminSettingsUpdateDto) {
+    return this.superAdminService.upsertSetting(dto);
+  }
+
+  @Post('notifications')
+  sendNotification(
+    @Req() req: { user: { userId: string } },
+    @Body() dto: SuperAdminSendNotificationDto,
+  ) {
+    return this.superAdminService.sendNotification(req.user.userId, dto);
+  }
+
+  @Post('impersonation/start')
+  startImpersonation(
+    @Req() req: { user: { userId: string } },
+    @Body() dto: SuperAdminImpersonateDto,
+  ) {
+    return this.superAdminService.impersonate(req.user.userId, dto);
+  }
+
+  @Post('impersonation/stop')
+  stopImpersonation(
+    @Req() req: { user: { userId: string } },
+    @Body() dto: SuperAdminStopImpersonationDto,
+  ) {
+    return this.superAdminService.stopImpersonation(req.user.userId, dto.sessionId);
+  }
+}
+

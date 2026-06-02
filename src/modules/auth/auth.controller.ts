@@ -32,6 +32,13 @@ export class AuthController {
 
   @Public()
   @SkipThrottle({ default: true })
+  @Post('super-admin/login')
+  async superAdminLogin(@Body() dto: LoginDto): Promise<LoginResponseDto> {
+    return this.authService.superAdminLogin(dto);
+  }
+
+  @Public()
+  @SkipThrottle({ default: true })
   @Post('signup')
   async signup(@Body() dto: PublicSignupDto): Promise<{ message: string; emailVerified?: boolean }> {
     this.logger.log(`Signup request: ${dto.email?.toLowerCase?.() ?? dto.email}`);
