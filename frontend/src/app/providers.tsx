@@ -16,6 +16,7 @@ import { ErrorBanner5xx } from "@/components/error-banner-5xx";
 import { Toaster } from "@/components/ui/toaster";
 import { SessionExpiredModal } from "@/components/session-expired-modal";
 import { UpgradeModal } from "@/components/upgrade-modal";
+import { UpgradePlanModalProvider } from "@/context/upgrade-plan-modal-context";
 import { OnboardingFlow } from "@/components/onboarding/onboarding-flow";
 import { FirstTimeOnboardingGate } from "@/components/onboarding/first-time-onboarding-gate";
 
@@ -48,6 +49,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
             <TenantProvider>
               <PlanProvider>
                 <UpgradeModalProvider>
+                  <UpgradePlanModalProvider>
                   <FirstTimeOnboardingProvider>
                     <OnboardingProvider>
                       <NotificationsProvider>
@@ -58,6 +60,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
                       </NotificationsProvider>
                     </OnboardingProvider>
                   </FirstTimeOnboardingProvider>
+                  </UpgradePlanModalProvider>
                   <ErrorBanner5xx />
                   <GlobalErrorToast />
                   <Toaster />

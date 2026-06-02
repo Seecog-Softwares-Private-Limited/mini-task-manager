@@ -2,9 +2,11 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
+  forwardRef,
 } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { InvitationsRepository } from './repositories/invitations.repository';
@@ -17,6 +19,7 @@ import { OrganizationInvitationEntity } from './entities/organization-invitation
 import { generateUuid } from '../../common/utils/uuid.util';
 import { buildInviteAcceptUrls } from '../../common/utils/frontend-url.util';
 import { isLocalhostUrl } from './email-template.util';
+import { PlanLimitService } from '../../plans/plan-limit.service';
 
 const INVITE_EXPIRY_DAYS = 7;
 
@@ -40,6 +43,8 @@ export class InvitationsService {
     private readonly orgsService: OrganizationsService,
     private readonly usersService: UsersService,
     private readonly orgMembersRepo: OrganizationMembersRepository,
+    @Inject(forwardRef(() => PlanLimitService))
+    private readonly planLimitService: PlanLimitService,
   ) {}
 
   async createInvitation(
@@ -65,6 +70,8 @@ export class InvitationsService {
     if (existingInvite) {
       throw new ConflictException('A pending invitation already exists for this email');
     }
+
+    await this.planLimitService.assertMemberLimit(organizationId);
 
     const existingUser = await this.usersService.findByEmail(normalizedEmail);
     if (existingUser) {

@@ -13,12 +13,14 @@ import { OrganizationsController } from './organizations.controller';
 import { SSOController } from './sso.controller';
 import { SSOService } from './sso.service';
 import { BillingModule } from '../billing/billing.module';
+import { PlansModule } from '../../plans/plans.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([OrganizationEntity, OrganizationMemberEntity, SSOConfigEntity]),
     forwardRef(() => BillingModule),
     forwardRef(() => AuthModule),
+    forwardRef(() => PlansModule),
   ],
   controllers: [OrganizationsController, SSOController],
   providers: [

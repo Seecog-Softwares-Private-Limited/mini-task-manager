@@ -45,4 +45,16 @@ export class UserEntity extends BaseEntity {
 
   @Column({ name: 'onboarding_completed_at', type: 'timestamp', nullable: true })
   onboardingCompletedAt!: Date | null;
+
+  @Column({ name: 'current_plan', type: 'varchar', length: 20, default: 'free' })
+  currentPlan!: string;
+
+  @Column({ name: 'plan_started_at', type: 'timestamp', nullable: true })
+  planStartedAt!: Date | null;
+
+  @Column({ name: 'plan_expires_at', type: 'timestamp', nullable: true })
+  planExpiresAt!: Date | null;
+
+  @Column({ name: 'storage_used', type: 'bigint', default: 0 })
+  storageUsed!: string;
 }
