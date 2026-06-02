@@ -20,6 +20,7 @@
     "test:email": "jest test/email.integration-spec.ts",
     "test:throttle": "jest --testPathPattern=throttle-integration --runInBand",
     "test:plans": "npx ts-node -r tsconfig-paths/register src/plans/run-tests.ts",
+    "seed:plan-configurations": "npx ts-node -r tsconfig-paths/register src/plans/seed-plan-configurations.ts",
     "seed": "npx ts-node -r tsconfig-paths/register src/infrastructure/database/seed/run-seed.ts",
     "seed:add-admin": "npx ts-node -r tsconfig-paths/register src/infrastructure/database/seed/add-admin.ts",
     "seed:add-invited-user": "npx ts-node -r tsconfig-paths/register src/infrastructure/database/seed/add-invited-user.ts",
