@@ -45,4 +45,41 @@ export class UsersRepository {
   async deleteById(id: string): Promise<void> {
     await this.repo.delete(id);
   }
+
+  async incrementStorageUsed(userId: string, bytes: number): Promise<void> {
+    await this.repo.increment({ id: userId }, 'storageUsed', bytes);
+  }
+
+  async decrementStorageUsed(userId: string, bytes: number): Promise<void> {
+    await this.repo
+      .createQueryBuilder()
+      .update(UserEntity)
+      .set({
+        storageUsed: () => `GREATEST(0, CAST(storage_used AS SIGNED) - ${Math.floor(bytes)})`,
+      })
+      .where('id = :id', { id: userId })
+      .execute();
+  }
+
+  async findWithExpiredPaidPlan(): Promise<UserEntity[]> {
+    return this.repo
+      .createQueryBuilder('u')
+      .where('u.current_plan IN (:...plans)', { plans: ['silver', 'gold'] })
+      .andWhere('u.plan_expires_at IS NOT NULL')
+      .andWhere('u.plan_expires_at < :now', { now: new Date() })
+      .getMany();
+  }
+
+  async findPlansExpiringWithinDays(days: number): Promise<UserEntity[]> {
+    const now = new Date();
+    const until = new Date();
+    until.setDate(until.getDate() + days);
+    return this.repo
+      .createQueryBuilder('u')
+      .where('u.current_plan IN (:...plans)', { plans: ['silver', 'gold'] })
+      .andWhere('u.plan_expires_at IS NOT NULL')
+      .andWhere('u.plan_expires_at > :now', { now })
+      .andWhere('u.plan_expires_at <= :until', { until })
+      .getMany();
+  }
 }

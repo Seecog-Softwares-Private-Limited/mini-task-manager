@@ -1,7 +1,13 @@
-import { BadRequestException, ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  forwardRef,
+} from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
-import { QueryFailedError } from 'typeorm';
+import { DataSource, QueryFailedError } from 'typeorm';
 import { OrganizationsRepository } from './repositories/organizations.repository';
 import { OrganizationMembersRepository } from './repositories/organization-members.repository';
 import { OrganizationEntity } from './entities/organization.entity';
@@ -10,6 +16,7 @@ import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { OrganizationResponseDto } from './dto/organization-response.dto';
 import { generateUuid } from '../../common/utils/uuid.util';
+import { PlanLimitService } from '../../plans/plan-limit.service';
 
 @Injectable()
 export class OrganizationsService {
@@ -18,6 +25,8 @@ export class OrganizationsService {
     private readonly orgMembersRepository: OrganizationMembersRepository,
     @InjectDataSource()
     private readonly dataSource: DataSource,
+    @Inject(forwardRef(() => PlanLimitService))
+    private readonly planLimitService: PlanLimitService,
   ) {}
 
   async findById(id: string): Promise<OrganizationEntity | null> {
@@ -56,6 +65,8 @@ export class OrganizationsService {
     if (existing) {
       throw new ConflictException('An organization with this slug already exists. Please choose a different slug.');
     }
+
+    await this.planLimitService.assertWorkspaceLimit(ownerId);
 
     const orgId = generateUuid();
     try {

@@ -9,14 +9,16 @@ import { AuthModule } from '../auth/auth.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { UsersModule } from '../users/users.module';
 import { BillingModule } from '../billing/billing.module';
+import { PlansModule } from '../../plans/plans.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([OrganizationInvitationEntity]),
     forwardRef(() => AuthModule),
-    OrganizationsModule,
+    forwardRef(() => OrganizationsModule),
     UsersModule,
     forwardRef(() => BillingModule),
+    forwardRef(() => PlansModule),
   ],
   controllers: [InvitationsController],
   providers: [InvitationsRepository, InvitationsService, EmailService],

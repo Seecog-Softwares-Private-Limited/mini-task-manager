@@ -100,6 +100,16 @@ apiClient.interceptors.response.use(
           );
         }
       } else if (
+        (body as { error?: string })?.error === "LIMIT_EXCEEDED"
+      ) {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("plans:limitExceeded", {
+              detail: body,
+            })
+          );
+        }
+      } else if (
         typeof msgStr === "string" &&
         (msgStr.includes("Organization context") || msgStr.includes("not a member of this organization"))
       ) {

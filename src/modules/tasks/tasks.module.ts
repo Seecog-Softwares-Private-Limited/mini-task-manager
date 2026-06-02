@@ -7,6 +7,7 @@ import { ProjectsModule } from '../projects/projects.module';
 import { WorkflowsModule } from '../workflows/workflows.module';
 import { InvitationsModule } from '../invitations/invitations.module';
 import { UsersModule } from '../users/users.module';
+import { PlansModule } from '../../plans/plans.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ActivityLogsModule } from '../activity-logs/activity-logs.module';
 import { TaskEntity } from './entities/task.entity';
@@ -30,6 +31,7 @@ import { TasksController } from './tasks.controller';
     UsersModule,
     NotificationsModule,
     ActivityLogsModule,
+    forwardRef(() => PlansModule),
   ],
   controllers: [TasksController],
   providers: [TasksRepository, TaskCommentsRepository, TaskAttachmentsRepository, TasksService],

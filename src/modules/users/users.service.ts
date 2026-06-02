@@ -75,10 +75,15 @@ export class UsersService {
   }
 
   async create(data: { email: string; fullName: string; password: string }): Promise<UserEntity> {
+    const now = new Date();
     return this.usersRepository.create({
       email: data.email.toLowerCase(),
       fullName: data.fullName,
       passwordHash: toStoredPassword(data.password),
+      currentPlan: 'free',
+      planStartedAt: now,
+      planExpiresAt: null,
+      storageUsed: '0',
     });
   }
 

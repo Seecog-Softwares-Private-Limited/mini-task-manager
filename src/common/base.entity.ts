@@ -16,9 +16,19 @@ export const uuidBinaryTransformer: ValueTransformer = {
     const hex = String(value).replace(/-/g, '');
     return Buffer.from(hex, 'hex');
   },
-  from: (value: Buffer | null): string | null => {
+  from: (value: Buffer | string | null): string | null => {
     if (value == null) return null;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
+        return trimmed.toLowerCase();
+      }
+      const hex = trimmed.replace(/-/g, '');
+      if (hex.length !== 32) return trimmed;
+      value = Buffer.from(hex, 'hex');
+    }
     const hex = (value as Buffer).toString('hex');
+    if (hex.length !== 32) return hex;
     return [
       hex.slice(0, 8),
       hex.slice(8, 12),

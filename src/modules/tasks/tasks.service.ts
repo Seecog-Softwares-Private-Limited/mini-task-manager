@@ -8,6 +8,7 @@ import { WorkflowsService } from '../workflows/workflows.service';
 import { UsageService } from '../billing/usage.service';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
 import { OrganizationsService } from '../organizations/organizations.service';
+import { PlanLimitService } from '../../plans/plan-limit.service';
 import { TaskEntity } from './entities/task.entity';
 import { TaskAttachmentEntity } from './entities/task-attachment.entity';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -65,6 +66,8 @@ export class TasksService {
     private readonly activityLogsService: ActivityLogsService,
     private readonly configService: ConfigService<Configuration>,
     private readonly organizationsService: OrganizationsService,
+    @Inject(forwardRef(() => PlanLimitService))
+    private readonly planLimitService: PlanLimitService,
   ) {}
 
   async findById(id: string): Promise<TaskEntity | null> {
@@ -350,6 +353,8 @@ export class TasksService {
     if (file.size > MAX_FILE_SIZE) throw new ForbiddenException('File too large (max 10MB)');
     if (!isAllowedMime(file.mimetype || '')) throw new ForbiddenException('File type not allowed');
 
+    await this.planLimitService.assertStorageLimit(userId, file.size);
+
     const storageMbIncrement = Math.ceil(file.size / (1024 * 1024));
     const limitCheck = await this.usageService.checkLimit(organizationId, 'storageGb', storageMbIncrement);
     if (!limitCheck.allowed) {
@@ -382,6 +387,7 @@ export class TasksService {
       fileSizeBytes: file.size,
       uploadedBy: userId,
     });
+    await this.planLimitService.incrementStorageUsed(userId, file.size);
     return attachment;
   }
 
@@ -408,6 +414,12 @@ export class TasksService {
     const fullPath = path.join(uploadsPath, attachment.fileUrl);
     await fs.unlink(fullPath).catch(() => {});
     await this.taskAttachmentsRepository.delete(attachmentId);
+    if (attachment.fileSizeBytes && attachment.uploadedBy) {
+      await this.planLimitService.decrementStorageUsed(
+        attachment.uploadedBy,
+        Number(attachment.fileSizeBytes),
+      );
+    }
   }
 
   /** Pick a valid board column for new tasks (requested status, else first To Do). */

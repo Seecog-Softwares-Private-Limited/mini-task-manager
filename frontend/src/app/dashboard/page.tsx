@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WhatsNewBanner } from "@/components/feature-tour/whats-new-banner";
 import { SystemStatusWidget } from "@/components/observability/system-status-widget";
+import { PlanUsageWidget } from "@/components/PlanUsageWidget";
 import { cn } from "@/lib/utils";
 import { FolderKanban, Users, CheckCircle2, TrendingUp, ArrowRight, Plus, Building2, Layers3, ListTodo, CircleDashed, CircleCheckBig } from "lucide-react";
 
@@ -309,6 +310,10 @@ export default function DashboardPage() {
                 </p>
               </CardContent>
             </Card>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-3">
+            <PlanUsageWidget className="lg:col-span-1" />
           </div>
 
           {/* Recent projects */}
