@@ -1,4 +1,5 @@
 "use client";
+export { default } from "./user-plans-page";
 
 import { useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -72,7 +73,7 @@ const featureList: { key: string; label: string; icon: React.ReactNode; free: st
   { key: "support", label: "Priority Support", icon: <HeadphonesIcon className="h-4 w-4" />, free: "Community", pro: "Email", enterprise: "24/7 Dedicated" },
 ];
 
-export default function PlansPage() {
+function PlansPage() {
   const router = useRouter();
   const { orgId } = useTenant();
   const { subscription, plan: currentPlan, plans, refetch, isTrial, isTrialExpired } = usePlan();
