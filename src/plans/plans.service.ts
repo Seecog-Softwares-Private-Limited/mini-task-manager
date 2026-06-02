@@ -15,6 +15,7 @@ import {
 import { UserEntity } from '../modules/users/entities/user.entity';
 import { PlanLimitService } from './plan-limit.service';
 import { PaymentService } from './payment.service';
+import { PlanConfigurationsService } from './plan-configurations.service';
 
 @Injectable()
 export class PlansService {
@@ -24,12 +25,20 @@ export class PlansService {
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
     private readonly planLimitService: PlanLimitService,
+    private readonly planConfigurationsService: PlanConfigurationsService,
     private readonly paymentService: PaymentService,
   ) {}
 
-  listPlans() {
+  async listPlans() {
+    const limitRows = await this.planConfigurationsService.getAll();
+    const byPlan = new Map(limitRows.map((row) => [row.planName, row]));
     return PLAN_ORDER.map((slug) => {
       const def = PLANS[slug];
+      const limits = byPlan.get(slug) ?? {
+        maxWorkspaces: def.limits.maxWorkspaces,
+        maxUsers: def.limits.maxMembersPerWorkspace,
+        maxStorage: def.limits.storageBytes,
+      };
       return {
         slug: def.slug,
         name: def.name,
@@ -37,9 +46,9 @@ export class PlansService {
         currency: def.pricing.currency,
         priceLabel: def.pricing.label,
         limits: {
-          maxWorkspaces: def.limits.maxWorkspaces,
-          maxMembersPerWorkspace: def.limits.maxMembersPerWorkspace,
-          storageBytes: def.limits.storageBytes,
+          maxWorkspaces: limits.maxWorkspaces,
+          maxMembersPerWorkspace: limits.maxUsers,
+          storageBytes: limits.maxStorage,
         },
         benefits: def.benefits,
       };
