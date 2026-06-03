@@ -1,7 +1,8 @@
-import { IsInt, IsOptional, Min } from 'class-validator';
+import { IsInt, IsOptional, Min, ValidateIf } from 'class-validator';
 
 export class UpdatePlanConfigurationDto {
   @IsOptional()
+  @ValidateIf((_, value) => value !== null)
   @IsInt()
   @Min(1)
   maxUsers?: number | null;
@@ -12,6 +13,7 @@ export class UpdatePlanConfigurationDto {
   maxStorage?: number;
 
   @IsOptional()
+  @ValidateIf((_, value) => value !== null)
   @IsInt()
   @Min(1)
   maxWorkspaces?: number | null;

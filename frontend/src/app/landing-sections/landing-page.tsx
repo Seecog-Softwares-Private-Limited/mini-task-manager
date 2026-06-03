@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
+import { fetchUserPlans, formatBytes, type UserPlanSlug } from "@/services/api/user-plans.api";
 import "../landing.css";
 import { useScrollReveal, useSpotlight, useScrollProgress, useTilt } from "./hooks";
 
@@ -495,68 +497,127 @@ function HowItWorks() {
 /* ═══════════════════════════════════════════════════════════════
    PRICING
    ═══════════════════════════════════════════════════════════════ */
+const LANDING_PLAN_STYLE: Record<
+  UserPlanSlug,
+  {
+    desc: string;
+    gradient: string;
+    border: string;
+    cta: string;
+    popular: boolean;
+    extras: string[];
+  }
+> = {
+  free: {
+    desc: "For getting started with core task management",
+    gradient: "from-slate-500 to-slate-700",
+    border: "border-slate-200 dark:border-slate-700",
+    cta: "Get Started Free",
+    popular: false,
+    extras: ["Kanban boards", "Basic reporting", "Community support"],
+  },
+  silver: {
+    desc: "For teams that need more members and storage",
+    gradient: "from-slate-300 via-slate-200 to-slate-300",
+    border: "border-slate-300 dark:border-slate-600",
+    cta: "Upgrade to Silver",
+    popular: true,
+    extras: ["Upgraded reporting", "Priority email support", "Faster collaboration"],
+  },
+  gold: {
+    desc: "For power users who need more workspaces",
+    gradient: "from-amber-500 via-yellow-400 to-amber-300",
+    border: "border-amber-300 dark:border-amber-600",
+    cta: "Upgrade to Gold",
+    popular: false,
+    extras: ["Advanced analytics", "Gold support", "Priority upgrades"],
+  },
+};
+
+const FALLBACK_LANDING_PLANS = [
+  {
+    name: "Free",
+    slug: "free" as UserPlanSlug,
+    desc: LANDING_PLAN_STYLE.free.desc,
+    price: 0,
+    priceAnnual: 0,
+    gradient: LANDING_PLAN_STYLE.free.gradient,
+    border: LANDING_PLAN_STYLE.free.border,
+    features: ["1 workspace", "5 members / workspace", "500 MB storage", ...LANDING_PLAN_STYLE.free.extras],
+    cta: LANDING_PLAN_STYLE.free.cta,
+    popular: false,
+  },
+  {
+    name: "Silver",
+    slug: "silver" as UserPlanSlug,
+    desc: LANDING_PLAN_STYLE.silver.desc,
+    price: 500,
+    priceAnnual: 510,
+    gradient: LANDING_PLAN_STYLE.silver.gradient,
+    border: LANDING_PLAN_STYLE.silver.border,
+    features: ["1 workspace", "20 members / workspace", "2 GB storage", ...LANDING_PLAN_STYLE.silver.extras],
+    cta: LANDING_PLAN_STYLE.silver.cta,
+    popular: true,
+  },
+  {
+    name: "Gold",
+    slug: "gold" as UserPlanSlug,
+    desc: LANDING_PLAN_STYLE.gold.desc,
+    price: 1000,
+    priceAnnual: 1020,
+    gradient: LANDING_PLAN_STYLE.gold.gradient,
+    border: LANDING_PLAN_STYLE.gold.border,
+    features: ["10 workspaces", "Unlimited members / workspace", "4 GB storage", ...LANDING_PLAN_STYLE.gold.extras],
+    cta: LANDING_PLAN_STYLE.gold.cta,
+    popular: false,
+  },
+];
+
+function landingLimitFeatures(
+  limits: {
+    maxWorkspaces: number | null;
+    maxMembersPerWorkspace: number | null;
+    storageBytes: number;
+  }
+): string[] {
+  const workspaces =
+    limits.maxWorkspaces === null
+      ? "Unlimited workspaces"
+      : `${limits.maxWorkspaces} workspace${limits.maxWorkspaces === 1 ? "" : "s"}`;
+  const members =
+    limits.maxMembersPerWorkspace === null
+      ? "Unlimited members / workspace"
+      : `${limits.maxMembersPerWorkspace} members / workspace`;
+  const storage = `${formatBytes(limits.storageBytes)} storage`;
+  return [workspaces, members, storage];
+}
+
 function PricingSection() {
   const [annual, setAnnual] = useState(false);
+  const { data: apiPlans } = useQuery({
+    queryKey: ["public-user-plans"],
+    queryFn: fetchUserPlans,
+    staleTime: 60_000,
+  });
 
-  const plans = [
-    {
-      name: "Free",
-      slug: "free",
-      desc: "For getting started with core task management",
-      price: 0,
-      priceAnnual: 0,
-      gradient: "from-slate-500 to-slate-700",
-      border: "border-slate-200 dark:border-slate-700",
-      features: [
-        "1 workspace",
-        "5 members / workspace",
-        "500 MB storage",
-        "Kanban boards",
-        "Basic reporting",
-        "Community support",
-      ],
-      cta: "Get Started Free",
-      popular: false,
-    },
-    {
-      name: "Silver",
-      slug: "silver",
-      desc: "For teams that need more members and storage",
-      price: 500,
-      priceAnnual: 510, // placeholder (annual toggle is cosmetic on landing)
-      gradient: "from-slate-300 via-slate-200 to-slate-300",
-      border: "border-slate-300 dark:border-slate-600",
-      features: [
-        "1 workspace",
-        "20 members / workspace",
-        "2 GB storage",
-        "Upgraded reporting",
-        "Priority email support",
-        "Faster collaboration",
-      ],
-      cta: "Upgrade to Silver",
-      popular: true,
-    },
-    {
-      name: "Gold",
-      slug: "gold",
-      desc: "For power users who need more workspaces",
-      price: 1000,
-      priceAnnual: 1020, // placeholder (annual toggle is cosmetic on landing)
-      gradient: "from-amber-500 via-yellow-400 to-amber-300",
-      border: "border-amber-300 dark:border-amber-600",
-      features: [
-        "10 workspaces",
-        "Unlimited members / workspace",
-        "4 GB storage",
-        "Advanced analytics",
-        "Gold support",
-        "Priority upgrades",
-      ],
-      cta: "Upgrade to Gold",
-      popular: false,
-    },
-  ];
+  const plans = useMemo(() => {
+    if (!apiPlans?.length) return FALLBACK_LANDING_PLANS;
+    return apiPlans.map((p) => {
+      const style = LANDING_PLAN_STYLE[p.slug];
+      return {
+        name: p.name,
+        slug: p.slug,
+        desc: style.desc,
+        price: p.price,
+        priceAnnual: p.price === 0 ? 0 : Math.round(p.price * 0.85),
+        gradient: style.gradient,
+        border: style.border,
+        features: [...landingLimitFeatures(p.limits), ...style.extras],
+        cta: style.cta,
+        popular: style.popular,
+      };
+    });
+  }, [apiPlans]);
 
   return (
     <section id="pricing" className="relative py-32 overflow-hidden">

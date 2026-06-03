@@ -89,3 +89,16 @@ export function formatStorageBytes(bytes: number): string {
   if (bytes >= MB) return `${Math.round(bytes / MB)} MB`;
   return `${bytes} B`;
 }
+
+export function buildPlanBenefitsFromLimits(limits: PlanLimits): string[] {
+  const workspaceLine =
+    limits.maxWorkspaces === null
+      ? 'Unlimited workspaces'
+      : `${limits.maxWorkspaces} workspace${limits.maxWorkspaces === 1 ? '' : 's'}`;
+  const memberLine =
+    limits.maxMembersPerWorkspace === null
+      ? 'Unlimited members per workspace'
+      : `${limits.maxMembersPerWorkspace} members per workspace`;
+  const storageLine = `${formatStorageBytes(limits.storageBytes)} storage`;
+  return [workspaceLine, memberLine, storageLine];
+}

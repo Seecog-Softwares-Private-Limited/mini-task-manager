@@ -42,8 +42,33 @@ export async function deleteSuperAdminUser(id: string) {
   return data;
 }
 
+export interface UserPlanConfiguration {
+  planName: "free" | "silver" | "gold";
+  maxUsers: number | null;
+  maxStorage: number;
+  maxWorkspaces: number | null;
+}
+
 export async function fetchSuperAdminPlans() {
   const { data } = await apiClient.get("/super-admin/plans");
+  return data as {
+    billingPlans: Record<string, unknown>[];
+    userPlanConfigs: UserPlanConfiguration[];
+  };
+}
+
+export async function updateSuperAdminPlanConfiguration(
+  planName: "free" | "silver" | "gold",
+  payload: {
+    maxUsers?: number | null;
+    maxStorage?: number;
+    maxWorkspaces?: number | null;
+  }
+) {
+  const { data } = await apiClient.put<UserPlanConfiguration>(
+    `/super-admin/plan-configurations/${planName}`,
+    payload
+  );
   return data;
 }
 
