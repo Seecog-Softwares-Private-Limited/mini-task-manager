@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import {
   PLANS,
   PLAN_ORDER,
+  buildPlanBenefitsFromLimits,
   getPlanDefinition,
   normalizePlanSlug,
   type UserPlanSlug,
@@ -39,18 +40,23 @@ export class PlansService {
         maxUsers: def.limits.maxMembersPerWorkspace,
         maxStorage: def.limits.storageBytes,
       };
+      const resolvedLimits = {
+        maxWorkspaces: limits.maxWorkspaces,
+        maxMembersPerWorkspace: limits.maxUsers,
+        storageBytes: limits.maxStorage,
+      };
       return {
         slug: def.slug,
         name: def.name,
         price: def.pricing.priceMonthlyInr,
         currency: def.pricing.currency,
         priceLabel: def.pricing.label,
-        limits: {
-          maxWorkspaces: limits.maxWorkspaces,
-          maxMembersPerWorkspace: limits.maxUsers,
-          storageBytes: limits.maxStorage,
-        },
-        benefits: def.benefits,
+        limits: resolvedLimits,
+        benefits: buildPlanBenefitsFromLimits({
+          maxWorkspaces: resolvedLimits.maxWorkspaces,
+          maxMembersPerWorkspace: resolvedLimits.maxMembersPerWorkspace,
+          storageBytes: resolvedLimits.storageBytes,
+        }),
       };
     });
   }
