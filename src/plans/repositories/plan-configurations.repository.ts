@@ -21,7 +21,10 @@ export class PlanConfigurationsRepository {
 
   async upsert(
     planName: UserPlanSlug,
-    data: Pick<PlanConfigurationEntity, 'maxUsers' | 'maxStorage' | 'maxWorkspaces'>,
+    data: Pick<
+      PlanConfigurationEntity,
+      'maxUsers' | 'maxStorage' | 'maxWorkspaces' | 'allowCoupon'
+    >,
   ): Promise<PlanConfigurationEntity> {
     const existing = await this.findByPlanName(planName);
     if (existing) {

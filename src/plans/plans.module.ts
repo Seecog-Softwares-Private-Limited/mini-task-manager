@@ -15,6 +15,10 @@ import { PlanConfigurationEntity } from './entities/plan-configuration.entity';
 import { PlanConfigurationsRepository } from './repositories/plan-configurations.repository';
 import { PlanConfigurationsService } from './plan-configurations.service';
 import { PlanConfigurationsController } from './plan-configurations.controller';
+import { CouponCodeEntity } from './entities/coupon-code.entity';
+import { CouponRedemptionEntity } from './entities/coupon-redemption.entity';
+import { CouponCodesRepository } from './repositories/coupon-codes.repository';
+import { CouponCodesService } from './coupon-codes.service';
 
 @Module({
   imports: [
@@ -24,6 +28,8 @@ import { PlanConfigurationsController } from './plan-configurations.controller';
       OrganizationMemberEntity,
       OrganizationInvitationEntity,
       PlanConfigurationEntity,
+      CouponCodeEntity,
+      CouponRedemptionEntity,
     ]),
   ],
   controllers: [PlansController, PlanConfigurationsController],
@@ -32,11 +38,19 @@ import { PlanConfigurationsController } from './plan-configurations.controller';
     OrganizationMembersRepository,
     PlanConfigurationsRepository,
     PlanConfigurationsService,
+    CouponCodesRepository,
+    CouponCodesService,
     PlanLimitService,
     PlansService,
     PaymentService,
     PlanExpiryCronService,
   ],
-  exports: [PlanLimitService, PlansService, PaymentService, PlanConfigurationsService],
+  exports: [
+    PlanLimitService,
+    PlansService,
+    PaymentService,
+    PlanConfigurationsService,
+    CouponCodesService,
+  ],
 })
 export class PlansModule {}

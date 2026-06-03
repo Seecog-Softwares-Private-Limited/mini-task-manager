@@ -18,6 +18,7 @@ export interface PlanConfigurationView {
   maxUsers: number | null;
   maxStorage: number;
   maxWorkspaces: number | null;
+  allowCoupon: boolean;
 }
 
 type CacheEntry = {
@@ -34,6 +35,10 @@ export class PlanConfigurationsService {
     private readonly planConfigurationsRepository: PlanConfigurationsRepository,
   ) {}
 
+  private static defaultAllowCoupon(slug: UserPlanSlug): boolean {
+    return slug === 'silver' || slug === 'gold';
+  }
+
   private static fromDefault(slug: UserPlanSlug): PlanConfigurationView {
     const limits = PLANS[slug].limits;
     return {
@@ -41,6 +46,7 @@ export class PlanConfigurationsService {
       maxUsers: limits.maxMembersPerWorkspace,
       maxStorage: limits.storageBytes,
       maxWorkspaces: limits.maxWorkspaces,
+      allowCoupon: PlanConfigurationsService.defaultAllowCoupon(slug),
     };
   }
 
@@ -63,6 +69,8 @@ export class PlanConfigurationsService {
         maxUsers: row.maxUsers,
         maxStorage: Number(row.maxStorage),
         maxWorkspaces: row.maxWorkspaces,
+        allowCoupon:
+          row.allowCoupon ?? PlanConfigurationsService.defaultAllowCoupon(key),
       };
     }
 
@@ -135,6 +143,12 @@ export class PlanConfigurationsService {
       dto.maxStorage === undefined ? current.maxStorage : dto.maxStorage;
     const nextWorkspaces =
       dto.maxWorkspaces === undefined ? current.maxWorkspaces : dto.maxWorkspaces;
+    const nextAllowCoupon =
+      dto.allowCoupon === undefined ? current.allowCoupon : dto.allowCoupon;
+
+    if (planName === 'free' && nextAllowCoupon) {
+      throw new BadRequestException('Coupon codes cannot be enabled on the Free plan');
+    }
 
     if (nextStorage <= 0) {
       throw new BadRequestException('maxStorage must be a positive number');
@@ -150,6 +164,7 @@ export class PlanConfigurationsService {
       maxUsers: nextMaxMembers,
       maxStorage: String(nextStorage),
       maxWorkspaces: nextWorkspaces,
+      allowCoupon: nextAllowCoupon,
     });
     this.invalidateCache();
 
@@ -158,6 +173,7 @@ export class PlanConfigurationsService {
       maxUsers: saved.maxUsers,
       maxStorage: Number(saved.maxStorage),
       maxWorkspaces: saved.maxWorkspaces,
+      allowCoupon: saved.allowCoupon ?? PlanConfigurationsService.defaultAllowCoupon(planName),
     };
   }
 }

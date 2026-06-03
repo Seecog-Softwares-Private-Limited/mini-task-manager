@@ -14,6 +14,18 @@ export interface PlanListItem {
     storageBytes: number;
   };
   benefits: string[];
+  allowCoupon?: boolean;
+}
+
+export interface CouponValidationResult {
+  valid: boolean;
+  code: string;
+  plan: UserPlanSlug;
+  discountPercent: number;
+  originalAmountInr: number;
+  finalAmountInr: number;
+  savingsInr: number;
+  message?: string;
 }
 
 export interface PlanUsageBucket {
@@ -76,11 +88,30 @@ export async function fetchUserPlanUsage(): Promise<CurrentPlanResponse> {
   return data;
 }
 
+export async function validatePlanCoupon(
+  code: string,
+  plan: UserPlanSlug
+): Promise<CouponValidationResult> {
+  const { data } = await apiClient.post<CouponValidationResult>("/plans/validate-coupon", {
+    code,
+    plan,
+  });
+  return data;
+}
+
 export async function upgradeUserPlan(
   plan: UserPlanSlug,
-  paymentId?: string
-): Promise<{ requiresPayment?: boolean; payment?: { paymentId: string; gatewayUrl: string }; plan?: UserPlanSlug }> {
-  const { data } = await apiClient.post("/plans/upgrade", { plan, paymentId });
+  paymentId?: string,
+  couponCode?: string
+): Promise<{
+  requiresPayment?: boolean;
+  payment?: { paymentId: string; gatewayUrl: string; amountInr?: number };
+  plan?: UserPlanSlug;
+  originalAmountInr?: number;
+  finalAmountInr?: number;
+  couponApplied?: boolean;
+}> {
+  const { data } = await apiClient.post("/plans/upgrade", { plan, paymentId, couponCode });
   return data;
 }
 

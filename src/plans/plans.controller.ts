@@ -3,6 +3,7 @@ import { JwtAuthGuard } from '../modules/auth/guards/jwt-auth.guard';
 import { Public } from '../common/decorators/public.decorator';
 import { PlansService } from './plans.service';
 import { UpgradePlanDto } from './dto/upgrade-plan.dto';
+import { ValidateCouponDto } from './dto/validate-coupon.dto';
 
 @Controller('plans')
 @UseGuards(JwtAuthGuard)
@@ -26,8 +27,18 @@ export class PlansController {
     return this.plansService.getUsage(req.user.sub, orgId);
   }
 
+  @Post('validate-coupon')
+  validateCoupon(@Req() req: { user: { sub: string } }, @Body() dto: ValidateCouponDto) {
+    return this.plansService.validateCoupon(req.user.sub, dto.code, dto.plan);
+  }
+
   @Post('upgrade')
   upgrade(@Req() req: { user: { sub: string } }, @Body() dto: UpgradePlanDto) {
-    return this.plansService.upgrade(req.user.sub, dto.plan, dto.paymentId);
+    return this.plansService.upgrade(
+      req.user.sub,
+      dto.plan,
+      dto.paymentId,
+      dto.couponCode,
+    );
   }
 }

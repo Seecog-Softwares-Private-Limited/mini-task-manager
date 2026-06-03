@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { PlanUsageWidget } from "@/components/PlanUsageWidget";
 import { PlanBadge } from "@/components/PlanBadge";
@@ -12,10 +14,12 @@ import {
   fetchCurrentUserPlan,
   fetchUserPlans,
   formatBytes,
+  validatePlanCoupon,
+  type CouponValidationResult,
   type UserPlanSlug,
   upgradeUserPlan,
 } from "@/services/api/user-plans.api";
-import { Check, Crown, HardDrive, Users, Building2, Sparkles } from "lucide-react";
+import { Check, Crown, HardDrive, Users, Building2, Sparkles, Ticket } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type PlanAccent = {
@@ -91,6 +95,11 @@ export default function UserPlansPage() {
 
   const currentPlan: UserPlanSlug | null | undefined = current?.plan;
   const [upgrading, setUpgrading] = useState<UserPlanSlug | null>(null);
+  const [couponInputs, setCouponInputs] = useState<Partial<Record<UserPlanSlug, string>>>({});
+  const [appliedCoupons, setAppliedCoupons] = useState<
+    Partial<Record<UserPlanSlug, CouponValidationResult | null>>
+  >({});
+  const [validatingCoupon, setValidatingCoupon] = useState<UserPlanSlug | null>(null);
 
   const paymentId = searchParams.get("payment") ?? undefined;
   const paymentPlanParam = searchParams.get("plan") ?? undefined;
@@ -111,7 +120,16 @@ export default function UserPlansPage() {
     (async () => {
       setUpgrading(paymentPlan);
       try {
-        const verified = await upgradeUserPlan(paymentPlan, paymentId);
+        const storedCoupon =
+          typeof window !== "undefined"
+            ? sessionStorage.getItem(`pending_coupon_${paymentPlan}`)
+            : null;
+        const verified = await upgradeUserPlan(
+          paymentPlan,
+          paymentId,
+          storedCoupon ?? undefined
+        );
+        if (storedCoupon) sessionStorage.removeItem(`pending_coupon_${paymentPlan}`);
         if (cancelled) return;
         if (verified.plan) {
           toast({
@@ -151,12 +169,50 @@ export default function UserPlansPage() {
     return `Upgrade to ${target.charAt(0).toUpperCase() + target.slice(1)}`;
   };
 
+  const applyCoupon = async (target: UserPlanSlug) => {
+    const code = couponInputs[target]?.trim();
+    if (!code) {
+      toast({ title: "Enter a coupon code", variant: "error" });
+      return;
+    }
+    setValidatingCoupon(target);
+    try {
+      const result = await validatePlanCoupon(code, target);
+      setAppliedCoupons((prev) => ({ ...prev, [target]: result }));
+      if (result.valid) {
+        toast({
+          title: "Coupon applied",
+          description: `${result.discountPercent}% off — pay ₹${result.finalAmountInr} instead of ₹${result.originalAmountInr}`,
+          variant: "success",
+        });
+      } else {
+        toast({
+          title: "Invalid coupon",
+          description: result.message ?? "This code cannot be used for this plan",
+          variant: "error",
+        });
+      }
+    } catch (e) {
+      toast({
+        title: "Could not validate coupon",
+        description: e instanceof Error ? e.message : "Try again",
+        variant: "error",
+      });
+    } finally {
+      setValidatingCoupon(null);
+    }
+  };
+
   const onUpgrade = async (target: UserPlanSlug) => {
     setUpgrading(target);
+    const applied = appliedCoupons[target];
+    const couponCode = applied?.valid ? applied.code : undefined;
     try {
-      const init = await upgradeUserPlan(target);
+      const init = await upgradeUserPlan(target, undefined, couponCode);
       if (init.requiresPayment && init.payment?.gatewayUrl) {
-        // Redirect to the placeholder gatewayUrl (backend returns a callback URL).
+        if (couponCode) {
+          sessionStorage.setItem(`pending_coupon_${target}`, couponCode);
+        }
         window.location.href = init.payment.gatewayUrl;
         return;
       }
@@ -204,6 +260,10 @@ export default function UserPlansPage() {
                   ) : null;
                 const canUpgrade = canUpgradeTo(currentPlan, plan.slug as UserPlanSlug);
                 const isUpgrading = upgrading === plan.slug;
+                const slug = plan.slug as UserPlanSlug;
+                const applied = appliedCoupons[slug];
+                const showCoupon =
+                  plan.allowCoupon && slug !== "free" && canUpgrade;
 
                 return (
                   <Card
@@ -240,6 +300,21 @@ export default function UserPlansPage() {
                             <span className="text-4xl font-extrabold">₹0</span>
                             <span className="text-muted-foreground">/forever</span>
                           </div>
+                        ) : applied?.valid ? (
+                          <div>
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-4xl font-extrabold text-emerald-600">
+                                ₹{applied.finalAmountInr}
+                              </span>
+                              <span className="text-lg text-muted-foreground line-through">
+                                ₹{applied.originalAmountInr}
+                              </span>
+                              <span className="text-muted-foreground">/mo</span>
+                            </div>
+                            <p className="mt-1 text-xs font-medium text-emerald-600">
+                              {applied.discountPercent}% off with {applied.code}
+                            </p>
+                          </div>
                         ) : (
                           <div className="flex items-baseline gap-1">
                             <span className="text-4xl font-extrabold">₹{plan.price}</span>
@@ -247,6 +322,37 @@ export default function UserPlansPage() {
                           </div>
                         )}
                       </div>
+
+                      {showCoupon && (
+                        <div className="space-y-2 rounded-xl border border-dashed border-primary/30 bg-primary/5 p-3">
+                          <Label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            <Ticket className="h-3.5 w-3.5" />
+                            Coupon code
+                          </Label>
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Enter code"
+                              value={couponInputs[slug] ?? ""}
+                              onChange={(e) =>
+                                setCouponInputs((prev) => ({
+                                  ...prev,
+                                  [slug]: e.target.value.toUpperCase(),
+                                }))
+                              }
+                              className="h-9 text-sm"
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="secondary"
+                              disabled={validatingCoupon === slug}
+                              onClick={() => void applyCoupon(slug)}
+                            >
+                              {validatingCoupon === slug ? "…" : "Apply"}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
 
                       <div className="space-y-2 rounded-xl border bg-muted/30 p-3">
                         <div className="flex items-center justify-between text-sm">

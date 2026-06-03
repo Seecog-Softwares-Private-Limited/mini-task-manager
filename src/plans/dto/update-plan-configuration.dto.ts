@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, Min, ValidateIf } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, Min, ValidateIf } from 'class-validator';
 
 export class UpdatePlanConfigurationDto {
   @IsOptional()
@@ -17,5 +17,9 @@ export class UpdatePlanConfigurationDto {
   @IsInt()
   @Min(1)
   maxWorkspaces?: number | null;
+
+  @IsOptional()
+  @IsBoolean()
+  allowCoupon?: boolean;
 }
 

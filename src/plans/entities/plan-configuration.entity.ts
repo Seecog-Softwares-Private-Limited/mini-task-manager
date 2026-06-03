@@ -19,5 +19,8 @@ export class PlanConfigurationEntity extends BaseEntity {
 
   @Column({ name: 'max_workspaces', type: 'int', unsigned: true, nullable: true })
   maxWorkspaces!: number | null;
+
+  @Column({ name: 'allow_coupon', type: 'boolean', default: false })
+  allowCoupon!: boolean;
 }
 

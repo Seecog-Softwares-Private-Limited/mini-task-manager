@@ -26,7 +26,9 @@ import {
   SuperAdminUserQueryDto,
 } from './dto/super-admin.dto';
 import { UpdatePlanConfigurationDto } from '../../plans/dto/update-plan-configuration.dto';
+import { CreateCouponDto } from '../../plans/dto/create-coupon.dto';
 import { PlanConfigurationsService } from '../../plans/plan-configurations.service';
+import { CouponCodesService } from '../../plans/coupon-codes.service';
 import { normalizePlanSlug } from '../../config/plans.config';
 
 @Controller('super-admin')
@@ -35,6 +37,7 @@ export class SuperAdminController {
   constructor(
     private readonly superAdminService: SuperAdminService,
     private readonly planConfigurationsService: PlanConfigurationsService,
+    private readonly couponCodesService: CouponCodesService,
   ) {}
 
   @Get('dashboard')
@@ -103,6 +106,29 @@ export class SuperAdminController {
     @Body() dto: UpdatePlanConfigurationDto,
   ) {
     return this.planConfigurationsService.updatePlan(normalizePlanSlug(planName), dto);
+  }
+
+  @Get('coupon-codes')
+  listCouponCodes() {
+    return this.couponCodesService.listAll();
+  }
+
+  @Post('coupon-codes')
+  createCouponCode(
+    @Req() req: { user: { userId: string } },
+    @Body() dto: CreateCouponDto,
+  ) {
+    return this.couponCodesService.create(dto, req.user.userId);
+  }
+
+  @Patch('coupon-codes/:id/active')
+  setCouponActive(@Param('id') id: string, @Body() dto: { isActive: boolean }) {
+    return this.couponCodesService.setActive(id, dto.isActive);
+  }
+
+  @Delete('coupon-codes/:id')
+  deactivateCouponCode(@Param('id') id: string) {
+    return this.couponCodesService.delete(id);
   }
 
   @Get('subscriptions')
