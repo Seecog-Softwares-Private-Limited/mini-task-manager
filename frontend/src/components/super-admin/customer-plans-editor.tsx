@@ -54,6 +54,7 @@ type PlanFormState = {
   maxWorkspaces: string;
   unlimitedWorkspaces: boolean;
   maxStorageGb: string;
+  allowCoupon: boolean;
 };
 
 function bytesToGb(bytes: number): string {
@@ -61,13 +62,17 @@ function bytesToGb(bytes: number): string {
   return Number.isInteger(gb) ? String(gb) : gb.toFixed(2);
 }
 
-function configToForm(config: UserPlanConfiguration): PlanFormState {
+function configToFormFromConfig(
+  config: UserPlanConfiguration,
+  planName: UserPlanSlug
+): PlanFormState {
   return {
     maxUsers: config.maxUsers === null ? "" : String(config.maxUsers),
     unlimitedUsers: config.maxUsers === null,
     maxWorkspaces: config.maxWorkspaces === null ? "" : String(config.maxWorkspaces),
     unlimitedWorkspaces: config.maxWorkspaces === null,
     maxStorageGb: bytesToGb(config.maxStorage),
+    allowCoupon: config.allowCoupon ?? (planName === "silver" || planName === "gold"),
   };
 }
 
@@ -81,11 +86,11 @@ function PlanEditorCard({
   const meta = PLAN_META[planName];
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [form, setForm] = useState<PlanFormState>(() => configToForm(config));
+  const [form, setForm] = useState<PlanFormState>(() => configToFormFromConfig(config, planName));
 
   useEffect(() => {
-    setForm(configToForm(config));
-  }, [config]);
+    setForm(configToFormFromConfig(config, planName));
+  }, [config, planName]);
 
   const preview = useMemo(() => {
     const members = form.unlimitedUsers
@@ -118,6 +123,7 @@ function PlanEditorCard({
         maxUsers,
         maxWorkspaces,
         maxStorage: Math.round(storageGb * 1024 ** 3),
+        allowCoupon: planName === "free" ? false : form.allowCoupon,
       });
     },
     onSuccess: () => {
@@ -234,6 +240,23 @@ function PlanEditorCard({
             className="max-w-[140px]"
           />
         </div>
+
+        {planName !== "free" && (
+          <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2.5">
+            <div>
+              <p className="text-sm font-medium">Allow coupon codes</p>
+              <p className="text-xs text-muted-foreground">
+                Customers can apply discount codes when upgrading to {meta.name}
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              checked={form.allowCoupon}
+              onChange={(e) => setForm((f) => ({ ...f, allowCoupon: e.target.checked }))}
+              className="h-4 w-4 rounded border-input"
+            />
+          </div>
+        )}
 
         <div className="rounded-lg border bg-muted/40 p-3">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">

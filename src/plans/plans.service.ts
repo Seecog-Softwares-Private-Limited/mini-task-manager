@@ -17,6 +17,7 @@ import { UserEntity } from '../modules/users/entities/user.entity';
 import { PlanLimitService } from './plan-limit.service';
 import { PaymentService } from './payment.service';
 import { PlanConfigurationsService } from './plan-configurations.service';
+import { CouponCodesService } from './coupon-codes.service';
 
 @Injectable()
 export class PlansService {
@@ -28,6 +29,7 @@ export class PlansService {
     private readonly planLimitService: PlanLimitService,
     private readonly planConfigurationsService: PlanConfigurationsService,
     private readonly paymentService: PaymentService,
+    private readonly couponCodesService: CouponCodesService,
   ) {}
 
   async listPlans() {
@@ -39,6 +41,7 @@ export class PlansService {
         maxWorkspaces: def.limits.maxWorkspaces,
         maxUsers: def.limits.maxMembersPerWorkspace,
         maxStorage: def.limits.storageBytes,
+        allowCoupon: slug === 'silver' || slug === 'gold',
       };
       const resolvedLimits = {
         maxWorkspaces: limits.maxWorkspaces,
@@ -57,8 +60,13 @@ export class PlansService {
           maxMembersPerWorkspace: resolvedLimits.maxMembersPerWorkspace,
           storageBytes: resolvedLimits.storageBytes,
         }),
+        allowCoupon: limits.allowCoupon ?? false,
       };
     });
+  }
+
+  async validateCoupon(userId: string, code: string, plan: UserPlanSlug) {
+    return this.couponCodesService.validateForPlan(code, plan, userId);
   }
 
   async getCurrent(userId: string) {
@@ -74,7 +82,12 @@ export class PlansService {
     return current;
   }
 
-  async upgrade(userId: string, targetPlan: UserPlanSlug, paymentId?: string) {
+  async upgrade(
+    userId: string,
+    targetPlan: UserPlanSlug,
+    paymentId?: string,
+    couponCode?: string,
+  ) {
     if (targetPlan === 'free') {
       throw new BadRequestException('Use downgrade endpoint to return to Free');
     }
@@ -90,13 +103,30 @@ export class PlansService {
     }
 
     const def = getPlanDefinition(targetPlan);
-    const amount = def.pricing.priceMonthlyInr;
+    const originalAmount = def.pricing.priceMonthlyInr;
+    let amount = originalAmount;
+    const normalizedCoupon = couponCode?.trim();
+
+    if (normalizedCoupon) {
+      const validation = await this.couponCodesService.validateForPlan(
+        normalizedCoupon,
+        targetPlan,
+        userId,
+      );
+      if (!validation.valid) {
+        throw new BadRequestException(validation.message ?? 'Invalid coupon code');
+      }
+      amount = validation.finalAmountInr;
+    }
 
     if (!paymentId) {
       const init = this.paymentService.initiatePayment(userId, targetPlan, amount);
       return {
         requiresPayment: true,
         payment: init,
+        originalAmountInr: originalAmount,
+        finalAmountInr: amount,
+        couponApplied: !!normalizedCoupon,
         message: 'Complete payment then call upgrade again with paymentId',
       };
     }
@@ -104,6 +134,16 @@ export class PlansService {
     const verified = this.paymentService.verifyPayment(paymentId);
     if (!verified) {
       throw new BadRequestException('Payment verification failed — plan was not activated');
+    }
+
+    if (normalizedCoupon) {
+      await this.couponCodesService.redeem(
+        normalizedCoupon,
+        targetPlan,
+        userId,
+        originalAmount,
+        amount,
+      );
     }
 
     await this.activatePlan(userId, targetPlan);

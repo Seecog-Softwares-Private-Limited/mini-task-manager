@@ -47,6 +47,19 @@ export interface UserPlanConfiguration {
   maxUsers: number | null;
   maxStorage: number;
   maxWorkspaces: number | null;
+  allowCoupon?: boolean;
+}
+
+export interface CouponCodeItem {
+  id: string;
+  code: string;
+  discountPercent: number;
+  applicablePlans: ("silver" | "gold")[];
+  isActive: boolean;
+  maxRedemptions: number | null;
+  redemptionCount: number;
+  expiresAt: string | null;
+  createdAt: string;
 }
 
 export async function fetchSuperAdminPlans() {
@@ -57,12 +70,41 @@ export async function fetchSuperAdminPlans() {
   };
 }
 
+export async function fetchSuperAdminCouponCodes() {
+  const { data } = await apiClient.get<CouponCodeItem[]>("/super-admin/coupon-codes");
+  return data;
+}
+
+export async function createSuperAdminCouponCode(payload: {
+  discountPercent: number;
+  applicablePlans: ("silver" | "gold")[];
+  code?: string;
+  maxRedemptions?: number;
+  expiresAt?: string;
+}) {
+  const { data } = await apiClient.post<CouponCodeItem>("/super-admin/coupon-codes", payload);
+  return data;
+}
+
+export async function setSuperAdminCouponActive(id: string, isActive: boolean) {
+  const { data } = await apiClient.patch<CouponCodeItem>(`/super-admin/coupon-codes/${id}/active`, {
+    isActive,
+  });
+  return data;
+}
+
+export async function deactivateSuperAdminCouponCode(id: string) {
+  const { data } = await apiClient.delete(`/super-admin/coupon-codes/${id}`);
+  return data;
+}
+
 export async function updateSuperAdminPlanConfiguration(
   planName: "free" | "silver" | "gold",
   payload: {
     maxUsers?: number | null;
     maxStorage?: number;
     maxWorkspaces?: number | null;
+    allowCoupon?: boolean;
   }
 ) {
   const { data } = await apiClient.put<UserPlanConfiguration>(

@@ -17,6 +17,7 @@ import {
   ScrollText,
   Settings,
   Shield,
+  Ticket,
   Users,
 } from "lucide-react";
 import { logout } from "@/services/api/auth.api";
@@ -31,6 +32,7 @@ const NAV = [
   { href: "/super-admin/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/super-admin/audit-logs", label: "Audit Logs", icon: ScrollText },
   { href: "/super-admin/notifications", label: "Notifications", icon: Bell },
+  { href: "/super-admin/coupon-codes", label: "Coupon Code", icon: Ticket },
   { href: "/super-admin/settings", label: "Settings", icon: Settings },
 ];
 

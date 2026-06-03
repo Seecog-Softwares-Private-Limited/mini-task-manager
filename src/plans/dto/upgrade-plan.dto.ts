@@ -8,4 +8,8 @@ export class UpgradePlanDto {
   @IsOptional()
   @IsString()
   paymentId?: string;
+
+  @IsOptional()
+  @IsString()
+  couponCode?: string;
 }
