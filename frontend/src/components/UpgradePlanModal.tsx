@@ -12,13 +12,10 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { PlanBadge } from "@/components/PlanBadge";
-import { useToast } from "@/components/ui/use-toast";
 import {
   type LimitExceededErrorBody,
   type UserPlanSlug,
-  upgradeUserPlan,
 } from "@/services/api/user-plans.api";
-import { useQueryClient } from "@tanstack/react-query";
 import { Check, Crown, X, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -70,41 +67,11 @@ export function UpgradePlanModal({
   detail,
   onClose,
 }: UpgradePlanModalProps) {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
   const [upgrading, setUpgrading] = useState<UserPlanSlug | null>(null);
 
-  const handleUpgrade = async (plan: UserPlanSlug) => {
-    setUpgrading(plan);
-    try {
-      const init = await upgradeUserPlan(plan);
-      if (init.requiresPayment && init.payment?.paymentId) {
-        const verified = await upgradeUserPlan(plan, init.payment.paymentId);
-        if (verified.plan) {
-          toast({
-            title: "Plan upgraded",
-            description: `You are now on the ${plan.charAt(0).toUpperCase() + plan.slice(1)} plan.`,
-            variant: "success",
-          });
-          queryClient.invalidateQueries({ queryKey: ["user-plans"] });
-          onClose();
-          return;
-        }
-      }
-      if (!init.requiresPayment) {
-        toast({ title: "Plan upgraded", variant: "success" });
-        queryClient.invalidateQueries({ queryKey: ["user-plans"] });
-        onClose();
-      }
-    } catch (err) {
-      toast({
-        title: "Upgrade failed",
-        description: err instanceof Error ? err.message : "Could not upgrade plan",
-        variant: "error",
-      });
-    } finally {
-      setUpgrading(null);
-    }
+  const handleUpgrade = (plan: UserPlanSlug) => {
+    onClose();
+    window.location.href = `/dashboard/plans`;
   };
 
   if (!detail) return null;

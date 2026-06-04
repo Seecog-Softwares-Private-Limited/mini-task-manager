@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,16 +10,27 @@ import { useToast } from "@/components/ui/use-toast";
 import { PlanUsageWidget } from "@/components/PlanUsageWidget";
 import { PlanBadge } from "@/components/PlanBadge";
 import {
+  createUserPlanOrder,
   fetchCurrentUserPlan,
   fetchUserPlans,
   formatBytes,
   validatePlanCoupon,
+  verifyUserPlanPayment,
   type CouponValidationResult,
   type UserPlanSlug,
-  upgradeUserPlan,
 } from "@/services/api/user-plans.api";
+import { parseApiError } from "@/services/api/client";
 import { Check, Crown, HardDrive, Users, Building2, Sparkles, Ticket } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+declare global {
+  interface Window {
+    Razorpay: new (options: Record<string, unknown>) => {
+      open: () => void;
+      on: (event: string, handler: (response: unknown) => void) => void;
+    };
+  }
+}
 
 type PlanAccent = {
   gradient: string;
@@ -76,10 +86,9 @@ function planIcon(plan: UserPlanSlug) {
 }
 
 export default function UserPlansPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [checkoutOverlay, setCheckoutOverlay] = useState(false);
 
   const { data: plans, isLoading: plansLoading } = useQuery({
     queryKey: ["user-plans", "list"],
@@ -101,68 +110,30 @@ export default function UserPlansPage() {
   >({});
   const [validatingCoupon, setValidatingCoupon] = useState<UserPlanSlug | null>(null);
 
-  const paymentId = searchParams.get("payment") ?? undefined;
-  const paymentPlanParam = searchParams.get("plan") ?? undefined;
-  const paymentPlan = useMemo<UserPlanSlug | null>(() => {
-    if (!paymentPlanParam) return null;
-    if (paymentPlanParam === "free" || paymentPlanParam === "silver" || paymentPlanParam === "gold") {
-      return paymentPlanParam;
-    }
-    return null;
-  }, [paymentPlanParam]);
-
-  // Handles the placeholder gatewayUrl returned by backend:
-  //   /dashboard/plans?payment=<paymentId>&plan=<plan>
-  useEffect(() => {
-    if (!paymentId || !paymentPlan) return;
-    let cancelled = false;
-
-    (async () => {
-      setUpgrading(paymentPlan);
-      try {
-        const storedCoupon =
-          typeof window !== "undefined"
-            ? sessionStorage.getItem(`pending_coupon_${paymentPlan}`)
-            : null;
-        const verified = await upgradeUserPlan(
-          paymentPlan,
-          paymentId,
-          storedCoupon ?? undefined
-        );
-        if (storedCoupon) sessionStorage.removeItem(`pending_coupon_${paymentPlan}`);
-        if (cancelled) return;
-        if (verified.plan) {
-          toast({
-            title: "Plan upgraded",
-            description: `You are now on the ${verified.plan.charAt(0).toUpperCase() + verified.plan.slice(1)} plan.`,
-            variant: "success",
-          });
-          await queryClient.invalidateQueries({ queryKey: ["user-plans"] });
-        } else {
-          toast({
-            title: "Payment not verified",
-            description: "Your payment could not be verified. Please try upgrading again.",
-            variant: "error",
-          });
+  const ensureRazorpayLoaded = useCallback(() => {
+    if (typeof window === "undefined") return Promise.resolve(false);
+    if (window.Razorpay) return Promise.resolve(true);
+    const existing = document.getElementById("razorpay-script") as HTMLScriptElement | null;
+    if (existing) {
+      return new Promise<boolean>((resolve) => {
+        if (window.Razorpay) {
+          resolve(true);
+          return;
         }
-      } catch (e) {
-        if (cancelled) return;
-        toast({
-          title: "Upgrade failed",
-          description: e instanceof Error ? e.message : "Could not verify payment",
-          variant: "error",
-        });
-      } finally {
-        if (cancelled) return;
-        setUpgrading(null);
-        router.replace("/dashboard/plans");
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [paymentId, paymentPlan, queryClient, router, toast]);
+        existing.addEventListener("load", () => resolve(true));
+        existing.addEventListener("error", () => resolve(false));
+      });
+    }
+    const script = document.createElement("script");
+    script.id = "razorpay-script";
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    return new Promise<boolean>((resolve) => {
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  }, []);
 
   const upgradeButtonText = (target: UserPlanSlug) => {
     if (currentPlan === target) return "Current plan";
@@ -208,34 +179,108 @@ export default function UserPlansPage() {
     const applied = appliedCoupons[target];
     const couponCode = applied?.valid ? applied.code : undefined;
     try {
-      const init = await upgradeUserPlan(target, undefined, couponCode);
-      if (init.requiresPayment && init.payment?.gatewayUrl) {
-        if (couponCode) {
-          sessionStorage.setItem(`pending_coupon_${target}`, couponCode);
-        }
-        window.location.href = init.payment.gatewayUrl;
+      const orderResponse = await createUserPlanOrder(target, couponCode);
+
+      if (!orderResponse.requiresPayment) {
+        toast({
+          title: "Plan upgraded",
+          variant: "success",
+          description: `You are now on the ${orderResponse.plan ?? target} plan.`,
+        });
+        await queryClient.invalidateQueries({ queryKey: ["user-plans"] });
         return;
       }
-      toast({
-        title: "Plan upgraded",
-        variant: "success",
-        description: init.plan ? `You're now on the ${init.plan}` : undefined,
+
+      const rz = orderResponse.razorpay;
+      if (!rz?.orderId || !rz.keyId) {
+        throw new Error("Payment could not be started. Please try again.");
+      }
+
+      const loaded = await ensureRazorpayLoaded();
+      if (!loaded || !window.Razorpay) {
+        throw new Error("Payment system failed to load. Please refresh and try again.");
+      }
+
+      setCheckoutOverlay(true);
+      const planLabel = rz.planName ?? target.charAt(0).toUpperCase() + target.slice(1);
+
+      const options: Record<string, unknown> = {
+        key: rz.keyId,
+        amount: rz.amount,
+        currency: rz.currency,
+        name: "Mini Task Manager",
+        description: `${planLabel} plan — monthly`,
+        order_id: rz.orderId,
+        redirect: false,
+        handler: async (response: {
+          razorpay_order_id: string;
+          razorpay_payment_id: string;
+          razorpay_signature: string;
+        }) => {
+          try {
+            const result = await verifyUserPlanPayment({
+              plan: target,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              couponCode,
+            });
+            toast({
+              title: "Plan upgraded",
+              variant: "success",
+              description: `You are now on the ${result.plan} plan.`,
+            });
+            await queryClient.invalidateQueries({ queryKey: ["user-plans"] });
+          } catch (err) {
+            toast({
+              title: "Payment verification failed",
+              description: parseApiError(err),
+              variant: "error",
+            });
+          } finally {
+            setUpgrading(null);
+            setCheckoutOverlay(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setUpgrading(null);
+            setCheckoutOverlay(false);
+          },
+          escape: true,
+          confirm_close: true,
+        },
+        theme: {
+          color: target === "gold" ? "#f59e0b" : "#8b5cf6",
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.on("payment.failed", () => {
+        toast({
+          title: "Payment failed",
+          description: "Your payment was not completed. You can try again.",
+          variant: "error",
+        });
+        setUpgrading(null);
+        setCheckoutOverlay(false);
       });
-      await queryClient.invalidateQueries({ queryKey: ["user-plans"] });
+      rzp.open();
     } catch (e) {
       toast({
         title: "Upgrade failed",
-        description: e instanceof Error ? e.message : "Could not upgrade plan",
+        description: parseApiError(e),
         variant: "error",
       });
-    } finally {
       setUpgrading(null);
+      setCheckoutOverlay(false);
     }
   };
 
   const plansList = plans ?? [];
 
   return (
+    <>
     <div className="mx-auto max-w-7xl space-y-8 pb-10 pt-6">
       <div className="text-center space-y-3">
         <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-foreground via-foreground/90 to-foreground/70 bg-clip-text">
@@ -420,6 +465,15 @@ export default function UserPlansPage() {
         </div>
       </div>
     </div>
+
+    {checkoutOverlay && (
+      <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <p className="rounded-lg bg-background px-6 py-4 text-sm font-medium shadow-lg">
+          Complete your payment in the Razorpay popup…
+        </p>
+      </div>
+    )}
+    </>
   );
 }
 

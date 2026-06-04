@@ -418,7 +418,7 @@ export function CreateTaskModal({
                 onClick={onExportCsv}
               >
                 <Download className="h-3.5 w-3.5" />
-                Export tasks as CSV
+                Export tasks as ZIP
               </Button>
             ) : null}
           </div>

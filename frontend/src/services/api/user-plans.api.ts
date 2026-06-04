@@ -99,19 +99,58 @@ export async function validatePlanCoupon(
   return data;
 }
 
-export async function upgradeUserPlan(
-  plan: UserPlanSlug,
-  paymentId?: string,
-  couponCode?: string
-): Promise<{
-  requiresPayment?: boolean;
-  payment?: { paymentId: string; gatewayUrl: string; amountInr?: number };
+export interface UserPlanRazorpayOrder {
+  orderId: string;
+  amount: number;
+  currency: string;
+  keyId: string;
+  amountInr: number;
+  planName?: string;
+}
+
+export interface CreateUserPlanOrderResponse {
+  requiresPayment: boolean;
   plan?: UserPlanSlug;
+  planExpiresAt?: string;
+  message?: string;
+  razorpay?: UserPlanRazorpayOrder;
   originalAmountInr?: number;
   finalAmountInr?: number;
   couponApplied?: boolean;
-}> {
-  const { data } = await apiClient.post("/plans/upgrade", { plan, paymentId, couponCode });
+}
+
+export async function createUserPlanOrder(
+  plan: UserPlanSlug,
+  couponCode?: string
+): Promise<CreateUserPlanOrderResponse> {
+  const { data } = await apiClient.post<CreateUserPlanOrderResponse>("/plans/create-order", {
+    plan,
+    couponCode,
+  });
+  return data;
+}
+
+export async function verifyUserPlanPayment(params: {
+  plan: UserPlanSlug;
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+  couponCode?: string;
+}): Promise<{ plan: UserPlanSlug; planExpiresAt: string }> {
+  const { data } = await apiClient.post("/plans/verify-payment", params);
+  return data;
+}
+
+/** @deprecated Use createUserPlanOrder + verifyUserPlanPayment */
+export async function upgradeUserPlan(
+  plan: UserPlanSlug,
+  _paymentId?: string,
+  couponCode?: string
+): Promise<CreateUserPlanOrderResponse> {
+  const { data } = await apiClient.post<CreateUserPlanOrderResponse>("/plans/create-order", {
+    plan,
+    couponCode,
+  });
   return data;
 }
 

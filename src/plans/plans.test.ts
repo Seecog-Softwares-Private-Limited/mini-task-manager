@@ -262,19 +262,23 @@ export async function runAllPlanTests(app: INestApplicationContext): Promise<Tes
   await run('Payment failed does not activate plan', async () => {
     const payUser = await createTestUser(usersService, 'pay-fail');
     try {
-      await plansService.upgrade(payUser.id, 'silver', 'invalid_payment_id');
+      await plansService.verifyPayment(payUser.id, {
+        plan: 'silver',
+        razorpay_order_id: 'order_invalid',
+        razorpay_payment_id: 'pay_invalid',
+        razorpay_signature: 'invalid_signature',
+      });
       throw new Error('Should reject bad payment');
-    } catch (e) {
+    } catch {
       const u = await usersRepo.findById(payUser.id);
       if (u?.currentPlan !== 'free') throw new Error('Plan should stay free');
     }
     await cleanupUser(usersRepo, orgsService, payUser.id);
   });
 
-  await run('Valid placeholder payment activates plan', async () => {
+  await run('activatePlan sets silver', async () => {
     const payUser = await createTestUser(usersService, 'pay-ok');
-    const init = paymentService.initiatePayment(payUser.id, 'silver', 500);
-    await plansService.upgrade(payUser.id, 'silver', init.paymentId);
+    await plansService.activatePlan(payUser.id, 'silver');
     const u = await usersRepo.findById(payUser.id);
     if (u?.currentPlan !== 'silver') throw new Error('Should activate silver');
     await cleanupUser(usersRepo, orgsService, payUser.id);

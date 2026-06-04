@@ -87,10 +87,14 @@ export class PlanConfigurationsService {
       merged = this.mergeWithDefaults(rows);
     } catch (error) {
       // Backward compatibility for environments where migration has not run yet.
-      if (
+      const msg =
         error instanceof QueryFailedError &&
-        typeof (error as { message?: unknown }).message === 'string' &&
-        (error as { message: string }).message.includes('plan_configurations')
+        typeof (error as { message?: unknown }).message === 'string'
+          ? (error as { message: string }).message
+          : '';
+      if (
+        msg.includes('plan_configurations') ||
+        msg.includes('allow_coupon')
       ) {
         merged = this.mergeWithDefaults([]);
       } else {

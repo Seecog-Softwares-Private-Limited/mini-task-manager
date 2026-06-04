@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -18,6 +19,7 @@ import { PlanLimitService } from './plan-limit.service';
 import { PaymentService } from './payment.service';
 import { PlanConfigurationsService } from './plan-configurations.service';
 import { CouponCodesService } from './coupon-codes.service';
+import { VerifyUserPlanPaymentDto } from './dto/verify-user-plan-payment.dto';
 
 @Injectable()
 export class PlansService {
@@ -82,18 +84,16 @@ export class PlansService {
     return current;
   }
 
-  async upgrade(
-    userId: string,
-    targetPlan: UserPlanSlug,
-    paymentId?: string,
-    couponCode?: string,
-  ) {
+  private async assertCanUpgrade(userId: string, targetPlan: UserPlanSlug) {
+    if (!userId) {
+      throw new BadRequestException('Authentication required');
+    }
     if (targetPlan === 'free') {
       throw new BadRequestException('Use downgrade endpoint to return to Free');
     }
 
     const user = await this.userRepo.findOne({ where: { id: userId } });
-    if (!user) throw new BadRequestException('User not found');
+    if (!user) throw new NotFoundException('User not found');
 
     const current = this.planLimitService.resolveEffectivePlan(user);
     const targetIdx = PLAN_ORDER.indexOf(targetPlan);
@@ -102,10 +102,18 @@ export class PlansService {
       throw new BadRequestException(`Already on ${current} plan or higher`);
     }
 
+    return user;
+  }
+
+  private async resolveUpgradePricing(
+    userId: string,
+    targetPlan: UserPlanSlug,
+    couponCode?: string,
+  ) {
     const def = getPlanDefinition(targetPlan);
     const originalAmount = def.pricing.priceMonthlyInr;
     let amount = originalAmount;
-    const normalizedCoupon = couponCode?.trim();
+    const normalizedCoupon = couponCode?.trim() || undefined;
 
     if (normalizedCoupon) {
       const validation = await this.couponCodesService.validateForPlan(
@@ -119,40 +127,100 @@ export class PlansService {
       amount = validation.finalAmountInr;
     }
 
-    if (!paymentId) {
-      const init = this.paymentService.initiatePayment(userId, targetPlan, amount);
+    return { originalAmount, amount, normalizedCoupon, planName: def.name };
+  }
+
+  /** Create Razorpay checkout order for user plan upgrade. */
+  async createOrder(userId: string, targetPlan: UserPlanSlug, couponCode?: string) {
+    await this.assertCanUpgrade(userId, targetPlan);
+    const { originalAmount, amount, normalizedCoupon, planName } =
+      await this.resolveUpgradePricing(userId, targetPlan, couponCode);
+
+    if (amount <= 0) {
+      if (normalizedCoupon) {
+        await this.couponCodesService.redeem(
+          normalizedCoupon,
+          targetPlan,
+          userId,
+          originalAmount,
+          amount,
+        );
+      }
+      await this.activatePlan(userId, targetPlan);
       return {
-        requiresPayment: true,
-        payment: init,
-        originalAmountInr: originalAmount,
-        finalAmountInr: amount,
-        couponApplied: !!normalizedCoupon,
-        message: 'Complete payment then call upgrade again with paymentId',
+        requiresPayment: false,
+        plan: targetPlan,
+        planExpiresAt: this.paymentService.getPlanExpiryFromNow().toISOString(),
+        message: 'Plan activated (100% discount)',
       };
     }
 
-    const verified = this.paymentService.verifyPayment(paymentId);
-    if (!verified) {
-      throw new BadRequestException('Payment verification failed — plan was not activated');
+    const razorpay = await this.paymentService.createUserPlanOrder({
+      userId,
+      plan: targetPlan,
+      amountInr: amount,
+      couponCode: normalizedCoupon,
+    });
+
+    return {
+      requiresPayment: true,
+      razorpay: {
+        ...razorpay,
+        planName,
+      },
+      originalAmountInr: originalAmount,
+      finalAmountInr: amount,
+      couponApplied: !!normalizedCoupon,
+    };
+  }
+
+  /** Verify Razorpay payment and activate user plan. */
+  async verifyPayment(userId: string, dto: VerifyUserPlanPaymentDto) {
+    await this.assertCanUpgrade(userId, dto.plan);
+    const { originalAmount, amount, normalizedCoupon } = await this.resolveUpgradePricing(
+      userId,
+      dto.plan,
+      dto.couponCode,
+    );
+
+    const valid = this.paymentService.verifyUserPlanPayment({
+      orderId: dto.razorpay_order_id,
+      paymentId: dto.razorpay_payment_id,
+      signature: dto.razorpay_signature,
+    });
+    if (!valid) {
+      throw new BadRequestException('Payment verification failed — invalid signature');
     }
 
     if (normalizedCoupon) {
       await this.couponCodesService.redeem(
         normalizedCoupon,
-        targetPlan,
+        dto.plan,
         userId,
         originalAmount,
         amount,
       );
     }
 
-    await this.activatePlan(userId, targetPlan);
-    this.logger.log(`User ${userId} upgraded to ${targetPlan} (paymentId=${paymentId})`);
+    await this.activatePlan(userId, dto.plan);
+    this.logger.log(
+      `User ${userId} upgraded to ${dto.plan} (order=${dto.razorpay_order_id})`,
+    );
     return {
       requiresPayment: false,
-      plan: targetPlan,
+      plan: dto.plan,
       planExpiresAt: this.paymentService.getPlanExpiryFromNow().toISOString(),
     };
+  }
+
+  /** @deprecated Use createOrder + verifyPayment with Razorpay checkout */
+  async upgrade(
+    userId: string,
+    targetPlan: UserPlanSlug,
+    _paymentId?: string,
+    couponCode?: string,
+  ) {
+    return this.createOrder(userId, targetPlan, couponCode);
   }
 
   async activatePlan(userId: string, plan: UserPlanSlug): Promise<void> {

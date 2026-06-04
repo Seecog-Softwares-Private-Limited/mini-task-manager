@@ -25,12 +25,18 @@ function toAttachment(r: TaskAttachmentResponse): TaskAttachment {
   };
 }
 
-/** Fetch attachment bytes with auth and return a blob URL for preview. Caller must revoke when done. */
-export async function fetchAttachmentPreviewUrl(attachmentId: string): Promise<string> {
+/** Fetch attachment file bytes (for export). */
+export async function fetchAttachmentBlob(attachmentId: string): Promise<Blob> {
   const { data } = await apiClient.get(`/tasks/attachments/${attachmentId}/file`, {
     responseType: "blob",
   });
-  return URL.createObjectURL(data as Blob);
+  return data as Blob;
+}
+
+/** Fetch attachment bytes with auth and return a blob URL for preview. Caller must revoke when done. */
+export async function fetchAttachmentPreviewUrl(attachmentId: string): Promise<string> {
+  const url = URL.createObjectURL(await fetchAttachmentBlob(attachmentId));
+  return url;
 }
 
 export async function fetchAttachments(taskId: string): Promise<TaskAttachment[]> {
