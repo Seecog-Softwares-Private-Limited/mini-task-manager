@@ -16,6 +16,13 @@ export const TASKS_CSV_HEADERS = [
   "Project",
 ] as const;
 
+/** ZIP export includes media mapping columns. */
+export const TASKS_CSV_HEADERS_ZIP = [
+  ...TASKS_CSV_HEADERS,
+  "Export Key",
+  "Media Files",
+] as const;
+
 const MONTH_BY_SHORT: Record<string, number> = {
   jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
   jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
@@ -135,6 +142,10 @@ export interface ParsedTaskCsvRow {
   storyPoints?: number;
   tags: string[];
   subtasks: Array<{ title: string; completed: boolean }>;
+  /** Folder name under `media/` in ZIP export (e.g. task-0001). */
+  exportKey?: string;
+  /** Filenames inside `media/{exportKey}/`. */
+  mediaFileNames: string[];
 }
 
 export function parseTasksCsvContent(content: string): {
@@ -187,6 +198,7 @@ export function parseTasksCsvContent(content: string): {
       completed: i < doneCount,
     }));
 
+    const exportKey = cellAt(line, headerIndex, "Export Key") || undefined;
     rows.push({
       rowNumber,
       title,
@@ -198,6 +210,8 @@ export function parseTasksCsvContent(content: string): {
       storyPoints,
       tags: splitList(cellAt(line, headerIndex, "Tags")),
       subtasks,
+      exportKey,
+      mediaFileNames: splitList(cellAt(line, headerIndex, "Media Files")),
     });
   }
 

@@ -1,46 +1,86 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { parseRazorpayFailure, RazorpayService } from '../modules/billing/razorpay.service';
 import type { UserPlanSlug } from '../config/plans.config';
 
-export interface PaymentInitResult {
-  paymentId: string;
-  /** Placeholder gateway URL — integrate Razorpay/PayU here. */
-  gatewayUrl: string;
+export interface UserPlanOrderResult {
+  orderId: string;
+  amount: number;
+  currency: string;
+  keyId: string;
   amountInr: number;
-  currency: 'INR';
 }
 
 @Injectable()
 export class PaymentService {
   private readonly logger = new Logger(PaymentService.name);
 
-  /**
-   * TODO: Integrate Razorpay/PayU — create order and return checkout URL.
-   */
-  initiatePayment(userId: string, plan: UserPlanSlug, amountInr: number): PaymentInitResult {
-    const paymentId = `pay_${plan}_${userId.slice(0, 8)}_${Date.now()}`;
-    this.logger.log(`[Payment placeholder] initiatePayment user=${userId} plan=${plan} amount=₹${amountInr}`);
-    return {
-      paymentId,
-      gatewayUrl: `/dashboard/plans?payment=${paymentId}&plan=${plan}`,
-      amountInr,
-      currency: 'INR',
-    };
-  }
+  constructor(private readonly razorpayService: RazorpayService) {}
 
   /**
-   * TODO: Verify signature with Razorpay/PayU webhook or client callback.
-   * Test payments: paymentId starting with `test_pay_` succeed in non-production.
+   * Create a Razorpay order for user-level plan upgrade (Silver / Gold).
+   * Amount is in INR; converted to paise for Razorpay (minimum ₹1 / 100 paise).
    */
-  verifyPayment(paymentId: string): boolean {
-    if (!paymentId?.trim()) return false;
-    if (paymentId.startsWith('test_pay_')) return true;
-    // Placeholder checkout ids from initiatePayment (non-production only)
-    if (process.env.NODE_ENV !== 'production' && paymentId.startsWith('pay_')) {
-      return true;
+  async createUserPlanOrder(params: {
+    userId: string;
+    plan: UserPlanSlug;
+    amountInr: number;
+    couponCode?: string;
+  }): Promise<UserPlanOrderResult> {
+    const amountPaise = Math.max(100, Math.round(params.amountInr * 100));
+    const userShort = params.userId.replace(/-/g, '').slice(0, 8);
+    const receipt = `uplan_${userShort}_${Date.now()}`.slice(0, 40);
+
+    try {
+      const order = await this.razorpayService.createOrder({
+        amount: amountPaise,
+        currency: 'INR',
+        receipt,
+        notes: {
+          type: 'user_plan',
+          userId: params.userId,
+          plan: params.plan,
+          couponCode: params.couponCode?.trim() || '',
+          amountInr: String(params.amountInr),
+        },
+      });
+
+      this.logger.log(
+        `User plan Razorpay order ${order.id} user=${params.userId} plan=${params.plan} ₹${params.amountInr}`,
+      );
+
+      return {
+        orderId: order.id,
+        amount: amountPaise,
+        currency: order.currency || 'INR',
+        keyId: this.razorpayService.getKeyId(),
+        amountInr: params.amountInr,
+      };
+    } catch (err: unknown) {
+      const parsed = parseRazorpayFailure(err);
+      this.logger.error(`createUserPlanOrder failed: ${parsed.message}`);
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.BAD_GATEWAY,
+          error: 'RazorpayError',
+          message: parsed.message,
+          hint:
+            'Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in properties.env with Test keys from https://dashboard.razorpay.com/app/keys',
+        },
+        HttpStatus.BAD_GATEWAY,
+      );
     }
-    // TODO: Razorpay orders.verify / PayU hash verification
-    this.logger.warn(`[Payment placeholder] verifyPayment not integrated for id=${paymentId}`);
-    return false;
+  }
+
+  verifyUserPlanPayment(params: {
+    orderId: string;
+    paymentId: string;
+    signature: string;
+  }): boolean {
+    return this.razorpayService.verifyPaymentSignature({
+      orderId: params.orderId,
+      paymentId: params.paymentId,
+      signature: params.signature,
+    });
   }
 
   /** Activate paid plan for one billing month. */

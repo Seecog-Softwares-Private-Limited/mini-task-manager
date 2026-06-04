@@ -4,6 +4,10 @@ import { Public } from '../common/decorators/public.decorator';
 import { PlansService } from './plans.service';
 import { UpgradePlanDto } from './dto/upgrade-plan.dto';
 import { ValidateCouponDto } from './dto/validate-coupon.dto';
+import { CreateUserPlanOrderDto } from './dto/create-user-plan-order.dto';
+import { VerifyUserPlanPaymentDto } from './dto/verify-user-plan-payment.dto';
+
+type AuthUser = { userId: string; organizationId?: string };
 
 @Controller('plans')
 @UseGuards(JwtAuthGuard)
@@ -17,28 +21,33 @@ export class PlansController {
   }
 
   @Get('current')
-  getCurrent(@Req() req: { user: { sub: string } }) {
-    return this.plansService.getCurrent(req.user.sub);
+  getCurrent(@Req() req: { user: AuthUser }) {
+    return this.plansService.getCurrent(req.user.userId);
   }
 
   @Get('usage')
-  getUsage(@Req() req: { user: { sub: string; organizationId?: string } }) {
-    const orgId = req.user.organizationId;
-    return this.plansService.getUsage(req.user.sub, orgId);
+  getUsage(@Req() req: { user: AuthUser }) {
+    return this.plansService.getUsage(req.user.userId, req.user.organizationId);
   }
 
   @Post('validate-coupon')
-  validateCoupon(@Req() req: { user: { sub: string } }, @Body() dto: ValidateCouponDto) {
-    return this.plansService.validateCoupon(req.user.sub, dto.code, dto.plan);
+  validateCoupon(@Req() req: { user: AuthUser }, @Body() dto: ValidateCouponDto) {
+    return this.plansService.validateCoupon(req.user.userId, dto.code, dto.plan);
   }
 
+  @Post('create-order')
+  createOrder(@Req() req: { user: AuthUser }, @Body() dto: CreateUserPlanOrderDto) {
+    return this.plansService.createOrder(req.user.userId, dto.plan, dto.couponCode);
+  }
+
+  @Post('verify-payment')
+  verifyPayment(@Req() req: { user: AuthUser }, @Body() dto: VerifyUserPlanPaymentDto) {
+    return this.plansService.verifyPayment(req.user.userId, dto);
+  }
+
+  /** Legacy alias — prefer POST /plans/create-order */
   @Post('upgrade')
-  upgrade(@Req() req: { user: { sub: string } }, @Body() dto: UpgradePlanDto) {
-    return this.plansService.upgrade(
-      req.user.sub,
-      dto.plan,
-      dto.paymentId,
-      dto.couponCode,
-    );
+  upgrade(@Req() req: { user: AuthUser }, @Body() dto: UpgradePlanDto) {
+    return this.plansService.createOrder(req.user.userId, dto.plan, dto.couponCode);
   }
 }

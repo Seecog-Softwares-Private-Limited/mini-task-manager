@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { BillingModule } from '../modules/billing/billing.module';
 import { UserEntity } from '../modules/users/entities/user.entity';
 import { OrganizationEntity } from '../modules/organizations/entities/organization.entity';
 import { OrganizationMemberEntity } from '../modules/organizations/entities/organization-member.entity';
@@ -22,6 +23,7 @@ import { CouponCodesService } from './coupon-codes.service';
 
 @Module({
   imports: [
+    BillingModule,
     TypeOrmModule.forFeature([
       UserEntity,
       OrganizationEntity,

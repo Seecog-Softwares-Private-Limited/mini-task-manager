@@ -74,8 +74,8 @@ import { useBulkSelection } from "@/hooks/use-bulk-selection";
 import { useBoardPermissions } from "@/hooks/use-board-permissions";
 import { useRetentionTracking } from "@/hooks/use-retention-tracking";
 import type { Task } from "@/types/api";
-import { exportTasksToCsvFile } from "@/lib/export-tasks-csv";
-import { ImportTasksCsvModal } from "@/components/tasks/import-tasks-csv-modal";
+import { exportTasksToZipFile } from "@/lib/export-tasks-zip";
+import { ImportTasksZipModal } from "@/components/tasks/import-tasks-zip-modal";
 import { Building2, Plus, Sparkles, Columns3, Keyboard, Shield, Rocket, Download, Upload } from "lucide-react";
 
 function getCurrentUserId(): string | null {
@@ -105,7 +105,8 @@ export default function TasksPage() {
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createSprintModalOpen, setCreateSprintModalOpen] = useState(false);
-  const [importCsvOpen, setImportCsvOpen] = useState(false);
+  const [importZipOpen, setImportZipOpen] = useState(false);
+  const [exportingZip, setExportingZip] = useState(false);
   const [defaultStatusId, setDefaultStatusId] = useState<string | undefined>();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
@@ -525,7 +526,7 @@ export default function TasksPage() {
     [orgId, selectedProjectId, createMutation]
   );
 
-  const handleExportCsv = useCallback(() => {
+  const handleExportZip = useCallback(async () => {
     if (!selectedProject || projectTasks.length === 0) {
       toast({
         title: "Nothing to export",
@@ -540,18 +541,29 @@ export default function TasksPage() {
     }
     const hasActiveFilters =
       filters.search.length > 0 || filters.priority.length > 0 || filters.assignee.length > 0;
-    const { count, filename } = exportTasksToCsvFile(projectTasks, {
-      projectName: selectedProject.name,
-      statuses,
-      assigneeNameById,
-      filters,
-      onlyFiltered: hasActiveFilters,
-    });
-    toast({
-      title: "CSV exported",
-      description: `Downloaded ${filename} (${count} task${count === 1 ? "" : "s"}). Share the file with anyone.`,
-      variant: "success",
-    });
+    setExportingZip(true);
+    try {
+      const { count, filename, mediaFiles } = await exportTasksToZipFile(projectTasks, {
+        projectName: selectedProject.name,
+        statuses,
+        assigneeNameById,
+        filters,
+        onlyFiltered: hasActiveFilters,
+      });
+      toast({
+        title: "ZIP exported",
+        description: `Downloaded ${filename} (${count} task${count === 1 ? "" : "s"}, ${mediaFiles} file${mediaFiles === 1 ? "" : "s"} with images). Unzip to view tasks and media.`,
+        variant: "success",
+      });
+    } catch (err) {
+      toast({
+        title: "Export failed",
+        description: err instanceof Error ? err.message : "Could not create ZIP file",
+        variant: "error",
+      });
+    } finally {
+      setExportingZip(false);
+    }
   }, [selectedProject, projectTasks, assigneeMap, statuses, filters, toast]);
 
   const handleCreateFromModal = useCallback((data: CreateTaskFormData, descriptionImageFiles?: File[]) => {
@@ -699,23 +711,23 @@ export default function TasksPage() {
             variant="outline"
             size="sm"
             className="h-9 gap-1.5"
-            disabled={!selectedProjectId || projectTasks.length === 0}
-            onClick={handleExportCsv}
-            data-cy="export-tasks-csv"
+            disabled={!selectedProjectId || projectTasks.length === 0 || exportingZip}
+            onClick={() => void handleExportZip()}
+            data-cy="export-tasks-zip"
           >
             <Download className="h-4 w-4" />
-            Export CSV
+            {exportingZip ? "Exporting…" : "Export ZIP"}
           </Button>
           {permissions.canCreateTask && selectedProjectId && (
             <Button
               variant="outline"
               size="sm"
               className="h-9 gap-1.5"
-              onClick={() => setImportCsvOpen(true)}
-              data-cy="import-tasks-csv"
+              onClick={() => setImportZipOpen(true)}
+              data-cy="import-tasks-zip"
             >
               <Upload className="h-4 w-4" />
-              Import CSV
+              Import ZIP
             </Button>
           )}
           {permissions.canCreateTask && (
@@ -880,8 +892,8 @@ export default function TasksPage() {
         projectId={selectedProjectId ?? ""}
         statuses={statuses}
         defaultStatusId={defaultStatusId}
-        onExportCsv={handleExportCsv}
-        exportCsvDisabled={!selectedProjectId || projectTasks.length === 0}
+        onExportCsv={() => void handleExportZip()}
+        exportCsvDisabled={!selectedProjectId || projectTasks.length === 0 || exportingZip}
       />
 
       {orgId && selectedProjectId && (
@@ -932,9 +944,9 @@ export default function TasksPage() {
       />
 
       {orgId && selectedProjectId && permissions.canCreateTask && (
-        <ImportTasksCsvModal
-          open={importCsvOpen}
-          onOpenChange={setImportCsvOpen}
+        <ImportTasksZipModal
+          open={importZipOpen}
+          onOpenChange={setImportZipOpen}
           projectId={selectedProjectId}
           organizationId={orgId}
           projectName={selectedProject.name}
