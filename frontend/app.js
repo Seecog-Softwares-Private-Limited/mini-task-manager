@@ -13,14 +13,21 @@ if (fs.existsSync(propsPath)) {
 
 const ROOT = path.resolve(__dirname);
 const PORT = process.env.FRONTEND_PORT || process.env.PORT || '3001';
+const nextBin = path.join(ROOT, 'node_modules', 'next', 'dist', 'bin', 'next');
 
 console.log('[frontend app.js] Starting Next.js dev server on port', PORT);
 console.log('[frontend app.js] Open http://localhost:' + PORT);
 
-const child = spawn('npx', ['next', 'dev', '-p', PORT], {
+if (!fs.existsSync(nextBin)) {
+  console.error(
+    '[frontend app.js] Next.js is not installed. Run:\n  cd frontend && npm install',
+  );
+  process.exit(1);
+}
+
+const child = spawn(process.execPath, [nextBin, 'dev', '-p', PORT], {
   cwd: ROOT,
   stdio: 'inherit',
-  shell: true,
 });
 
 child.on('error', (err) => {
