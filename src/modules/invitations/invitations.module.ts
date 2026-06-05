@@ -10,6 +10,7 @@ import { OrganizationsModule } from '../organizations/organizations.module';
 import { UsersModule } from '../users/users.module';
 import { BillingModule } from '../billing/billing.module';
 import { PlansModule } from '../../plans/plans.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { PlansModule } from '../../plans/plans.module';
     UsersModule,
     forwardRef(() => BillingModule),
     forwardRef(() => PlansModule),
+    NotificationsModule,
   ],
   controllers: [InvitationsController],
   providers: [InvitationsRepository, InvitationsService, EmailService],

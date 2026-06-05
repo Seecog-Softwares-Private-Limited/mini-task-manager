@@ -1,5 +1,11 @@
 import { ConflictException, forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { DataSource } from 'typeorm';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import { ProjectsRepository } from './repositories/projects.repository';
+import { uuidBinaryTransformer } from '../../common/base.entity';
+import { Configuration } from '../../config/configuration';
 import { ProjectMembersRepository } from './repositories/project-members.repository';
 import { ProjectEntity } from './entities/project.entity';
 import { ProjectMemberEntity } from './entities/project-member.entity';
@@ -25,6 +31,8 @@ export class ProjectsService {
     @Inject(forwardRef(() => WorkflowsService))
     private readonly workflowsService: WorkflowsService,
     private readonly activityLogsService: ActivityLogsService,
+    private readonly dataSource: DataSource,
+    private readonly configService: ConfigService<Configuration>,
   ) {}
 
   async findById(id: string): Promise<ProjectEntity | null> {
@@ -85,6 +93,56 @@ export class ProjectsService {
       .log({ organizationId, userId: userId ?? undefined, entityType: 'project', entityId: id, action: 'update', metadata: { name: updated?.name ?? project.name } })
       .catch(() => {});
     return updated!;
+  }
+
+  /** Permanently delete a project and all tasks, workflows, and attachments. */
+  async deletePermanently(
+    id: string,
+    organizationId: string,
+    userId?: string,
+  ): Promise<void> {
+    const project = await this.projectsRepository.findByIdAndOrganization(id, organizationId);
+    if (!project) {
+      throw new NotFoundException('Project not found');
+    }
+
+    const projectBin = uuidBinaryTransformer.to(id) as Buffer;
+    const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
+
+    const attachmentRows = (await this.dataSource.query(
+      `SELECT ta.file_url AS fileUrl FROM task_attachments ta
+       INNER JOIN tasks t ON t.id = ta.task_id
+       WHERE t.project_id = ?`,
+      [projectBin],
+    )) as Array<{ fileUrl: string }>;
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager.query(
+        `UPDATE tasks SET parent_task_id = NULL, sprint_id = NULL, status_id = NULL WHERE project_id = ?`,
+        [projectBin],
+      );
+      await manager.query(`DELETE FROM projects WHERE id = ?`, [projectBin]);
+    });
+
+    for (const row of attachmentRows) {
+      if (row.fileUrl) {
+        await fs.unlink(path.join(uploadsPath, row.fileUrl)).catch(() => {});
+      }
+    }
+    await fs
+      .rm(path.join(uploadsPath, 'task-attachments', id), { recursive: true, force: true })
+      .catch(() => {});
+
+    this.activityLogsService
+      .log({
+        organizationId,
+        userId: userId ?? undefined,
+        entityType: 'project',
+        entityId: id,
+        action: 'delete',
+        metadata: { name: project.name, permanent: true },
+      })
+      .catch(() => {});
   }
 
   // ── Project Members ──

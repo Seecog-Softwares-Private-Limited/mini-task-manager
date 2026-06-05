@@ -66,3 +66,18 @@ export async function acceptInvitation(token: string): Promise<{
   );
   return data;
 }
+
+export async function fetchMyPendingInvitations(): Promise<OrgInvitation[]> {
+  const { data } = await apiClient.get<OrgInvitation[]>("/invitations/mine");
+  return data ?? [];
+}
+
+export async function acceptInvitationById(invitationId: string): Promise<{
+  success: boolean;
+  organizationId: string;
+}> {
+  const { data } = await apiClient.post<{ success: boolean; organizationId: string }>(
+    `/invitations/mine/${invitationId}/accept`
+  );
+  return data;
+}

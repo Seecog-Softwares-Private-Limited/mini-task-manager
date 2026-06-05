@@ -275,6 +275,7 @@ export interface ProjectMember {
 export interface OrgInvitation {
   id: string;
   organizationId: string;
+  organizationName?: string;
   email: string;
   role: string;
   status: "PENDING" | "ACCEPTED" | "EXPIRED" | "CANCELLED";

@@ -8,6 +8,8 @@ import { ProjectEntity } from './entities/project.entity';
 import { ProjectMemberEntity } from './entities/project-member.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 import { SubscriptionGuard } from '../billing/guards/subscription.guard';
 import { CheckSubscriptionLimit } from '../billing/decorators/check-limit.decorator';
 import { TenantId } from '../../common/decorators/tenant.decorator';
@@ -173,6 +175,18 @@ export class ProjectsController {
   ): Promise<ProjectResponseDto> {
     const project = await this.projectsService.update(id, tenantId!, dto, userId);
     return this.toResponse(project);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles('owner', 'admin')
+  @Delete(':id')
+  async remove(
+    @Param('id') id: string,
+    @TenantId() tenantId?: string,
+    @CurrentUserId() userId?: string,
+  ): Promise<{ success: boolean }> {
+    await this.projectsService.deletePermanently(id, tenantId!, userId);
+    return { success: true };
   }
 
   private toResponse(p: ProjectEntity): ProjectResponseDto {

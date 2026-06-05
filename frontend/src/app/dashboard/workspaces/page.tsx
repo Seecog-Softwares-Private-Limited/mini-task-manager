@@ -55,6 +55,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { WorkspaceAvatarPresetsPicker } from "@/components/workspaces/workspace-avatar-presets-picker";
 import type { Organization } from "@/types/api";
 import { cn, formatRelativeTime, isWithinLast24h, getInitials, nameToSlug } from "@/lib/utils";
+import { PendingWorkspaceInvitations } from "@/components/members/pending-workspace-invitations";
 
 const schema = z.object({
   name: z.string().min(1).max(150),
@@ -409,6 +410,8 @@ export default function WorkspacesPage() {
           New Workspace
         </Button>
       </div>
+
+      <PendingWorkspaceInvitations />
 
       {/* Metrics bar + workspace card grid */}
       <div>

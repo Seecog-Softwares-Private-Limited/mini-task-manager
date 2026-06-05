@@ -68,8 +68,8 @@ export function InviteMemberModal({
         <DialogHeader>
           <DialogTitle id="invite-member-title">Invite member</DialogTitle>
           <DialogDescription id="invite-member-desc">
-            Invite a new team member who does not yet have an account. If the email is already
-            registered, you&apos;ll see an error here.
+            Send an email invitation to join this workspace. If they already have an account, they
+            can sign in and accept from Workspaces or the invite link.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
