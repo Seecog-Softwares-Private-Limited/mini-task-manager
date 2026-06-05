@@ -657,9 +657,9 @@ export default function TasksPage() {
   const isBoardLoading = workflowsLoading || statusesLoading || tasksLoading || setupWorkflowMutation.isPending;
 
   return (
-    <div className="space-y-4 animate-slide-up">
+    <div className="flex h-[calc(100dvh-14rem)] min-h-[28rem] flex-col gap-4 overflow-hidden animate-slide-up md:h-[calc(100dvh-16rem)]">
       {celebrationLayer}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex shrink-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 flex-1 flex-col gap-3">
           <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
             <div className="w-full sm:max-w-[280px]">
@@ -742,95 +742,103 @@ export default function TasksPage() {
         <BoardSkeleton />
       ) : statuses.length > 0 ? (
         <>
-          {projectTasks.length > 0 && <BoardStatsBar stats={boardStats} />}
-          <BoardToolbar
-            filters={filters}
-            onFiltersChange={setFilters}
-            assigneeMap={assigneeMap}
-            viewMode={viewMode}
-            onViewModeChange={setViewMode}
-            taskCount={projectTasks.length}
-            filteredCount={filteredTaskCount}
-            savedViews={savedViews}
-            onSaveView={(name: string, viewFilters: BoardFilters) => saveView(name, viewFilters)}
-            onLoadView={(view: SavedView) => setFilters(view.filters)}
-            onDeleteView={(viewId: string) => deleteView(viewId)}
-            isSelectionMode={bulk.state.isSelectionMode}
-            onToggleSelectionMode={handleToggleSelectionMode}
-            canBulkSelect={permissions.canBulkSelect}
-          />
+          <div className="shrink-0 space-y-4">
+            {projectTasks.length > 0 && <BoardStatsBar stats={boardStats} />}
+            <BoardToolbar
+              filters={filters}
+              onFiltersChange={setFilters}
+              assigneeMap={assigneeMap}
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+              taskCount={projectTasks.length}
+              filteredCount={filteredTaskCount}
+              savedViews={savedViews}
+              onSaveView={(name: string, viewFilters: BoardFilters) => saveView(name, viewFilters)}
+              onLoadView={(view: SavedView) => setFilters(view.filters)}
+              onDeleteView={(viewId: string) => deleteView(viewId)}
+              isSelectionMode={bulk.state.isSelectionMode}
+              onToggleSelectionMode={handleToggleSelectionMode}
+              canBulkSelect={permissions.canBulkSelect}
+            />
+          </div>
 
-          {viewMode === "kanban" ? (
-            <KanbanBoard
-              statuses={statuses}
-              tasksByStatus={tasksByStatus}
-              onMoveTask={handleMoveTask}
-              onQuickAdd={permissions.canCreateTask ? handleQuickAdd : undefined}
-              onTaskClick={(task) => setSelectedTaskId(task.id)}
-              assigneeMap={assigneeMap}
-              commentCountMap={commentCountMap}
-              subtaskMap={subtaskMap}
-              filters={filters}
-              quickActions={quickActions}
-              wipLimits={boardSettings.wipLimits}
-              movingTaskId={movingTaskId}
-              collapsedColumns={collapsedColumns}
-              onToggleColumnCollapse={(statusId) => setCollapsedColumns((prev) => ({ ...prev, [statusId]: !prev[statusId] }))}
-              isSelectionMode={bulk.state.isSelectionMode}
-              selectedIds={bulk.state.selectedIds}
-              onToggleSelect={bulk.toggle}
-              onSelectColumnTasks={(statusId) => {
-                const columnTasks = tasksByStatus[statusId] ?? [];
-                if (columnTasks.length === 0) return;
-                if (!bulk.state.isSelectionMode) bulk.enterSelectionMode();
-                bulk.selectAll(columnTasks.map((t) => t.id));
-              }}
-              onSetWipLimit={(statusId, limit) => {
-                setBoardSettings((prev) => {
-                  const wipLimits = { ...prev.wipLimits };
-                  if (limit === undefined) delete wipLimits[statusId];
-                  else wipLimits[statusId] = limit;
-                  return { ...prev, wipLimits };
-                });
-              }}
-              permissions={permissions}
-              aria-label={`Tasks for ${selectedProject.name}`}
-            />
-          ) : viewMode === "scrum" ? (
-            <ScrumBoard
-              swimlanes={swimlanes}
-              statuses={statuses}
-              tasksByCell={tasksByCell}
-              onMoveTask={handleScrumMoveTask}
-              onTaskClick={(task) => setSelectedTaskId(task.id)}
-              assigneeMap={assigneeMap}
-              commentCountMap={commentCountMap}
-              subtaskMap={subtaskMap}
-              filters={filters}
-              quickActions={quickActions}
-              wipLimits={boardSettings.wipLimits}
-              movingTaskId={movingTaskId}
-              collapsedSwimlanes={collapsedSwimlanes}
-              onToggleSwimlaneCollapse={(id) => setCollapsedSwimlanes((prev) => ({ ...prev, [id]: !prev[id] }))}
-              isSelectionMode={bulk.state.isSelectionMode}
-              selectedIds={bulk.state.selectedIds}
-              onToggleSelect={bulk.toggle}
-              permissions={permissions}
-              aria-label={`Scrum board for ${selectedProject.name}`}
-            />
-          ) : (
-            <BoardTableView
-              tasks={allTasksFlat}
-              statuses={statuses}
-              assigneeMap={assigneeMap}
-              subtaskMap={subtaskMap}
-              onTaskClick={(task) => setSelectedTaskId(task.id)}
-              isSelectionMode={bulk.state.isSelectionMode}
-              selectedIds={bulk.state.selectedIds}
-              onToggleSelect={bulk.toggle}
-              permissions={permissions}
-            />
-          )}
+          <div className="min-h-0 flex-1 overflow-hidden">
+            {viewMode === "kanban" ? (
+              <KanbanBoard
+                className="h-full"
+                statuses={statuses}
+                tasksByStatus={tasksByStatus}
+                onMoveTask={handleMoveTask}
+                onQuickAdd={permissions.canCreateTask ? handleQuickAdd : undefined}
+                onTaskClick={(task) => setSelectedTaskId(task.id)}
+                assigneeMap={assigneeMap}
+                commentCountMap={commentCountMap}
+                subtaskMap={subtaskMap}
+                filters={filters}
+                quickActions={quickActions}
+                wipLimits={boardSettings.wipLimits}
+                movingTaskId={movingTaskId}
+                collapsedColumns={collapsedColumns}
+                onToggleColumnCollapse={(statusId) => setCollapsedColumns((prev) => ({ ...prev, [statusId]: !prev[statusId] }))}
+                isSelectionMode={bulk.state.isSelectionMode}
+                selectedIds={bulk.state.selectedIds}
+                onToggleSelect={bulk.toggle}
+                onSelectColumnTasks={(statusId) => {
+                  const columnTasks = tasksByStatus[statusId] ?? [];
+                  if (columnTasks.length === 0) return;
+                  if (!bulk.state.isSelectionMode) bulk.enterSelectionMode();
+                  bulk.selectAll(columnTasks.map((t) => t.id));
+                }}
+                onSetWipLimit={(statusId, limit) => {
+                  setBoardSettings((prev) => {
+                    const wipLimits = { ...prev.wipLimits };
+                    if (limit === undefined) delete wipLimits[statusId];
+                    else wipLimits[statusId] = limit;
+                    return { ...prev, wipLimits };
+                  });
+                }}
+                permissions={permissions}
+                aria-label={`Tasks for ${selectedProject.name}`}
+              />
+            ) : viewMode === "scrum" ? (
+              <ScrumBoard
+                className="h-full"
+                swimlanes={swimlanes}
+                statuses={statuses}
+                tasksByCell={tasksByCell}
+                onMoveTask={handleScrumMoveTask}
+                onTaskClick={(task) => setSelectedTaskId(task.id)}
+                assigneeMap={assigneeMap}
+                commentCountMap={commentCountMap}
+                subtaskMap={subtaskMap}
+                filters={filters}
+                quickActions={quickActions}
+                wipLimits={boardSettings.wipLimits}
+                movingTaskId={movingTaskId}
+                collapsedSwimlanes={collapsedSwimlanes}
+                onToggleSwimlaneCollapse={(id) => setCollapsedSwimlanes((prev) => ({ ...prev, [id]: !prev[id] }))}
+                isSelectionMode={bulk.state.isSelectionMode}
+                selectedIds={bulk.state.selectedIds}
+                onToggleSelect={bulk.toggle}
+                permissions={permissions}
+                aria-label={`Scrum board for ${selectedProject.name}`}
+              />
+            ) : (
+              <div className="h-full overflow-y-auto">
+                <BoardTableView
+                  tasks={allTasksFlat}
+                  statuses={statuses}
+                  assigneeMap={assigneeMap}
+                  subtaskMap={subtaskMap}
+                  onTaskClick={(task) => setSelectedTaskId(task.id)}
+                  isSelectionMode={bulk.state.isSelectionMode}
+                  selectedIds={bulk.state.selectedIds}
+                  onToggleSelect={bulk.toggle}
+                  permissions={permissions}
+                />
+              </div>
+            )}
+          </div>
 
           {bulk.state.isSelectionMode && (
             <BulkActionBar

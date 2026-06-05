@@ -663,10 +663,10 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex h-[calc(100dvh-14rem)] min-h-[28rem] flex-col gap-4 overflow-hidden md:h-[calc(100dvh-16rem)]">
       {celebrationLayer}
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex shrink-0 items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold tracking-tight flex items-center gap-2">
             Board
@@ -751,7 +751,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
 
       {/* Plan enforcement banner */}
       {isTrialOrFree && tasks.length > 25 && (
-        <div className="flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 animate-in fade-in duration-300">
+        <div className="flex shrink-0 items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 animate-in fade-in duration-300">
           <Crown className="h-4 w-4 text-amber-500 shrink-0" />
           <p className="flex-1 text-sm text-amber-700 dark:text-amber-400">
             You have <strong>{tasks.length} tasks</strong>. Upgrade your plan for unlimited tasks, advanced analytics, and priority support.
@@ -764,30 +764,34 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
         </div>
       )}
 
-      {/* Stats */}
-      {tasks.length > 0 && <BoardStatsBar stats={boardStats} />}
+      <div className="shrink-0 space-y-4">
+        {/* Stats */}
+        {tasks.length > 0 && <BoardStatsBar stats={boardStats} />}
 
-      {/* Toolbar */}
-      <BoardToolbar
-        filters={filters}
-        onFiltersChange={setFilters}
-        assigneeMap={assigneeMap}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        taskCount={tasks.length}
-        filteredCount={filteredTaskCount}
-        savedViews={savedViews}
-        onSaveView={handleSaveView}
-        onLoadView={handleLoadView}
-        onDeleteView={handleDeleteView}
-        isSelectionMode={bulk.state.isSelectionMode}
-        onToggleSelectionMode={handleToggleSelectionMode}
-        canBulkSelect={permissions.canBulkSelect}
-      />
+        {/* Toolbar */}
+        <BoardToolbar
+          filters={filters}
+          onFiltersChange={setFilters}
+          assigneeMap={assigneeMap}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          taskCount={tasks.length}
+          filteredCount={filteredTaskCount}
+          savedViews={savedViews}
+          onSaveView={handleSaveView}
+          onLoadView={handleLoadView}
+          onDeleteView={handleDeleteView}
+          isSelectionMode={bulk.state.isSelectionMode}
+          onToggleSelectionMode={handleToggleSelectionMode}
+          canBulkSelect={permissions.canBulkSelect}
+        />
+      </div>
 
       {/* Board / Table */}
+      <div className="min-h-0 flex-1 overflow-hidden">
       {viewMode === "kanban" ? (
         <KanbanBoard
+          className="h-full"
           statuses={statuses}
           tasksByStatus={tasksByStatus}
           onMoveTask={handleMoveTask}
@@ -812,6 +816,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
         />
       ) : viewMode === "scrum" ? (
         <ScrumBoard
+          className="h-full"
           swimlanes={swimlanes}
           statuses={statuses}
           tasksByCell={tasksByCell}
@@ -835,18 +840,21 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
           aria-label={`Scrum board for ${project.name}`}
         />
       ) : (
-        <BoardTableView
-          tasks={allTasksFlat}
-          statuses={statuses}
-          assigneeMap={assigneeMap}
-          subtaskMap={subtaskMap}
-          onTaskClick={(task) => setSelectedTaskId(task.id)}
-          isSelectionMode={bulk.state.isSelectionMode}
-          selectedIds={bulk.state.selectedIds}
-          onToggleSelect={bulk.toggle}
-          permissions={permissions}
-        />
+        <div className="h-full overflow-y-auto">
+          <BoardTableView
+            tasks={allTasksFlat}
+            statuses={statuses}
+            assigneeMap={assigneeMap}
+            subtaskMap={subtaskMap}
+            onTaskClick={(task) => setSelectedTaskId(task.id)}
+            isSelectionMode={bulk.state.isSelectionMode}
+            selectedIds={bulk.state.selectedIds}
+            onToggleSelect={bulk.toggle}
+            permissions={permissions}
+          />
+        </div>
       )}
+      </div>
 
       {/* Bulk action bar */}
       {bulk.state.isSelectionMode && (
