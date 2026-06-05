@@ -1,6 +1,8 @@
 import JSZip from "jszip";
 import type { CreateTaskPayload } from "@/services/api/tasks.api";
 import { uploadAttachment } from "@/services/api/attachments.api";
+import { parseApiError } from "@/services/api/client";
+import { blobToTypedFile } from "@/lib/file-mime";
 import { parseTasksCsvContent, type ParsedTaskCsvRow } from "@/lib/tasks-csv";
 import {
   mapParsedRowToCreatePayload,
@@ -12,6 +14,21 @@ export interface ParsedTasksZip {
   rows: ParsedTaskCsvRow[];
   errors: string[];
   mediaByExportKey: Map<string, File[]>;
+}
+
+function resolveExportKey(row: ParsedTaskCsvRow, rowIndex: number): string {
+  const key = row.exportKey?.trim();
+  if (key) return key;
+  return `task-${String(rowIndex + 1).padStart(4, "0")}`;
+}
+
+function pickMediaFiles(exportKey: string, row: ParsedTaskCsvRow, mediaByExportKey: Map<string, File[]>): File[] {
+  const all = mediaByExportKey.get(exportKey) ?? [];
+  if (!row.mediaFileNames.length) return all;
+
+  const wanted = new Set(row.mediaFileNames.map((n) => n.trim().toLowerCase()).filter(Boolean));
+  const matched = all.filter((f) => wanted.has(f.name.toLowerCase()));
+  return matched.length ? matched : all;
 }
 
 export async function parseTasksZipFile(file: File): Promise<ParsedTasksZip> {
@@ -40,9 +57,7 @@ export async function parseTasksZipFile(file: File): Promise<ParsedTasksZip> {
 
     loadPromises.push(
       entry.async("blob").then((blob) => {
-        const file = new File([blob], fileName, {
-          type: blob.type || "application/octet-stream",
-        });
+        const file = blobToTypedFile(blob, fileName);
         const list = mediaByExportKey.get(exportKey) ?? [];
         list.push(file);
         mediaByExportKey.set(exportKey, list);
@@ -63,10 +78,11 @@ export async function importTasksFromZip(
     createTask: (payload: CreateTaskPayload) => Promise<{ id: string }>;
     onProgress?: (done: number, total: number, message?: string) => void;
   }
-): Promise<ImportTasksResult & { mediaUploaded: number }> {
+): Promise<ImportTasksResult & { mediaUploaded: number; mediaFailed: number }> {
   const failed: ImportTasksResult["failed"] = [];
   let created = 0;
   let mediaUploaded = 0;
+  let mediaFailed = 0;
   const { rows, mediaByExportKey } = parsed;
   const { projectId, organizationId, context, createTask, onProgress } = options;
 
@@ -78,18 +94,21 @@ export async function importTasksFromZip(
       const createdTask = await createTask(payload);
       created++;
 
-      const exportKey = row.exportKey;
-      const mediaFiles =
-        (exportKey && mediaByExportKey.get(exportKey)) ||
-        (exportKey ? [] : []);
+      const exportKey = resolveExportKey(row, i);
+      const mediaFiles = pickMediaFiles(exportKey, row, mediaByExportKey);
 
       if (mediaFiles.length && createdTask?.id) {
         for (const file of mediaFiles) {
           try {
             await uploadAttachment(createdTask.id, file);
             mediaUploaded++;
-          } catch {
-            // Continue other files
+          } catch (err) {
+            mediaFailed++;
+            failed.push({
+              row: row.rowNumber,
+              title: row.title,
+              error: `Attachment "${file.name}": ${parseApiError(err)}`,
+            });
           }
         }
       }
@@ -100,5 +119,5 @@ export async function importTasksFromZip(
     onProgress?.(i + 1, rows.length);
   }
 
-  return { created, failed, mediaUploaded };
+  return { created, failed, mediaUploaded, mediaFailed };
 }

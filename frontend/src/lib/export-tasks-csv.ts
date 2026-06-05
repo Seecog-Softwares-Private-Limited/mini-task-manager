@@ -35,6 +35,15 @@ function parseDateParts(value: string): { day: number; month: number; year: numb
   return { day: d.getDate(), month: d.getMonth() + 1, year: d.getFullYear() };
 }
 
+/** ISO date for ZIP export/import (avoids Excel locale shifts). */
+export function formatCsvDateIso(value: string | undefined | null): string {
+  if (!value) return "";
+  const parts = parseDateParts(String(value));
+  if (!parts) return "";
+  const { day, month, year } = parts;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 /** Human-readable date for CSV (Excel shows `########` on narrow ISO date columns). */
 function formatCsvDate(value: string | undefined | null): string {
   if (!value) return "";
@@ -74,46 +83,62 @@ export function filterTasksByBoardFilters(tasks: Task[], filters: BoardFilters):
   });
 }
 
+export type TasksCsvDateFormat = "pretty" | "iso";
+
+export function buildTaskCsvRowCells(
+  t: Task,
+  options: {
+    projectName?: string;
+    statusNameById: Record<string, string>;
+    assigneeNameById: Record<string, string>;
+    dateFormat?: TasksCsvDateFormat;
+  }
+): Array<string | number> {
+  const assigneeIds = t.assigneeIds?.length ? t.assigneeIds : t.assigneeId ? [t.assigneeId] : [];
+  const assigneeNames = assigneeIds
+    .map((id) => options.assigneeNameById[id] ?? t.assignee?.fullName ?? t.assignee?.email ?? id)
+    .filter(Boolean)
+    .join("; ");
+  const subtasks = t.subtasks ?? [];
+  const subtasksDone = subtasks.filter((s) => s.completed).length;
+  const tagNames = (t.tags ?? []).map((tag) => tag.name).join("; ");
+  const subtaskTitles = subtasks.map((s) => s.title).join("; ");
+  const formatDueDate = options.dateFormat === "iso" ? formatCsvDateIso : formatCsvDate;
+
+  return [
+    t.id,
+    t.title,
+    stripHtml(t.description ?? ""),
+    t.statusId ? options.statusNameById[t.statusId] ?? t.statusId : "",
+    t.priority,
+    assigneeNames,
+    formatDueDate(t.dueDate),
+    t.storyPoints ?? "",
+    tagNames,
+    subtaskTitles,
+    subtasks.length ? `${subtasksDone}/${subtasks.length}` : "",
+    formatCsvDateTime(t.createdAt),
+    formatCsvDateTime(t.updatedAt),
+    options.projectName ?? t.projectId,
+  ];
+}
+
 export function buildTasksCsv(
   tasks: Task[],
   options: {
     projectName?: string;
     statusNameById: Record<string, string>;
     assigneeNameById: Record<string, string>;
+    dateFormat?: TasksCsvDateFormat;
   }
 ): string {
   const headers = [...TASKS_CSV_HEADERS];
 
-  const rows = tasks.map((t) => {
-    const assigneeIds = t.assigneeIds?.length ? t.assigneeIds : t.assigneeId ? [t.assigneeId] : [];
-    const assigneeNames = assigneeIds
-      .map((id) => options.assigneeNameById[id] ?? t.assignee?.fullName ?? t.assignee?.email ?? id)
-      .filter(Boolean)
-      .join("; ");
-    const subtasks = t.subtasks ?? [];
-    const subtasksDone = subtasks.filter((s) => s.completed).length;
-    const tagNames = (t.tags ?? []).map((tag) => tag.name).join("; ");
-    const subtaskTitles = subtasks.map((s) => s.title).join("; ");
-
-    return [
-      t.id,
-      t.title,
-      stripHtml(t.description ?? ""),
-      t.statusId ? options.statusNameById[t.statusId] ?? t.statusId : "",
-      t.priority,
-      assigneeNames,
-      formatCsvDate(t.dueDate),
-      t.storyPoints ?? "",
-      tagNames,
-      subtaskTitles,
-      subtasks.length ? `${subtasksDone}/${subtasks.length}` : "",
-      formatCsvDateTime(t.createdAt),
-      formatCsvDateTime(t.updatedAt),
-      options.projectName ?? t.projectId,
-    ]
+  const rows = tasks.map((t) =>
+    buildTaskCsvRowCells(t, options)
       .map(escapeCsvCell)
-      .join(",");
-  });
+      .join(",")
+  );
 
   return [headers.map(escapeCsvCell).join(","), ...rows].join("\r\n");
 }

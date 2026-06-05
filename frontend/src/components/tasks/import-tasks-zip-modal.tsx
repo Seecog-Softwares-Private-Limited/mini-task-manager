@@ -114,6 +114,9 @@ export function ImportTasksZipModal({
 
       onImported?.();
 
+      const taskFailures = result.failed.filter((f) => !f.error.startsWith("Attachment "));
+      const attachmentFailures = result.failed.length - taskFailures.length;
+
       if (result.failed.length === 0) {
         toast({
           title: "Import complete",
@@ -124,7 +127,7 @@ export function ImportTasksZipModal({
       } else {
         toast({
           title: "Import finished with errors",
-          description: `${result.created} created, ${result.mediaUploaded} files uploaded, ${result.failed.length} failed.`,
+          description: `${result.created} task${result.created === 1 ? "" : "s"} created, ${result.mediaUploaded} file${result.mediaUploaded === 1 ? "" : "s"} uploaded${attachmentFailures ? `, ${attachmentFailures} attachment${attachmentFailures === 1 ? "" : "s"} failed` : ""}${taskFailures.length ? `, ${taskFailures.length} task${taskFailures.length === 1 ? "" : "s"} failed` : ""}.`,
           variant: "error",
         });
       }

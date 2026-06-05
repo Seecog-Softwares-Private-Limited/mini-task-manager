@@ -4,9 +4,10 @@ import Link from "next/link";
 import { usePermissions } from "@/hooks/use-permissions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Building2, Shield, Key, Webhook, Download, Lock, ArrowLeft, ArrowRight, Users } from "lucide-react";
+import { Building2, Shield, Key, Webhook, Download, Lock, ArrowLeft, ArrowRight, Users, KeyRound } from "lucide-react";
 
 const SECTIONS = [
+  { href: "/dashboard/settings/password", title: "Password", description: "Change your account password", icon: KeyRound, color: "text-sky-500 bg-sky-500/10", requiredCap: null },
   { href: "/dashboard/settings/workspace", title: "Workspace", description: "Name, slug, subscription, danger zone", icon: Building2, color: "text-primary bg-primary/10", requiredCap: "canEditOrgSettings" as const },
   { href: "/dashboard/settings/members", title: "Members", description: "Invite members, manage roles, transfer ownership", icon: Users, color: "text-emerald-600 bg-emerald-500/10", requiredCap: "canInviteMembers" as const },
   { href: "/dashboard/settings/permissions", title: "Roles & Permissions", description: "Role matrix and feature access", icon: Shield, color: "text-purple-500 bg-purple-500/10", requiredCap: null },
