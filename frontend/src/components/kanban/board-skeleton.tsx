@@ -46,13 +46,13 @@ export function BoardSkeleton({
       )}
 
       {/* Columns skeleton */}
-      <div className="flex gap-4 overflow-hidden">
+      <div className="flex w-full gap-4 overflow-hidden">
         {Array.from({ length: columns }).map((_, colIdx) => {
           const cardCount = cardsPerColumn[colIdx % cardsPerColumn.length];
           return (
             <div
               key={colIdx}
-              className="w-[310px] shrink-0 rounded-2xl border bg-muted/10"
+              className="min-h-[450px] min-w-[310px] flex-1 rounded-2xl border bg-muted/10"
             >
               {/* Column header */}
               <div className="flex items-center gap-2 border-b px-4 py-3">
