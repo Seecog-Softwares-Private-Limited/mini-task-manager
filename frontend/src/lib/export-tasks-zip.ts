@@ -3,7 +3,7 @@ import type { BoardFilters } from "@/components/kanban/kanban-board";
 import type { Task, WorkflowStatus } from "@/types/api";
 import { fetchAttachments, fetchAttachmentBlob } from "@/services/api/attachments.api";
 import {
-  buildTasksCsv,
+  buildTaskCsvRowCells,
   filterTasksByBoardFilters,
   sanitizeExportFilename,
 } from "@/lib/export-tasks-csv";
@@ -38,21 +38,11 @@ function buildTasksCsvWithMedia(
     assigneeNameById: Record<string, string>;
   }
 ): string {
-  const baseCsv = buildTasksCsv(
-    entries.map((e) => e.task),
-    options
-  );
-  const lines = baseCsv.split(/\r?\n/);
-  if (lines.length === 0) return baseCsv;
-
   const header = TASKS_CSV_HEADERS_ZIP.map(escapeCsvCell).join(",");
-  const dataLines = entries.map((entry, idx) => {
-    const line = lines[idx + 1] ?? "";
-    const extra = [
-      escapeCsvCell(entry.exportKey),
-      escapeCsvCell(entry.mediaFileNames.join("; ")),
-    ].join(",");
-    return line ? `${line},${extra}` : extra;
+  const dataLines = entries.map((entry) => {
+    const cells = buildTaskCsvRowCells(entry.task, { ...options, dateFormat: "iso" });
+    cells.push(entry.exportKey, entry.mediaFileNames.join("; "));
+    return cells.map(escapeCsvCell).join(",");
   });
 
   return [header, ...dataLines].join("\r\n");

@@ -68,6 +68,19 @@ export async function resetPassword(token: string, password: string): Promise<{ 
   return data;
 }
 
+export async function fetchPasswordStatus(): Promise<{ hasPassword: boolean }> {
+  const { data } = await apiClient.get<{ hasPassword: boolean }>("auth/password-status");
+  return data;
+}
+
+export async function changePassword(payload: {
+  currentPassword?: string;
+  newPassword: string;
+}): Promise<{ message: string }> {
+  const { data } = await apiClient.post<{ message: string }>("auth/change-password", payload);
+  return data;
+}
+
 export async function sendOtp(phone: string): Promise<{ message: string }> {
   const { data } = await apiClient.post<{ message: string }>("auth/send-otp", { phone });
   return data;

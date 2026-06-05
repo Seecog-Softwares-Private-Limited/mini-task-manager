@@ -69,8 +69,11 @@ export function parseCsvText(content: string): string[][] {
 
 /** Parse exported / Excel date text → `YYYY-MM-DD` for the API. */
 export function parseCsvDateToYmd(value: string | undefined): string | undefined {
-  const raw = (value ?? "").trim();
+  let raw = (value ?? "").trim();
   if (!raw) return undefined;
+
+  // Excel sometimes prefixes text dates with a single quote.
+  if (raw.startsWith("'")) raw = raw.slice(1).trim();
 
   const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
@@ -80,12 +83,24 @@ export function parseCsvDateToYmd(value: string | undefined): string | undefined
     const a = Number(dmy[1]);
     const b = Number(dmy[2]);
     const year = Number(dmy[3]);
-    const month = a > 12 ? b : a;
-    const day = a > 12 ? a : b;
+    let month: number;
+    let day: number;
+    if (a > 12) {
+      day = a;
+      month = b;
+    } else if (b > 12) {
+      month = a;
+      day = b;
+    } else {
+      // Ambiguous — prefer DD/MM/YYYY (common outside US).
+      day = a;
+      month = b;
+    }
     return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   }
 
-  const pretty = raw.match(/^(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})/);
+  const dateOnly = raw.replace(/\s+\d{1,2}:\d{2}(?::\d{2})?.*$/, "");
+  const pretty = dateOnly.match(/^(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})/);
   if (pretty) {
     const month = MONTH_BY_SHORT[pretty[2].slice(0, 3).toLowerCase()];
     if (month) {

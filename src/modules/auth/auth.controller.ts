@@ -10,6 +10,7 @@ import { PublicSignupDto } from './dto/public-signup.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -85,6 +86,23 @@ export class AuthController {
   @Post('logout')
   async logout(): Promise<{ message: string }> {
     return { message: 'Logged out' };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @SkipThrottle({ auth: true })
+  @Get('password-status')
+  async passwordStatus(@Req() req: { user: { userId: string } }): Promise<{ hasPassword: boolean }> {
+    return this.authService.getPasswordStatus(req.user.userId);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @SkipThrottle({ auth: true })
+  @Post('change-password')
+  async changePassword(
+    @Req() req: { user: { userId: string } },
+    @Body() dto: ChangePasswordDto,
+  ): Promise<{ message: string }> {
+    return this.authService.changePassword(req.user.userId, dto.currentPassword, dto.newPassword);
   }
 
   @Public()

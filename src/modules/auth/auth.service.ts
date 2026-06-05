@@ -331,6 +331,48 @@ export class AuthService {
     return { message: 'Password reset successfully. You can now sign in.' };
   }
 
+  async getPasswordStatus(userId: string): Promise<{ hasPassword: boolean }> {
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new BadRequestException('User not found');
+    const hasPassword = Boolean(user.passwordHash?.trim());
+    return { hasPassword };
+  }
+
+  async changePassword(
+    userId: string,
+    currentPassword: string | undefined,
+    newPassword: string,
+  ): Promise<{ message: string }> {
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new BadRequestException('User not found');
+    if (!user.isActive) {
+      throw new BadRequestException('Your account is deactivated.');
+    }
+
+    const hasPassword = Boolean(user.passwordHash?.trim());
+    if (hasPassword) {
+      const current = currentPassword ?? '';
+      if (!current) {
+        throw new BadRequestException('Current password is required');
+      }
+      const valid = await this.usersService.validatePassword(userId, current);
+      if (!valid) {
+        throw new BadRequestException('Current password is incorrect');
+      }
+    }
+
+    if (hasPassword && currentPassword === newPassword) {
+      throw new BadRequestException('New password must be different from your current password');
+    }
+
+    await this.usersService.updatePassword(userId, newPassword);
+    return {
+      message: hasPassword
+        ? 'Password updated successfully'
+        : 'Password set successfully. You can now sign in with email and password.',
+    };
+  }
+
   async loginWithGoogleUser(user: { id: string; email: string; fullName: string }): Promise<string> {
     const payload = { sub: user.id, email: user.email };
     return this.jwtService.sign(payload);

@@ -4,7 +4,10 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChangePasswordForm } from "@/components/settings/change-password-form";
 import { fetchSuperAdminSettings, upsertSuperAdminSetting } from "@/services/api/super-admin.api";
+import { KeyRound } from "lucide-react";
 
 export default function SuperAdminSettingsPage() {
   const { data, refetch, isLoading } = useQuery({
@@ -34,6 +37,18 @@ export default function SuperAdminSettingsPage() {
           {saving ? "Saving..." : "Save Platform Name"}
         </Button>
       </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <KeyRound className="h-5 w-5 text-primary" />
+            Change password
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ChangePasswordForm />
+        </CardContent>
+      </Card>
+
       <div className="rounded-lg border p-4">
         <h2 className="mb-2 font-semibold">Current Settings</h2>
         {isLoading ? (
