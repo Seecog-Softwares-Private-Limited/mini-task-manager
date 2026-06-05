@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { usePlatformAdmin } from "@/hooks/use-platform-admin";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -52,7 +52,10 @@ const nav: {
 ];
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const router = useRouter();
+  const isBoardView =
+    pathname === "/dashboard/tasks" || pathname.includes("/board");
   const { hasRole } = useAuth();
   const { isPlatformAdmin } = usePlatformAdmin();
   const { canManageBilling, canViewAudit } = usePermissions();
@@ -152,7 +155,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
         <TrialBanner />
-        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-8 animate-fade-in">
+        <main
+          className={cn(
+            "flex min-h-0 flex-1 flex-col p-4 md:p-8 animate-fade-in",
+            isBoardView ? "overflow-hidden" : "overflow-y-auto",
+          )}
+        >
           <TenantGuard>{children}</TenantGuard>
         </main>
       </div>

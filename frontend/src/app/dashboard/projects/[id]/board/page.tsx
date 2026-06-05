@@ -84,7 +84,6 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
   const [boardSettings, setBoardSettings] = useState<BoardSettings>({ wipLimits: {} });
   const [collapsedColumns, setCollapsedColumns] = useState<Record<string, boolean>>({});
   const [collapsedSwimlanes, setCollapsedSwimlanes] = useState<Record<string, boolean>>({});
-  const [movingTaskId, setMovingTaskId] = useState<string | null>(null);
   const [createSprintModalOpen, setCreateSprintModalOpen] = useState(false);
   const [importZipOpen, setImportZipOpen] = useState(false);
   const [exportingZip, setExportingZip] = useState(false);
@@ -278,7 +277,6 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
     mutationFn: ({ taskId, statusId }: { taskId: string; statusId: string | null }) =>
       updateTaskStatus(taskId, statusId),
     onMutate: async ({ taskId, statusId: toStatusId }) => {
-      setMovingTaskId(taskId);
       await queryClient.cancelQueries({ queryKey: ["tasks", id] });
       const prev = queryClient.getQueryData<{ data: Task[] }>(["tasks", id]);
       queryClient.setQueryData<{ data: Task[] }>(["tasks", id], (old) => {
@@ -287,17 +285,23 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
       });
       return { previous: prev };
     },
+    onSuccess: (updated, vars) => {
+      if (updated?.id) {
+        queryClient.setQueryData<{ data: Task[] }>(["tasks", id], (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            data: old.data.map((t) => (t.id === vars.taskId ? { ...t, ...updated } : t)),
+          };
+        });
+        queryClient.setQueryData(["task", vars.taskId], updated);
+      }
+      const toName = statuses.find((s) => s.id === vars.statusId)?.name ?? "new column";
+      toast({ title: "Task moved", description: `Moved to ${toName}`, variant: "success" });
+    },
     onError: (_err, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(["tasks", id], context.previous);
       toast({ title: "Failed to move task", description: "Returned to original column.", variant: "error" });
-    },
-    onSettled: () => {
-      setMovingTaskId(null);
-      queryClient.invalidateQueries({ queryKey: ["tasks", id] });
-    },
-    onSuccess: (_data, vars) => {
-      const toName = statuses.find((s) => s.id === vars.statusId)?.name ?? "new column";
-      toast({ title: "Task moved", description: `Moved to ${toName}`, variant: "success" });
     },
   });
 
@@ -371,7 +375,6 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
     mutationFn: ({ taskId, statusId, sprintId }: { taskId: string; statusId: string; sprintId: string | null }) =>
       updateTaskStatusAndSprint(taskId, statusId, sprintId),
     onMutate: async ({ taskId, statusId: toStatusId, sprintId: toSprintId }) => {
-      setMovingTaskId(taskId);
       await queryClient.cancelQueries({ queryKey: ["tasks", id] });
       const prev = queryClient.getQueryData<{ data: Task[] }>(["tasks", id]);
       queryClient.setQueryData<{ data: Task[] }>(["tasks", id], (old) => {
@@ -385,13 +388,20 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
       });
       return { previous: prev };
     },
+    onSuccess: (updated, vars) => {
+      if (!updated?.id) return;
+      queryClient.setQueryData<{ data: Task[] }>(["tasks", id], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          data: old.data.map((t) => (t.id === vars.taskId ? { ...t, ...updated } : t)),
+        };
+      });
+      queryClient.setQueryData(["task", vars.taskId], updated);
+    },
     onError: (_err, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(["tasks", id], context.previous);
       toast({ title: "Failed to move task", description: "Returned to original position.", variant: "error" });
-    },
-    onSettled: () => {
-      setMovingTaskId(null);
-      queryClient.invalidateQueries({ queryKey: ["tasks", id] });
     },
   });
 
@@ -663,7 +673,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+    <div className="flex min-h-0 flex-1 basis-0 flex-col gap-4 overflow-hidden">
       {celebrationLayer}
       {/* Header */}
       <div className="flex shrink-0 items-center justify-between gap-4">
@@ -788,10 +798,10 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
       </div>
 
       {/* Board / Table */}
-      <div className="min-h-0 flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 basis-0 flex-col overflow-hidden">
       {viewMode === "kanban" ? (
         <KanbanBoard
-          className="h-full"
+          className="min-h-0 flex-1 basis-0"
           statuses={statuses}
           tasksByStatus={tasksByStatus}
           onMoveTask={handleMoveTask}
@@ -803,7 +813,6 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
           filters={filters}
           quickActions={quickActions}
           wipLimits={boardSettings.wipLimits}
-          movingTaskId={movingTaskId}
           collapsedColumns={collapsedColumns}
           onToggleColumnCollapse={toggleColumnCollapse}
           isSelectionMode={bulk.state.isSelectionMode}
@@ -816,7 +825,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
         />
       ) : viewMode === "scrum" ? (
         <ScrumBoard
-          className="h-full"
+          className="min-h-0 flex-1 basis-0"
           swimlanes={swimlanes}
           statuses={statuses}
           tasksByCell={tasksByCell}
@@ -828,7 +837,6 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
           filters={filters}
           quickActions={quickActions}
           wipLimits={boardSettings.wipLimits}
-          movingTaskId={movingTaskId}
           collapsedSwimlanes={collapsedSwimlanes}
           onToggleSwimlaneCollapse={(swimlaneId) =>
             setCollapsedSwimlanes((prev) => ({ ...prev, [swimlaneId]: !prev[swimlaneId] }))
@@ -840,7 +848,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
           aria-label={`Scrum board for ${project.name}`}
         />
       ) : (
-        <div className="h-full overflow-y-auto">
+        <div className="min-h-0 flex-1 basis-0 overflow-y-auto">
           <BoardTableView
             tasks={allTasksFlat}
             statuses={statuses}

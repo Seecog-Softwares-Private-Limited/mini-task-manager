@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import type { BoardFilters, AssigneeMap } from "./kanban-board";
 import {
   Search,
@@ -249,7 +249,7 @@ export function BoardToolbar({
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-52">
+            <DropdownMenuContent align="start" className="w-80 max-h-80 overflow-y-auto">
               <DropdownMenuLabel className="text-xs">Filter by assignee</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {assigneeEntries.map(([userId, info]) => (
@@ -257,16 +257,20 @@ export function BoardToolbar({
                   key={userId}
                   checked={filters.assignee.includes(userId)}
                   onCheckedChange={() => toggleArrayFilter("assignee", userId)}
+                  className="items-center py-2"
                 >
-                  <span className="flex items-center gap-2">
-                    <Avatar className="h-5 w-5">
-                      <AvatarImage src={info.avatarUrl} />
-                      <AvatarFallback className="text-[8px]">
-                        {info.name.slice(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="truncate">{info.name}</span>
-                  </span>
+                  <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                    <UserAvatar
+                      userId={userId}
+                      name={info.name}
+                      avatarUrl={info.avatarUrl}
+                      className="h-6 w-6"
+                      fallbackClassName="text-[9px]"
+                    />
+                    <span className="min-w-0 flex-1 break-all text-sm leading-snug">
+                      {info.name}
+                    </span>
+                  </div>
                 </DropdownMenuCheckboxItem>
               ))}
             </DropdownMenuContent>
@@ -507,14 +511,15 @@ export function BoardToolbar({
           {filters.assignee.map((userId) => {
             const info = assigneeMap?.[userId];
             return (
-              <Badge key={userId} variant="secondary" className="h-6 gap-1 pl-1.5 pr-1 text-[11px] font-medium">
-                <Avatar className="h-3.5 w-3.5">
-                  <AvatarImage src={info?.avatarUrl} />
-                  <AvatarFallback className="text-[6px]">
-                    {(info?.name ?? "?").slice(0, 2).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                {info?.name ?? userId.slice(0, 8)}
+              <Badge key={userId} variant="secondary" className="h-6 max-w-[12rem] gap-1 pl-1.5 pr-1 text-[11px] font-medium">
+                <UserAvatar
+                  userId={userId}
+                  name={info?.name}
+                  avatarUrl={info?.avatarUrl}
+                  className="h-3.5 w-3.5"
+                  fallbackClassName="text-[6px]"
+                />
+                <span className="truncate">{info?.name ?? userId.slice(0, 8)}</span>
                 <button
                   onClick={() => removeAssigneeFilter(userId)}
                   className="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5 transition-colors"

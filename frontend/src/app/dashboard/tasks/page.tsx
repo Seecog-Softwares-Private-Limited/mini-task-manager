@@ -116,7 +116,6 @@ export default function TasksPage() {
   const [boardSettings, setBoardSettings] = useState<BoardSettings>({ wipLimits: {} });
   const [collapsedColumns, setCollapsedColumns] = useState<Record<string, boolean>>({});
   const [collapsedSwimlanes, setCollapsedSwimlanes] = useState<Record<string, boolean>>({});
-  const [movingTaskId, setMovingTaskId] = useState<string | null>(null);
   const [isBulkMoving, setIsBulkMoving] = useState(false);
 
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
@@ -166,7 +165,6 @@ export default function TasksPage() {
     setFilters(DEFAULT_FILTERS);
     setCollapsedColumns({});
     setCollapsedSwimlanes({});
-    setMovingTaskId(null);
     setSelectedTaskId(null);
     setCreateModalOpen(false);
     bulk.exitSelectionMode();
@@ -339,7 +337,6 @@ export default function TasksPage() {
     mutationFn: ({ taskId, statusId }: { taskId: string; statusId: string | null }) =>
       updateTaskStatus(taskId, statusId),
     onMutate: async ({ taskId, statusId: toStatusId }) => {
-      setMovingTaskId(taskId);
       const qk = ["tasks", selectedProjectId];
       await queryClient.cancelQueries({ queryKey: qk });
       const prev = queryClient.getQueryData<{ data: Task[] }>(qk);
@@ -349,13 +346,20 @@ export default function TasksPage() {
       });
       return { previous: prev };
     },
+    onSuccess: (updated, { taskId }) => {
+      if (!updated?.id) return;
+      queryClient.setQueryData<{ data: Task[] }>(["tasks", selectedProjectId], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          data: old.data.map((t) => (t.id === taskId ? { ...t, ...updated } : t)),
+        };
+      });
+      queryClient.setQueryData(["task", taskId], updated);
+    },
     onError: (_err, _vars, ctx) => {
       if (ctx?.previous) queryClient.setQueryData(["tasks", selectedProjectId], ctx.previous);
       toast({ title: "Failed to move task", description: "Returned to original column.", variant: "error" });
-    },
-    onSettled: () => {
-      setMovingTaskId(null);
-      queryClient.invalidateQueries({ queryKey: ["tasks", selectedProjectId] });
     },
   });
 
@@ -380,7 +384,6 @@ export default function TasksPage() {
     mutationFn: ({ taskId, statusId, sprintId }: { taskId: string; statusId: string; sprintId: string | null }) =>
       updateTaskStatusAndSprint(taskId, statusId, sprintId),
     onMutate: async ({ taskId, statusId: toStatusId, sprintId: toSprintId }) => {
-      setMovingTaskId(taskId);
       const qk = ["tasks", selectedProjectId];
       await queryClient.cancelQueries({ queryKey: qk });
       const prev = queryClient.getQueryData<{ data: Task[] }>(qk);
@@ -395,13 +398,20 @@ export default function TasksPage() {
       });
       return { previous: prev };
     },
+    onSuccess: (updated, { taskId }) => {
+      if (!updated?.id) return;
+      queryClient.setQueryData<{ data: Task[] }>(["tasks", selectedProjectId], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          data: old.data.map((t) => (t.id === taskId ? { ...t, ...updated } : t)),
+        };
+      });
+      queryClient.setQueryData(["task", taskId], updated);
+    },
     onError: (_err, _vars, ctx) => {
       if (ctx?.previous) queryClient.setQueryData(["tasks", selectedProjectId], ctx.previous);
       toast({ title: "Failed to move task", description: "Returned to original position.", variant: "error" });
-    },
-    onSettled: () => {
-      setMovingTaskId(null);
-      queryClient.invalidateQueries({ queryKey: ["tasks", selectedProjectId] });
     },
   });
 
@@ -657,7 +667,7 @@ export default function TasksPage() {
   const isBoardLoading = workflowsLoading || statusesLoading || tasksLoading || setupWorkflowMutation.isPending;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden animate-slide-up">
+    <div className="flex min-h-0 flex-1 basis-0 flex-col gap-4 overflow-hidden animate-slide-up">
       {celebrationLayer}
       <div className="flex shrink-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 flex-1 flex-col gap-3">
@@ -762,10 +772,10 @@ export default function TasksPage() {
             />
           </div>
 
-          <div className="min-h-0 flex-1 overflow-hidden">
+          <div className="flex min-h-0 flex-1 basis-0 flex-col overflow-hidden">
             {viewMode === "kanban" ? (
               <KanbanBoard
-                className="h-full"
+                className="min-h-0 flex-1 basis-0"
                 statuses={statuses}
                 tasksByStatus={tasksByStatus}
                 onMoveTask={handleMoveTask}
@@ -777,7 +787,6 @@ export default function TasksPage() {
                 filters={filters}
                 quickActions={quickActions}
                 wipLimits={boardSettings.wipLimits}
-                movingTaskId={movingTaskId}
                 collapsedColumns={collapsedColumns}
                 onToggleColumnCollapse={(statusId) => setCollapsedColumns((prev) => ({ ...prev, [statusId]: !prev[statusId] }))}
                 isSelectionMode={bulk.state.isSelectionMode}
@@ -802,7 +811,7 @@ export default function TasksPage() {
               />
             ) : viewMode === "scrum" ? (
               <ScrumBoard
-                className="h-full"
+                className="min-h-0 flex-1 basis-0"
                 swimlanes={swimlanes}
                 statuses={statuses}
                 tasksByCell={tasksByCell}
@@ -814,7 +823,6 @@ export default function TasksPage() {
                 filters={filters}
                 quickActions={quickActions}
                 wipLimits={boardSettings.wipLimits}
-                movingTaskId={movingTaskId}
                 collapsedSwimlanes={collapsedSwimlanes}
                 onToggleSwimlaneCollapse={(id) => setCollapsedSwimlanes((prev) => ({ ...prev, [id]: !prev[id] }))}
                 isSelectionMode={bulk.state.isSelectionMode}
@@ -824,7 +832,7 @@ export default function TasksPage() {
                 aria-label={`Scrum board for ${selectedProject.name}`}
               />
             ) : (
-              <div className="h-full overflow-y-auto">
+              <div className="min-h-0 flex-1 basis-0 overflow-y-auto">
                 <BoardTableView
                   tasks={allTasksFlat}
                   statuses={statuses}

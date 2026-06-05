@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { Task, WorkflowStatus } from "@/types/api";
 import type { BoardPermissions } from "@/hooks/use-board-permissions";
 import type { AssigneeMap, SubtaskInfo, TaskCardQuickActions } from "@/components/kanban/kanban-board";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -141,16 +142,68 @@ export function getWorkflowStatusCategory(
 }
 
 const STATUS_LANE_ACCENT = {
-  todo: "bg-sky-600/75 dark:bg-sky-500/65",
+  todo: "bg-rose-500/75 dark:bg-rose-400/65",
   done: "bg-emerald-500/70 dark:bg-emerald-400/60",
-  in_progress: "bg-orange-500/70 dark:bg-orange-400/55",
+  in_progress: "bg-amber-400/80 dark:bg-amber-400/60",
 } as const;
 
 const STATUS_BULB = {
-  todo: "bg-sky-600 ring-2 ring-sky-500/30 dark:bg-sky-400 dark:ring-sky-400/35",
+  todo: "bg-rose-500 ring-2 ring-rose-500/30 dark:bg-rose-400 dark:ring-rose-400/35",
   done: "bg-emerald-500 ring-2 ring-emerald-500/25 dark:bg-emerald-400 dark:ring-emerald-400/30",
-  in_progress: "bg-orange-500 ring-2 ring-orange-500/25 dark:bg-orange-400 dark:ring-orange-400/30",
+  in_progress: "bg-amber-500 ring-2 ring-amber-500/25 dark:bg-amber-400 dark:ring-amber-400/30",
 } as const;
+
+/** Glassy card surface per workflow column. */
+const STATUS_CARD_SURFACE = {
+  todo: cn(
+    "border-rose-200/55 bg-gradient-to-br from-rose-100/50 via-rose-50/75 to-white/80",
+    "backdrop-blur-xl backdrop-saturate-150",
+    "ring-1 ring-inset ring-white/60 dark:ring-white/10",
+    "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.85),0_2px_8px_rgba(244,63,94,0.06),0_14px_36px_-10px_rgba(244,63,94,0.18)]",
+    "dark:border-rose-500/25 dark:from-rose-950/50 dark:via-rose-950/30 dark:to-rose-950/5",
+    "hover:border-rose-300/65 hover:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.95),0_6px_24px_-6px_rgba(244,63,94,0.22)]",
+    "dark:hover:border-rose-400/30",
+  ),
+  in_progress: cn(
+    "border-amber-200/55 bg-gradient-to-br from-amber-100/50 via-amber-50/75 to-white/80",
+    "backdrop-blur-xl backdrop-saturate-150",
+    "ring-1 ring-inset ring-white/60 dark:ring-white/10",
+    "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.85),0_2px_8px_rgba(245,158,11,0.06),0_14px_36px_-10px_rgba(245,158,11,0.18)]",
+    "dark:border-amber-500/25 dark:from-amber-950/50 dark:via-amber-950/30 dark:to-amber-950/5",
+    "hover:border-amber-300/65 hover:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.95),0_6px_24px_-6px_rgba(245,158,11,0.22)]",
+    "dark:hover:border-amber-400/30",
+  ),
+  done: cn(
+    "border-emerald-200/55 bg-gradient-to-br from-emerald-100/50 via-emerald-50/75 to-white/80",
+    "backdrop-blur-xl backdrop-saturate-150",
+    "ring-1 ring-inset ring-white/60 dark:ring-white/10",
+    "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.85),0_2px_8px_rgba(16,185,129,0.06),0_14px_36px_-10px_rgba(16,185,129,0.18)]",
+    "dark:border-emerald-500/25 dark:from-emerald-950/50 dark:via-emerald-950/30 dark:to-emerald-950/5",
+    "hover:border-emerald-300/65 hover:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.95),0_6px_24px_-6px_rgba(16,185,129,0.22)]",
+    "dark:hover:border-emerald-400/30",
+  ),
+  default: cn(
+    "border-[#E7EAF0] bg-gradient-to-br from-white via-[#FCFCFD] to-slate-50/80",
+    "backdrop-blur-md ring-1 ring-inset ring-white/70 dark:ring-white/5",
+    "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.9),0_8px_24px_-8px_rgba(15,23,42,0.08)]",
+    "dark:border-border dark:from-card dark:via-card dark:to-muted/20",
+    "hover:border-[#E2E6ED] hover:shadow-[0_12px_32px_-10px_rgba(15,23,42,0.12)]",
+    "dark:hover:border-neutral-600",
+  ),
+} as const;
+
+const STATUS_CARD_SHINE = {
+  todo: "from-rose-100/30 via-white/20",
+  in_progress: "from-amber-100/30 via-white/20",
+  done: "from-emerald-100/30 via-white/20",
+  default: "from-white/40 via-transparent",
+} as const;
+
+const QUICK_ACTION_BTN = cn(
+  "h-7 w-7 rounded-lg border border-white/70 bg-white/75 shadow-sm backdrop-blur-md",
+  "hover:border-white hover:bg-white hover:shadow-md",
+  "dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20",
+);
 
 function getDueDateTone(dueDate?: string) {
   if (!dueDate) return null;
@@ -179,7 +232,8 @@ export function TaskPriorityBadge({ priority }: { priority: string }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium leading-none tracking-tight",
+        "inline-flex items-center gap-1.5 rounded-full border border-white/50 px-2.5 py-1 text-[11px] font-semibold leading-none tracking-tight backdrop-blur-sm",
+        "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.5)] dark:border-white/10",
         cfg.badgeBg,
         cfg.badgeText
       )}
@@ -293,17 +347,16 @@ export function TaskAvatarStack({
         {visible.map((assignee, index) => (
           <Tooltip key={`${assignee.id ?? assignee.name}-${index}`}>
             <TooltipTrigger asChild>
-              <Avatar
+              <UserAvatar
+                userId={assignee.id}
+                name={assignee.name}
+                avatarUrl={assignee.avatarUrl}
                 className={cn(
                   "h-8 w-8 ring-2 ring-white shadow-sm dark:ring-card",
                   index > 0 && "-ml-2.5"
                 )}
-              >
-                <AvatarImage src={assignee.avatarUrl} alt="" />
-                <AvatarFallback className="text-[10px] font-medium tracking-tight bg-violet-100 text-violet-700 dark:bg-primary/15 dark:text-primary">
-                  {assignee.name.slice(0, 2).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+                fallbackClassName="text-[10px] font-medium tracking-tight bg-violet-100 text-violet-700 dark:bg-primary/15 dark:text-primary"
+              />
             </TooltipTrigger>
             <TooltipContent className="text-xs">
               {assignee.name}{assignee.email ? ` (${assignee.email})` : ""}
@@ -370,6 +423,8 @@ export function TaskCard({
     [task.assignees, task.assigneeId, assigneeMap]
   );
   const [localAssignees, setLocalAssignees] = useState<TaskAssignee[]>(initialAssignees);
+  /** Radix menu close can pass the click through to the card and open the task modal. */
+  const suppressOpenRef = useRef(false);
   useEffect(() => {
     setLocalAssignees(initialAssignees);
   }, [initialAssignees]);
@@ -400,12 +455,32 @@ export function TaskCard({
         : statusCategory === "in_progress"
           ? STATUS_BULB.in_progress
           : "bg-neutral-300 ring-2 ring-neutral-200/80 dark:bg-neutral-600 dark:ring-neutral-500/40";
+  const statusSurfaceClass =
+    statusCategory === "todo"
+      ? STATUS_CARD_SURFACE.todo
+      : statusCategory === "done"
+        ? STATUS_CARD_SURFACE.done
+        : statusCategory === "in_progress"
+          ? STATUS_CARD_SURFACE.in_progress
+          : STATUS_CARD_SURFACE.default;
+  const statusShineClass =
+    statusCategory === "todo"
+      ? STATUS_CARD_SHINE.todo
+      : statusCategory === "done"
+        ? STATUS_CARD_SHINE.done
+        : statusCategory === "in_progress"
+          ? STATUS_CARD_SHINE.in_progress
+          : STATUS_CARD_SHINE.default;
 
   return (
     <div
       role="button"
       tabIndex={0}
       onClick={(e) => {
+        if (suppressOpenRef.current) {
+          suppressOpenRef.current = false;
+          return;
+        }
         if ((e.target as HTMLElement).closest("[data-quick-action]")) return;
         if ((e.target as HTMLElement).closest("[data-bulk-check]")) return;
         if (isSelectionMode && onToggleSelect) return onToggleSelect(task.id);
@@ -418,30 +493,33 @@ export function TaskCard({
         }
       }}
       className={cn(
-        "group/card relative cursor-pointer overflow-hidden rounded-2xl border border-[#E7EAF0] bg-[#FCFCFD]",
-        "dark:border-border dark:bg-card",
-        /* Soft layered shadow — calm depth without harsh contrast */
-        "shadow-[0_1px_2px_rgba(15,23,42,0.035),0_6px_20px_-4px_rgba(15,23,42,0.055)]",
-        "transition-[box-shadow,transform,border-color,background-color] duration-200 ease-out",
-        /* Hover: brighten toward white + slightly deeper shadow (enterprise polish) */
-        "hover:-translate-y-0.5 hover:bg-white hover:border-[#E2E6ED]",
-        "hover:shadow-[0_2px_4px_rgba(15,23,42,0.045),0_10px_28px_-6px_rgba(15,23,42,0.085)]",
-        "dark:hover:border-neutral-600 dark:hover:bg-neutral-800/90",
-        "dark:hover:shadow-[0_4px_24px_-6px_rgba(0,0,0,0.38)]",
+        "group/card relative cursor-pointer overflow-hidden rounded-2xl border",
+        statusSurfaceClass,
+        "transition-[box-shadow,transform,border-color,background-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+        "hover:-translate-y-1",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 focus-visible:ring-offset-2",
         isOverlay && "scale-[1.02] shadow-xl ring-2 ring-primary/30",
         isSelected && "border-primary/30 bg-violet-50/40 ring-2 ring-primary/25 dark:bg-primary/[0.06]",
         isMoving && "opacity-65",
         task.id.startsWith("temp-") && "border-dashed",
-        readOnly &&
-          "cursor-default hover:translate-y-0 hover:border-[#E7EAF0] hover:bg-[#FCFCFD] dark:hover:bg-card hover:shadow-[0_1px_2px_rgba(15,23,42,0.035),0_6px_20px_-4px_rgba(15,23,42,0.055)]"
+        readOnly && "cursor-default hover:translate-y-0",
       )}
       data-cy={`task-card-${task.id}`}
       aria-label={`Open task ${task.title}`}
     >
-      {/* Column: To do = blue, In progress = orange, Done = green; other columns use priority accent */}
+      {/* Glass highlight + column accent */}
       <span
-        className={cn("pointer-events-none absolute left-0 top-3 bottom-3 w-[3px] rounded-full", leftAccentClass)}
+        className={cn(
+          "pointer-events-none absolute inset-x-0 top-0 h-[45%] rounded-t-2xl bg-gradient-to-b to-transparent opacity-90",
+          statusShineClass,
+        )}
+        aria-hidden
+      />
+      <span
+        className={cn(
+          "pointer-events-none absolute left-0 top-4 bottom-4 w-1 rounded-full shadow-sm",
+          leftAccentClass,
+        )}
         aria-hidden
       />
 
@@ -463,12 +541,12 @@ export function TaskCard({
       )}
 
       {!readOnly && !isSelectionMode && (
-        <div className="absolute right-3 top-3 z-20 flex items-center gap-0.5 opacity-0 transition-opacity duration-200 group-hover/card:opacity-100">
+        <div className="absolute right-3 top-3 z-20 flex items-center gap-1 opacity-0 transition-all duration-300 group-hover/card:opacity-100">
           <Button
             type="button"
             variant="outline"
             size="icon"
-            className="h-7 w-7 rounded-lg border-[#E7EAF0] bg-[#FCFCFD]/95 shadow-sm hover:bg-white dark:border-border dark:bg-card/95"
+            className={QUICK_ACTION_BTN}
             data-quick-action
             aria-label="Edit task"
             onClick={(e) => {
@@ -486,7 +564,7 @@ export function TaskCard({
                 type="button"
                 variant="outline"
                 size="icon"
-                className="h-7 w-7 rounded-lg border-[#E7EAF0] bg-[#FCFCFD]/95 shadow-sm hover:bg-white dark:border-border dark:bg-card/95"
+                className={QUICK_ACTION_BTN}
                 data-quick-action
                 aria-label="Assign task"
                 onClick={(e) => e.stopPropagation()}
@@ -499,7 +577,7 @@ export function TaskCard({
             type="button"
             variant="outline"
             size="icon"
-            className="h-7 w-7 rounded-lg border-[#E7EAF0] bg-[#FCFCFD]/95 shadow-sm hover:bg-white dark:border-border dark:bg-card/95"
+            className={QUICK_ACTION_BTN}
             data-quick-action
             aria-label="Change due date"
             onClick={(e) => {
@@ -514,7 +592,7 @@ export function TaskCard({
               type="button"
               variant="outline"
               size="icon"
-              className="h-7 w-7 rounded-lg border-[#E7EAF0] bg-[#FCFCFD]/95 shadow-sm hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive dark:border-border dark:bg-card/95"
+              className={cn(QUICK_ACTION_BTN, "hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive")}
               data-quick-action
               aria-label="Delete task"
               onClick={(e) => {
@@ -532,20 +610,33 @@ export function TaskCard({
                   type="button"
                   variant="outline"
                   size="icon"
-                  className="h-7 w-7 rounded-lg border-[#E7EAF0] bg-[#FCFCFD]/95 shadow-sm hover:bg-white dark:border-border dark:bg-card/95"
+                  className={QUICK_ACTION_BTN}
                   data-quick-action
                   aria-label="More task actions"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <MoreHorizontal className="h-3.5 w-3.5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuContent
+                align="end"
+                className="w-44"
+                data-quick-action
+                onCloseAutoFocus={(e) => e.preventDefault()}
+                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+              >
                 <DropdownMenuLabel className="text-xs">Move to</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {statuses.filter((s) => s.id !== task.statusId).map((s) => (
                   <DropdownMenuItem
                     key={s.id}
-                    onClick={() => quickActions.onChangeStatus?.(task, s.id)}
+                    onSelect={() => {
+                      suppressOpenRef.current = true;
+                      quickActions.onChangeStatus?.(task, s.id);
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
                     className="text-xs"
                   >
                     <ArrowRight className="mr-2 h-3.5 w-3.5" />
@@ -564,9 +655,8 @@ export function TaskCard({
         </div>
       )}
 
-      <div className={cn("px-4 pb-4 pt-3.5 pl-[18px]", isSelectionMode && "pl-8")}>
-        {/* Status bulb + ID + type — To do blue, In progress orange, Done green */}
-        <div className="mb-2 flex items-center justify-between gap-2">
+      <div className={cn("relative z-10 px-4 pb-4 pt-4 pl-5", isSelectionMode && "pl-9")}>
+        <div className="mb-3 flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
             <span
               role="img"
@@ -579,21 +669,23 @@ export function TaskCard({
                       ? "Column status: In progress"
                       : "Column status: Other"
               }
-              className={cn("h-2 w-2 shrink-0 rounded-full", statusBulbClass)}
+              className={cn("h-2.5 w-2.5 shrink-0 rounded-full shadow-sm", statusBulbClass)}
             />
-            <span className="font-mono text-[10px] font-medium uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+            <span className="rounded-md border border-white/60 bg-white/50 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-widest text-neutral-500 backdrop-blur-sm dark:border-white/10 dark:bg-white/5 dark:text-neutral-400">
               #{task.id.slice(0, 4).toUpperCase()}
             </span>
           </div>
-          <TypeIcon type={task.type} />
+          <span className="flex h-6 w-6 items-center justify-center rounded-md border border-white/50 bg-white/40 backdrop-blur-sm dark:border-white/10 dark:bg-white/5">
+            <TypeIcon type={task.type} />
+          </span>
         </div>
 
-        <h3 className="line-clamp-2 text-[15px] font-semibold leading-snug tracking-[-0.015em] text-neutral-900 dark:text-neutral-100">
+        <h3 className="line-clamp-2 text-[15px] font-semibold leading-[1.35] tracking-[-0.02em] text-neutral-900 dark:text-neutral-50">
           {task.title}
         </h3>
 
         {task.description && (
-          <p className="mt-2 line-clamp-2 text-[12px] leading-relaxed text-neutral-500 dark:text-neutral-400">
+          <p className="mt-2.5 line-clamp-2 text-[12px] leading-[1.55] text-neutral-600/90 dark:text-neutral-400">
             {task.description}
           </p>
         )}
@@ -628,7 +720,7 @@ export function TaskCard({
           </div>
         )}
 
-        <div className="mt-4 flex items-end justify-between gap-3 border-t border-[#EEF0F5] pt-3 dark:border-white/[0.06]">
+        <div className="mt-4 flex items-end justify-between gap-3 rounded-xl border border-white/50 bg-white/40 px-2.5 py-2.5 backdrop-blur-sm dark:border-white/[0.08] dark:bg-black/10">
           <TaskMetaRow
             commentsCount={activityComments}
             attachmentsCount={activityAttachments}

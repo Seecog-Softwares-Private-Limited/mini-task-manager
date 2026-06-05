@@ -65,13 +65,36 @@ function checkDbEnv() {
 function runProduction() {
   if (!fs.existsSync(DIST_MAIN)) {
     console.error(
-      '[app.js] Production mode requires a build. Run: npm run build\n' +
-        '  Then run: node app.js (with NODE_ENV=production) or npm run start:app:prod'
+      '[app.js] Production mode requires a backend build. Run: npm run build\n' +
+        '  Then run: node app.js (with APP_MODE=production) or npm run start:app:prod'
     );
     process.exit(1);
   }
   process.env.NODE_ENV = 'production';
   require(DIST_MAIN);
+}
+
+function scheduleFrontend(mode) {
+  const apiPort = parseInt(process.env.PORT || '3000', 10);
+  const frontendPort = process.env.FRONTEND_PORT || '3001';
+  console.log(
+    '[app.js] Backend + frontend via node app.js (' + mode + ')\n' +
+      '  API:      http://localhost:' + apiPort + '/api/v1\n' +
+      '  Frontend: http://localhost:' + frontendPort,
+  );
+  console.log(
+    '[app.js] Waiting for API to accept connections on 127.0.0.1:' + apiPort + ' ...',
+  );
+  waitForApiPort(apiPort).then((ready) => {
+    if (ready) {
+      console.log('[app.js] API port is open; starting Next.js.');
+    } else {
+      console.warn(
+        '[app.js] API did not open within the timeout. Check MySQL and Nest logs. Starting Next anyway.',
+      );
+    }
+    startFrontend(mode);
+  });
 }
 
 function runDevelopment() {
@@ -134,21 +157,40 @@ function waitForApiPort(port, options) {
   });
 }
 
-function startFrontend() {
+function startFrontend(mode) {
   if (!fs.existsSync(FRONTEND_DIR) || !fs.existsSync(path.join(FRONTEND_DIR, 'package.json'))) {
-    console.warn('[app.js] Frontend folder not found; skipping frontend.');
-    return;
+    console.error('[app.js] Frontend folder not found.');
+    process.exit(1);
   }
+  const isProd = mode === 'production';
   const frontendPort = process.env.FRONTEND_PORT || '3001';
   const apiPort = process.env.PORT || '3000';
   // Next API proxy (app/api/v1/[...path]) uses this so it always matches Nest, regardless of cwd.
   const miniTmBackendUrl = `http://127.0.0.1:${apiPort}`;
-  console.log('[app.js] Starting frontend (Next.js) on http://localhost:' + frontendPort);
+  const nextBin = path.join(FRONTEND_DIR, 'node_modules', 'next', 'dist', 'bin', 'next');
+  if (!fs.existsSync(nextBin)) {
+    console.error(
+      '[app.js] Frontend dependencies are missing. Run:\n  cd frontend && npm install',
+    );
+    process.exit(1);
+  }
+  if (isProd && !fs.existsSync(path.join(FRONTEND_DIR, '.next'))) {
+    console.error(
+      '[app.js] Production frontend requires a build. Run:\n  cd frontend && npm run build',
+    );
+    process.exit(1);
+  }
+  const nextArgs = isProd
+    ? [nextBin, 'start', '-p', frontendPort]
+    : [nextBin, 'dev', '-p', frontendPort];
+  console.log(
+    '[app.js] Starting frontend (Next.js ' + (isProd ? 'production' : 'dev') + ') on http://localhost:' +
+      frontendPort,
+  );
   console.log('[app.js] Next proxy → Nest at ' + miniTmBackendUrl);
-  frontendChild = spawn('npx', ['next', 'dev', '-p', frontendPort], {
+  frontendChild = spawn(process.execPath, nextArgs, {
     cwd: FRONTEND_DIR,
     stdio: 'inherit',
-    shell: true,
     env: {
       ...process.env,
       FORCE_COLOR: '1',
@@ -188,25 +230,11 @@ function main() {
 
   if (mode === 'production') {
     runProduction();
+    scheduleFrontend('production');
   } else {
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[app.js] Starting in development mode (source: src/main.ts)');
-    }
+    console.log('[app.js] Starting backend in development mode (source: src/main.ts)');
     runDevelopment();
-    const apiPort = parseInt(process.env.PORT || '3000', 10);
-    console.log(
-      '[app.js] Waiting for API to accept connections on 127.0.0.1:' + apiPort + ' ...'
-    );
-    waitForApiPort(apiPort).then((ready) => {
-      if (ready) {
-        console.log('[app.js] API port is open; starting Next.js.');
-      } else {
-        console.warn(
-          '[app.js] API did not open within the timeout. Check MySQL and Nest logs. Starting Next anyway.'
-        );
-      }
-      startFrontend();
-    });
+    scheduleFrontend('development');
   }
 }
 
