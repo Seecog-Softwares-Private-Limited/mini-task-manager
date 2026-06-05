@@ -19,7 +19,7 @@ const HOP_BY_HOP = new Set([
 /**
  * Find PORT in repo-root properties.env. Tries several cwd layouts (frontend/, standalone/, etc.).
  */
-function readPortFromRepoPropertiesEnv(): string | undefined {
+function readFromRepoPropertiesEnv(key: string): string | undefined {
   const candidates = [
     path.join(process.cwd(), "..", "properties.env"),
     path.join(process.cwd(), "..", "..", "properties.env"),
@@ -30,8 +30,9 @@ function readPortFromRepoPropertiesEnv(): string | undefined {
     try {
       if (!fs.existsSync(envPath)) continue;
       const text = fs.readFileSync(envPath, "utf8");
-      const m = text.match(/^\s*PORT\s*=\s*(\d+)/m);
-      if (m?.[1]) return m[1];
+      const re = new RegExp(`^\\s*${key}\\s*=\\s*([^#\\r\\n]+)`, "m");
+      const m = text.match(re);
+      if (m?.[1]) return m[1].trim().replace(/^["']|["']$/g, "");
     } catch {
       /* try next */
     }
@@ -39,17 +40,24 @@ function readPortFromRepoPropertiesEnv(): string | undefined {
   return undefined;
 }
 
+function readPortFromRepoPropertiesEnv(): string | undefined {
+  return readFromRepoPropertiesEnv("PORT");
+}
+
 function upstreamBaseUrl(): string {
   if (process.env.BACKEND_INTERNAL_URL) {
     return process.env.BACKEND_INTERNAL_URL.replace(/\/$/, "");
   }
-  // Set by root `app.js` when starting Next — avoids wrong port when cwd ≠ repo layout.
-  if (process.env.MINI_TM_BACKEND_URL) {
-    return process.env.MINI_TM_BACKEND_URL.replace(/\/$/, "");
-  }
+  // Set by root `app.js` or PM2 ecosystem — avoids wrong port when cwd ≠ repo layout.
+  const fromEnv = process.env.MINI_TM_BACKEND_URL?.replace(/\/$/, "");
+  if (fromEnv) return fromEnv;
+
+  const fromFile = readFromRepoPropertiesEnv("MINI_TM_BACKEND_URL")?.replace(/\/$/, "");
+  if (fromFile) return fromFile;
+
   const port =
     process.env.PORT || readPortFromRepoPropertiesEnv() || "3000";
-  const host = process.env.BACKEND_HOST || "127.0.0.1";
+  const host = process.env.BACKEND_HOST || readFromRepoPropertiesEnv("BACKEND_HOST") || "127.0.0.1";
   return `http://${host}:${port}`;
 }
 

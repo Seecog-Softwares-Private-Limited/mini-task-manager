@@ -16,6 +16,7 @@ import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { OrganizationResponseDto } from './dto/organization-response.dto';
 import { generateUuid } from '../../common/utils/uuid.util';
+import { uuidBinaryTransformer } from '../../common/base.entity';
 import { PlanLimitService } from '../../plans/plan-limit.service';
 
 @Injectable()
@@ -275,7 +276,7 @@ export class OrganizationsService {
     await this.orgMembersRepository.update(memberId, { status: 'REMOVED' });
   }
 
-  /** Delete organization. Owner only. */
+  /** Delete organization. Owner only. Clears task FKs before cascade delete. */
   async delete(id: string, userId: string): Promise<void> {
     const membership = await this.getMembership(id, userId);
     if (!membership) {
@@ -284,6 +285,33 @@ export class OrganizationsService {
     if (membership.role?.toLowerCase() !== 'owner') {
       throw new ForbiddenException('Only the organization owner can delete the organization');
     }
-    await this.organizationsRepository.delete(id);
+
+    const org = await this.organizationsRepository.findById(id);
+    if (!org) {
+      throw new ForbiddenException('Organization not found');
+    }
+
+    const orgBin = uuidBinaryTransformer.to(id) as Buffer;
+    try {
+      await this.dataSource.transaction(async (manager) => {
+        await manager.query(
+          `UPDATE tasks SET parent_task_id = NULL, sprint_id = NULL, status_id = NULL WHERE organization_id = ?`,
+          [orgBin],
+        );
+        try {
+          await manager.query(`DELETE FROM organization_usage WHERE organization_id = ?`, [orgBin]);
+        } catch {
+          /* optional table */
+        }
+        await manager.query(`DELETE FROM organizations WHERE id = ?`, [orgBin]);
+      });
+    } catch (err) {
+      if (err instanceof QueryFailedError) {
+        throw new BadRequestException(
+          'Could not delete workspace. Remove or reassign remaining tasks and try again.',
+        );
+      }
+      throw err;
+    }
   }
 }
