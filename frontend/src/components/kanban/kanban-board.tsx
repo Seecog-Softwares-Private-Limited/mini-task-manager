@@ -414,7 +414,7 @@ function DroppableColumn({
       ref={setNodeRef}
       data-cy={`kanban-column-${status.id}`}
       className={cn(
-        "group/col flex h-full min-h-0 w-[310px] shrink-0 flex-col rounded-2xl border transition-all duration-300",
+        "group/col flex h-full min-h-[450px] min-w-[310px] flex-1 flex-col rounded-2xl border transition-all duration-300",
         isActiveTarget
           ? "ring-2 ring-primary/40 border-primary/30 bg-primary/[0.03] shadow-lg shadow-primary/10 scale-[1.01]"
           : "bg-muted/15 hover:bg-muted/20",
@@ -747,7 +747,7 @@ export function KanbanBoard({
     >
       <div
         className={cn(
-          "flex h-full min-h-0 gap-4 overflow-x-auto overflow-y-hidden pb-2",
+          "flex h-full min-h-[450px] w-full gap-4 overflow-x-auto overflow-y-hidden pb-2",
           className
         )}
         role="region"
