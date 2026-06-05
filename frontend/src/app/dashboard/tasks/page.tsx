@@ -657,7 +657,7 @@ export default function TasksPage() {
   const isBoardLoading = workflowsLoading || statusesLoading || tasksLoading || setupWorkflowMutation.isPending;
 
   return (
-    <div className="flex h-[calc(100dvh-14rem)] min-h-[28rem] flex-col gap-4 overflow-hidden animate-slide-up md:h-[calc(100dvh-16rem)]">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden animate-slide-up">
       {celebrationLayer}
       <div className="flex shrink-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 flex-1 flex-col gap-3">
