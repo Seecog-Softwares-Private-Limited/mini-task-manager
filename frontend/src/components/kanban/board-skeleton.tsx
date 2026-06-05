@@ -52,7 +52,7 @@ export function BoardSkeleton({
           return (
             <div
               key={colIdx}
-              className="min-h-[450px] min-w-[310px] flex-1 rounded-2xl border bg-muted/10"
+              className="min-h-64 min-w-[310px] flex-1 rounded-2xl border bg-muted/10"
             >
               {/* Column header */}
               <div className="flex items-center gap-2 border-b px-4 py-3">

@@ -90,7 +90,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       />
       <div
         className={cn(
-          "flex min-h-screen flex-1 flex-col transition-[margin] duration-300 ease-in-out",
+          "flex h-dvh min-h-0 flex-1 flex-col overflow-hidden transition-[margin] duration-300 ease-in-out",
           "md:ml-0",
           sidebarCollapsed ? "md:ml-sidebar-collapsed" : "md:ml-sidebar"
         )}
@@ -152,7 +152,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
         <TrialBanner />
-        <main className="flex-1 p-4 md:p-8 animate-fade-in">
+        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto p-4 md:p-8 animate-fade-in">
           <TenantGuard>{children}</TenantGuard>
         </main>
       </div>

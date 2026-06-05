@@ -663,7 +663,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
   }
 
   return (
-    <div className="flex h-[calc(100dvh-14rem)] min-h-[28rem] flex-col gap-4 overflow-hidden md:h-[calc(100dvh-16rem)]">
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
       {celebrationLayer}
       {/* Header */}
       <div className="flex shrink-0 items-center justify-between gap-4">
