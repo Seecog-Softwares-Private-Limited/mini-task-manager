@@ -39,4 +39,8 @@ export class ProjectsRepository {
   async update(id: string, data: Partial<ProjectEntity>): Promise<void> {
     await this.repo.update(id, data);
   }
+
+  async delete(id: string): Promise<void> {
+    await this.repo.delete(id);
+  }
 }

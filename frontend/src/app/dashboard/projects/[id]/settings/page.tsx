@@ -1,22 +1,24 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { fetchProject, updateProject } from "@/services/api/projects.api";
+import { fetchProject, updateProject, deleteProjectPermanently } from "@/services/api/projects.api";
 import { useTenant } from "@/context/tenant-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { ProjectRemoveDialog } from "@/components/projects/project-remove-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import { parseApiError } from "@/services/api/client";
-import { Settings, Archive, ArchiveRestore } from "lucide-react";
+import { Settings, Archive, ArchiveRestore, Trash2 } from "lucide-react";
 
 export default function ProjectSettingsPage({ params }: { params: { id: string } }) {
   const { id } = params;
+  const router = useRouter();
   const { orgId } = useTenant();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
 
   const { data: project } = useQuery({
     queryKey: ["project", id],
@@ -29,10 +31,22 @@ export default function ProjectSettingsPage({ params }: { params: { id: string }
     onSuccess: (_, isArchived) => {
       queryClient.invalidateQueries({ queryKey: ["project", id] });
       queryClient.invalidateQueries({ queryKey: ["projects", orgId ?? ""] });
-      setArchiveConfirmOpen(false);
+      setRemoveDialogOpen(false);
       toast({ title: isArchived ? "Project archived" : "Project restored", variant: "success" });
     },
     onError: (err) => toast({ title: "Failed to update", description: parseApiError(err), variant: "error" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteProjectPermanently(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects", orgId ?? ""] });
+      setRemoveDialogOpen(false);
+      toast({ title: "Project deleted permanently", variant: "success" });
+      router.push("/dashboard/projects");
+    },
+    onError: (err) =>
+      toast({ title: "Failed to delete project", description: parseApiError(err), variant: "error" }),
   });
 
   if (!project) return null;
@@ -70,29 +84,55 @@ export default function ProjectSettingsPage({ params }: { params: { id: string }
         </CardHeader>
         <CardContent>
           <Button
-            variant={project.isArchived ? "default" : "outline"}
-            className={project.isArchived ? "" : "border-amber-500/50 text-amber-600 hover:bg-amber-500/10"}
-            onClick={() => setArchiveConfirmOpen(true)}
-            disabled={archiveMutation.isPending}
+            variant="outline"
+            className="gap-2 border-amber-500/50 text-amber-600 hover:bg-amber-500/10"
+            onClick={() => setRemoveDialogOpen(true)}
+            disabled={archiveMutation.isPending || deleteMutation.isPending}
           >
-            {project.isArchived ? "Restore project" : "Archive project"}
+            {project.isArchived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+            {project.isArchived ? "Restore or delete" : "Archive or delete"}
           </Button>
         </CardContent>
       </Card>
 
-      <ConfirmDialog
-        open={archiveConfirmOpen}
-        onOpenChange={setArchiveConfirmOpen}
-        title={project.isArchived ? "Restore project" : "Archive project"}
-        description={
-          project.isArchived
-            ? `Restore "${project.name}"? It will appear in project lists again.`
-            : `Archive "${project.name}"? You can restore it later from project settings.`
-        }
-        confirmLabel={project.isArchived ? "Restore" : "Archive"}
-        variant="destructive"
-        onConfirm={() => archiveMutation.mutate(!project.isArchived)}
-        loading={archiveMutation.isPending}
+      <Card className="border-destructive/30">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-destructive">
+            <Trash2 className="h-5 w-5" />
+            Danger zone
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Permanently delete this project and all of its tasks and attachments.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <Button
+            variant="destructive"
+            onClick={() => setRemoveDialogOpen(true)}
+            disabled={deleteMutation.isPending}
+          >
+            Delete project permanently
+          </Button>
+        </CardContent>
+      </Card>
+
+      <ProjectRemoveDialog
+        project={project}
+        open={removeDialogOpen}
+        onOpenChange={setRemoveDialogOpen}
+        archiveLoading={archiveMutation.isPending}
+        deleteLoading={deleteMutation.isPending}
+        onArchive={async () => {
+          if (project.isArchived) return;
+          await archiveMutation.mutateAsync(true);
+        }}
+        onRestore={async () => {
+          if (!project.isArchived) return;
+          await archiveMutation.mutateAsync(false);
+        }}
+        onDeletePermanently={async () => {
+          await deleteMutation.mutateAsync();
+        }}
       />
     </div>
   );

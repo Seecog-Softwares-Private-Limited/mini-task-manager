@@ -178,6 +178,25 @@ export class InvitationsController {
     return result;
   }
 
+  /** GET /invitations/mine — pending workspace invites for the signed-in user */
+  @UseGuards(JwtAuthGuard)
+  @Get('invitations/mine')
+  async listMine(@CurrentUserId() userId: string) {
+    const invitations = await this.invitationsService.listPendingForUser(userId);
+    return invitations.map((inv) => this.toResponse(inv));
+  }
+
+  /** POST /invitations/mine/:id/accept — accept a pending invite from the portal */
+  @UseGuards(JwtAuthGuard)
+  @Post('invitations/mine/:id/accept')
+  async acceptMineById(
+    @Param('id') invitationId: string,
+    @CurrentUserId() userId: string,
+  ) {
+    const result = await this.invitationsService.acceptInvitationById(invitationId, userId);
+    return { success: true, organizationId: result.organizationId };
+  }
+
   /** POST /invitations/accept — accept invite (authenticated, token in body) */
   @UseGuards(JwtAuthGuard)
   @Post('invitations/accept')
@@ -204,6 +223,7 @@ export class InvitationsController {
     return {
       id: inv.id,
       organizationId: inv.organizationId,
+      organizationName: inv.organization?.name,
       email: inv.email,
       role: inv.role,
       status: inv.status,

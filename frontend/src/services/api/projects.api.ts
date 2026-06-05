@@ -76,6 +76,10 @@ export async function updateProject(
   return data;
 }
 
+export async function deleteProjectPermanently(id: string): Promise<void> {
+  await apiClient.delete(`/projects/${id}`);
+}
+
 export async function seedDemoTasks(projectId: string): Promise<{ created: number }> {
   const { data } = await apiClient.post<{ created: number }>(
     `/projects/${projectId}/seed-demo-tasks`

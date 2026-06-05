@@ -20,6 +20,7 @@ import { generateUuid } from '../../common/utils/uuid.util';
 import { buildInviteAcceptUrls } from '../../common/utils/frontend-url.util';
 import { isLocalhostUrl } from './email-template.util';
 import { PlanLimitService } from '../../plans/plan-limit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const INVITE_EXPIRY_DAYS = 7;
 
@@ -45,6 +46,7 @@ export class InvitationsService {
     private readonly orgMembersRepo: OrganizationMembersRepository,
     @Inject(forwardRef(() => PlanLimitService))
     private readonly planLimitService: PlanLimitService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async createInvitation(
@@ -74,11 +76,6 @@ export class InvitationsService {
     await this.planLimitService.assertMemberLimit(organizationId);
 
     const existingUser = await this.usersService.findByEmail(normalizedEmail);
-    if (existingUser) {
-      throw new ConflictException(
-        'An account with this email already exists. Ask them to sign in to accept the invitation.',
-      );
-    }
 
     const token = generateToken();
     const invitation = await this.invitationsRepo.create({
@@ -117,7 +114,47 @@ export class InvitationsService {
 
     this.logger.log(`Workspace invitation email dispatched to ${normalizedEmail} (invitationId=${invitation.id})`);
 
+    if (existingUser) {
+      const orgName = org?.name ?? 'a workspace';
+      const inviterLabel = inviter?.fullName ?? inviter?.email ?? 'A team member';
+      await this.notificationsService.createNotification(
+        existingUser.id,
+        `Invitation to ${orgName}`,
+        `${inviterLabel} invited you to join ${orgName} as ${role}. Open Workspaces to accept.`,
+      );
+    }
+
     return invitation;
+  }
+
+  async listPendingForUser(userId: string): Promise<OrganizationInvitationEntity[]> {
+    const user = await this.usersService.findById(userId);
+    if (!user?.email) return [];
+
+    const invitations = await this.invitationsRepo.findPendingByEmail(user.email);
+    const now = new Date();
+    const active: OrganizationInvitationEntity[] = [];
+
+    for (const invitation of invitations) {
+      if (new Date(invitation.expiresAt) <= now) {
+        await this.invitationsRepo.updateStatus(invitation.id, 'EXPIRED');
+        continue;
+      }
+      active.push(invitation);
+    }
+
+    return active;
+  }
+
+  async acceptInvitationById(
+    invitationId: string,
+    userId: string,
+  ): Promise<{ organizationId: string }> {
+    const invitation = await this.invitationsRepo.findById(invitationId);
+    if (!invitation) {
+      throw new NotFoundException('Invitation not found');
+    }
+    return this.acceptInvitation(invitation.token, userId);
   }
 
   async listByOrganization(organizationId: string): Promise<OrganizationInvitationEntity[]> {

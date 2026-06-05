@@ -12,6 +12,7 @@ import {
   fetchProjects,
   createProject,
   updateProject,
+  deleteProjectPermanently,
   type CreateProjectPayload,
   type UpdateProjectPayload,
 } from "@/services/api/projects.api";
@@ -48,8 +49,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ProjectPreviewDrawer } from "@/components/projects/project-preview-drawer";
+import { ProjectRemoveDialog } from "@/components/projects/project-remove-dialog";
 import {
   Dialog,
   DialogContent,
@@ -70,8 +71,6 @@ import {
   LayoutGrid as LayoutGridIcon,
   List as ListIcon,
   MoreHorizontal,
-  Archive,
-  ArchiveRestore,
   Users,
   CheckSquare,
   CalendarClock,
@@ -285,12 +284,12 @@ function getProjectColumns(
   doneStatusIdsByWorkflowId: Map<string, string[]>,
   membersQueries: { data?: ProjectMember[]; isLoading?: boolean }[],
   options: {
-    onArchive: (p: Project) => void;
+    onRemove: (p: Project) => void;
     onPreview: (p: Project) => void;
     onEditProject: (p: Project) => void;
   }
 ): DataTableColumn<Project>[] {
-  const { onArchive, onPreview, onEditProject } = options;
+  const { onRemove, onPreview, onEditProject } = options;
   return [
     {
       key: "name",
@@ -524,20 +523,16 @@ function getProjectColumns(
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8"
-                    aria-label={p.isArchived ? "Unarchive project" : "Archive project"}
+                    aria-label="Remove project"
                     onClick={(e) => {
                       e.preventDefault();
-                      onArchive(p);
+                      onRemove(p);
                     }}
                   >
-                    {p.isArchived ? (
-                      <ArchiveRestore className="h-4 w-4" />
-                    ) : (
-                      <Archive className="h-4 w-4" />
-                    )}
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="left">{p.isArchived ? "Unarchive" : "Archive"}</TooltipContent>
+                <TooltipContent side="left">Archive or delete</TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
@@ -607,7 +602,7 @@ export default function ProjectsPage() {
   const [filterOverdue, setFilterOverdue] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [page, setPage] = useState(1);
-  const [archiveTarget, setArchiveTarget] = useState<Project | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<Project | null>(null);
   const [previewProject, setPreviewProject] = useState<Project | null>(null);
   const pageSize = 10;
 
@@ -780,7 +775,8 @@ export default function ProjectsPage() {
       updateProject(id, { isArchived }),
     onSuccess: (_, { isArchived }) => {
       queryClient.invalidateQueries({ queryKey: ["projects", orgId ?? ""] });
-      setArchiveTarget(null);
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      setRemoveTarget(null);
       toast({
         title: isArchived ? "Project archived" : "Project restored",
         variant: "success",
@@ -788,6 +784,23 @@ export default function ProjectsPage() {
     },
     onError: (err) => {
       toast({ title: "Failed to update project", description: parseApiError(err), variant: "error" });
+    },
+  });
+
+  const deleteProjectMutation = useMutation({
+    mutationFn: (id: string) => deleteProjectPermanently(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["projects", orgId ?? ""] });
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      setRemoveTarget(null);
+      toast({ title: "Project deleted permanently", variant: "success" });
+    },
+    onError: (err) => {
+      toast({
+        title: "Failed to delete project",
+        description: parseApiError(err),
+        variant: "error",
+      });
     },
   });
 
@@ -1526,7 +1539,7 @@ export default function ProjectsPage() {
         {!isLoading && projects && projects.length > 0 && viewMode === "list" && (
           <DataTable<Project>
             columns={getProjectColumns(tasksQueries, projectIds, defaultWorkflowIds, doneStatusIdsByWorkflowId, membersQueries, {
-              onArchive: setArchiveTarget,
+              onRemove: setRemoveTarget,
               onPreview: setPreviewProject,
               onEditProject: openProjectEditModal,
             })}
@@ -1615,19 +1628,13 @@ export default function ProjectsPage() {
                                     ? "text-emerald-600 hover:bg-emerald-500/15 hover:text-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-500/20 dark:hover:text-emerald-300"
                                     : "text-red-600 hover:bg-red-500/15 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/20 dark:hover:text-red-300"
                                 )}
-                                aria-label={p.isArchived ? "Restore project from archive" : "Archive project"}
-                                onClick={() => setArchiveTarget(p)}
+                                aria-label="Remove project"
+                                onClick={() => setRemoveTarget(p)}
                               >
-                                {p.isArchived ? (
-                                  <ArchiveRestore className="h-4 w-4" />
-                                ) : (
-                                  <Trash2 className="h-4 w-4" />
-                                )}
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent side="bottom">
-                              {p.isArchived ? "Restore from archive" : "Archive (remove from active list)"}
-                            </TooltipContent>
+                            <TooltipContent side="bottom">Archive or delete</TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
                         <DropdownMenu>
@@ -1752,23 +1759,24 @@ export default function ProjectsPage() {
         )}
       </div>
 
-      <ConfirmDialog
-        open={!!archiveTarget}
-        onOpenChange={(open) => !open && setArchiveTarget(null)}
-        title={archiveTarget?.isArchived ? "Unarchive project" : "Archive project"}
-        description={
-          archiveTarget
-            ? archiveTarget.isArchived
-              ? `Restore "${archiveTarget.name}" to active projects?`
-              : `Archive "${archiveTarget.name}"? You can restore it later.`
-            : ""
-        }
-        confirmLabel={archiveTarget?.isArchived ? "Restore" : "Archive"}
-        variant="destructive"
-        onConfirm={() => {
-          if (archiveTarget) archiveMutation.mutate({ id: archiveTarget.id, isArchived: !archiveTarget.isArchived });
+      <ProjectRemoveDialog
+        project={removeTarget}
+        open={!!removeTarget}
+        onOpenChange={(open) => !open && setRemoveTarget(null)}
+        archiveLoading={archiveMutation.isPending}
+        deleteLoading={deleteProjectMutation.isPending}
+        onArchive={async () => {
+          if (!removeTarget || removeTarget.isArchived) return;
+          await archiveMutation.mutateAsync({ id: removeTarget.id, isArchived: true });
         }}
-        loading={archiveMutation.isPending}
+        onRestore={async () => {
+          if (!removeTarget || !removeTarget.isArchived) return;
+          await archiveMutation.mutateAsync({ id: removeTarget.id, isArchived: false });
+        }}
+        onDeletePermanently={async () => {
+          if (!removeTarget) return;
+          await deleteProjectMutation.mutateAsync(removeTarget.id);
+        }}
       />
 
       <ProjectPreviewDrawer

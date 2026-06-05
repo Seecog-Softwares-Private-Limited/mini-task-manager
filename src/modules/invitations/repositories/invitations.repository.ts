@@ -36,6 +36,14 @@ export class InvitationsRepository {
     });
   }
 
+  async findPendingByEmail(email: string): Promise<OrganizationInvitationEntity[]> {
+    return this.repo.find({
+      where: { email: email.toLowerCase(), status: 'PENDING' },
+      relations: ['organization', 'inviter'],
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   async create(data: Partial<OrganizationInvitationEntity>): Promise<OrganizationInvitationEntity> {
     const id = data.id ?? generateUuid();
     const entity = this.repo.create({ ...data, id });
