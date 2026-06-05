@@ -414,7 +414,7 @@ function DroppableColumn({
       ref={setNodeRef}
       data-cy={`kanban-column-${status.id}`}
       className={cn(
-        "group/col flex min-h-[450px] w-[310px] shrink-0 flex-col rounded-2xl border transition-all duration-300",
+        "group/col flex h-full min-h-0 w-[310px] shrink-0 flex-col rounded-2xl border transition-all duration-300",
         isActiveTarget
           ? "ring-2 ring-primary/40 border-primary/30 bg-primary/[0.03] shadow-lg shadow-primary/10 scale-[1.01]"
           : "bg-muted/15 hover:bg-muted/20",
@@ -422,8 +422,8 @@ function DroppableColumn({
       )}
       aria-label={`Column: ${status.name}`}
     >
-      {/* Header */}
-      <div className="flex items-center gap-2 border-b px-4 py-3">
+      {/* Header — fixed at top of column; only task list below scrolls */}
+      <div className="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b bg-muted/15 px-4 py-3 backdrop-blur-sm dark:bg-muted/20">
         <button
           onClick={() => onToggleCollapse?.(status.id)}
           className="flex items-center gap-2 hover:opacity-70 transition-opacity"
@@ -462,7 +462,7 @@ function DroppableColumn({
 
       {/* WIP warning */}
       {isOverWipLimit && (
-        <div className="mx-3 mt-2 flex items-center gap-1.5 rounded-lg bg-red-500/10 border border-red-500/20 px-2.5 py-1.5 animate-in fade-in duration-200">
+        <div className="mx-3 mt-2 flex shrink-0 items-center gap-1.5 rounded-lg bg-red-500/10 border border-red-500/20 px-2.5 py-1.5 animate-in fade-in duration-200">
           <AlertCircle className="h-3 w-3 text-red-500 shrink-0" />
           <span className="text-[10px] font-medium text-red-600 dark:text-red-400">
             WIP limit exceeded ({tasks.length}/{wipLimit})
@@ -470,8 +470,8 @@ function DroppableColumn({
         </div>
       )}
 
-      {/* Cards */}
-      <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto p-3 scrollbar-thin">
+      {/* Cards — only this area scrolls vertically */}
+      <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto overscroll-y-contain p-3 scrollbar-thin">
         {tasks.map((task) => (
           <DraggableCard
             key={task.id}
@@ -513,7 +513,7 @@ function DroppableColumn({
 
       {/* Quick add */}
       {onQuickAdd && !permissions?.isViewer && (
-        <div className="p-3 pt-0">
+        <div className="shrink-0 p-3 pt-0">
           <QuickAddInline onAdd={(title) => onQuickAdd(title, status.id)} />
         </div>
       )}
@@ -746,7 +746,10 @@ export function KanbanBoard({
       }}
     >
       <div
-        className={cn("flex gap-4 overflow-x-auto pb-4", className)}
+        className={cn(
+          "flex h-full min-h-0 gap-4 overflow-x-auto overflow-y-hidden pb-2",
+          className
+        )}
         role="region"
         aria-label={ariaLabel}
       >
