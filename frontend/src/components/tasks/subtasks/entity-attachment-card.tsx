@@ -29,6 +29,7 @@ interface EntityAttachmentCardProps {
   onPreview?: (target: AttachmentPreviewTarget) => void;
   onDownload?: (item: AttachmentCardItem) => void;
   onDelete?: (item: AttachmentCardItem) => void;
+  /** When true, only delete is disabled — preview and download stay available. */
   disabled?: boolean;
 }
 
@@ -88,7 +89,7 @@ export function EntityAttachmentCard({
             variant="ghost"
             size="icon"
             className="h-8 w-8"
-            disabled={disabled || item.status === "uploading"}
+            disabled={item.status === "uploading"}
             onClick={() =>
               onPreview({
                 id: item.attachmentId ?? (item.status === "done" ? item.id : undefined),
@@ -108,7 +109,7 @@ export function EntityAttachmentCard({
             variant="ghost"
             size="icon"
             className="h-8 w-8"
-            disabled={disabled || item.status !== "done"}
+            disabled={item.status !== "done"}
             onClick={() => onDownload(item)}
             aria-label="Download"
           >
