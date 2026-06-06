@@ -53,6 +53,11 @@ class CreateTaskSubtaskDto {
   @IsOptional()
   @IsUUID('4')
   statusId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(10000)
+  description?: string;
 }
 
 class CreateTaskTagDto {

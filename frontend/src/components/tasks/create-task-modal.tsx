@@ -19,6 +19,8 @@ import {
   SubtasksEditor,
   type SubtaskItem,
 } from "@/components/tasks/create-task/subtasks-editor";
+import { TaskAttachmentsSection } from "@/components/tasks/task-attachments-section";
+import type { PendingSubtaskAttachment } from "@/components/tasks/subtasks/subtask-attachments-section";
 import { DueDateField } from "@/components/tasks/create-task/due-date-field";
 import {
   TaskDescriptionField,
@@ -61,7 +63,9 @@ const schema = z.object({
   subtasks: z
     .array(
       z.object({
+        id: z.string().optional(),
         title: z.string().trim().min(1, "Subtask title is required").max(200),
+        description: z.string().max(10000).optional(),
         completed: z.boolean().default(false),
         assigneeId: z.string().uuid().optional(),
         priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).default("MEDIUM"),
@@ -81,7 +85,12 @@ export type CreateTaskFormData = z.infer<typeof schema>;
 interface CreateTaskModalProps {
   open: boolean;
   onClose: () => void;
-  onSubmit: (data: CreateTaskFormData, descriptionImageFiles?: File[]) => void;
+  onSubmit: (
+    data: CreateTaskFormData,
+    descriptionImageFiles?: File[],
+    subtaskPendingAttachments?: Record<string, PendingSubtaskAttachment[]>,
+    taskPendingAttachments?: PendingSubtaskAttachment[]
+  ) => void;
   isSubmitting: boolean;
   error?: string | null;
   projectId: string;
@@ -108,6 +117,10 @@ export function CreateTaskModal({
   const descriptionFieldRef = useRef<TaskDescriptionFieldHandle>(null);
   const { toast } = useToast();
   const [mounted, setMounted] = useState(false);
+  const [pendingSubtaskAttachments, setPendingSubtaskAttachments] = useState<
+    Record<string, PendingSubtaskAttachment[]>
+  >({});
+  const [pendingTaskAttachments, setPendingTaskAttachments] = useState<PendingSubtaskAttachment[]>([]);
 
   useEffect(() => {
     setMounted(true);
@@ -174,6 +187,8 @@ export function CreateTaskModal({
         subtasks: [],
       });
       descriptionFieldRef.current?.resetPendingImages();
+      setPendingSubtaskAttachments({});
+      setPendingTaskAttachments([]);
     }
   }, [open, defaultStatusId, statuses, reset]);
 
@@ -181,7 +196,13 @@ export function CreateTaskModal({
 
   function handleFormSubmit(data: CreateTaskFormData) {
     const imageFiles = descriptionFieldRef.current?.getPendingImageFiles() ?? [];
-    onSubmit(data, imageFiles.length ? imageFiles : undefined);
+    const hasSubtaskFiles = Object.values(pendingSubtaskAttachments).some((list) => list.length > 0);
+    onSubmit(
+      data,
+      imageFiles.length ? imageFiles : undefined,
+      hasSubtaskFiles ? pendingSubtaskAttachments : undefined,
+      pendingTaskAttachments.length ? pendingTaskAttachments : undefined
+    );
   }
 
   const statusColors = ["bg-blue-500", "bg-amber-500", "bg-purple-500", "bg-emerald-500", "bg-red-500"];
@@ -374,6 +395,13 @@ export function CreateTaskModal({
             )}
           />
 
+          <TaskAttachmentsSection
+            persist={false}
+            pendingAttachments={pendingTaskAttachments}
+            onPendingChange={setPendingTaskAttachments}
+            disabled={isSubmitting}
+          />
+
           <SubtasksEditor
             projectId={projectId}
             fields={fields as Array<{ id: string } & SubtaskItem>}
@@ -384,6 +412,10 @@ export function CreateTaskModal({
             remove={remove}
             errors={errors}
             disabled={isSubmitting}
+            pendingAttachmentsBySubtask={pendingSubtaskAttachments}
+            onPendingAttachmentsChange={(subtaskKey, items) =>
+              setPendingSubtaskAttachments((prev) => ({ ...prev, [subtaskKey]: items }))
+            }
           />
 
           {errors.dueDate && (

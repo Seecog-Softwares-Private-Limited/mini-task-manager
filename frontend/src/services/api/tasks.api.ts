@@ -17,7 +17,10 @@ export interface CreateTaskPayload {
   parentTaskId?: string;
   sprintId?: string;
   subtasks?: Array<
-    Pick<TaskSubtask, "title" | "completed" | "assigneeId" | "dueDate" | "priority" | "statusId"> & {
+    Pick<
+      TaskSubtask,
+      "title" | "completed" | "description" | "assigneeId" | "dueDate" | "priority" | "statusId"
+    > & {
       id?: string;
     }
   >;
@@ -34,6 +37,7 @@ export function serializeSubtasksForApi(subtasks: TaskSubtask[]): TaskSubtask[] 
       title: s.title,
       completed: Boolean(s.completed),
     };
+    if (s.description?.trim()) item.description = s.description.trim();
     if (s.assigneeId) item.assigneeId = s.assigneeId;
     if (s.priority) item.priority = s.priority;
     if (s.statusId) item.statusId = s.statusId;

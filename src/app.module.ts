@@ -14,6 +14,7 @@ import { ProjectsModule } from './modules/projects/projects.module';
 import { WorkflowsModule } from './modules/workflows/workflows.module';
 import { SprintsModule } from './modules/sprints/sprints.module';
 import { TasksModule } from './modules/tasks/tasks.module';
+import { AttachmentsModule } from './modules/attachments/attachments.module';
 import { CustomFieldsModule } from './modules/custom-fields/custom-fields.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { BillingModule } from './modules/billing/billing.module';
@@ -44,6 +45,7 @@ import { RootController } from './root.controller';
     WorkflowsModule,
     SprintsModule,
     TasksModule,
+    AttachmentsModule,
     CustomFieldsModule,
     NotificationsModule,
     BillingModule,

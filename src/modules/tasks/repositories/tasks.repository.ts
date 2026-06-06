@@ -61,4 +61,38 @@ export class TasksRepository {
   async delete(id: string): Promise<void> {
     await this.repo.delete(id);
   }
+
+  /** Find a task whose JSON subtasks array contains the given subtask id. */
+  async findBySubtaskId(subtaskId: string, organizationId: string): Promise<TaskEntity | null> {
+    const rows = await this.repo
+      .createQueryBuilder('task')
+      .where('task.organization_id = :organizationId', { organizationId })
+      .andWhere('task.subtasks IS NOT NULL')
+      .andWhere(
+        `JSON_SEARCH(
+          CAST(task.subtasks AS JSON),
+          :searchMode,
+          :subtaskId,
+          NULL,
+          :jsonPath
+        ) IS NOT NULL`,
+        {
+          searchMode: 'one',
+          subtaskId,
+          jsonPath: '$[*].id',
+        },
+      )
+      .limit(1)
+      .getMany();
+    if (rows[0]) return rows[0];
+
+    // Fallback when JSON_SEARCH misses (e.g. legacy text-encoded subtasks).
+    const candidates = await this.repo.find({
+      where: { organizationId },
+      select: ['id', 'projectId', 'organizationId', 'subtasks'],
+      take: 500,
+      order: { updatedAt: 'DESC' },
+    });
+    return candidates.find((task) => task.subtasks?.some((s) => s.id === subtaskId)) ?? null;
+  }
 }

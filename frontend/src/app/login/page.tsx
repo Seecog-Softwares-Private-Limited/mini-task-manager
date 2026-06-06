@@ -30,10 +30,6 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-/** Seed owner (see README / `npm run seed`). Default password unless `SEED_USER_PASSWORD` was set when seeding. */
-const SEED_OWNER_EMAIL = "owner@example.com";
-const SEED_OWNER_DEFAULT_PASSWORD = "Password123!";
-
 function LoginForm() {
   const searchParams = useSearchParams();
   const fromParam = searchParams.get("from") ?? "/dashboard";
@@ -50,8 +46,6 @@ function LoginForm() {
   const [otpSubmitting, setOtpSubmitting] = useState(false);
   const [resendSuccess, setResendSuccess] = useState<string | null>(null);
   const urlError = searchParams.get("error");
-  const prepopulateSeed =
-    process.env.NODE_ENV === "development" && !emailParam;
 
   const {
     register,
@@ -62,16 +56,14 @@ function LoginForm() {
   } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: {
-      email: emailParam || (prepopulateSeed ? SEED_OWNER_EMAIL : ""),
-      password: emailParam ? "" : prepopulateSeed ? SEED_OWNER_DEFAULT_PASSWORD : "",
+      email: emailParam,
+      password: "",
     },
   });
 
   useEffect(() => {
     if (emailParam) {
       reset({ email: emailParam, password: "" });
-    } else if (process.env.NODE_ENV === "development") {
-      reset({ email: SEED_OWNER_EMAIL, password: SEED_OWNER_DEFAULT_PASSWORD });
     }
   }, [emailParam, reset]);
 
