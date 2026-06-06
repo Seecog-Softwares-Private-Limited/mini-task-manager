@@ -849,6 +849,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
           onSelectColumnTasks={handleSelectColumnTasks}
           onSetWipLimit={handleSetWipLimit}
           permissions={permissions}
+          currentUserId={currentUserId}
           aria-label={`Tasks for ${project.name}`}
         />
       ) : viewMode === "scrum" ? (
@@ -873,6 +874,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
           selectedIds={bulk.state.selectedIds}
           onToggleSelect={bulk.toggle}
           permissions={permissions}
+          currentUserId={currentUserId}
           aria-label={`Scrum board for ${project.name}`}
         />
       ) : (

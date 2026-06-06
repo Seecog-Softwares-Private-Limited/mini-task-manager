@@ -38,6 +38,7 @@ import {
   CheckSquare2,
 } from "lucide-react";
 import type { BoardPermissions } from "@/hooks/use-board-permissions";
+import { canUserMoveTask } from "@/lib/task-assignees";
 import { TaskCard as EnterpriseTaskCard } from "@/components/kanban/task-card";
 
 // ─── Types ────────────────────────────────────────────────────
@@ -169,8 +170,15 @@ function DraggableCard(props: {
   isSelectionMode?: boolean;
   onToggleSelect?: (taskId: string) => void;
   permissions?: BoardPermissions;
+  currentUserId?: string | null;
 }) {
-  const canDrag = !!props.permissions?.canMoveTask && !props.isSelectionMode;
+  const canDrag =
+    !props.isSelectionMode &&
+    canUserMoveTask(
+      props.task,
+      props.currentUserId,
+      !!props.permissions?.canMoveTask
+    );
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: props.task.id,
     data: { task: props.task, statusId: props.statusId },
@@ -346,6 +354,7 @@ function DroppableColumn({
   onSelectColumnTasks,
   onSetWipLimit,
   permissions,
+  currentUserId,
 }: {
   status: WorkflowStatus;
   statusIndex: number;
@@ -369,6 +378,7 @@ function DroppableColumn({
   onSelectColumnTasks?: (statusId: string) => void;
   onSetWipLimit?: (statusId: string, limit: number | undefined) => void;
   permissions?: BoardPermissions;
+  currentUserId?: string | null;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: status.id,
@@ -490,6 +500,7 @@ function DroppableColumn({
             isSelectionMode={isSelectionMode}
             onToggleSelect={onToggleSelect}
             permissions={permissions}
+            currentUserId={currentUserId}
           />
         ))}
 
@@ -631,6 +642,7 @@ export interface KanbanBoardProps {
   onSelectColumnTasks?: (statusId: string) => void;
   onSetWipLimit?: (statusId: string, limit: number | undefined) => void;
   permissions?: BoardPermissions;
+  currentUserId?: string | null;
   "aria-label"?: string;
   className?: string;
 }
@@ -657,13 +669,12 @@ export function KanbanBoard({
   onSelectColumnTasks,
   onSetWipLimit,
   permissions,
+  currentUserId,
   "aria-label": ariaLabel = "Kanban board",
   className,
 }: KanbanBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overColumnId, setOverColumnId] = useState<string | null>(null);
-
-  const canDrag = !!permissions?.canMoveTask && !isSelectionMode;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -697,9 +708,8 @@ export function KanbanBoard({
   }, [tasksByStatus, filters]);
 
   const handleDragStart = useCallback((e: DragStartEvent) => {
-    if (!canDrag) return;
     setActiveId(e.active.id as string);
-  }, [canDrag]);
+  }, []);
 
   const handleDragOver = useCallback((e: DragOverEvent) => {
     const overId = e.over?.id as string | undefined;
@@ -778,6 +788,7 @@ export function KanbanBoard({
             onSelectColumnTasks={onSelectColumnTasks}
             onSetWipLimit={onSetWipLimit}
             permissions={permissions}
+            currentUserId={currentUserId}
           />
         ))}
       </div>

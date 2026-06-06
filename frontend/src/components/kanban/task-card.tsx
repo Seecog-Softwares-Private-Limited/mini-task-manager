@@ -41,6 +41,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { TaskAssigneePopover } from "@/components/tasks/task-assignee-popover";
+import { isUserAssignedToTask } from "@/lib/task-assignees";
 
 export type TaskType = "bug" | "feature" | "story" | "improvement";
 
@@ -386,6 +387,7 @@ interface TaskCardProps {
   boardColumnStatus?: WorkflowStatus;
   quickActions?: TaskCardQuickActions;
   permissions?: BoardPermissions;
+  currentUserId?: string | null;
   onTaskClick?: (task: Task) => void;
   onToggleSelect?: (taskId: string) => void;
 }
@@ -404,10 +406,13 @@ export function TaskCard({
   boardColumnStatus,
   quickActions,
   permissions,
+  currentUserId,
   onTaskClick,
   onToggleSelect,
 }: TaskCardProps) {
-  const readOnly = !permissions?.canEditTask;
+  const canManageTask = !!permissions?.canEditTask;
+  const canWorkflowEdit = canManageTask || isUserAssignedToTask(task, currentUserId);
+  const showQuickActions = canWorkflowEdit && !isSelectionMode;
   const dueTone = getDueDateTone(task.dueDate);
   const labels = task.labels ?? (task.sprintId ? [{ id: "sprint", name: "Sprint", color: "#6366f1" }] : []);
   const activityComments = task.commentsCount ?? commentCount;
@@ -502,7 +507,7 @@ export function TaskCard({
         isSelected && "border-primary/30 bg-violet-50/40 ring-2 ring-primary/25 dark:bg-primary/[0.06]",
         isMoving && "opacity-65",
         task.id.startsWith("temp-") && "border-dashed",
-        readOnly && "cursor-default hover:translate-y-0",
+        !canWorkflowEdit && "cursor-default hover:translate-y-0",
       )}
       data-cy={`task-card-${task.id}`}
       aria-label={`Open task ${task.title}`}
@@ -540,7 +545,7 @@ export function TaskCard({
         </button>
       )}
 
-      {!readOnly && !isSelectionMode && (
+      {showQuickActions && (
         <div className="absolute right-3 top-3 z-20 flex items-center gap-1 opacity-0 transition-all duration-300 group-hover/card:opacity-100">
           <Button
             type="button"
@@ -556,37 +561,41 @@ export function TaskCard({
           >
             <SquarePen className="h-3.5 w-3.5" />
           </Button>
-          <TaskAssigneePopover
-            task={{ id: task.id, projectId: task.projectId, assigneeId: task.assigneeId, assignees: localAssignees }}
-            onAssigneesChange={setLocalAssignees}
-            trigger={
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className={QUICK_ACTION_BTN}
-                data-quick-action
-                aria-label="Assign task"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <UserPlus className="h-3.5 w-3.5" />
-              </Button>
-            }
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className={QUICK_ACTION_BTN}
-            data-quick-action
-            aria-label="Change due date"
-            onClick={(e) => {
-              e.stopPropagation();
-              quickActions?.onEdit?.(task);
-            }}
-          >
-            <Calendar className="h-3.5 w-3.5" />
-          </Button>
+          {canManageTask ? (
+            <TaskAssigneePopover
+              task={{ id: task.id, projectId: task.projectId, assigneeId: task.assigneeId, assignees: localAssignees }}
+              onAssigneesChange={setLocalAssignees}
+              trigger={
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className={QUICK_ACTION_BTN}
+                  data-quick-action
+                  aria-label="Assign task"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <UserPlus className="h-3.5 w-3.5" />
+                </Button>
+              }
+            />
+          ) : null}
+          {canManageTask ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className={QUICK_ACTION_BTN}
+              data-quick-action
+              aria-label="Change due date"
+              onClick={(e) => {
+                e.stopPropagation();
+                quickActions?.onEdit?.(task);
+              }}
+            >
+              <Calendar className="h-3.5 w-3.5" />
+            </Button>
+          ) : null}
           {permissions?.canDeleteTask && quickActions?.onDelete && (
             <Button
               type="button"
