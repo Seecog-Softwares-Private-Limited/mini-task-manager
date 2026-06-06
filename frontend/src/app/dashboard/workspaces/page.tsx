@@ -552,7 +552,7 @@ export default function WorkspacesPage() {
                     tabIndex={0}
                     aria-current={isCurrent ? "true" : undefined}
                     className={cn(
-                      "group/card relative cursor-pointer rounded-2xl border border-[#E7EAF0] bg-[#FCFCFD]/95 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_20px_45px_-28px_rgba(15,23,42,0.24)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_1px_2px_rgba(15,23,42,0.06),0_24px_48px_-24px_rgba(15,23,42,0.3)] active:scale-[0.998] dark:border-border dark:bg-card/60",
+                      "group/card relative cursor-pointer overflow-hidden rounded-2xl border border-[#E7EAF0] bg-[#FCFCFD]/95 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_20px_45px_-28px_rgba(15,23,42,0.24)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_1px_2px_rgba(15,23,42,0.06),0_24px_48px_-24px_rgba(15,23,42,0.3)] active:scale-[0.998] dark:border-border dark:bg-card/60",
                       "focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2",
                       "outline-none",
                       isCurrent
@@ -650,10 +650,10 @@ export default function WorkspacesPage() {
                           </div>
 
                           {/* Footer: activity + hover action buttons */}
-                          <div className="mt-4 flex items-center justify-between gap-3">
+                          <div className="mt-4 min-w-0 space-y-2">
                             <p
                               className={cn(
-                                "min-w-0 flex-1 truncate text-sm leading-snug",
+                                "truncate text-sm leading-snug",
                                 lastActivityLoading && "text-muted-foreground/50",
                                 !lastActivityLoading && activityRecent
                                   ? "font-medium text-primary/90"
@@ -672,16 +672,16 @@ export default function WorkspacesPage() {
                               />
                               {lastActivityLoading ? "…" : lastActivityRelative ? `Active ${lastActivityRelative}` : "No activity"}
                             </p>
-                            {/* Hover-only action buttons - right-aligned, never overlap name */}
+                            {/* Hover-only action buttons — wrap inside card width */}
                             <div
-                              className="hidden shrink-0 flex-wrap items-center justify-end gap-1 opacity-0 translate-y-0.5 transition-all duration-200 group-hover/card:translate-y-0 group-hover/card:opacity-100 group-focus-within/card:translate-y-0 group-focus-within/card:opacity-100 sm:flex"
+                              className="hidden max-w-full flex-wrap items-center justify-end gap-0.5 opacity-0 translate-y-0.5 transition-all duration-200 group-hover/card:translate-y-0 group-hover/card:opacity-100 group-focus-within/card:translate-y-0 group-focus-within/card:opacity-100 sm:flex"
                               onClick={(e) => e.stopPropagation()}
                               onKeyDown={(e) => e.stopPropagation()}
                             >
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-9 w-9 shrink-0 rounded-lg text-cyan-600 hover:bg-cyan-500/15 hover:text-cyan-700 dark:text-cyan-400 dark:hover:text-cyan-300 md:h-10 md:w-10"
+                                className="h-8 w-8 shrink-0 rounded-lg text-cyan-600 hover:bg-cyan-500/15 hover:text-cyan-700 dark:text-cyan-400 dark:hover:text-cyan-300 md:h-9 md:w-9"
                                 onClick={() => setPreviewOrg(org)}
                                 title="Preview"
                                 aria-label="Preview workspace"
@@ -691,7 +691,7 @@ export default function WorkspacesPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-9 w-9 shrink-0 rounded-lg text-violet-600 hover:bg-violet-500/15 hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300 md:h-10 md:w-10"
+                                className="h-8 w-8 shrink-0 rounded-lg text-violet-600 hover:bg-violet-500/15 hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300 md:h-9 md:w-9"
                                 onClick={() => { setOrgId(org.id); router.push("/dashboard/projects"); }}
                                 title="Projects"
                                 aria-label="Open projects"
@@ -702,7 +702,7 @@ export default function WorkspacesPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-9 w-9 shrink-0 rounded-lg text-amber-600 hover:bg-amber-500/15 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 md:h-10 md:w-10"
+                                  className="h-8 w-8 shrink-0 rounded-lg text-amber-600 hover:bg-amber-500/15 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 md:h-9 md:w-9"
                                   onClick={() => openEditWorkspace(org)}
                                   title="Edit workspace"
                                   aria-label="Edit workspace"
@@ -713,7 +713,7 @@ export default function WorkspacesPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-9 w-9 shrink-0 rounded-lg text-slate-600 hover:bg-slate-500/15 hover:text-slate-800 dark:text-slate-300 dark:hover:text-slate-100 md:h-10 md:w-10"
+                                className="h-8 w-8 shrink-0 rounded-lg text-slate-600 hover:bg-slate-500/15 hover:text-slate-800 dark:text-slate-300 dark:hover:text-slate-100 md:h-9 md:w-9"
                                 onClick={() => { setOrgId(org.id); router.push("/dashboard/settings"); }}
                                 title="Settings"
                                 aria-label="Open settings"
@@ -723,7 +723,7 @@ export default function WorkspacesPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-9 w-9 shrink-0 rounded-lg text-emerald-600 hover:bg-emerald-500/15 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 md:h-10 md:w-10"
+                                className="h-8 w-8 shrink-0 rounded-lg text-emerald-600 hover:bg-emerald-500/15 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 md:h-9 md:w-9"
                                 onClick={() => { setOrgId(org.id); router.push("/dashboard/billing"); }}
                                 title="Billing"
                                 aria-label="Billing"
@@ -733,7 +733,7 @@ export default function WorkspacesPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-9 w-9 shrink-0 rounded-lg text-blue-600 hover:bg-blue-500/15 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 md:h-10 md:w-10"
+                                className="h-8 w-8 shrink-0 rounded-lg text-blue-600 hover:bg-blue-500/15 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 md:h-9 md:w-9"
                                 onClick={() => { setOrgId(org.id); archiveMutation.mutate({ orgId: org.id, isArchived: !org.isArchived }); }}
                                 disabled={archiveMutation.isPending}
                                 title={org.isArchived ? "Restore" : "Archive"}
@@ -749,7 +749,7 @@ export default function WorkspacesPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-9 w-9 shrink-0 rounded-lg text-red-600 hover:bg-red-500/15 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 md:h-10 md:w-10"
+                                  className="h-8 w-8 shrink-0 rounded-lg text-red-600 hover:bg-red-500/15 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 md:h-9 md:w-9"
                                   onClick={() => { setOrgId(org.id); setOrgPendingDelete(org); }}
                                   disabled={deleteMutation.isPending}
                                   title="Delete workspace"
