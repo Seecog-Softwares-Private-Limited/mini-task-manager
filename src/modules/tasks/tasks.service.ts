@@ -14,7 +14,7 @@ import { TaskAttachmentEntity } from './entities/task-attachment.entity';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { PatchTaskDto } from './dto/patch-task.dto';
 import { PaginationQueryDto, PaginatedResult, paginate } from '../../common/pagination';
-import { generateUuid } from '../../common/utils/uuid.util';
+import { formatUuid, generateUuid } from '../../common/utils/uuid.util';
 import { Configuration } from '../../config/configuration';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -39,14 +39,21 @@ function sanitizeFileName(name: string): string {
 /** Fields assignees may update on tasks assigned to them (owner can update all). */
 const ASSIGNEE_PATCH_FIELDS = new Set(['statusId', 'priority', 'subtasks']);
 
+function normalizeAssigneeUserId(id: string | Buffer | null | undefined): string | null {
+  const formatted = formatUuid(id as string | Buffer | null | undefined);
+  if (!formatted) return null;
+  return formatted.trim().toLowerCase().replace(/-/g, '');
+}
+
 function taskAssigneeUserIds(task: TaskEntity): string[] {
-  const normalize = (id: string) => String(id).trim().toLowerCase();
-  const fromList = task.assigneeIds?.length ? task.assigneeIds : [];
-  const ids = [...fromList];
-  if (task.assigneeId && !ids.some((id) => normalize(id) === normalize(task.assigneeId!))) {
-    ids.push(task.assigneeId);
-  }
-  return ids.map(normalize);
+  const ids = new Set<string>();
+  const add = (id: string | Buffer | null | undefined) => {
+    const normalized = normalizeAssigneeUserId(id);
+    if (normalized) ids.add(normalized);
+  };
+  for (const id of task.assigneeIds ?? []) add(id);
+  add(task.assigneeId);
+  return Array.from(ids);
 }
 
 function patchDtoKeys(dto: PatchTaskDto): string[] {
@@ -238,7 +245,8 @@ export class TasksService {
     if (role === 'owner') return;
 
     const assigneeIds = taskAssigneeUserIds(task);
-    const isAssignee = assigneeIds.includes(String(userId).trim().toLowerCase());
+    const normalizedUserId = normalizeAssigneeUserId(userId);
+    const isAssignee = normalizedUserId != null && assigneeIds.includes(normalizedUserId);
     if (!isAssignee) {
       throw new ForbiddenException('Only the workspace owner or task assignee can update this task');
     }

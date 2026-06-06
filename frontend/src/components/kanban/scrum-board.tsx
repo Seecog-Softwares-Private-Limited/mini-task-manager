@@ -26,6 +26,7 @@ import {
   Zap,
 } from "lucide-react";
 import type { BoardPermissions } from "@/hooks/use-board-permissions";
+import { canUserMoveTask } from "@/lib/task-assignees";
 import type { AssigneeMap, BoardFilters, SubtaskInfo, TaskCardQuickActions } from "./kanban-board";
 import { TaskCard } from "./task-card";
 
@@ -137,8 +138,15 @@ function ScrumDraggableCard(props: {
   isSelectionMode?: boolean;
   onToggleSelect?: (taskId: string) => void;
   permissions?: BoardPermissions;
+  currentUserId?: string | null;
 }) {
-  const canDrag = !!props.permissions?.canMoveTask && !props.isSelectionMode;
+  const canDrag =
+    !props.isSelectionMode &&
+    canUserMoveTask(
+      props.task,
+      props.currentUserId,
+      !!props.permissions?.canMoveTask
+    );
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: props.task.id,
     data: {
@@ -175,6 +183,7 @@ function ScrumDraggableCard(props: {
         isSelectionMode={props.isSelectionMode}
         onToggleSelect={props.onToggleSelect}
         permissions={props.permissions}
+        currentUserId={props.currentUserId}
       />
     </div>
   );
@@ -200,6 +209,7 @@ function ScrumCell({
   selectedIds,
   onToggleSelect,
   permissions,
+  currentUserId,
 }: {
   swimlaneId: string;
   status: WorkflowStatus;
@@ -218,6 +228,7 @@ function ScrumCell({
   selectedIds?: Set<string>;
   onToggleSelect?: (taskId: string) => void;
   permissions?: BoardPermissions;
+  currentUserId?: string | null;
 }) {
   const droppableId = cellId(swimlaneId, status.id);
   const { setNodeRef, isOver } = useDroppable({ id: droppableId });
@@ -268,6 +279,7 @@ function ScrumCell({
             isSelectionMode={isSelectionMode}
             onToggleSelect={onToggleSelect}
             permissions={permissions}
+            currentUserId={currentUserId}
           />
         ))}
         {tasks.length === 0 && !active && (
@@ -307,6 +319,7 @@ export interface ScrumBoardProps {
   selectedIds?: Set<string>;
   onToggleSelect?: (taskId: string) => void;
   permissions?: BoardPermissions;
+  currentUserId?: string | null;
   "aria-label"?: string;
   className?: string;
 }
@@ -333,13 +346,12 @@ export function ScrumBoard({
   selectedIds,
   onToggleSelect,
   permissions,
+  currentUserId,
   "aria-label": ariaLabel = "Scrum board",
   className,
 }: ScrumBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overCellId, setOverCellId] = useState<string | null>(null);
-
-  const canDrag = !!permissions?.canMoveTask && !isSelectionMode;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -367,9 +379,8 @@ export function ScrumBoard({
   }, [activeId, tasksByCell, statuses]);
 
   const handleDragStart = useCallback((e: DragStartEvent) => {
-    if (!canDrag) return;
     setActiveId(e.active.id as string);
-  }, [canDrag]);
+  }, []);
 
   const handleDragOver = useCallback((e: DragOverEvent) => {
     const overId = e.over?.id as string | undefined;
@@ -497,6 +508,7 @@ export function ScrumBoard({
                             selectedIds={selectedIds}
                             onToggleSelect={onToggleSelect}
                             permissions={permissions}
+                            currentUserId={currentUserId}
                           />
                         </td>
                       );

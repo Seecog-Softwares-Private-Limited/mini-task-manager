@@ -21,7 +21,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getStoredToken, parseApiError } from "@/services/api/client";
+import { parseApiError } from "@/services/api/client";
+import { useAuth } from "@/hooks/use-auth";
+import { isUserAssignedToTask } from "@/lib/task-assignees";
 import { fetchTask, updateTask, updateTaskAssignee, deleteTask } from "@/services/api/tasks.api";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { fetchComments, addComment, deleteComment } from "@/services/api/comments.api";
@@ -267,16 +269,8 @@ export function TaskDetailModal({
     [projectId, queryClient]
   );
   const { toast } = useToast();
-  const currentUserId = React.useMemo(() => {
-    const token = getStoredToken();
-    if (!token) return "";
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-      return payload.sub ?? "";
-    } catch {
-      return "";
-    }
-  }, []);
+  const { user } = useAuth();
+  const currentUserId = user?.id ?? "";
   const [commentText, setCommentText] = React.useState("");
   const [commentMentionedIds, setCommentMentionedIds] = React.useState<string[]>([]);
   const [newCheckItem, setNewCheckItem] = React.useState("");
@@ -407,19 +401,10 @@ export function TaskDetailModal({
     [orgMembers, currentUserId]
   );
 
-  const isAssignee = React.useMemo(() => {
-    if (!task || !currentUserId) return false;
-    const uid = currentUserId.toLowerCase();
-    const ids = (
-      task.assigneeIds?.length
-        ? task.assigneeIds
-        : task.assigneeId
-          ? [task.assigneeId]
-          : []
-    ).map((id) => id.toLowerCase());
-    if (ids.includes(uid)) return true;
-    return (task.assignee?.id?.toLowerCase() ?? "") === uid;
-  }, [task, currentUserId]);
+  const isAssignee = React.useMemo(
+    () => (task ? isUserAssignedToTask(task, currentUserId) : false),
+    [task, currentUserId]
+  );
 
   /** Owner can edit every field; assignees can update status, priority, and subtasks only. */
   const canEditAll = isOwner;

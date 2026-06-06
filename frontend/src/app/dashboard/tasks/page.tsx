@@ -835,6 +835,7 @@ export default function TasksPage() {
                   });
                 }}
                 permissions={permissions}
+                currentUserId={currentUserId}
                 aria-label={`Tasks for ${selectedProject.name}`}
               />
             ) : viewMode === "scrum" ? (
@@ -857,6 +858,7 @@ export default function TasksPage() {
                 selectedIds={bulk.state.selectedIds}
                 onToggleSelect={bulk.toggle}
                 permissions={permissions}
+                currentUserId={currentUserId}
                 aria-label={`Scrum board for ${selectedProject.name}`}
               />
             ) : (
