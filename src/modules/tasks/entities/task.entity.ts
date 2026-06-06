@@ -42,6 +42,7 @@ export class TaskEntity extends BaseEntity {
     id: string;
     title: string;
     completed: boolean;
+    description?: string;
     assigneeId?: string;
     dueDate?: string;
     priority?: string;

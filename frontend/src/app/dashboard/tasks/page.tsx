@@ -416,8 +416,23 @@ export default function TasksPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: ({ payload, imageFiles }: { payload: Parameters<typeof createTask>[0]; imageFiles?: File[] }) =>
-      createTaskWithDescriptionImages(payload, imageFiles),
+    mutationFn: ({
+      payload,
+      imageFiles,
+      subtaskPendingAttachments,
+      taskAttachmentFiles,
+    }: {
+      payload: Parameters<typeof createTask>[0];
+      imageFiles?: File[];
+      subtaskPendingAttachments?: import("@/lib/upload-subtask-attachments").SubtaskPendingUploadMap;
+      taskAttachmentFiles?: File[];
+    }) =>
+      createTaskWithDescriptionImages(
+        payload,
+        imageFiles,
+        subtaskPendingAttachments,
+        taskAttachmentFiles
+      ),
     onSettled: () => {
       if (!selectedProjectId) return;
       queryClient.invalidateQueries({ queryKey: ["tasks", selectedProjectId] });
@@ -426,10 +441,14 @@ export default function TasksPage() {
     },
     onSuccess: (result) => {
       setCreateModalOpen(false);
-      if (result.imageUploadWarning) {
+      const uploadWarning =
+        result.subtaskUploadWarning ??
+        result.taskAttachmentWarning ??
+        result.imageUploadWarning;
+      if (uploadWarning) {
         toast({
           title: "Task created",
-          description: result.imageUploadWarning,
+          description: uploadWarning,
           variant: "error",
         });
       } else {
@@ -576,7 +595,12 @@ export default function TasksPage() {
     }
   }, [selectedProject, projectTasks, assigneeMap, statuses, filters, toast]);
 
-  const handleCreateFromModal = useCallback((data: CreateTaskFormData, descriptionImageFiles?: File[]) => {
+  const handleCreateFromModal = useCallback((
+    data: CreateTaskFormData,
+    descriptionImageFiles?: File[],
+    subtaskPendingAttachments?: import("@/lib/upload-subtask-attachments").SubtaskPendingUploadMap,
+    taskPendingAttachments?: import("@/components/tasks/subtasks/subtask-attachments-section").PendingSubtaskAttachment[]
+  ) => {
     if (!orgId || !selectedProjectId) return;
     createMutation.mutate({
       payload: {
@@ -593,7 +617,9 @@ export default function TasksPage() {
         tags: data.labels?.length ? data.labels.map((l) => ({ name: l.name, color: l.color })) : undefined,
         subtasks: data.subtasks
           .map((s) => ({
+            id: s.id,
             title: s.title.trim(),
+            description: s.description?.trim() || undefined,
             completed: s.completed,
             assigneeId: s.assigneeId || undefined,
             dueDate: s.dueDate || undefined,
@@ -602,6 +628,8 @@ export default function TasksPage() {
           .filter((s) => s.title.length > 0),
       },
       imageFiles: descriptionImageFiles,
+      subtaskPendingAttachments,
+      taskAttachmentFiles: taskPendingAttachments?.map((item) => item.file),
     });
   }, [orgId, selectedProjectId, createMutation, statuses]);
 

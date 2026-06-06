@@ -101,10 +101,33 @@ export interface TaskSubtask {
   id: string;
   title: string;
   completed: boolean;
+  description?: string;
   assigneeId?: string;
   dueDate?: string;
   priority?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   statusId?: string;
+}
+
+export type EntityAttachmentType = "TASK" | "SUBTASK";
+
+export interface EntityAttachment {
+  id: string;
+  workspaceId: string;
+  projectId: string;
+  taskId?: string | null;
+  entityType: EntityAttachmentType;
+  entityId: string;
+  originalFileName: string;
+  storedFileName: string;
+  mimeType: string;
+  fileExtension?: string | null;
+  fileSize: number;
+  storageProvider: string;
+  thumbnailUrl?: string | null;
+  previewUrl?: string | null;
+  uploadedBy: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Workflow {

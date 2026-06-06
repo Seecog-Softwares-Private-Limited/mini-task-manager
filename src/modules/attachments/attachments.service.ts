@@ -1,0 +1,266 @@
+import {
+  BadRequestException,
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { Configuration } from '../../config/configuration';
+import { generateUuid } from '../../common/utils/uuid.util';
+import { TasksRepository } from '../tasks/repositories/tasks.repository';
+import { UsageService } from '../billing/usage.service';
+import { PlanLimitService } from '../../plans/plan-limit.service';
+import { AttachmentEntity, AttachmentEntityType } from './entities/attachment.entity';
+import { AttachmentsRepository } from './repositories/attachments.repository';
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+function sanitizeFileName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 200) || 'file';
+}
+
+function isAllowedMime(mimetype: string): boolean {
+  if (!mimetype) return false;
+  const allowed = [
+    'image/',
+    'text/',
+    'application/pdf',
+    'application/json',
+    'application/zip',
+    'application/x-zip-compressed',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'text/csv',
+  ];
+  return allowed.some((prefix) =>
+    prefix.endsWith('/') ? mimetype.startsWith(prefix) : mimetype === prefix,
+  );
+}
+
+function isPreviewableMime(mimetype: string | null): 'image' | 'pdf' | 'text' | 'none' {
+  if (!mimetype) return 'none';
+  if (mimetype.startsWith('image/')) return 'image';
+  if (mimetype === 'application/pdf') return 'pdf';
+  if (
+    mimetype.startsWith('text/') ||
+    mimetype === 'application/json' ||
+    mimetype === 'text/csv'
+  ) {
+    return 'text';
+  }
+  return 'none';
+}
+
+@Injectable()
+export class AttachmentsService {
+  constructor(
+    private readonly attachmentsRepository: AttachmentsRepository,
+    private readonly tasksRepository: TasksRepository,
+    private readonly configService: ConfigService<Configuration>,
+    private readonly usageService: UsageService,
+    private readonly planLimitService: PlanLimitService,
+  ) {}
+
+  async findByEntity(
+    entityType: AttachmentEntityType,
+    entityId: string,
+    organizationId: string,
+    taskIdHint?: string,
+  ): Promise<AttachmentEntity[]> {
+    await this.assertEntityAccess(entityType, entityId, organizationId, taskIdHint);
+    return this.attachmentsRepository.findByEntity(entityType, entityId);
+  }
+
+  async upload(
+    entityType: AttachmentEntityType,
+    entityId: string,
+    organizationId: string,
+    userId: string,
+    file: { originalname?: string; mimetype?: string; size: number; buffer: Buffer },
+    taskIdHint?: string,
+  ): Promise<AttachmentEntity> {
+    if (!file) throw new BadRequestException('File is required');
+    if (file.size > MAX_FILE_SIZE) throw new ForbiddenException('File too large (max 10MB)');
+    if (!isAllowedMime(file.mimetype || '')) throw new ForbiddenException('File type not allowed');
+
+    const context = await this.resolveEntityContext(
+      entityType,
+      entityId,
+      organizationId,
+      taskIdHint,
+    );
+
+    await this.planLimitService.assertStorageLimit(userId, file.size);
+
+    const storageMbIncrement = Math.ceil(file.size / (1024 * 1024));
+    const limitCheck = await this.usageService.checkLimit(
+      organizationId,
+      'storageGb',
+      storageMbIncrement,
+    );
+    if (!limitCheck.allowed) {
+      throw new HttpException(
+        {
+          statusCode: HttpStatus.FORBIDDEN,
+          error: 'LIMIT_EXCEEDED',
+          code: 'SUBSCRIPTION_LIMIT_EXCEEDED',
+          resource: limitCheck.resource,
+          current: limitCheck.current,
+          limit: limitCheck.limit,
+          message: limitCheck.message,
+          upgradeUrl: '/dashboard/billing',
+        },
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
+    const dir = path.join(uploadsPath, 'attachments', entityType.toLowerCase(), entityId);
+    await fs.mkdir(dir, { recursive: true });
+
+    const ext = path.extname(file.originalname || '') || '';
+    const base = sanitizeFileName(path.basename(file.originalname || 'file', ext));
+    const storedFileName = `${generateUuid()}-${base}${ext}`;
+    const storageKey = path
+      .join('attachments', entityType.toLowerCase(), entityId, storedFileName)
+      .replace(/\\/g, '/');
+    const fullPath = path.join(uploadsPath, storageKey);
+    await fs.writeFile(fullPath, file.buffer);
+
+    const attachment = await this.attachmentsRepository.create({
+      workspaceId: organizationId,
+      projectId: context.projectId,
+      taskId: context.taskId,
+      entityType,
+      entityId,
+      originalFileName: file.originalname || null,
+      storedFileName,
+      mimeType: file.mimetype || null,
+      fileExtension: ext.replace(/^\./, '') || null,
+      fileSize: file.size,
+      storageProvider: 'local',
+      storageKey,
+      uploadedBy: userId,
+      isDeleted: false,
+    });
+
+    await this.planLimitService.incrementStorageUsed(userId, file.size);
+    return attachment;
+  }
+
+  async getFileForDownload(
+    attachmentId: string,
+    organizationId: string,
+  ): Promise<{ path: string; fileName: string | null; mimeType: string | null }> {
+    const attachment = await this.getAttachmentOrThrow(attachmentId, organizationId);
+    const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
+    const fullPath = path.join(uploadsPath, attachment.storageKey);
+    return {
+      path: fullPath,
+      fileName: attachment.originalFileName,
+      mimeType: attachment.mimeType,
+    };
+  }
+
+  async getPreviewInfo(
+    attachmentId: string,
+    organizationId: string,
+  ): Promise<
+    | { kind: 'file'; path: string; fileName: string | null; mimeType: string | null }
+    | { kind: 'unsupported'; fileName: string | null; mimeType: string | null }
+  > {
+    const attachment = await this.getAttachmentOrThrow(attachmentId, organizationId);
+    const previewKind = isPreviewableMime(attachment.mimeType);
+    if (previewKind === 'none') {
+      return {
+        kind: 'unsupported',
+        fileName: attachment.originalFileName,
+        mimeType: attachment.mimeType,
+      };
+    }
+    const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
+    return {
+      kind: 'file',
+      path: path.join(uploadsPath, attachment.storageKey),
+      fileName: attachment.originalFileName,
+      mimeType: attachment.mimeType,
+    };
+  }
+
+  async delete(attachmentId: string, organizationId: string, userId: string): Promise<void> {
+    const attachment = await this.getAttachmentOrThrow(attachmentId, organizationId);
+    const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
+    const fullPath = path.join(uploadsPath, attachment.storageKey);
+    await fs.unlink(fullPath).catch(() => {});
+    await this.attachmentsRepository.softDelete(attachmentId);
+    if (attachment.fileSize && attachment.uploadedBy) {
+      await this.planLimitService.decrementStorageUsed(
+        attachment.uploadedBy,
+        Number(attachment.fileSize),
+      );
+    }
+  }
+
+  private async getAttachmentOrThrow(
+    attachmentId: string,
+    organizationId: string,
+  ): Promise<AttachmentEntity> {
+    const attachment = await this.attachmentsRepository.findById(attachmentId);
+    if (!attachment || attachment.workspaceId !== organizationId) {
+      throw new NotFoundException('Attachment not found');
+    }
+    return attachment;
+  }
+
+  private async assertEntityAccess(
+    entityType: AttachmentEntityType,
+    entityId: string,
+    organizationId: string,
+    taskIdHint?: string,
+  ): Promise<void> {
+    await this.resolveEntityContext(entityType, entityId, organizationId, taskIdHint);
+  }
+
+  private async resolveEntityContext(
+    entityType: AttachmentEntityType,
+    entityId: string,
+    organizationId: string,
+    taskIdHint?: string,
+  ): Promise<{ projectId: string; taskId: string | null }> {
+    if (entityType === 'TASK') {
+      const task = await this.tasksRepository.findByIdAndOrganization(entityId, organizationId);
+      if (!task) throw new NotFoundException('Task not found');
+      return { projectId: task.projectId, taskId: task.id };
+    }
+
+    if (entityType === 'SUBTASK') {
+      let task = taskIdHint
+        ? await this.tasksRepository.findByIdAndOrganization(taskIdHint, organizationId)
+        : null;
+      if (task) {
+        const hasSubtask = task.subtasks?.some((s) => s.id === entityId);
+        if (!hasSubtask) task = null;
+      }
+      if (!task) {
+        task = await this.findTaskContainingSubtask(entityId, organizationId);
+      }
+      if (!task) throw new NotFoundException('Subtask not found');
+      return { projectId: task.projectId, taskId: task.id };
+    }
+
+    throw new BadRequestException('Invalid entity type');
+  }
+
+  private async findTaskContainingSubtask(
+    subtaskId: string,
+    organizationId: string,
+  ) {
+    return this.tasksRepository.findBySubtaskId(subtaskId, organizationId);
+  }
+}

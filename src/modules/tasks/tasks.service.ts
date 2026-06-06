@@ -276,6 +276,7 @@ export class TasksService {
       id?: string;
       title: string;
       completed?: boolean;
+      description?: string;
       assigneeId?: string;
       dueDate?: string;
       priority?: string;
@@ -285,6 +286,7 @@ export class TasksService {
     id: string;
     title: string;
     completed: boolean;
+    description?: string;
     assigneeId?: string;
     dueDate?: string;
     priority?: string;
@@ -292,15 +294,19 @@ export class TasksService {
   }> {
     if (!subtasks?.length) return [];
     return subtasks
-      .map((s) => ({
-        id: s.id ?? generateUuid(),
-        title: s.title?.trim() ?? '',
-        completed: Boolean(s.completed),
-        assigneeId: s.assigneeId || undefined,
-        dueDate: s.dueDate ? String(s.dueDate).slice(0, 10) : undefined,
-        priority: s.priority ?? 'MEDIUM',
-        statusId: s.statusId || undefined,
-      }))
+      .map((s) => {
+        const description = s.description?.trim();
+        return {
+          id: s.id ?? generateUuid(),
+          title: s.title?.trim() ?? '',
+          completed: Boolean(s.completed),
+          ...(description ? { description } : {}),
+          assigneeId: s.assigneeId || undefined,
+          dueDate: s.dueDate ? String(s.dueDate).slice(0, 10) : undefined,
+          priority: s.priority ?? 'MEDIUM',
+          statusId: s.statusId || undefined,
+        };
+      })
       .filter((s) => s.title.length > 0);
   }
 

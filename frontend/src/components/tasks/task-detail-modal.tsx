@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import dynamic from "next/dynamic";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -27,26 +27,22 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { fetchComments, addComment, deleteComment } from "@/services/api/comments.api";
 import { fetchOrgMembers, fetchProjectMembers } from "@/services/api/members.api";
 import { fetchActivityLogs } from "@/services/api/activity-logs.api";
-import {
-  fetchAttachments,
-  uploadAttachment,
-  deleteAttachment,
-  downloadAttachment,
-} from "@/services/api/attachments.api";
+import { fetchAttachments } from "@/services/api/attachments.api";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 import { generateClientId } from "@/lib/generate-client-id";
 
-import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-selector";
-import { SubtaskDueDatePicker } from "@/components/tasks/subtask-due-date-picker";
-import { SubtaskPrioritySelector } from "@/components/tasks/subtask-priority-selector";
 import {
-  SubtaskStatusSelector,
   defaultDoneStatusId,
   defaultTodoStatusId,
   isDoneWorkflowStatus,
-  resolveSubtaskStatusId,
 } from "@/components/tasks/subtask-status-selector";
+import { SubtaskCompactRow } from "@/components/tasks/subtasks/subtask-compact-row";
+import {
+  SubtaskDetailPanel,
+  type SubtaskDraft,
+} from "@/components/tasks/subtasks/subtask-detail-panel";
+import { fetchEntityAttachments } from "@/services/api/entity-attachments.api";
 import { CommentInputWithMentions } from "@/components/tasks/comment-input-with-mentions";
 import {
   normalizeDescriptionHtml,
@@ -56,7 +52,7 @@ import {
 } from "@/lib/task-description-html";
 import { filterTaskImageAttachments } from "@/lib/task-image-attachments";
 import { isTinyMceUiTarget } from "@/lib/tinymce-dialog";
-import { TaskDescriptionAttachmentPreviews } from "@/components/tasks/task-description-attachment-previews";
+import { TaskAttachmentsSection } from "@/components/tasks/task-attachments-section";
 
 const TaskDescriptionEditor = dynamic(
   () =>
@@ -73,7 +69,6 @@ const TaskDescriptionEditor = dynamic(
 );
 import type {
   Task,
-  TaskAttachment,
   WorkflowStatus,
   OrgMember,
   TaskComment,
@@ -86,7 +81,6 @@ import {
   Check,
   Flag,
   MessageSquare,
-  Paperclip,
   Hash,
   Search,
   UserRoundPlus,
@@ -104,7 +98,6 @@ import {
   Plus,
   Tag,
   X,
-  Upload,
   FileText,
 } from "lucide-react";
 
@@ -178,6 +171,20 @@ function parseTaskDueDate(iso?: string | null): Date | null {
   if (!iso) return null;
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Compare due date to today in local time (avoids UTC off-by-one). */
+function isTaskDueDateOverdue(iso?: string | null): boolean {
+  if (!iso) return false;
+  const match = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const due = match
+    ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+    : new Date(iso);
+  if (Number.isNaN(due.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  due.setHours(0, 0, 0, 0);
+  return due < today;
 }
 
 /** Primary due date label, e.g. `30 May 2026`. */
@@ -273,10 +280,7 @@ export function TaskDetailModal({
   const [commentText, setCommentText] = React.useState("");
   const [commentMentionedIds, setCommentMentionedIds] = React.useState<string[]>([]);
   const [newCheckItem, setNewCheckItem] = React.useState("");
-  const [editingSubtaskId, setEditingSubtaskId] = React.useState<string | null>(null);
-  const [editingSubtaskTitle, setEditingSubtaskTitle] = React.useState("");
-  const editingInitialTitleRef = React.useRef("");
-  const subtaskInputRefs = React.useRef<Record<string, HTMLInputElement | null>>({});
+  const [expandedSubtaskId, setExpandedSubtaskId] = React.useState<string | null>(null);
   const [isEditingTitle, setIsEditingTitle] = React.useState(false);
   const [editingTitle, setEditingTitle] = React.useState("");
   const titleInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -291,14 +295,19 @@ export function TaskDetailModal({
   const [addTagOpen, setAddTagOpen] = React.useState(false);
   const [newTagName, setNewTagName] = React.useState("");
   const [newTagColor, setNewTagColor] = React.useState(TAG_COLORS[0]);
-  const [dragOver, setDragOver] = React.useState(false);
-  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const commentTextareaRef = React.useRef<HTMLTextAreaElement | null>(null);
   const [activityExpanded, setActivityExpanded] = React.useState(true);
   const [activityPage, setActivityPage] = React.useState(1);
   const [assigneeDropdownOpen, setAssigneeDropdownOpen] = React.useState(false);
   const [assigneeSearch, setAssigneeSearch] = React.useState("");
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false);
+  const [subtaskDeleteTarget, setSubtaskDeleteTarget] = React.useState<{
+    id: string;
+    title: string;
+  } | null>(null);
+  const [subtaskDraftDirty, setSubtaskDraftDirty] = React.useState(false);
+  const [subtaskCollapseConfirmOpen, setSubtaskCollapseConfirmOpen] = React.useState(false);
+  const [pendingSubtaskExpandId, setPendingSubtaskExpandId] = React.useState<string | null>(null);
 
   const isOnline = React.useCallback((lastSeenAt: string | undefined) => {
     if (!lastSeenAt) return false;
@@ -464,7 +473,7 @@ export function TaskDetailModal({
     enabled: open && !!taskId,
   });
 
-  const { data: attachments = [], isLoading: attachmentsLoading } = useQuery({
+  const { data: attachments = [] } = useQuery({
     queryKey: ["task-attachments", taskId],
     queryFn: () => fetchAttachments(taskId!),
     enabled: open && !!taskId,
@@ -499,6 +508,30 @@ export function TaskDetailModal({
   }, [activityPage, activityPageCount]);
 
   const checklist = task?.subtasks ?? [];
+
+  React.useEffect(() => {
+    if (!open || !taskId) return;
+    void queryClient.invalidateQueries({ queryKey: ["entity-attachments", "SUBTASK"] });
+    void queryClient.invalidateQueries({ queryKey: ["task-attachments", taskId] });
+  }, [open, taskId, queryClient]);
+
+  const subtaskAttachmentQueries = useQueries({
+    queries: checklist.map((item) => ({
+      queryKey: ["entity-attachments", "SUBTASK", item.id],
+      queryFn: () => fetchEntityAttachments("SUBTASK", item.id, taskId ?? undefined),
+      enabled: Boolean(taskId && item.id),
+      staleTime: 30_000,
+    })),
+  });
+
+  const attachmentCountBySubtaskId = React.useMemo(() => {
+    const map = new Map<string, number>();
+    checklist.forEach((item, index) => {
+      map.set(item.id, subtaskAttachmentQueries[index]?.data?.length ?? 0);
+    });
+    return map;
+  }, [checklist, subtaskAttachmentQueries]);
+
   const checklistStats = React.useMemo(() => {
     const total = checklist.length;
     const completed = checklist.filter((item) => item.completed).length;
@@ -693,39 +726,6 @@ export function TaskDetailModal({
     },
   });
 
-  const uploadAttachmentMutation = useMutation({
-    mutationFn: (file: File) => uploadAttachment(taskId!, file),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["task-attachments", taskId] });
-      toast({ title: "File uploaded", variant: "success" });
-    },
-    onError: () => {
-      toast({ title: "Failed to upload file", variant: "error" });
-    },
-  });
-
-  const deleteAttachmentMutation = useMutation({
-    mutationFn: (attachmentId: string) => deleteAttachment(taskId!, attachmentId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["task-attachments", taskId] });
-      toast({ title: "Attachment removed", variant: "default" });
-    },
-    onError: () => {
-      toast({ title: "Failed to remove attachment", variant: "error" });
-    },
-  });
-
-  const handleFiles = React.useCallback(
-    (files: FileList | null) => {
-      if (!files?.length || !taskId) return;
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        if (file?.size !== undefined) uploadAttachmentMutation.mutate(file);
-      }
-    },
-    [taskId, uploadAttachmentMutation]
-  );
-
   const appendSubtask = React.useCallback(
     (title: string) => {
       const trimmed = title.trim();
@@ -762,7 +762,9 @@ export function TaskDetailModal({
   );
 
   const isOverdue =
-    task?.dueDate && new Date(task.dueDate) < new Date() && task.statusId !== statuses.find((s) => s.type === "DONE")?.id;
+    Boolean(task?.dueDate) &&
+    isTaskDueDateOverdue(task?.dueDate) &&
+    task?.statusId !== statuses.find((s) => s.type === "DONE")?.id;
   const selectedPriority =
     PRIORITIES.find((pr) => pr.value === (task?.priority ?? "").toUpperCase()) ?? PRIORITIES[1];
   const selectedStatus =
@@ -775,34 +777,39 @@ export function TaskDetailModal({
     return map;
   }, [statuses]);
 
-  React.useEffect(() => {
-    if (!editingSubtaskId) return;
-    requestAnimationFrame(() => {
-      const input = subtaskInputRefs.current[editingSubtaskId];
-      input?.focus();
-      input?.select();
-    });
-  }, [editingSubtaskId]);
-
-  const startSubtaskInlineEdit = React.useCallback((subtaskId: string, currentTitle: string) => {
-    editingInitialTitleRef.current = currentTitle;
-    setEditingSubtaskTitle(currentTitle);
-    setEditingSubtaskId(subtaskId);
-  }, []);
-
-  const saveSubtaskInlineEdit = React.useCallback(
-    (subtaskId: string) => {
-      if (editingSubtaskId !== subtaskId) return;
-      const nextTitle = editingSubtaskTitle.trim();
-      const previousTitle = editingInitialTitleRef.current.trim();
-      setEditingSubtaskId(null);
-      if (!nextTitle || nextTitle === previousTitle) return;
+  const saveSubtaskDetail = React.useCallback(
+    (draft: SubtaskDraft) => {
+      const status = statuses.find((s) => s.id === draft.statusId);
       updateSubtasksMutation.mutate(
-        checklist.map((item) => (item.id === subtaskId ? { ...item, title: nextTitle } : item))
+        checklist.map((item) =>
+          item.id === draft.id
+            ? {
+                ...item,
+                ...draft,
+                completed: status ? isDoneWorkflowStatus(status) : draft.completed,
+              }
+            : item
+        ),
+        {
+          onSuccess: () => {
+            setSubtaskDraftDirty(false);
+            toast({ title: "Subtask saved", variant: "success" });
+          },
+        }
       );
     },
-    [checklist, editingSubtaskId, editingSubtaskTitle, updateSubtasksMutation]
+    [checklist, statuses, updateSubtasksMutation, toast]
   );
+
+  const confirmRemoveSubtask = React.useCallback(() => {
+    if (!subtaskDeleteTarget) return;
+    if (expandedSubtaskId === subtaskDeleteTarget.id) {
+      setExpandedSubtaskId(null);
+      setSubtaskDraftDirty(false);
+    }
+    updateSubtasksMutation.mutate(checklist.filter((i) => i.id !== subtaskDeleteTarget.id));
+    setSubtaskDeleteTarget(null);
+  }, [checklist, expandedSubtaskId, subtaskDeleteTarget, updateSubtasksMutation]);
 
   React.useEffect(() => {
     if (!isEditingTitle) return;
@@ -1129,14 +1136,17 @@ export function TaskDetailModal({
                           ) : null}
                         </span>
                       </div>
-                      {imageAttachments.length > 0 ? (
-                        <TaskDescriptionAttachmentPreviews
-                          attachments={attachments}
-                          className="mt-4 px-1"
-                        />
-                      ) : null}
                       </>
                     )}
+                    </div>
+
+                    <div className={tdWorkSectionDivider} aria-hidden />
+
+                    <div className={tdWorkSection}>
+                      <TaskAttachmentsSection
+                        taskId={taskId ?? undefined}
+                        disabled={!canEditAll}
+                      />
                     </div>
 
                     <div className={tdWorkSectionDivider} aria-hidden />
@@ -1170,158 +1180,96 @@ export function TaskDetailModal({
                       </div>
                     </div>
                     <div className="space-y-2">
-                      {checklist.map((item) => (
-                        <div
-                          key={item.id}
-                          className={cn(
-                            "group flex flex-col gap-2 rounded-2xl px-4 py-3.5 transition-all duration-200 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 lg:flex-nowrap",
-                            "td-inner-surface hover:shadow-[0_2px_8px_-2px_rgba(15,23,42,0.08)] dark:hover:bg-muted/20",
-                            item.completed && "opacity-[0.72]"
-                          )}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={item.completed}
-                            disabled={!canEditWorkflowFields || updateSubtasksMutation.isPending}
-                            onChange={() => {
-                              const nextCompleted = !item.completed;
-                              const doneId = defaultDoneStatusId(statuses);
-                              const todoId = defaultTodoStatusId(statuses);
-                              updateSubtasksMutation.mutate(
-                                checklist.map((i) =>
-                                  i.id === item.id
-                                    ? {
-                                        ...i,
-                                        completed: nextCompleted,
-                                        statusId: nextCompleted
-                                          ? (doneId ?? i.statusId)
-                                          : (todoId ?? i.statusId),
-                                      }
-                                    : i
-                                )
-                              );
-                            }}
-                            className="h-4 w-4 shrink-0 rounded border-input accent-primary"
-                          />
-                          {editingSubtaskId === item.id ? (
-                            <Input
-                              value={editingSubtaskTitle}
-                              onChange={(e) => setEditingSubtaskTitle(e.target.value)}
-                              onBlur={() => saveSubtaskInlineEdit(item.id)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  (e.currentTarget as HTMLInputElement).blur();
-                                }
-                                if (e.key === "Escape") {
-                                  e.preventDefault();
-                                  setEditingSubtaskId(null);
-                                  setEditingSubtaskTitle(editingInitialTitleRef.current);
-                                }
+                      {checklist.map((item) => {
+                        const expanded = expandedSubtaskId === item.id;
+                        return (
+                          <div key={item.id} className="space-y-0">
+                            <SubtaskCompactRow
+                              title={item.title}
+                              completed={item.completed}
+                              priority={item.priority ?? "MEDIUM"}
+                              dueDate={item.dueDate}
+                              assigneeId={item.assigneeId}
+                              attachmentCount={attachmentCountBySubtaskId.get(item.id) ?? 0}
+                              projectId={projectId}
+                              organizationId={organizationId}
+                              prefetchedOrgMembers={orgMembers}
+                              knownMembers={subtaskMemberHints}
+                              expanded={expanded}
+                              disabled={!canEditWorkflowFields || updateSubtasksMutation.isPending}
+                              onToggleComplete={() => {
+                                const nextCompleted = !item.completed;
+                                const doneId = defaultDoneStatusId(statuses);
+                                const todoId = defaultTodoStatusId(statuses);
+                                updateSubtasksMutation.mutate(
+                                  checklist.map((i) =>
+                                    i.id === item.id
+                                      ? {
+                                          ...i,
+                                          completed: nextCompleted,
+                                          statusId: nextCompleted
+                                            ? (doneId ?? i.statusId)
+                                            : (todoId ?? i.statusId),
+                                        }
+                                      : i
+                                  )
+                                );
                               }}
-                              ref={(node) => {
-                                subtaskInputRefs.current[item.id] = node;
+                              onRowClick={() => {
+                                const isCurrent = expandedSubtaskId === item.id;
+                                if (subtaskDraftDirty) {
+                                  setPendingSubtaskExpandId(isCurrent ? null : item.id);
+                                  setSubtaskCollapseConfirmOpen(true);
+                                  return;
+                                }
+                                setExpandedSubtaskId(isCurrent ? null : item.id);
+                                setSubtaskDraftDirty(false);
                               }}
-                              className={cn(
-                                "h-9 min-w-0 flex-1 rounded-lg border-border/50 bg-background/90 text-sm shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-primary/20",
-                                item.completed && "text-muted-foreground line-through decoration-1"
-                              )}
+                              onDelete={() => {
+                                setSubtaskDeleteTarget({
+                                  id: item.id,
+                                  title: item.title || "Untitled subtask",
+                                });
+                              }}
                             />
-                          ) : (
-                            <button
-                              type="button"
-                              disabled={!canEditWorkflowFields}
-                              onClick={() => startSubtaskInlineEdit(item.id, item.title)}
-                              className={cn(
-                                "min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left text-sm font-medium transition-colors duration-200 hover:bg-background/80",
-                                item.completed &&
-                                  "text-muted-foreground line-through decoration-1 [text-decoration-color:currentColor]"
-                              )}
-                            >
-                              <span>{item.title}</span>
-                              {item.completed && subtaskCompletionMeta.get(item.id) && (
-                                <span className="mt-0.5 block text-[11px] font-normal text-muted-foreground/80">
-                                  Completed by {subtaskCompletionMeta.get(item.id)?.userLabel} {"\u2022"}{" "}
-                                  {subtaskCompletionMeta.get(item.id)?.relative}
-                                </span>
-                              )}
-                            </button>
-                          )}
-                          <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:ml-auto sm:w-auto">
-                          <SubtaskAssigneeSelector
-                            projectId={projectId}
-                            organizationId={organizationId}
-                            prefetchedOrgMembers={orgMembers}
-                            value={item.assigneeId}
-                            knownMembers={subtaskMemberHints}
-                            onChange={(assigneeId) => {
-                              updateSubtasksMutation.mutate(
-                                checklist.map((i) =>
-                                  i.id === item.id ? { ...i, assigneeId } : i
-                                )
-                              );
-                            }}
-                            disabled={!canEditWorkflowFields || updateSubtasksMutation.isPending}
-                          />
-                          <SubtaskStatusSelector
-                            statuses={statuses}
-                            value={resolveSubtaskStatusId(item, statuses)}
-                            completed={item.completed}
-                            onChange={(statusId) => {
-                              const status = statuses.find((s) => s.id === statusId);
-                              updateSubtasksMutation.mutate(
-                                checklist.map((i) =>
-                                  i.id === item.id
-                                    ? {
-                                        ...i,
-                                        statusId,
-                                        completed: status ? isDoneWorkflowStatus(status) : i.completed,
-                                      }
-                                    : i
-                                )
-                              );
-                            }}
-                            disabled={!canEditWorkflowFields || updateSubtasksMutation.isPending}
-                          />
-                          <SubtaskPrioritySelector
-                            value={item.priority ?? "MEDIUM"}
-                            onChange={(priority) => {
-                              updateSubtasksMutation.mutate(
-                                checklist.map((i) =>
-                                  i.id === item.id ? { ...i, priority } : i
-                                )
-                              );
-                            }}
-                            disabled={!canEditWorkflowFields || updateSubtasksMutation.isPending}
-                          />
-                          <SubtaskDueDatePicker
-                            value={item.dueDate}
-                            completed={item.completed}
-                            onChange={(dueDate) => {
-                              updateSubtasksMutation.mutate(
-                                checklist.map((i) =>
-                                  i.id === item.id ? { ...i, dueDate } : i
-                                )
-                              );
-                            }}
-                            disabled={!canEditWorkflowFields || updateSubtasksMutation.isPending}
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 shrink-0 rounded-lg text-muted-foreground opacity-0 transition-all duration-200 hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
-                            disabled={!canEditWorkflowFields || updateSubtasksMutation.isPending}
-                            onClick={() =>
-                              updateSubtasksMutation.mutate(checklist.filter((i) => i.id !== item.id))
-                            }
-                            aria-label="Remove item"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                            {item.completed && subtaskCompletionMeta.get(item.id) && !expanded ? (
+                              <p className="ml-9 mt-0.5 text-[11px] text-muted-foreground/80">
+                                Completed by {subtaskCompletionMeta.get(item.id)?.userLabel} {"\u2022"}{" "}
+                                {subtaskCompletionMeta.get(item.id)?.relative}
+                              </p>
+                            ) : null}
+                            {expanded ? (
+                              <SubtaskDetailPanel
+                                draft={{
+                                  id: item.id,
+                                  title: item.title,
+                                  description: item.description,
+                                  completed: item.completed,
+                                  assigneeId: item.assigneeId,
+                                  dueDate: item.dueDate,
+                                  priority: item.priority ?? "MEDIUM",
+                                  statusId: item.statusId,
+                                }}
+                                projectId={projectId}
+                                organizationId={organizationId}
+                                taskId={taskId ?? undefined}
+                                statuses={statuses}
+                                prefetchedOrgMembers={orgMembers}
+                                knownMembers={subtaskMemberHints}
+                                persistAttachments
+                                disabled={!canEditWorkflowFields}
+                                saving={updateSubtasksMutation.isPending}
+                                onSave={saveSubtaskDetail}
+                                onDirtyChange={setSubtaskDraftDirty}
+                                onCancel={() => {
+                                  setSubtaskDraftDirty(false);
+                                  setExpandedSubtaskId(null);
+                                }}
+                              />
+                            ) : null}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                       <div className="flex gap-2 pt-4">
                         <div className="td-input-shell flex min-h-11 flex-1 items-center gap-2 rounded-2xl px-1 pl-3 transition-[box-shadow,ring-color] focus-within:ring-2 focus-within:ring-primary/20">
                           <Plus className="h-4 w-4 shrink-0 text-muted-foreground/50" aria-hidden />
@@ -2042,109 +1990,6 @@ export function TaskDetailModal({
                     </div>
                     </div>
                   </div>
-                  <div className={tdSidebarSurface}>
-                    <div className="mb-3.5 flex items-center gap-2">
-                      <Paperclip className="h-3.5 w-3.5 text-muted-foreground/50" aria-hidden />
-                      <span className={tdEyebrow}>Attachments</span>
-                    </div>
-                    <Label className="sr-only">Attachments</Label>
-                    <div className="space-y-3">
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setDragOver(true);
-                        }}
-                        onDragLeave={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setDragOver(false);
-                        }}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setDragOver(false);
-                          handleFiles(e.dataTransfer.files);
-                        }}
-                        onClick={() => fileInputRef.current?.click()}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            fileInputRef.current?.click();
-                          }
-                        }}
-                        className={cn(
-                          "td-inner-surface flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-dashed p-6 text-center text-sm text-muted-foreground transition-all duration-200 hover:shadow-[0_2px_8px_-2px_rgba(15,23,42,0.08)]",
-                          dragOver && "border-primary/35 bg-primary/[0.04] ring-2 ring-primary/25"
-                        )}
-                        aria-label="Upload files by drop or click"
-                      >
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          multiple
-                          className="hidden"
-                          onChange={(e) => {
-                            handleFiles(e.target.files);
-                            e.target.value = "";
-                          }}
-                          aria-hidden
-                        />
-                        <Upload className="h-9 w-9 text-muted-foreground/55" />
-                        <span className="max-w-[200px] leading-snug">Drop files here or click to browse</span>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="w-full gap-2 rounded-xl"
-                        disabled={uploadAttachmentMutation.isPending}
-                        onClick={() => fileInputRef.current?.click()}
-                      >
-                        {uploadAttachmentMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Upload className="h-4 w-4" />
-                        )}
-                        Upload
-                      </Button>
-                      {attachmentsLoading ? (
-                        <p className="text-xs text-muted-foreground">Loading attachments…</p>
-                      ) : attachments.length > 0 ? (
-                        <ul className="space-y-1.5" role="list">
-                          {attachments.map((att: TaskAttachment) => (
-                            <li
-                              key={att.id}
-                              className="td-inner-surface flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm transition-shadow hover:shadow-[0_2px_8px_-2px_rgba(15,23,42,0.08)]"
-                            >
-                              <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                              <button
-                                type="button"
-                                onClick={() => downloadAttachment(att.id, att.fileName)}
-                                className="min-w-0 flex-1 truncate text-left text-primary hover:underline"
-                              >
-                                {att.fileName}
-                              </button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="h-7 w-7 shrink-0"
-                                onClick={() => deleteAttachmentMutation.mutate(att.id)}
-                                disabled={deleteAttachmentMutation.isPending}
-                                aria-label={`Remove ${att.fileName}`}
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </Button>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : null}
-                    </div>
-                  </div>
-
                   {isOwner && (
                     <div className={tdSidebarSurface}>
                       <Button
@@ -2190,6 +2035,40 @@ export function TaskDetailModal({
       variant="destructive"
       loading={deleteTaskMutation.isPending}
       onConfirm={() => deleteTaskMutation.mutate()}
+    />
+
+    <ConfirmDialog
+      open={Boolean(subtaskDeleteTarget)}
+      onOpenChange={(next) => {
+        if (!next) setSubtaskDeleteTarget(null);
+      }}
+      title="Remove subtask?"
+      description={
+        subtaskDeleteTarget
+          ? `Remove "${subtaskDeleteTarget.title}" from this checklist? Subtask attachments remain stored unless deleted separately.`
+          : undefined
+      }
+      confirmLabel="Remove"
+      variant="destructive"
+      loading={updateSubtasksMutation.isPending}
+      onConfirm={confirmRemoveSubtask}
+    />
+
+    <ConfirmDialog
+      open={subtaskCollapseConfirmOpen}
+      onOpenChange={(next) => {
+        setSubtaskCollapseConfirmOpen(next);
+        if (!next) setPendingSubtaskExpandId(null);
+      }}
+      title="Discard unsaved changes?"
+      description="Title, description, and other field edits have not been saved. Attachments already uploaded will remain."
+      confirmLabel="Discard"
+      variant="destructive"
+      onConfirm={() => {
+        setSubtaskDraftDirty(false);
+        setExpandedSubtaskId(pendingSubtaskExpandId);
+        setPendingSubtaskExpandId(null);
+      }}
     />
     </>
   );

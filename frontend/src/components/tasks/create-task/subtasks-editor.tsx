@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,14 +12,20 @@ import type {
   UseFormRegister,
   UseFormSetValue,
 } from "react-hook-form";
-import { CheckSquare2, Plus, Trash2 } from "lucide-react";
-import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-selector";
-import { SubtaskDueDatePicker } from "@/components/tasks/subtask-due-date-picker";
-import { SubtaskPrioritySelector } from "@/components/tasks/subtask-priority-selector";
+import { CheckSquare2, Plus } from "lucide-react";
+import { SubtaskCompactRow } from "@/components/tasks/subtasks/subtask-compact-row";
+import {
+  SubtaskDetailPanel,
+  type SubtaskDraft,
+} from "@/components/tasks/subtasks/subtask-detail-panel";
+import type { PendingSubtaskAttachment } from "@/components/tasks/subtasks/subtask-attachments-section";
+import { generateClientId } from "@/lib/generate-client-id";
 
 export interface SubtaskItem {
+  id?: string;
   title: string;
   completed: boolean;
+  description?: string;
   assigneeId?: string;
   dueDate?: string;
   priority?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -35,6 +41,11 @@ interface SubtasksEditorProps {
   remove: UseFieldArrayRemove;
   errors: FieldErrors<any>;
   disabled?: boolean;
+  pendingAttachmentsBySubtask?: Record<string, PendingSubtaskAttachment[]>;
+  onPendingAttachmentsChange?: (
+    subtaskKey: string,
+    items: PendingSubtaskAttachment[]
+  ) => void;
 }
 
 export function SubtasksEditor({
@@ -47,11 +58,16 @@ export function SubtasksEditor({
   remove,
   errors,
   disabled,
+  pendingAttachmentsBySubtask = {},
+  onPendingAttachmentsChange,
 }: SubtasksEditorProps) {
   const inputRefs = useRef<Record<number, HTMLInputElement | null>>({});
   const pendingFocusIndexRef = useRef<number | null>(null);
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+
   const subtaskErrors =
     (errors.subtasks as Array<{ title?: { message?: string } } | undefined> | undefined) ?? [];
+
   const progress = useMemo(() => {
     const list = values ?? [];
     const total = list.filter((s) => s.title.trim().length > 0).length;
@@ -67,6 +83,31 @@ export function SubtasksEditor({
       inputRefs.current[index]?.focus();
     });
   }, [fields.length]);
+
+  const syncDraftToForm = (index: number, draft: SubtaskDraft) => {
+    setValue(`subtasks.${index}.title`, draft.title, { shouldDirty: true, shouldTouch: true });
+    setValue(`subtasks.${index}.description`, draft.description ?? "", {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+    setValue(`subtasks.${index}.priority`, draft.priority ?? "MEDIUM", {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+    setValue(`subtasks.${index}.dueDate`, draft.dueDate, {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+    setValue(`subtasks.${index}.assigneeId`, draft.assigneeId, {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+  };
+
+  const saveDraft = (index: number, draft: SubtaskDraft) => {
+    syncDraftToForm(index, draft);
+    setExpandedKey(null);
+  };
 
   return (
     <div className="space-y-3 rounded-xl border border-border/70 bg-muted/10 p-4">
@@ -84,15 +125,19 @@ export function SubtasksEditor({
           variant="outline"
           size="sm"
           className="h-7 text-xs"
-          onClick={() =>
+          onClick={() => {
+            const clientId = generateClientId();
             append({
+              id: clientId,
               title: "",
               completed: false,
+              description: "",
               assigneeId: undefined,
               dueDate: undefined,
               priority: "MEDIUM",
-            })
-          }
+            });
+            setExpandedKey(clientId);
+          }}
           disabled={disabled}
         >
           <Plus className="mr-1 h-3.5 w-3.5" /> Add
@@ -101,104 +146,110 @@ export function SubtasksEditor({
 
       <div className="space-y-2">
         {fields.length === 0 ? (
-          <p className="text-xs text-muted-foreground">Break larger work into actionable subtasks.</p>
+          <p className="text-xs text-muted-foreground">
+            Break larger work into actionable subtasks with notes and attachments.
+          </p>
         ) : (
           fields.map((field, index) => {
             const message = subtaskErrors[index]?.title?.message ?? "";
-            const completed = Boolean(values?.[index]?.completed);
-            const titleRegistration = register(`subtasks.${index}.title` as const);
+            const value = values?.[index];
+            const completed = Boolean(value?.completed);
+            const subtaskKey = value?.id ?? field.id;
+            const attachmentCount = (pendingAttachmentsBySubtask[subtaskKey] ?? []).length;
+            const expanded = expandedKey === subtaskKey;
+
             return (
-              <div key={field.id} className="space-y-1.5">
-                <div
-                  className={cn(
-                    "flex items-center gap-2 rounded-md transition-opacity",
-                    completed && "opacity-70"
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 shrink-0 rounded border-input accent-primary"
-                    {...register(`subtasks.${index}.completed` as const)}
-                    disabled={disabled}
-                    aria-label={`Mark subtask ${index + 1} complete`}
-                  />
-                  <Input
-                    placeholder={`Subtask ${index + 1}`}
-                    className={cn(
-                      "h-9 text-sm",
-                      completed && "line-through text-muted-foreground"
-                    )}
-                    {...titleRegistration}
-                    ref={(node) => {
-                      titleRegistration.ref(node);
-                      inputRefs.current[index] = node;
+              <div key={field.id} className="space-y-0">
+                <input type="hidden" {...register(`subtasks.${index}.id` as const)} />
+                <input type="hidden" {...register(`subtasks.${index}.description` as const)} />
+                <SubtaskCompactRow
+                  title={value?.title ?? ""}
+                  completed={completed}
+                  priority={value?.priority ?? "MEDIUM"}
+                  dueDate={value?.dueDate}
+                  assigneeId={value?.assigneeId}
+                  attachmentCount={attachmentCount}
+                  projectId={projectId}
+                  expanded={expanded}
+                  disabled={disabled}
+                  onToggleComplete={() =>
+                    setValue(`subtasks.${index}.completed`, !completed, {
+                      shouldDirty: true,
+                      shouldTouch: true,
+                    })
+                  }
+                  onRowClick={() =>
+                    setExpandedKey((prev) => (prev === subtaskKey ? null : subtaskKey))
+                  }
+                  onDelete={() => {
+                    if (expandedKey === subtaskKey) setExpandedKey(null);
+                    remove(index);
+                  }}
+                  onAssigneeChange={(assigneeId) =>
+                    setValue(`subtasks.${index}.assigneeId`, assigneeId, {
+                      shouldDirty: true,
+                      shouldTouch: true,
+                    })
+                  }
+                />
+                {expanded ? (
+                  <SubtaskDetailPanel
+                    draft={{
+                      id: subtaskKey,
+                      title: value?.title ?? "",
+                      description: value?.description,
+                      completed,
+                      assigneeId: value?.assigneeId,
+                      dueDate: value?.dueDate,
+                      priority: value?.priority ?? "MEDIUM",
                     }}
-                    onKeyDown={(event) => {
-                      if (event.key !== "Enter" || disabled) return;
-                      event.preventDefault();
-                      // Persists instantly in RHF state and appends next row for rapid entry.
-                      append({
-                        title: "",
-                        completed: false,
-                        assigneeId: undefined,
-                        dueDate: undefined,
-                        priority: "MEDIUM",
-                      });
-                      pendingFocusIndexRef.current = fields.length;
-                    }}
-                    disabled={disabled}
-                  />
-                  <SubtaskPrioritySelector
-                    value={values?.[index]?.priority ?? "MEDIUM"}
-                    onChange={(priority) =>
-                      setValue(`subtasks.${index}.priority`, priority, {
-                        shouldDirty: true,
-                        shouldTouch: true,
-                      })
-                    }
-                    disabled={disabled}
-                  />
-                  <SubtaskDueDatePicker
-                    value={values?.[index]?.dueDate}
-                    completed={completed}
-                    onChange={(dueDate) =>
-                      setValue(`subtasks.${index}.dueDate`, dueDate, {
-                        shouldDirty: true,
-                        shouldTouch: true,
-                      })
-                    }
-                    disabled={disabled}
-                  />
-                  <SubtaskAssigneeSelector
                     projectId={projectId}
-                    value={values?.[index]?.assigneeId}
-                    onChange={(assigneeId) =>
-                      setValue(`subtasks.${index}.assigneeId`, assigneeId, {
-                        shouldDirty: true,
-                        shouldTouch: true,
-                      })
+                    persistAttachments={false}
+                    pendingAttachments={pendingAttachmentsBySubtask[subtaskKey] ?? []}
+                    onPendingAttachmentsChange={(items) =>
+                      onPendingAttachmentsChange?.(subtaskKey, items)
                     }
                     disabled={disabled}
+                    onDraftChange={(draft) => syncDraftToForm(index, draft)}
+                    onSave={(draft) => saveDraft(index, draft)}
+                    onCancel={() => setExpandedKey(null)}
                   />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 shrink-0 text-muted-foreground hover:text-destructive"
-                    onClick={() => remove(index)}
-                    disabled={disabled}
-                    aria-label={`Remove subtask ${index + 1}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-                {message && <p className="text-xs text-destructive">{message}</p>}
+                ) : null}
+                {message ? <p className="text-xs text-destructive">{message}</p> : null}
               </div>
             );
           })
         )}
       </div>
+
+      {fields.length > 0 ? (
+        <div className="flex gap-2 pt-1">
+          <div className="td-input-shell flex min-h-10 flex-1 items-center gap-2 rounded-xl px-3">
+            <Plus className="h-4 w-4 shrink-0 text-muted-foreground/50" aria-hidden />
+            <Input
+              placeholder="Quick add subtask…"
+              className="h-9 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
+              disabled={disabled}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter" || disabled) return;
+                event.preventDefault();
+                const clientId = generateClientId();
+                append({
+                  id: clientId,
+                  title: "",
+                  completed: false,
+                  description: "",
+                  assigneeId: undefined,
+                  dueDate: undefined,
+                  priority: "MEDIUM",
+                });
+                pendingFocusIndexRef.current = fields.length;
+                setExpandedKey(clientId);
+              }}
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
-

@@ -1,5 +1,6 @@
 import { apiClient } from "@/services/api/client";
 import { config } from "@/config/env";
+import { ensurePreviewBlob, inferMimeTypeFromFileName } from "@/lib/attachment-file-meta";
 import type { TaskAttachment } from "@/types/api";
 
 /** Backend returns fileUrl (relative path); we expose a download URL. */
@@ -8,17 +9,19 @@ export interface TaskAttachmentResponse {
   taskId: string;
   fileName: string | null;
   fileUrl: string;
+  fileSizeBytes?: number | string | null;
   uploadedBy: string;
   uploadedAt: string;
 }
 
 function toAttachment(r: TaskAttachmentResponse): TaskAttachment {
+  const fileName = r.fileName ?? "file";
   return {
     id: r.id,
     taskId: r.taskId,
-    fileName: r.fileName ?? "file",
-    fileSize: 0,
-    mimeType: "",
+    fileName,
+    fileSize: Number(r.fileSizeBytes ?? 0),
+    mimeType: inferMimeTypeFromFileName(fileName),
     url: `${config.apiBaseUrl}/tasks/attachments/${r.id}/file`,
     uploadedBy: r.uploadedBy,
     uploadedAt: r.uploadedAt,
@@ -26,11 +29,16 @@ function toAttachment(r: TaskAttachmentResponse): TaskAttachment {
 }
 
 /** Fetch attachment file bytes (for export). */
-export async function fetchAttachmentBlob(attachmentId: string): Promise<Blob> {
+export async function fetchAttachmentBlob(
+  attachmentId: string,
+  fileName?: string
+): Promise<Blob> {
   const { data } = await apiClient.get(`/tasks/attachments/${attachmentId}/file`, {
     responseType: "blob",
   });
-  return data as Blob;
+  const blob = data as Blob;
+  const mime = inferMimeTypeFromFileName(fileName);
+  return ensurePreviewBlob(blob, mime, fileName);
 }
 
 /** Fetch attachment bytes with auth and return a blob URL for preview. Caller must revoke when done. */
