@@ -1196,7 +1196,7 @@ export function TaskDetailModal({
                               prefetchedOrgMembers={orgMembers}
                               knownMembers={subtaskMemberHints}
                               expanded={expanded}
-                              disabled={!canEditWorkflowFields || updateSubtasksMutation.isPending}
+                              editDisabled={!canEditWorkflowFields || updateSubtasksMutation.isPending}
                               onToggleComplete={() => {
                                 const nextCompleted = !item.completed;
                                 const doneId = defaultDoneStatusId(statuses);
@@ -1258,6 +1258,7 @@ export function TaskDetailModal({
                                 knownMembers={subtaskMemberHints}
                                 persistAttachments
                                 disabled={!canEditWorkflowFields}
+                                readOnly={isViewOnly}
                                 saving={updateSubtasksMutation.isPending}
                                 onSave={saveSubtaskDetail}
                                 onDirtyChange={setSubtaskDraftDirty}

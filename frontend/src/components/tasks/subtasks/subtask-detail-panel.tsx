@@ -45,6 +45,8 @@ interface SubtaskDetailPanelProps {
   pendingAttachments?: PendingSubtaskAttachment[];
   onPendingAttachmentsChange?: (items: PendingSubtaskAttachment[]) => void;
   disabled?: boolean;
+  /** View-only: fields read-only, attachments viewable, no save. */
+  readOnly?: boolean;
   saving?: boolean;
   onSave: (draft: SubtaskDraft) => void;
   /** Sync draft to parent form/state while editing (e.g. create-task flow). */
@@ -66,6 +68,7 @@ export function SubtaskDetailPanel({
   pendingAttachments = [],
   onPendingAttachmentsChange,
   disabled,
+  readOnly,
   saving,
   onSave,
   onDraftChange,
@@ -79,6 +82,8 @@ export function SubtaskDetailPanel({
   const baselineRef = React.useRef(initialDraft);
   const descriptionRef = React.useRef<HTMLTextAreaElement>(null);
   const attachmentQueryKey = ["entity-attachments", "SUBTASK", initialDraft.id];
+  const fieldsDisabled = Boolean(disabled || readOnly);
+  const attachmentsManageDisabled = Boolean(disabled || readOnly);
 
   const draftsEqual = React.useCallback((a: SubtaskDraft, b: SubtaskDraft) => {
     return (
@@ -162,7 +167,7 @@ export function SubtaskDetailPanel({
         <Input
           value={draft.title}
           onChange={(e) => update("title", e.target.value)}
-          disabled={disabled}
+          disabled={fieldsDisabled}
           className="h-10 bg-background/90"
           placeholder="Subtask title"
         />
@@ -175,7 +180,7 @@ export function SubtaskDetailPanel({
           value={draft.description ?? ""}
           onChange={(e) => update("description", e.target.value)}
           onPaste={handleDescriptionPaste}
-          disabled={disabled}
+          disabled={fieldsDisabled}
           rows={5}
           className="min-h-[120px] resize-y bg-background/90 text-sm leading-relaxed"
           placeholder="Add detailed notes…"
@@ -188,20 +193,20 @@ export function SubtaskDetailPanel({
         persist={persistAttachments}
         pendingAttachments={pendingAttachments}
         onPendingChange={onPendingAttachmentsChange}
-        disabled={disabled}
+        disabled={attachmentsManageDisabled}
       />
 
       <div className="flex flex-wrap items-center gap-2">
         <SubtaskPrioritySelector
           value={draft.priority ?? "MEDIUM"}
           onChange={(priority) => update("priority", priority)}
-          disabled={disabled}
+          disabled={fieldsDisabled}
         />
         <SubtaskDueDatePicker
           value={draft.dueDate}
           completed={draft.completed}
           onChange={(dueDate) => update("dueDate", dueDate)}
-          disabled={disabled}
+          disabled={fieldsDisabled}
         />
         <SubtaskAssigneeSelector
           projectId={projectId}
@@ -210,7 +215,7 @@ export function SubtaskDetailPanel({
           knownMembers={knownMembers}
           value={draft.assigneeId}
           onChange={(assigneeId) => update("assigneeId", assigneeId)}
-          disabled={disabled}
+          disabled={fieldsDisabled}
         />
         {statuses.length > 0 ? (
           <SubtaskStatusSelector
@@ -218,37 +223,47 @@ export function SubtaskDetailPanel({
             value={resolveSubtaskStatusId(draft, statuses)}
             completed={draft.completed}
             onChange={(statusId) => update("statusId", statusId)}
-            disabled={disabled}
+            disabled={fieldsDisabled}
           />
         ) : null}
       </div>
 
       <div className="flex items-center justify-end gap-2 border-t border-border/40 pt-3">
-        {onCancel ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              if (!draftsEqual(draft, baselineRef.current)) {
-                setDiscardConfirmOpen(true);
-                return;
-              }
-              onCancel();
-            }}
-            disabled={saving}
-          >
-            Cancel
-          </Button>
-        ) : null}
-        <Button
-          type="button"
-          size="sm"
-          disabled={disabled || saving || !draft.title.trim()}
-          onClick={() => onSave({ ...draft, title: draft.title.trim() })}
-        >
-          {saving ? "Saving…" : "Save"}
-        </Button>
+        {readOnly ? (
+          onCancel ? (
+            <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+              Close
+            </Button>
+          ) : null
+        ) : (
+          <>
+            {onCancel ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (!draftsEqual(draft, baselineRef.current)) {
+                    setDiscardConfirmOpen(true);
+                    return;
+                  }
+                  onCancel();
+                }}
+                disabled={saving}
+              >
+                Cancel
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              size="sm"
+              disabled={disabled || saving || !draft.title.trim()}
+              onClick={() => onSave({ ...draft, title: draft.title.trim() })}
+            >
+              {saving ? "Saving…" : "Save"}
+            </Button>
+          </>
+        )}
       </div>
 
       <ConfirmDialog
