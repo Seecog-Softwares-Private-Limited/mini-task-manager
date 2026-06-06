@@ -38,7 +38,8 @@ interface SubtaskCompactRowProps {
   prefetchedOrgMembers?: OrgMember[];
   knownMembers?: MemberHint[];
   expanded?: boolean;
-  disabled?: boolean;
+  /** Disables checkbox and delete — row expand stays enabled. */
+  editDisabled?: boolean;
   onToggleComplete: () => void;
   onRowClick: () => void;
   onDelete: () => void;
@@ -57,7 +58,7 @@ export function SubtaskCompactRow({
   prefetchedOrgMembers,
   knownMembers,
   expanded,
-  disabled,
+  editDisabled,
   onToggleComplete,
   onRowClick,
   onDelete,
@@ -77,7 +78,7 @@ export function SubtaskCompactRow({
       <input
         type="checkbox"
         checked={completed}
-        disabled={disabled}
+        disabled={editDisabled}
         onChange={(e) => {
           e.stopPropagation();
           onToggleComplete();
@@ -88,7 +89,6 @@ export function SubtaskCompactRow({
       />
       <button
         type="button"
-        disabled={disabled}
         onClick={onRowClick}
         className={cn(
           "flex min-w-0 flex-1 items-center gap-2 text-left",
@@ -126,7 +126,7 @@ export function SubtaskCompactRow({
             knownMembers={knownMembers}
             value={assigneeId}
             onChange={onAssigneeChange}
-            disabled={disabled}
+            disabled={editDisabled}
           />
         ) : (
           <SubtaskAssigneeSelector
@@ -153,7 +153,7 @@ export function SubtaskCompactRow({
           variant="ghost"
           size="icon"
           className="h-8 w-8 shrink-0 text-muted-foreground opacity-60 hover:text-destructive group-hover:opacity-100"
-          disabled={disabled}
+          disabled={editDisabled}
           onClick={onDelete}
           aria-label="Remove subtask"
         >

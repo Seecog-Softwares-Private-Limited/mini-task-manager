@@ -171,7 +171,7 @@ export function SubtasksEditor({
                   attachmentCount={attachmentCount}
                   projectId={projectId}
                   expanded={expanded}
-                  disabled={disabled}
+                  editDisabled={disabled}
                   onToggleComplete={() =>
                     setValue(`subtasks.${index}.completed`, !completed, {
                       shouldDirty: true,
