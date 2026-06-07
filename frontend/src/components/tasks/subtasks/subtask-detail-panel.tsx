@@ -25,6 +25,8 @@ import { uploadEntityAttachment } from "@/services/api/entity-attachments.api";
 import { useQueryClient } from "@tanstack/react-query";
 import { parseApiError } from "@/services/api/client";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { SUBTASK_TITLE_MAX_LENGTH, clampSubtaskTitle } from "@/lib/subtask-limits";
+import { cn } from "@/lib/utils";
 
 type MemberHint = { id: string; name: string; email?: string; avatarUrl?: string };
 
@@ -41,6 +43,7 @@ interface SubtaskDetailPanelProps {
   statuses?: WorkflowStatus[];
   prefetchedOrgMembers?: OrgMember[];
   knownMembers?: MemberHint[];
+  taskAssigneesOnly?: boolean;
   persistAttachments?: boolean;
   pendingAttachments?: PendingSubtaskAttachment[];
   onPendingAttachmentsChange?: (items: PendingSubtaskAttachment[]) => void;
@@ -64,6 +67,7 @@ export function SubtaskDetailPanel({
   statuses = [],
   prefetchedOrgMembers,
   knownMembers,
+  taskAssigneesOnly,
   persistAttachments = true,
   pendingAttachments = [],
   onPendingAttachmentsChange,
@@ -99,8 +103,12 @@ export function SubtaskDetailPanel({
 
   // Reset local draft when switching subtasks or when parent syncs saved data.
   React.useEffect(() => {
-    setDraft(initialDraft);
-    baselineRef.current = initialDraft;
+    const normalized = {
+      ...initialDraft,
+      title: clampSubtaskTitle(initialDraft.title),
+    };
+    setDraft(normalized);
+    baselineRef.current = normalized;
   }, [
     initialDraft.id,
     initialDraft.title,
@@ -163,14 +171,32 @@ export function SubtaskDetailPanel({
   return (
     <div className="mt-2 space-y-4 rounded-2xl border border-primary/15 bg-gradient-to-b from-primary/[0.04] to-background p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
       <div className="space-y-1.5">
-        <Label className="text-xs font-semibold text-muted-foreground">Title</Label>
+        <div className="flex items-center justify-between gap-2">
+          <Label className="text-xs font-semibold text-muted-foreground">Title</Label>
+          <span
+            className={cn(
+              "text-[11px] tabular-nums",
+              draft.title.length >= SUBTASK_TITLE_MAX_LENGTH
+                ? "font-medium text-destructive"
+                : "text-muted-foreground"
+            )}
+            aria-live="polite"
+          >
+            {draft.title.length}/{SUBTASK_TITLE_MAX_LENGTH}
+          </span>
+        </div>
         <Input
           value={draft.title}
-          onChange={(e) => update("title", e.target.value)}
+          maxLength={SUBTASK_TITLE_MAX_LENGTH}
+          onChange={(e) => update("title", clampSubtaskTitle(e.target.value))}
           disabled={fieldsDisabled}
           className="h-10 bg-background/90"
           placeholder="Subtask title"
+          aria-describedby="subtask-title-limit-hint"
         />
+        <p id="subtask-title-limit-hint" className="text-[11px] text-muted-foreground">
+          Maximum {SUBTASK_TITLE_MAX_LENGTH} characters.
+        </p>
       </div>
 
       <div className="space-y-1.5">
@@ -213,6 +239,7 @@ export function SubtaskDetailPanel({
           organizationId={organizationId}
           prefetchedOrgMembers={prefetchedOrgMembers}
           knownMembers={knownMembers}
+          taskAssigneesOnly={taskAssigneesOnly}
           value={draft.assigneeId}
           onChange={(assigneeId) => update("assigneeId", assigneeId)}
           disabled={fieldsDisabled}
@@ -257,8 +284,18 @@ export function SubtaskDetailPanel({
             <Button
               type="button"
               size="sm"
-              disabled={disabled || saving || !draft.title.trim()}
-              onClick={() => onSave({ ...draft, title: draft.title.trim() })}
+              disabled={
+                disabled ||
+                saving ||
+                !draft.title.trim() ||
+                draft.title.length > SUBTASK_TITLE_MAX_LENGTH
+              }
+              onClick={() =>
+                onSave({
+                  ...draft,
+                  title: clampSubtaskTitle(draft.title.trim()),
+                })
+              }
             >
               {saving ? "Saving…" : "Save"}
             </Button>

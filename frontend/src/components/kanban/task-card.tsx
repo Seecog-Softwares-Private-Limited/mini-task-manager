@@ -418,15 +418,22 @@ export function TaskCard({
   const activityComments = task.commentsCount ?? commentCount;
   const activityAttachments = task.attachmentsCount ?? attachmentCount;
 
-  const initialAssignees: TaskAssignee[] = useMemo(
-    () =>
-      task.assignees?.length
-        ? task.assignees
-        : task.assigneeId && assigneeMap?.[task.assigneeId]
-          ? [{ id: task.assigneeId, name: assigneeMap[task.assigneeId].name, avatarUrl: assigneeMap[task.assigneeId].avatarUrl }]
-          : [],
-    [task.assignees, task.assigneeId, assigneeMap]
-  );
+  const initialAssignees: TaskAssignee[] = useMemo(() => {
+    const ids = task.assigneeIds?.length
+      ? task.assigneeIds
+      : task.assigneeId
+        ? [task.assigneeId]
+        : [];
+    if (ids.length === 0) return task.assignees?.length ? task.assignees : [];
+    return ids.map((id) => {
+      if (assigneeMap?.[id]) {
+        return { id, name: assigneeMap[id].name, avatarUrl: assigneeMap[id].avatarUrl };
+      }
+      const fromTask = task.assignees?.find((a) => a.id === id);
+      if (fromTask) return fromTask;
+      return { id, name: "User" };
+    });
+  }, [task.assignees, task.assigneeId, task.assigneeIds, assigneeMap]);
   const [localAssignees, setLocalAssignees] = useState<TaskAssignee[]>(initialAssignees);
   /** Radix menu close can pass the click through to the card and open the task modal. */
   const suppressOpenRef = useRef(false);
@@ -563,7 +570,14 @@ export function TaskCard({
           </Button>
           {canManageTask ? (
             <TaskAssigneePopover
-              task={{ id: task.id, projectId: task.projectId, assigneeId: task.assigneeId, assignees: localAssignees }}
+              task={{
+              id: task.id,
+              projectId: task.projectId,
+              assigneeId: task.assigneeId,
+              assigneeIds: task.assigneeIds,
+              assignees: localAssignees,
+            }}
+            multiAssign
               onAssigneesChange={setLocalAssignees}
               trigger={
                 <Button
@@ -738,7 +752,14 @@ export function TaskCard({
             className="min-w-0 flex-1"
           />
           <TaskAssigneePopover
-            task={{ id: task.id, projectId: task.projectId, assigneeId: task.assigneeId, assignees: localAssignees }}
+            task={{
+              id: task.id,
+              projectId: task.projectId,
+              assigneeId: task.assigneeId,
+              assigneeIds: task.assigneeIds,
+              assignees: localAssignees,
+            }}
+            multiAssign
             onAssigneesChange={setLocalAssignees}
             trigger={
               <button

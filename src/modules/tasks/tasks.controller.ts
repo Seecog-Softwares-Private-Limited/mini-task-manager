@@ -34,6 +34,7 @@ import { CurrentUserId } from '../../common/decorators/current-user.decorator';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { CreateTaskCommentDto } from './dto/create-task-comment.dto';
 import { PatchTaskDto } from './dto/patch-task.dto';
+import { UpdateTaskAssigneeDto } from './dto/update-task-assignee.dto';
 import { PaginationQueryDto } from '../../common/pagination';
 import { TaskResponseDto } from './dto/task-response.dto';
 import { TaskCommentEntity } from './entities/task-comment.entity';
@@ -193,20 +194,29 @@ export class TasksController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles('owner')
+  @Roles('owner', 'admin')
   @Patch(':id/assignee')
   async updateAssignee(
     @Param('id') id: string,
     @TenantId() tenantId: string,
     @CurrentUserId() currentUserId: string,
-    @Body() body: { assigneeId: string | null },
+    @Body() body: UpdateTaskAssigneeDto,
   ): Promise<TaskResponseDto | null> {
-    const task = await this.tasksService.update(id, tenantId, { assigneeId: body.assigneeId ?? null }, currentUserId);
+    const patch =
+      body.assigneeIds !== undefined
+        ? { assigneeIds: body.assigneeIds }
+        : { assigneeId: body.assigneeId ?? null };
+    const task = await this.tasksService.update(id, tenantId, patch, currentUserId);
     if (!task) return null;
 
-    // Fire-and-forget: send assignment email + in-app notification
-    if (body.assigneeId) {
-      this.notifyAssignees([body.assigneeId], currentUserId, task.title, task.id, task.projectId).catch((err) =>
+    const notifyIds =
+      body.assigneeIds !== undefined
+        ? body.assigneeIds
+        : body.assigneeId
+          ? [body.assigneeId]
+          : [];
+    if (notifyIds.length > 0) {
+      this.notifyAssignees(notifyIds, currentUserId, task.title, task.id, task.projectId).catch((err) =>
         this.logger.warn(`Failed to send assignment notifications: ${err}`),
       );
     }

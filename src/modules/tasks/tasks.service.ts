@@ -172,7 +172,11 @@ export class TasksService {
     }
     if (dto.statusId !== undefined) patch.statusId = dto.statusId ?? null;
     if (dto.sprintId !== undefined) patch.sprintId = dto.sprintId ?? null;
-    if (dto.assigneeId !== undefined) {
+    if (dto.assigneeIds !== undefined) {
+      const ids = Array.from(new Set(dto.assigneeIds.filter((id) => !!String(id).trim())));
+      patch.assigneeIds = ids.length ? ids : null;
+      patch.assigneeId = ids[0] ?? null;
+    } else if (dto.assigneeId !== undefined) {
       patch.assigneeId = dto.assigneeId ?? null;
       patch.assigneeIds = patch.assigneeId ? [patch.assigneeId] : null;
     }

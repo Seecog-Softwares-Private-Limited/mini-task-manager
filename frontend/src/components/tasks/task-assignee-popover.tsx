@@ -3,7 +3,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchProjectMembers } from "@/services/api/members.api";
-import { updateTaskAssignee } from "@/services/api/tasks.api";
+import { updateTaskAssignee, updateTaskAssignees } from "@/services/api/tasks.api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import {
@@ -28,6 +28,7 @@ interface PopoverTask {
   id: string;
   projectId: string;
   assigneeId?: string;
+  assigneeIds?: string[];
   assignees?: TaskAssignee[];
 }
 
@@ -67,11 +68,14 @@ export function TaskAssigneePopover({
   );
 
   const selectedIds = useMemo(() => {
+    if (task.assigneeIds?.length) {
+      return new Set(task.assigneeIds);
+    }
     if (task.assignees && task.assignees.length > 0) {
       return new Set(task.assignees.map((a) => a.id).filter(Boolean) as string[]);
     }
     return new Set(task.assigneeId ? [task.assigneeId] : []);
-  }, [task.assigneeId, task.assignees]);
+  }, [task.assigneeId, task.assigneeIds, task.assignees]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -82,11 +86,12 @@ export function TaskAssigneePopover({
   }, [normalizedMembers, search]);
 
   const assignMutation = useMutation({
-    mutationFn: (assigneeId: string | null) => updateTaskAssignee(task.id, assigneeId),
-    onMutate: async (assigneeId) => {
-      const nextAssignees = assigneeId
-        ? normalizedMembers.filter((m) => m.id === assigneeId)
-        : [];
+    mutationFn: (assigneeIds: string[]) =>
+      assigneeIds.length === 1 && !multiAssign
+        ? updateTaskAssignee(task.id, assigneeIds[0])
+        : updateTaskAssignees(task.id, assigneeIds),
+    onMutate: async (assigneeIds) => {
+      const nextAssignees = normalizedMembers.filter((m) => assigneeIds.includes(m.id));
       onAssigneesChange?.(nextAssignees);
 
       await queryClient.cancelQueries({ queryKey: ["tasks", task.projectId] });
@@ -102,7 +107,12 @@ export function TaskAssigneePopover({
             ...old,
             data: old.data.map((item) =>
               item.id === task.id
-                ? { ...item, assigneeId: assigneeId ?? undefined, assignees: nextAssignees }
+                ? {
+                    ...item,
+                    assigneeIds,
+                    assigneeId: assigneeIds[0] ?? undefined,
+                    assignees: nextAssignees,
+                  }
                 : item
             ),
           };
@@ -110,7 +120,7 @@ export function TaskAssigneePopover({
       );
       return { previous };
     },
-    onError: (_err, _assigneeId, context) => {
+    onError: (_err, _assigneeIds, context) => {
       if (context?.previous) {
         queryClient.setQueryData(["tasks", task.projectId], context.previous);
       }
@@ -122,17 +132,12 @@ export function TaskAssigneePopover({
   });
 
   function handleSelect(memberId: string) {
-    if (multiAssign) {
-      // Backend currently persists primary assignee; first selected is treated as primary.
-      const next = new Set(selectedIds);
-      if (next.has(memberId)) next.delete(memberId);
-      else next.add(memberId);
-      const first = Array.from(next)[0] ?? null;
-      assignMutation.mutate(first);
-    } else {
-      assignMutation.mutate(memberId);
-      setOpen(false);
-    }
+    const next = new Set(selectedIds);
+    if (next.has(memberId)) next.delete(memberId);
+    else next.add(memberId);
+    const assigneeIds = Array.from(next);
+    assignMutation.mutate(assigneeIds);
+    if (!multiAssign) setOpen(false);
   }
 
   return (
@@ -163,7 +168,7 @@ export function TaskAssigneePopover({
         <div className="max-h-72 overflow-y-auto p-1">
           <DropdownMenuItem
             onClick={() => {
-              assignMutation.mutate(null);
+              assignMutation.mutate([]);
               setOpen(false);
             }}
             data-quick-action
