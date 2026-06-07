@@ -55,6 +55,7 @@ export function useTenant() {
 export const TENANT_REQUIRED_PATHS = [
   "/dashboard/projects",
   "/dashboard/tasks",
+  "/dashboard/recurring-tasks",
   "/dashboard/billing",
   "/dashboard/activity",
 ];

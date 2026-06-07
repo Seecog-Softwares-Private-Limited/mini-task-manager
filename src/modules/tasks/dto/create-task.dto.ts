@@ -15,6 +15,7 @@ import {
   ValidateIf,
   ValidateNested,
 } from 'class-validator';
+import { TaskRecurrenceDto } from './recurrence.dto';
 
 const normalizeCreateDueDate = ({ value }: { value: unknown }) => {
   if (value === '' || value === null || value === undefined) return undefined;
@@ -129,4 +130,9 @@ export class CreateTaskDto {
   @ValidateNested({ each: true })
   @Type(() => CreateTaskSubtaskDto)
   subtasks?: CreateTaskSubtaskDto[];
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TaskRecurrenceDto)
+  recurrence?: TaskRecurrenceDto;
 }

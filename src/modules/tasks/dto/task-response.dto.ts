@@ -34,6 +34,9 @@ export class TaskResponseDto {
   estimatedMinutes?: number;
   loggedMinutes!: number;
   sprintId?: string;
+  recurringTemplateId?: string;
+  recurrenceType?: string;
+  recurrenceSequence?: number;
   tags?: Array<{ name: string; color: string }>;
   subtasks?: TaskSubtaskResponseDto[];
   createdAt!: Date;

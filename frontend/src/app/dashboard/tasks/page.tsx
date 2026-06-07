@@ -20,6 +20,10 @@ import {
 import { fetchSprintsByProject, createSprint } from "@/services/api/sprints.api";
 import { fetchOrgMembers, fetchProjectMembers } from "@/services/api/members.api";
 import { fetchCommentCounts } from "@/services/api/comments.api";
+import {
+  completeRecurringTaskWithAction,
+  skipNextRecurringOccurrence,
+} from "@/services/api/recurring-tasks.api";
 import { parseApiError, isRateLimited, getStoredToken } from "@/services/api/client";
 import { createTaskWithDescriptionImages } from "@/lib/upload-task-description-images";
 import { useTenant } from "@/context/tenant-context";
@@ -313,7 +317,11 @@ export default function TasksPage() {
   }, [swimlanes, statuses, projectTasks]);
 
   const filteredTaskCount = useMemo(() => {
-    const hasFilter = filters.search || filters.priority.length > 0 || filters.assignee.length > 0;
+    const hasFilter =
+      filters.search ||
+      filters.priority.length > 0 ||
+      filters.assignee.length > 0 ||
+      filters.recurrence !== "all";
     if (!hasFilter) return undefined;
     let count = 0;
     for (const statusTasks of Object.values(tasksByStatus)) {
@@ -327,6 +335,8 @@ export default function TasksPage() {
           const taskAssignees = t.assigneeIds?.length ? t.assigneeIds : (t.assigneeId ? [t.assigneeId] : []);
           if (!taskAssignees.some((id) => filters.assignee.includes(id))) return false;
         }
+        if (filters.recurrence === "normal" && t.recurrenceType && t.recurrenceType !== "NONE") return false;
+        if (filters.recurrence === "recurring" && (!t.recurrenceType || t.recurrenceType === "NONE")) return false;
         return true;
       }).length;
     }
@@ -412,6 +422,41 @@ export default function TasksPage() {
     onError: (_err, _vars, ctx) => {
       if (ctx?.previous) queryClient.setQueryData(["tasks", selectedProjectId], ctx.previous);
       toast({ title: "Failed to move task", description: "Returned to original position.", variant: "error" });
+    },
+  });
+
+  const recurringActionMutation = useMutation({
+    mutationFn: async ({ type, task }: { type: "complete" | "skip"; task: Task }) => {
+      const recurringTemplateId = task.recurringTemplateId;
+      if (!recurringTemplateId) {
+        throw new Error("Recurring template was not found for this task.");
+      }
+      if (type === "skip") {
+        await skipNextRecurringOccurrence(recurringTemplateId);
+        return;
+      }
+      const doneStatusId = statuses.find((s) => s.type === "DONE")?.id;
+      await completeRecurringTaskWithAction(task.id, {
+        action: "ONLY_THIS",
+        doneStatusId,
+      });
+    },
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["tasks", selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ["task", vars.task.id] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-templates"] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-summary"] });
+      toast({
+        title: vars.type === "skip" ? "Next occurrence skipped" : "Occurrence completed",
+        variant: "success",
+      });
+    },
+    onError: (err) => {
+      toast({
+        title: "Recurring action failed",
+        description: parseApiError(err),
+        variant: "error",
+      });
     },
   });
 
@@ -569,7 +614,10 @@ export default function TasksPage() {
       assigneeNameById[id] = info.name;
     }
     const hasActiveFilters =
-      filters.search.length > 0 || filters.priority.length > 0 || filters.assignee.length > 0;
+      filters.search.length > 0 ||
+      filters.priority.length > 0 ||
+      filters.assignee.length > 0 ||
+      filters.recurrence !== "all";
     setExportingZip(true);
     try {
       const { count, filename, mediaFiles } = await exportTasksToZipFile(projectTasks, {
@@ -626,6 +674,10 @@ export default function TasksPage() {
             priority: s.priority ?? "MEDIUM",
           }))
           .filter((s) => s.title.length > 0),
+        recurrence:
+          data.recurrence?.repeat && data.recurrence.repeat !== "NONE"
+            ? data.recurrence
+            : undefined,
       },
       imageFiles: descriptionImageFiles,
       subtaskPendingAttachments,
@@ -636,10 +688,14 @@ export default function TasksPage() {
   const quickActions = useMemo(() => ({
     onEdit: (task: Task) => setSelectedTaskId(task.id),
     onChangeStatus: (task: Task, statusId: string) => updateMutation.mutate({ taskId: task.id, statusId }),
+    onCompleteOccurrence: (task: Task) =>
+      recurringActionMutation.mutate({ type: "complete", task }),
+    onSkipNextOccurrence: (task: Task) =>
+      recurringActionMutation.mutate({ type: "skip", task }),
     ...(permissions.canDeleteTask && {
       onDelete: (task: Task) => setDeleteTarget(task),
     }),
-  }), [updateMutation, permissions.canDeleteTask]);
+  }), [updateMutation, recurringActionMutation, permissions.canDeleteTask]);
 
   const handleToggleSelectionMode = useCallback(() => {
     if (bulk.state.isSelectionMode) bulk.exitSelectionMode();
@@ -781,7 +837,14 @@ export default function TasksPage() {
       ) : statuses.length > 0 ? (
         <>
           <div className="shrink-0 space-y-4">
-            {projectTasks.length > 0 && <BoardStatsBar stats={boardStats} />}
+            {projectTasks.length > 0 && (
+              <BoardStatsBar
+                stats={boardStats}
+                onRecurringFilterClick={() =>
+                  setFilters((prev) => ({ ...prev, recurrence: "recurring" }))
+                }
+              />
+            )}
             <BoardToolbar
               filters={filters}
               onFiltersChange={setFilters}
@@ -790,6 +853,7 @@ export default function TasksPage() {
               onViewModeChange={setViewMode}
               taskCount={projectTasks.length}
               filteredCount={filteredTaskCount}
+              recurringCount={boardStats.recurring}
               savedViews={savedViews}
               onSaveView={(name: string, viewFilters: BoardFilters) => saveView(name, viewFilters)}
               onLoadView={(view: SavedView) => setFilters(view.filters)}

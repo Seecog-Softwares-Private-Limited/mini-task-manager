@@ -136,6 +136,10 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
             priority: s.priority ?? "MEDIUM",
           }))
           .filter((s) => s.title.length > 0),
+        recurrence:
+          data.recurrence?.repeat && data.recurrence.repeat !== "NONE"
+            ? data.recurrence
+            : undefined,
       },
       imageFiles: descriptionImageFiles,
       subtaskPendingAttachments,

@@ -376,6 +376,11 @@ export class TasksController {
       estimatedMinutes: t.estimatedMinutes ?? undefined,
       loggedMinutes: t.loggedMinutes,
       sprintId: t.sprintId ? formatUuid(t.sprintId as string | Buffer) : undefined,
+      recurringTemplateId: t.recurringTemplateId
+        ? (formatUuid(t.recurringTemplateId as string | Buffer) ?? String(t.recurringTemplateId))
+        : undefined,
+      recurrenceType: t.recurrenceType ?? undefined,
+      recurrenceSequence: t.recurrenceSequence ?? undefined,
       tags: t.tags ?? undefined,
       subtasks: t.subtasks ?? undefined,
       createdAt: t.createdAt,

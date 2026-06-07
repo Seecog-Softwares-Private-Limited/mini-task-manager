@@ -13,6 +13,7 @@ import { TaskEntity } from './entities/task.entity';
 import { TaskAttachmentEntity } from './entities/task-attachment.entity';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { PatchTaskDto } from './dto/patch-task.dto';
+import { RecurringTasksService } from './recurring-tasks.service';
 import { PaginationQueryDto, PaginatedResult, paginate } from '../../common/pagination';
 import { formatUuid, generateUuid } from '../../common/utils/uuid.util';
 import { Configuration } from '../../config/configuration';
@@ -75,6 +76,8 @@ export class TasksService {
     private readonly organizationsService: OrganizationsService,
     @Inject(forwardRef(() => PlanLimitService))
     private readonly planLimitService: PlanLimitService,
+    @Inject(forwardRef(() => RecurringTasksService))
+    private readonly recurringTasksService: RecurringTasksService,
   ) {}
 
   async findById(id: string): Promise<TaskEntity | null> {
@@ -140,10 +143,30 @@ export class TasksService {
       sprintId: dto.sprintId ?? null,
       tags: tags.length ? tags : null,
     });
+
+    if (dto.recurrence && dto.recurrence.repeat && dto.recurrence.repeat !== 'NONE') {
+      await this.recurringTasksService.attachRecurrenceToTask({
+        taskId: task.id,
+        organizationId,
+        reporterId,
+        projectId,
+        title: dto.title,
+        description: dto.description ?? null,
+        statusId: statusId ?? null,
+        priority: dto.priority ?? 'MEDIUM',
+        assigneeId: assigneeIds[0] ?? dto.assigneeId ?? null,
+        assigneeIds: assigneeIds.length ? assigneeIds : null,
+        storyPoints: dto.storyPoints ?? null,
+        subtasks: dto.subtasks,
+        tags: tags.length ? tags : null,
+        dueDate: dto.dueDate ? String(dto.dueDate).slice(0, 10) : null,
+        recurrence: dto.recurrence,
+      });
+    }
     this.activityLogsService
       .log({ organizationId, userId: reporterId, entityType: 'task', entityId: task.id, action: 'create', metadata: { name: task.title } })
       .catch(() => {});
-    return task;
+    return (await this.tasksRepository.findById(task.id)) ?? task;
   }
 
   async update(
@@ -202,6 +225,8 @@ export class TasksService {
       const normalized = this.normalizeSubtasks(dto.subtasks);
       patch.subtasks = normalized.length ? normalized : null;
     }
+    const nextStatusId = dto.statusId !== undefined ? dto.statusId ?? null : task.statusId;
+    const statusChanged = dto.statusId !== undefined && nextStatusId !== task.statusId;
     if (Object.keys(patch).length > 0) {
       await this.tasksRepository.update(taskId, patch);
       const action = dto.statusId !== undefined ? 'move' : 'update';
@@ -209,7 +234,31 @@ export class TasksService {
         .log({ organizationId, userId: userId ?? undefined, entityType: 'task', entityId: taskId, action, metadata: { name: task.title } })
         .catch(() => {});
     }
+
+    if (dto.recurrence) {
+      await this.recurringTasksService.updateRecurrenceFromTask(taskId, organizationId, dto.recurrence);
+    }
+
+    if (task.recurringTemplateId && statusChanged) {
+      const done = await this.isDoneStatus(task.projectId, organizationId, nextStatusId);
+      await this.recurringTasksService.syncOccurrenceCompletionFromTaskStatus(taskId, done);
+    }
     return this.tasksRepository.findById(taskId);
+  }
+
+  private async isDoneStatus(
+    projectId: string,
+    organizationId: string,
+    statusId: string | null | undefined,
+  ): Promise<boolean> {
+    if (!statusId) return false;
+    const workflows = await this.workflowsService.findByProject(projectId, organizationId);
+    for (const workflow of workflows) {
+      const statuses = await this.workflowsService.getStatuses(workflow.id);
+      const status = statuses.find((s: { id: string; type?: string }) => s.id === statusId);
+      if (status) return (status.type ?? '').toUpperCase() === 'DONE';
+    }
+    return false;
   }
 
   async delete(taskId: string, organizationId: string, userId?: string): Promise<void> {

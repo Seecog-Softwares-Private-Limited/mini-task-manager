@@ -40,6 +40,7 @@ import {
 import type { BoardPermissions } from "@/hooks/use-board-permissions";
 import { canUserMoveTask } from "@/lib/task-assignees";
 import { TaskCard as EnterpriseTaskCard } from "@/components/kanban/task-card";
+import { partitionBoardTasks } from "@/lib/recurrence-display";
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -49,6 +50,7 @@ export interface BoardFilters {
   search: string;
   priority: string[];
   assignee: string[];
+  recurrence: "all" | "normal" | "recurring";
   sortBy: "created" | "priority" | "dueDate" | "title";
   sortDir: "asc" | "desc";
 }
@@ -57,6 +59,7 @@ export const DEFAULT_FILTERS: BoardFilters = {
   search: "",
   priority: [],
   assignee: [],
+  recurrence: "all",
   sortBy: "created",
   sortDir: "desc",
 };
@@ -66,6 +69,8 @@ export interface TaskCardQuickActions {
   onChangeStatus?: (task: Task, statusId: string) => void;
   onAssign?: (task: Task, assigneeId: string | null) => void;
   onDelete?: (task: Task) => void;
+  onCompleteOccurrence?: (task: Task) => void;
+  onSkipNextOccurrence?: (task: Task) => void;
 }
 
 /** Subtask info computed from all tasks on the board */
@@ -329,6 +334,18 @@ function ColumnSettingsDropdown({
   );
 }
 
+function ColumnSectionHeader({ label, count }: { label: string; count: number }) {
+  return (
+    <div className="flex items-center gap-2 px-0.5 pb-0.5 pt-1">
+      <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/55">
+        {label}
+      </span>
+      <span className="text-[10px] font-medium tabular-nums text-muted-foreground/40">({count})</span>
+      <div className="h-px flex-1 bg-border/40" />
+    </div>
+  );
+}
+
 // ─── Droppable Column ─────────────────────────────────────────
 
 function DroppableColumn({
@@ -389,6 +406,30 @@ function DroppableColumn({
   const isActiveTarget = isOver || activeOverColumnId === status.id;
   const isOverWipLimit = wipLimit ? tasks.length > wipLimit : false;
   const isAtWipLimit = wipLimit ? tasks.length === wipLimit : false;
+  const { recurring, oneTime } = partitionBoardTasks(tasks);
+  const showSections = recurring.length > 0 && oneTime.length > 0;
+
+  const renderTaskCard = (task: Task) => (
+    <DraggableCard
+      key={task.id}
+      task={task}
+      statusId={status.id}
+      boardColumnStatus={status}
+      onTaskClick={onTaskClick}
+      assigneeMap={assigneeMap}
+      commentCount={commentCountMap?.[task.id]}
+      attachmentCount={attachmentCountMap?.[task.id]}
+      subtaskInfo={subtaskMap?.[task.id]}
+      statuses={allStatuses}
+      quickActions={quickActions}
+      isMoving={movingTaskId === task.id}
+      isSelected={selectedIds?.has(task.id)}
+      isSelectionMode={isSelectionMode}
+      onToggleSelect={onToggleSelect}
+      permissions={permissions}
+      currentUserId={currentUserId}
+    />
+  );
 
   // Collapsed state
   if (collapsed) {
@@ -482,27 +523,18 @@ function DroppableColumn({
 
       {/* Cards — only this area scrolls vertically */}
       <div className="flex min-h-0 flex-1 basis-0 flex-col gap-2.5 overflow-y-auto overscroll-y-contain p-3">
-        {tasks.map((task) => (
-          <DraggableCard
-            key={task.id}
-            task={task}
-            statusId={status.id}
-            boardColumnStatus={status}
-            onTaskClick={onTaskClick}
-            assigneeMap={assigneeMap}
-            commentCount={commentCountMap?.[task.id]}
-            attachmentCount={attachmentCountMap?.[task.id]}
-            subtaskInfo={subtaskMap?.[task.id]}
-            statuses={allStatuses}
-            quickActions={quickActions}
-            isMoving={movingTaskId === task.id}
-            isSelected={selectedIds?.has(task.id)}
-            isSelectionMode={isSelectionMode}
-            onToggleSelect={onToggleSelect}
-            permissions={permissions}
-            currentUserId={currentUserId}
-          />
-        ))}
+        {recurring.length > 0 ? (
+          <div className="flex flex-col gap-2.5">
+            {showSections ? <ColumnSectionHeader label="Recurring" count={recurring.length} /> : null}
+            {recurring.map(renderTaskCard)}
+          </div>
+        ) : null}
+        {oneTime.length > 0 ? (
+          <div className="flex flex-col gap-2.5">
+            {showSections ? <ColumnSectionHeader label="Tasks" count={oneTime.length} /> : null}
+            {oneTime.map(renderTaskCard)}
+          </div>
+        ) : null}
 
         {/* Empty */}
         {tasks.length === 0 && !isActiveTarget && (
@@ -555,6 +587,11 @@ function applyFilters(tasks: Task[], filters: BoardFilters): Task[] {
       return taskAssignees.some((id) => filters.assignee.includes(id));
     });
   }
+  if (filters.recurrence === "normal") {
+    result = result.filter((t) => !t.recurrenceType || t.recurrenceType === "NONE");
+  } else if (filters.recurrence === "recurring") {
+    result = result.filter((t) => !!t.recurrenceType && t.recurrenceType !== "NONE");
+  }
   return result;
 }
 
@@ -588,6 +625,8 @@ export interface BoardStats {
   overdue: number;
   completedPercent: number;
   inProgress: number;
+  recurring: number;
+  oneTime: number;
 }
 
 export function computeBoardStats(tasks: Task[], statuses: WorkflowStatus[]): BoardStats {
@@ -599,7 +638,9 @@ export function computeBoardStats(tasks: Task[], statuses: WorkflowStatus[]): Bo
   const completedPercent = total > 0 ? Math.round((completed / total) * 100) : 0;
   const inProgressStatus = statuses.find((s) => s.type === "IN_PROGRESS" || s.name.toLowerCase().includes("progress"));
   const inProgress = inProgressStatus ? tasks.filter((t) => t.statusId === inProgressStatus.id).length : 0;
-  return { total, overdue, completedPercent, inProgress };
+  const recurring = tasks.filter((t) => !!t.recurrenceType && t.recurrenceType !== "NONE").length;
+  const oneTime = total - recurring;
+  return { total, overdue, completedPercent, inProgress, recurring, oneTime };
 }
 
 // ─── Compute subtask map ──────────────────────────────────────

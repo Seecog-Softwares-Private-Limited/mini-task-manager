@@ -13,15 +13,28 @@ import { ActivityLogsModule } from '../activity-logs/activity-logs.module';
 import { TaskEntity } from './entities/task.entity';
 import { TaskCommentEntity } from './entities/task-comment.entity';
 import { TaskAttachmentEntity } from './entities/task-attachment.entity';
+import { RecurringTaskTemplateEntity } from './entities/recurring-task-template.entity';
+import { RecurringTaskOccurrenceEntity } from './entities/recurring-task-occurrence.entity';
 import { TasksRepository } from './repositories/tasks.repository';
 import { TaskCommentsRepository } from './repositories/task-comments.repository';
 import { TaskAttachmentsRepository } from './repositories/task-attachments.repository';
+import { RecurringTaskTemplatesRepository } from './repositories/recurring-task-templates.repository';
+import { RecurringTaskOccurrencesRepository } from './repositories/recurring-task-occurrences.repository';
 import { TasksService } from './tasks.service';
 import { TasksController } from './tasks.controller';
+import { RecurringTasksController } from './recurring-tasks.controller';
+import { RecurringTasksService } from './recurring-tasks.service';
+import { RecurringTasksCron } from './recurring-tasks.cron';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([TaskEntity, TaskCommentEntity, TaskAttachmentEntity]),
+    TypeOrmModule.forFeature([
+      TaskEntity,
+      TaskCommentEntity,
+      TaskAttachmentEntity,
+      RecurringTaskTemplateEntity,
+      RecurringTaskOccurrenceEntity,
+    ]),
     AuthModule,
     BillingModule,
     OrganizationsModule,
@@ -33,8 +46,17 @@ import { TasksController } from './tasks.controller';
     ActivityLogsModule,
     forwardRef(() => PlansModule),
   ],
-  controllers: [TasksController],
-  providers: [TasksRepository, TaskCommentsRepository, TaskAttachmentsRepository, TasksService],
+  controllers: [TasksController, RecurringTasksController],
+  providers: [
+    TasksRepository,
+    TaskCommentsRepository,
+    TaskAttachmentsRepository,
+    RecurringTaskTemplatesRepository,
+    RecurringTaskOccurrencesRepository,
+    TasksService,
+    RecurringTasksService,
+    RecurringTasksCron,
+  ],
   exports: [TasksService, TasksRepository],
 })
 export class TasksModule {}
