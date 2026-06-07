@@ -29,6 +29,7 @@ import type { BoardPermissions } from "@/hooks/use-board-permissions";
 import { canUserMoveTask } from "@/lib/task-assignees";
 import type { AssigneeMap, BoardFilters, SubtaskInfo, TaskCardQuickActions } from "./kanban-board";
 import { TaskCard } from "./task-card";
+import { partitionBoardTasks } from "@/lib/recurrence-display";
 
 const BACKLOG_ID = "__backlog__";
 
@@ -77,6 +78,11 @@ function applyFilters(tasks: Task[], filters: BoardFilters): Task[] {
           : [];
       return taskAssignees.some((id) => filters.assignee.includes(id));
     });
+  }
+  if (filters.recurrence === "normal") {
+    result = result.filter((t) => !t.recurrenceType || t.recurrenceType === "NONE");
+  } else if (filters.recurrence === "recurring") {
+    result = result.filter((t) => !!t.recurrenceType && t.recurrenceType !== "NONE");
   }
   return result;
 }
@@ -236,6 +242,30 @@ function ScrumCell({
   const isOverWipLimit = wipLimit ? tasks.length > wipLimit : false;
   const isAtWipLimit = wipLimit ? tasks.length === wipLimit : false;
   const colorSet = getStatusColor(statusIndex);
+  const { recurring, oneTime } = partitionBoardTasks(tasks);
+  const showSections = recurring.length > 0 && oneTime.length > 0;
+
+  const renderTaskCard = (task: Task) => (
+    <ScrumDraggableCard
+      key={task.id}
+      task={task}
+      swimlaneId={swimlaneId}
+      statusId={status.id}
+      boardColumnStatus={status}
+      onTaskClick={onTaskClick}
+      assigneeMap={assigneeMap}
+      commentCount={commentCountMap?.[task.id]}
+      subtaskInfo={subtaskMap?.[task.id]}
+      statuses={allStatuses}
+      quickActions={quickActions}
+      isMoving={movingTaskId === task.id}
+      isSelected={selectedIds?.has(task.id)}
+      isSelectionMode={isSelectionMode}
+      onToggleSelect={onToggleSelect}
+      permissions={permissions}
+      currentUserId={currentUserId}
+    />
+  );
 
   return (
     <div
@@ -261,27 +291,32 @@ function ScrumCell({
         </span>
       </div>
       <div className="flex flex-1 flex-col gap-2 overflow-y-auto p-2 scrollbar-thin">
-        {tasks.map((task) => (
-          <ScrumDraggableCard
-            key={task.id}
-            task={task}
-            swimlaneId={swimlaneId}
-            statusId={status.id}
-            boardColumnStatus={status}
-            onTaskClick={onTaskClick}
-            assigneeMap={assigneeMap}
-            commentCount={commentCountMap?.[task.id]}
-            subtaskInfo={subtaskMap?.[task.id]}
-            statuses={allStatuses}
-            quickActions={quickActions}
-            isMoving={movingTaskId === task.id}
-            isSelected={selectedIds?.has(task.id)}
-            isSelectionMode={isSelectionMode}
-            onToggleSelect={onToggleSelect}
-            permissions={permissions}
-            currentUserId={currentUserId}
-          />
-        ))}
+        {recurring.length > 0 ? (
+          <div className="flex flex-col gap-2">
+            {showSections ? (
+              <div className="flex items-center gap-1.5 px-0.5">
+                <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/55">
+                  Recurring ({recurring.length})
+                </span>
+                <div className="h-px flex-1 bg-border/40" />
+              </div>
+            ) : null}
+            {recurring.map(renderTaskCard)}
+          </div>
+        ) : null}
+        {oneTime.length > 0 ? (
+          <div className="flex flex-col gap-2">
+            {showSections ? (
+              <div className="flex items-center gap-1.5 px-0.5">
+                <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/55">
+                  Tasks ({oneTime.length})
+                </span>
+                <div className="h-px flex-1 bg-border/40" />
+              </div>
+            ) : null}
+            {oneTime.map(renderTaskCard)}
+          </div>
+        ) : null}
         {tasks.length === 0 && !active && (
           <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-muted-foreground/10 py-4">
             <Zap className="h-4 w-4 text-muted-foreground/20" />
@@ -336,7 +371,7 @@ export function ScrumBoard({
   assigneeMap,
   commentCountMap,
   subtaskMap,
-  filters = { search: "", priority: [], assignee: [], sortBy: "created", sortDir: "desc" },
+  filters = { search: "", priority: [], assignee: [], recurrence: "all", sortBy: "created", sortDir: "desc" },
   quickActions,
   wipLimits,
   movingTaskId,

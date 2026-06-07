@@ -70,6 +70,15 @@ export class TaskEntity extends BaseEntity {
   @Column({ name: 'sprint_id', type: 'binary', length: 16, transformer: uuidBinaryTransformer, nullable: true })
   sprintId!: string | null;
 
+  @Column({ name: 'recurring_template_id', type: 'binary', length: 16, transformer: uuidBinaryTransformer, nullable: true })
+  recurringTemplateId!: string | null;
+
+  @Column({ name: 'recurrence_type', type: 'varchar', length: 20, nullable: true })
+  recurrenceType!: string | null;
+
+  @Column({ name: 'recurrence_sequence', type: 'int', nullable: true })
+  recurrenceSequence!: number | null;
+
   @Column({ type: 'simple-json', nullable: true })
   tags!: Array<{ name: string; color: string }> | null;
 

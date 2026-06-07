@@ -61,6 +61,12 @@ import {
 import { filterTaskImageAttachments } from "@/lib/task-image-attachments";
 import { isTinyMceUiTarget } from "@/lib/tinymce-dialog";
 import { TaskAttachmentsSection } from "@/components/tasks/task-attachments-section";
+import { RecurrenceEditor } from "@/components/tasks/recurrence/recurrence-editor";
+import {
+  completeRecurringTaskWithAction,
+  fetchRecurringTemplateHistory,
+} from "@/services/api/recurring-tasks.api";
+import { recurrenceSummary, toRecurrenceLabel } from "@/lib/recurrence-display";
 
 const TaskDescriptionEditor = dynamic(
   () =>
@@ -107,6 +113,7 @@ import {
   Tag,
   X,
   FileText,
+  Repeat,
 } from "lucide-react";
 
 const TAG_COLORS = [
@@ -131,14 +138,6 @@ const PRIORITIES = [
 const TASK_MODAL_DROPDOWN_Z = "z-[110]";
 const ACTIVITY_PAGE_SIZE = 5;
 
-/** Sidebar priority row — warm tint per level (visually distinct from status / primary actions). */
-const PRIORITY_SIDEBAR_SHELL: Record<string, string> = {
-  LOW: "bg-emerald-500/[0.07] ring-1 ring-emerald-600/15 dark:bg-emerald-500/[0.11] dark:ring-emerald-400/22",
-  MEDIUM: "bg-amber-500/[0.08] ring-1 ring-amber-600/18 dark:bg-amber-500/[0.12] dark:ring-amber-400/25",
-  HIGH: "bg-red-500/[0.07] ring-1 ring-red-600/18 dark:bg-red-500/[0.12] dark:ring-red-400/22",
-  CRITICAL: "bg-purple-500/[0.08] ring-1 ring-purple-600/18 dark:bg-purple-500/[0.12] dark:ring-purple-400/25",
-};
-
 const STATUS_DOT_FALLBACK = [
   "bg-blue-500",
   "bg-amber-500",
@@ -162,7 +161,8 @@ const tdSidebarSurface = cn(
   "dark:hover:bg-muted/25"
 );
 const tdSidebarHeading = cn(tdEyebrow, "mb-3 block");
-const tdSubtleDivider = "my-5 h-px bg-[#E5E7EB] dark:bg-border/35";
+const tdSidebarFieldShell =
+  "h-11 w-full justify-between rounded-xl border-0 bg-white/85 px-4 text-sm font-semibold tracking-tight text-foreground shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08)] transition-[background-color,box-shadow] hover:bg-white hover:!text-foreground hover:shadow-[inset_0_0_0_1px_rgba(15,23,42,0.12),0_4px_12px_-6px_rgba(15,23,42,0.12)] data-[state=open]:!text-foreground focus-visible:!text-foreground dark:bg-white/[0.06] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)] dark:hover:bg-white/[0.1] dark:hover:!text-foreground dark:data-[state=open]:!text-foreground";
 
 /** `YYYY-MM-DD` for native date input from API ISO / Date-only strings. */
 function taskDueDateToInputValue(iso?: string | null): string {
@@ -309,6 +309,12 @@ export function TaskDetailModal({
   const [subtaskDraftDirty, setSubtaskDraftDirty] = React.useState(false);
   const [subtaskCollapseConfirmOpen, setSubtaskCollapseConfirmOpen] = React.useState(false);
   const [pendingSubtaskExpandId, setPendingSubtaskExpandId] = React.useState<string | null>(null);
+  const [recurrenceDraft, setRecurrenceDraft] = React.useState<{
+    repeat?: "NONE" | "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY" | "CUSTOM";
+    [key: string]: unknown;
+  }>({ repeat: "NONE" });
+  const [completePromptOpen, setCompletePromptOpen] = React.useState(false);
+  const [pendingDoneStatusId, setPendingDoneStatusId] = React.useState<string | null>(null);
 
   const isOnline = React.useCallback((lastSeenAt: string | undefined) => {
     if (!lastSeenAt) return false;
@@ -319,6 +325,13 @@ export function TaskDetailModal({
     queryKey: ["task", taskId],
     queryFn: () => fetchTask(taskId!),
     enabled: open && !!taskId,
+  });
+
+  const recurringHistoryQuery = useQuery({
+    queryKey: ["recurring-template-history", task?.recurringTemplateId ?? ""],
+    queryFn: () => fetchRecurringTemplateHistory(task!.recurringTemplateId!),
+    enabled: open && Boolean(task?.recurringTemplateId),
+    staleTime: 60_000,
   });
 
   React.useEffect(() => {
@@ -333,6 +346,9 @@ export function TaskDetailModal({
     setNewTagName("");
     setNewTagColor(TAG_COLORS[0]);
     setActivityExpanded((prev) => prev);
+    setRecurrenceDraft({
+      repeat: task.recurrenceType && task.recurrenceType !== "NONE" ? task.recurrenceType : "NONE",
+    });
   }, [task?.id, task?.title, task?.description]);
 
   // task data is rendered directly — no local editing state needed for read-only fields
@@ -659,6 +675,27 @@ export function TaskDetailModal({
     },
   });
 
+  const completeRecurringMutation = useMutation({
+    mutationFn: (payload: {
+      action: "ONLY_THIS" | "THIS_AND_PREVIOUS_PENDING" | "STOP_SERIES_PERMANENTLY";
+      doneStatusId?: string;
+    }) => completeRecurringTaskWithAction(taskId!, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["task", taskId] });
+      queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
+      toast({ title: "Recurring occurrence completed", variant: "success" });
+      setCompletePromptOpen(false);
+      setPendingDoneStatusId(null);
+    },
+    onError: (err) => {
+      toast({
+        title: "Failed to complete recurring occurrence",
+        description: parseApiError(err),
+        variant: "error",
+      });
+    },
+  });
+
   const toggleTaskAssignee = React.useCallback(
     (memberUserId: string) => {
       const isSelected = taskAssigneeIds.some(
@@ -780,7 +817,15 @@ export function TaskDetailModal({
   const handleFieldChange = (field: keyof Task, value: unknown) => {
     if (!task || !canEditWorkflowFields) return;
     if (field === "statusId") {
-      updateMutation.mutate({ statusId: value as string | null });
+      const nextStatusId = value as string | null;
+      const next = statuses.find((s) => s.id === nextStatusId);
+      const markingDone = (next?.type ?? "").toUpperCase() === "DONE";
+      if (task.recurringTemplateId && markingDone) {
+        setPendingDoneStatusId(nextStatusId);
+        setCompletePromptOpen(true);
+        return;
+      }
+      updateMutation.mutate({ statusId: nextStatusId });
     }
   };
 
@@ -800,6 +845,15 @@ export function TaskDetailModal({
     PRIORITIES.find((pr) => pr.value === (task?.priority ?? "").toUpperCase()) ?? PRIORITIES[1];
   const selectedStatus =
     statuses.find((s) => s.id === (task?.statusId ?? statuses[0]?.id)) ?? statuses[0] ?? null;
+  const recurrenceTypeLabel = toRecurrenceLabel(task?.recurrenceType);
+  const recurrenceMetaSummary = recurrenceSummary(recurrenceDraft);
+  const recurringHistory = recurringHistoryQuery.data ?? [];
+  const recurringCompletedCount = recurringHistory.filter((item) => item.state === "COMPLETED").length;
+  const recurringOverduePendingCount = recurringHistory.filter((item) => {
+    if (item.state !== "PENDING") return false;
+    return isTaskDueDateOverdue(item.dueDate);
+  }).length;
+  const recurringUpcomingCount = recurringHistory.filter((item) => item.state === "PENDING").length;
   const statusColorById = React.useMemo(() => {
     const map = new Map<string, string>();
     statuses.forEach((s, index) => {
@@ -1029,15 +1083,30 @@ export function TaskDetailModal({
                       )}
                     </div>
                   )}
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {task.recurrenceType && task.recurrenceType !== "NONE" ? (
+                      <span className="td-meta-chip inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/[0.07] px-2.5 py-1 text-[11px] font-medium text-primary">
+                        <Repeat className="h-3 w-3 shrink-0 opacity-80" />
+                        Recurring
+                        <span className="text-primary/50">·</span>
+                        {recurrenceTypeLabel}
+                        {typeof task.recurrenceSequence === "number" && task.recurrenceSequence > 0
+                          ? ` #${task.recurrenceSequence}`
+                          : ""}
+                      </span>
+                    ) : (
+                      <span className="td-meta-chip inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+                        One-time task
+                      </span>
+                    )}
                     {task.dueDate && (
                       <span
                         className={cn(
-                          "td-meta-chip inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold text-foreground",
+                          "td-meta-chip inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium text-foreground",
                           isOverdue && "border-destructive/30 bg-destructive/5 text-destructive"
                         )}
                       >
-                        <Calendar className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
+                        <Calendar className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
                         {new Date(task.dueDate).toLocaleDateString(undefined, {
                           month: "short",
                           day: "numeric",
@@ -1054,11 +1123,14 @@ export function TaskDetailModal({
                     </span>
                     <span
                       id="task-detail-desc"
-                      className="text-[11px] font-medium tabular-nums text-muted-foreground/55"
+                      className="text-[11px] font-medium tabular-nums text-muted-foreground/45"
                     >
                       {task.projectId ? `ID ${task.id.slice(0, 8).toUpperCase()}` : ""}
                     </span>
                   </div>
+                  {task.recurrenceType && task.recurrenceType !== "NONE" && recurrenceMetaSummary ? (
+                    <p className="text-xs text-muted-foreground">{recurrenceMetaSummary}</p>
+                  ) : null}
                 </div>
               </div>
             </DialogHeader>
@@ -1561,7 +1633,7 @@ export function TaskDetailModal({
                 </div>
 
                 {/* Right column: metadata modules */}
-                <aside className="flex min-w-0 flex-col gap-3 lg:sticky lg:top-0 lg:self-start lg:border-l lg:border-[#E5E7EB] lg:pl-8 dark:lg:border-border/40">
+                <aside className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-0 lg:self-start lg:border-l lg:border-[#E5E7EB] lg:pl-8 dark:lg:border-border/40">
                   <div className={tdSidebarSurface}>
                     <span className={tdSidebarHeading}>Assignee</span>
                     <DropdownMenu
@@ -1721,117 +1793,185 @@ export function TaskDetailModal({
                   </div>
 
                   <div className={tdSidebarSurface}>
-                    <span className={tdSidebarHeading}>Schedule</span>
-                    <div className="space-y-3">
-                      <Label className="mb-0 block text-xs font-medium text-[#6B7280]" htmlFor="task-detail-due-date">
-                        Due date
-                      </Label>
+                    <span className={tdSidebarHeading}>Occurrence</span>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label className="mb-0 block text-xs font-medium text-muted-foreground" htmlFor="task-detail-due-date">
+                          Due date
+                        </Label>
 
-                      {canEditAll ? (
-                        <label
-                          htmlFor="task-detail-due-date"
-                          className={cn(
-                            "relative block cursor-pointer",
-                            (updateMutation.isPending || !canEditAll) && "cursor-default"
-                          )}
-                        >
-                          <Input
-                            id="task-detail-due-date"
-                            type="date"
-                            disabled={updateMutation.isPending}
-                            value={taskDueDateToInputValue(task.dueDate)}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              updateMutation.mutate({ dueDate: v ? v : null });
-                            }}
-                            className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
-                            aria-label="Due date"
-                          />
+                        {canEditAll ? (
+                          <label
+                            htmlFor="task-detail-due-date"
+                            className={cn(
+                              "relative block cursor-pointer",
+                              (updateMutation.isPending || !canEditAll) && "cursor-default"
+                            )}
+                          >
+                            <Input
+                              id="task-detail-due-date"
+                              type="date"
+                              disabled={updateMutation.isPending}
+                              value={taskDueDateToInputValue(task.dueDate)}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                updateMutation.mutate({ dueDate: v ? v : null });
+                              }}
+                              className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+                              aria-label="Due date"
+                            />
+                            <div
+                              className={cn(
+                                "pointer-events-none flex h-11 w-full items-center gap-3 rounded-xl border px-3.5 transition-colors",
+                                isOverdue && task.dueDate
+                                  ? "border-destructive/30 bg-destructive/[0.04]"
+                                  : "border-[#E5E7EB] bg-white dark:border-border dark:bg-white/[0.06]"
+                              )}
+                            >
+                              <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                              <span
+                                className={cn(
+                                  "min-w-0 flex-1 truncate text-sm font-medium",
+                                  task.dueDate ? "text-foreground" : "text-muted-foreground"
+                                )}
+                              >
+                                {formatTaskDueDatePrimary(task.dueDate)}
+                              </span>
+                            </div>
+                          </label>
+                        ) : (
                           <div
                             className={cn(
-                              "pointer-events-none flex h-11 w-full items-center gap-3 rounded-xl border px-3.5 transition-colors",
+                              "flex h-11 w-full items-center gap-3 rounded-xl border px-3.5",
                               isOverdue && task.dueDate
-                                ? "border-[#FECACA] bg-[#FEF2F2]"
+                                ? "border-destructive/30 bg-destructive/[0.04]"
                                 : "border-[#E5E7EB] bg-white dark:border-border dark:bg-white/[0.06]"
                             )}
                           >
-                            <Calendar className="h-4 w-4 shrink-0 text-[#6B7280]" aria-hidden />
-                            <span
-                              className={cn(
-                                "min-w-0 flex-1 truncate text-sm font-medium",
-                                task.dueDate ? "text-[#111827] dark:text-foreground" : "text-[#6B7280]"
-                              )}
-                            >
-                              {formatTaskDueDatePrimary(task.dueDate)}
+                            <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                            <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
+                              {task.dueDate ? formatTaskDueDatePrimary(task.dueDate) : "No date selected"}
                             </span>
-                            <Calendar className="h-4 w-4 shrink-0 text-[#6B7280]/70" aria-hidden />
                           </div>
-                        </label>
-                      ) : (
-                        <div
-                          className={cn(
-                            "flex h-11 w-full items-center gap-3 rounded-xl border px-3.5",
-                            isOverdue && task.dueDate
-                              ? "border-[#FECACA] bg-[#FEF2F2]"
-                              : "border-[#E5E7EB] bg-white dark:border-border dark:bg-white/[0.06]"
-                          )}
-                        >
-                          <Calendar className="h-4 w-4 shrink-0 text-[#6B7280]" aria-hidden />
-                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-[#111827] dark:text-foreground">
-                            {task.dueDate ? formatTaskDueDatePrimary(task.dueDate) : "No date selected"}
+                        )}
+
+                        {task.dueDate ? (
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-xs text-muted-foreground">{formatTaskDueDateHelper(task.dueDate)}</p>
+                            {canEditAll ? (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 shrink-0 rounded-lg px-2 text-xs font-normal text-muted-foreground hover:text-foreground"
+                                disabled={updateMutation.isPending}
+                                onClick={() => updateMutation.mutate({ dueDate: null })}
+                              >
+                                Clear
+                              </Button>
+                            ) : null}
+                          </div>
+                        ) : !canEditAll ? (
+                          <p className="text-xs text-muted-foreground">No date selected</p>
+                        ) : null}
+
+                        {isOverdue && task.dueDate ? (
+                          <span className="inline-flex w-fit items-center rounded-full bg-destructive/10 px-2.5 py-0.5 text-[11px] font-medium text-destructive">
+                            Overdue
                           </span>
-                        </div>
-                      )}
+                        ) : null}
 
-                      {task.dueDate ? (
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="text-xs text-[#6B7280]">{formatTaskDueDateHelper(task.dueDate)}</p>
-                          {canEditAll ? (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 shrink-0 rounded-lg px-2 text-xs font-normal text-[#6B7280] hover:text-[#111827]"
-                              disabled={updateMutation.isPending}
-                              onClick={() => updateMutation.mutate({ dueDate: null })}
-                            >
-                              Clear
-                            </Button>
-                          ) : null}
-                        </div>
-                      ) : !canEditAll ? (
-                        <p className="text-xs text-[#6B7280]">No date selected</p>
-                      ) : null}
+                        {task.recurrenceType && task.recurrenceType !== "NONE" ? (
+                          <p className="text-[11px] leading-relaxed text-muted-foreground/80">
+                            Due date for this occurrence. The series schedule is anchored to the first due date.
+                          </p>
+                        ) : null}
+                      </div>
 
-                      {isOverdue && task.dueDate ? (
-                        <span className="inline-flex w-fit items-center rounded-full bg-[#FEE2E2] px-2.5 py-0.5 text-[11px] font-semibold text-[#DC2626]">
-                          Overdue
+                      <div className="space-y-2">
+                        <span className="block text-xs font-medium text-muted-foreground">
+                          {task.recurrenceType && task.recurrenceType !== "NONE" ? "Status" : "Task status"}
                         </span>
-                      ) : null}
-                    </div>
+                        {selectedStatus ? (
+                          <DropdownMenu modal={false}>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                disabled={!canEditWorkflowFields || updateMutation.isPending}
+                                className={tdSidebarFieldShell}
+                                aria-label="Change task status"
+                              >
+                                <span className="flex min-w-0 flex-1 items-center gap-2.5">
+                                  <span
+                                    className={cn(
+                                      "h-2.5 w-2.5 shrink-0 rounded-full shadow-sm ring-2 ring-white/80 dark:ring-black/40",
+                                      statusColorById.get(selectedStatus.id) ?? STATUS_DOT_FALLBACK[0]
+                                    )}
+                                  />
+                                  <span className="truncate text-foreground">{selectedStatus.name}</span>
+                                </span>
+                                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                              align="start"
+                              className={cn(
+                                "w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px] p-1",
+                                TASK_MODAL_DROPDOWN_Z
+                              )}
+                              sideOffset={6}
+                              onClick={(e) => e.stopPropagation()}
+                              onPointerDown={(e) => e.stopPropagation()}
+                            >
+                              {statuses.map((s) => {
+                                const isCurrent = s.id === selectedStatus?.id;
+                                return (
+                                  <DropdownMenuItem
+                                    key={s.id}
+                                    disabled={updateMutation.isPending}
+                                    onSelect={(event) => {
+                                      event.preventDefault();
+                                      handleFieldChange("statusId", s.id);
+                                    }}
+                                    className="rounded-lg text-sm"
+                                  >
+                                    <span
+                                      className={cn(
+                                        "mr-2 h-2.5 w-2.5 shrink-0 rounded-full",
+                                        statusColorById.get(s.id) ?? STATUS_DOT_FALLBACK[0]
+                                      )}
+                                      aria-hidden
+                                    />
+                                    <span className="flex-1">{s.name}</span>
+                                    {isCurrent ? <Check className="h-3.5 w-3.5 shrink-0 text-primary" /> : null}
+                                  </DropdownMenuItem>
+                                );
+                              })}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        ) : null}
+                      </div>
 
-                    <div className={tdSubtleDivider} />
-
-                    <div className="space-y-2">
-                      <span className="block text-xs font-medium text-muted-foreground/75">Task status</span>
-                      {selectedStatus ? (
+                      <div className="space-y-2">
+                        <span className="block text-xs font-medium text-muted-foreground">Priority</span>
                         <DropdownMenu modal={false}>
                           <DropdownMenuTrigger asChild>
                             <Button
                               type="button"
                               variant="outline"
                               disabled={!canEditWorkflowFields || updateMutation.isPending}
-                              className="h-11 w-full justify-between rounded-xl border-0 bg-white/85 px-4 text-sm font-semibold tracking-tight text-foreground shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08)] transition-[background-color,box-shadow] hover:bg-white hover:shadow-[inset_0_0_0_1px_rgba(15,23,42,0.12),0_4px_12px_-6px_rgba(15,23,42,0.12)] dark:bg-white/[0.06] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)] dark:hover:bg-white/[0.1]"
-                              aria-label="Change task status"
+                              className={tdSidebarFieldShell}
+                              aria-label="Change task priority"
                             >
-                              <span className="flex items-center gap-2.5">
+                              <span className="flex min-w-0 flex-1 items-center gap-2.5">
                                 <span
                                   className={cn(
-                                    "h-2.5 w-2.5 rounded-full shadow-sm ring-2 ring-white/80 dark:ring-black/40",
-                                    statusColorById.get(selectedStatus.id) ?? STATUS_DOT_FALLBACK[0]
+                                    "h-2.5 w-2.5 shrink-0 rounded-full shadow-sm ring-2 ring-white/80 dark:ring-black/40",
+                                    selectedPriority.color
                                   )}
                                 />
-                                <span>{selectedStatus.name}</span>
+                                <span className="truncate text-foreground">{selectedPriority.label}</span>
                               </span>
                               <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
                             </Button>
@@ -1839,105 +1979,110 @@ export function TaskDetailModal({
                           <DropdownMenuContent
                             align="start"
                             className={cn(
-                              "w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px] p-1",
+                              "w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px] p-1 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 duration-150",
                               TASK_MODAL_DROPDOWN_Z
                             )}
                             sideOffset={6}
                             onClick={(e) => e.stopPropagation()}
                             onPointerDown={(e) => e.stopPropagation()}
                           >
-                            {statuses.map((s) => {
-                              const isCurrent = s.id === selectedStatus?.id;
+                            {PRIORITIES.map((p) => {
+                              const isCurrent = p.value === selectedPriority.value;
                               return (
                                 <DropdownMenuItem
-                                  key={s.id}
+                                  key={p.value}
                                   disabled={updateMutation.isPending}
                                   onSelect={(event) => {
                                     event.preventDefault();
-                                    handleFieldChange("statusId", s.id);
+                                    handlePriorityChange(p.value);
                                   }}
                                   className="rounded-lg text-sm"
                                 >
                                   <span
-                                    className={cn(
-                                      "mr-2 h-2.5 w-2.5 shrink-0 rounded-full",
-                                      statusColorById.get(s.id) ?? STATUS_DOT_FALLBACK[0]
-                                    )}
+                                    className={cn("mr-2 h-2.5 w-2.5 shrink-0 rounded-full", p.color)}
                                     aria-hidden
                                   />
-                                  <span className="flex-1">{s.name}</span>
+                                  <span className="flex-1">{p.label}</span>
                                   {isCurrent ? <Check className="h-3.5 w-3.5 shrink-0 text-primary" /> : null}
                                 </DropdownMenuItem>
                               );
                             })}
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      ) : null}
+                      </div>
                     </div>
+                  </div>
 
-                    <div className={tdSubtleDivider} />
+                  <div className={tdSidebarSurface}>
+                    <span className={tdSidebarHeading}>Repeat series</span>
 
-                    <div className="space-y-2">
-                      <span className="block text-xs font-medium text-muted-foreground/75">Priority</span>
-                      <DropdownMenu modal={false}>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            disabled={!canEditWorkflowFields || updateMutation.isPending}
-                            className={cn(
-                              "h-11 w-full justify-between rounded-xl border-0 px-4 text-sm font-semibold tracking-tight text-foreground transition-[background-color,box-shadow]",
-                              PRIORITY_SIDEBAR_SHELL[selectedPriority.value] ?? PRIORITY_SIDEBAR_SHELL.MEDIUM
-                            )}
-                            aria-label="Change task priority"
+                    {task.recurrenceType && task.recurrenceType !== "NONE" ? (
+                      <div className="mb-4 grid grid-cols-3 gap-2">
+                        {[
+                          { label: "Done", value: recurringCompletedCount },
+                          { label: "Upcoming", value: recurringUpcomingCount },
+                          { label: "Overdue", value: recurringOverduePendingCount, warn: true },
+                        ].map((stat) => (
+                          <div
+                            key={stat.label}
+                            className="rounded-xl bg-muted/35 px-2 py-2.5 text-center ring-1 ring-black/[0.04] dark:ring-white/[0.06]"
                           >
-                            <span className="flex items-center gap-2.5">
-                              <span
-                                className={cn(
-                                  "h-2.5 w-2.5 rounded-full shadow-sm ring-2 ring-white/80 dark:ring-black/40",
-                                  selectedPriority.color
-                                )}
-                              />
-                              <span>{selectedPriority.label}</span>
-                            </span>
-                            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                          align="start"
-                          className={cn(
-                            "w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px] p-1 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 duration-150",
-                            TASK_MODAL_DROPDOWN_Z
-                          )}
-                          sideOffset={6}
-                          onClick={(e) => e.stopPropagation()}
-                          onPointerDown={(e) => e.stopPropagation()}
-                        >
-                          {PRIORITIES.map((p) => {
-                            const isCurrent = p.value === selectedPriority.value;
-                            return (
-                              <DropdownMenuItem
-                                key={p.value}
-                                disabled={updateMutation.isPending}
-                                onSelect={(event) => {
-                                  event.preventDefault();
-                                  handlePriorityChange(p.value);
-                                }}
-                                className="rounded-lg text-sm"
-                              >
-                                <span
-                                  className={cn("mr-2 h-2.5 w-2.5 shrink-0 rounded-full", p.color)}
-                                  aria-hidden
-                                />
-                                <span className="flex-1">{p.label}</span>
-                                {isCurrent ? <Check className="h-3.5 w-3.5 shrink-0 text-primary" /> : null}
-                              </DropdownMenuItem>
-                            );
-                          })}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+                            <p
+                              className={cn(
+                                "text-base font-semibold tabular-nums leading-none",
+                                stat.warn && stat.value > 0 ? "text-destructive" : "text-foreground"
+                              )}
+                            >
+                              {stat.value}
+                            </p>
+                            <p className="mt-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                              {stat.label}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
 
+                    {recurrenceMetaSummary ? (
+                      <p className="mb-3 rounded-xl bg-muted/40 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+                        {recurrenceMetaSummary}
+                      </p>
+                    ) : null}
+
+                    <RecurrenceEditor
+                      value={recurrenceDraft}
+                      onChange={(next) => setRecurrenceDraft((next as any) ?? { repeat: "NONE" })}
+                      disabled={!canEditAll || updateMutation.isPending}
+                      embedded
+                      hideSummary
+                    />
+
+                    {canEditAll ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="mt-4 w-full"
+                        disabled={updateMutation.isPending}
+                        onClick={() => {
+                          if (
+                            recurrenceDraft?.repeat &&
+                            recurrenceDraft.repeat !== "NONE" &&
+                            !task.dueDate
+                          ) {
+                            toast({
+                              title: "Due date required",
+                              description:
+                                "Set an occurrence due date before enabling a repeating series.",
+                              variant: "error",
+                            });
+                            return;
+                          }
+                          updateMutation.mutate({ recurrence: recurrenceDraft });
+                        }}
+                      >
+                        Save series
+                      </Button>
+                    ) : null}
                   </div>
 
                   <div className={tdSidebarSurface}>
@@ -2164,6 +2309,66 @@ export function TaskDetailModal({
         setPendingSubtaskExpandId(null);
       }}
     />
+
+    <Dialog open={completePromptOpen} onOpenChange={setCompletePromptOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <h3 className="text-base font-semibold">Complete recurring task</h3>
+          <p className="text-sm text-muted-foreground">
+            Choose how this recurring occurrence should be completed.
+          </p>
+        </DialogHeader>
+        <div className="grid gap-2">
+          <Button
+            type="button"
+            disabled={completeRecurringMutation.isPending}
+            onClick={() =>
+              completeRecurringMutation.mutate({
+                action: "ONLY_THIS",
+                doneStatusId: pendingDoneStatusId ?? undefined,
+              })
+            }
+          >
+            Complete only this occurrence
+          </Button>
+          <p className="-mt-0.5 px-1 text-xs text-muted-foreground">
+            Marks this item done and keeps the recurring series active.
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={completeRecurringMutation.isPending}
+            onClick={() =>
+              completeRecurringMutation.mutate({
+                action: "THIS_AND_PREVIOUS_PENDING",
+                doneStatusId: pendingDoneStatusId ?? undefined,
+              })
+            }
+          >
+            Complete this and all previous pending
+          </Button>
+          <p className="-mt-0.5 px-1 text-xs text-muted-foreground">
+            Clears backlog in this series up to the current occurrence.
+          </p>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={completeRecurringMutation.isPending}
+            onClick={() =>
+              completeRecurringMutation.mutate({
+                action: "STOP_SERIES_PERMANENTLY",
+                doneStatusId: pendingDoneStatusId ?? undefined,
+              })
+            }
+          >
+            Stop this recurring task permanently
+          </Button>
+          <p className="-mt-0.5 px-1 text-xs text-muted-foreground">
+            Ends the full series and prevents future occurrences.
+          </p>
+        </div>
+      </DialogContent>
+    </Dialog>
     </>
   );
 }

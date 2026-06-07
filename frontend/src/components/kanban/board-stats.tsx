@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import type { BoardStats } from "./kanban-board";
-import { ListTodo, AlertCircle, CheckCircle2, Clock, TrendingUp, Zap } from "lucide-react";
+import { ListTodo, AlertCircle, CheckCircle2, Clock, TrendingUp, Zap, Repeat } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -13,10 +13,21 @@ import {
 interface BoardStatsBarProps {
   stats: BoardStats;
   className?: string;
+  onRecurringFilterClick?: () => void;
 }
 
-export function BoardStatsBar({ stats, className }: BoardStatsBarProps) {
-  const items = [
+type StatItem = {
+  label: string;
+  value: string | number;
+  icon: typeof ListTodo;
+  color: string;
+  bgColor: string;
+  tooltip: string;
+  onClick?: () => void;
+};
+
+export function BoardStatsBar({ stats, className, onRecurringFilterClick }: BoardStatsBarProps) {
+  const items: StatItem[] = [
     {
       label: "Total",
       value: stats.total,
@@ -33,6 +44,19 @@ export function BoardStatsBar({ stats, className }: BoardStatsBarProps) {
       bgColor: "bg-blue-500/10",
       tooltip: `${stats.inProgress} task${stats.inProgress !== 1 ? "s" : ""} currently in progress`,
     },
+    ...(stats.recurring > 0
+      ? [
+          {
+            label: "Recurring",
+            value: stats.recurring,
+            icon: Repeat,
+            color: "text-indigo-700 dark:text-indigo-300",
+            bgColor: "bg-indigo-500/10",
+            tooltip: `${stats.recurring} recurring occurrence${stats.recurring !== 1 ? "s" : ""} · ${stats.oneTime} one-time`,
+            onClick: onRecurringFilterClick,
+          } satisfies StatItem,
+        ]
+      : []),
     {
       label: "Overdue",
       value: stats.overdue,
@@ -77,18 +101,35 @@ export function BoardStatsBar({ stats, className }: BoardStatsBarProps) {
         {items.map((item) => (
           <Tooltip key={item.label}>
             <TooltipTrigger asChild>
-              <div
-                className={cn(
-                  "flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm transition-colors cursor-default",
-                  item.bgColor
-                )}
-              >
-                <item.icon className={cn("h-3.5 w-3.5", item.color)} />
-                <span className={cn("font-semibold tabular-nums", item.color)}>
-                  {item.value}
-                </span>
-                <span className="text-xs text-muted-foreground hidden sm:inline">{item.label}</span>
-              </div>
+              {item.onClick ? (
+                <button
+                  type="button"
+                  onClick={item.onClick}
+                  className={cn(
+                    "flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm transition-colors hover:brightness-[0.98]",
+                    item.bgColor
+                  )}
+                >
+                  <item.icon className={cn("h-3.5 w-3.5", item.color)} />
+                  <span className={cn("font-semibold tabular-nums", item.color)}>
+                    {item.value}
+                  </span>
+                  <span className="text-xs text-muted-foreground hidden sm:inline">{item.label}</span>
+                </button>
+              ) : (
+                <div
+                  className={cn(
+                    "flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm transition-colors cursor-default",
+                    item.bgColor
+                  )}
+                >
+                  <item.icon className={cn("h-3.5 w-3.5", item.color)} />
+                  <span className={cn("font-semibold tabular-nums", item.color)}>
+                    {item.value}
+                  </span>
+                  <span className="text-xs text-muted-foreground hidden sm:inline">{item.label}</span>
+                </div>
+              )}
             </TooltipTrigger>
             <TooltipContent className="text-xs max-w-[200px]">{item.tooltip}</TooltipContent>
           </Tooltip>

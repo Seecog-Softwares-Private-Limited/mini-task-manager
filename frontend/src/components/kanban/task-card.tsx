@@ -34,7 +34,9 @@ import {
   MessageSquare,
   MoreHorizontal,
   Paperclip,
+  Repeat,
   Rocket,
+  SkipForward,
   SquarePen,
   Trash2,
   UserPlus,
@@ -42,6 +44,11 @@ import {
 } from "lucide-react";
 import { TaskAssigneePopover } from "@/components/tasks/task-assignee-popover";
 import { isUserAssignedToTask } from "@/lib/task-assignees";
+import {
+  isRecurringTask,
+  recurrenceCadenceShort,
+  recurrenceRibbonLabel,
+} from "@/lib/recurrence-display";
 
 export type TaskType = "bug" | "feature" | "story" | "improvement";
 
@@ -245,6 +252,14 @@ export function TaskPriorityBadge({ priority }: { priority: string }) {
   );
 }
 
+const SERIES_CARD_CHROME = cn(
+  "border-indigo-200/55 ring-1 ring-indigo-400/20",
+  "dark:border-indigo-500/30 dark:ring-indigo-400/15",
+  "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.85),0_2px_8px_rgba(99,102,241,0.08),0_14px_36px_-10px_rgba(99,102,241,0.14)]",
+  "hover:border-indigo-300/65 hover:shadow-[0_6px_24px_-6px_rgba(99,102,241,0.2)]",
+  "dark:hover:border-indigo-400/35"
+);
+
 export function TaskLabelGroup({ labels }: { labels: TaskLabel[] }) {
   if (labels.length === 0) return null;
   const visible = labels.slice(0, 2);
@@ -413,7 +428,11 @@ export function TaskCard({
   const canManageTask = !!permissions?.canEditTask;
   const canWorkflowEdit = canManageTask || isUserAssignedToTask(task, currentUserId);
   const showQuickActions = canWorkflowEdit && !isSelectionMode;
+  const isRecurring = isRecurringTask(task);
+  const ribbonLabel = recurrenceRibbonLabel(task);
+  const cadenceLine = recurrenceCadenceShort(task.recurrenceType);
   const dueTone = getDueDateTone(task.dueDate);
+  const showDueChip = !isRecurring || (dueTone && (dueTone.tone === "overdue" || dueTone.tone === "today"));
   const labels = task.labels ?? (task.sprintId ? [{ id: "sprint", name: "Sprint", color: "#6366f1" }] : []);
   const activityComments = task.commentsCount ?? commentCount;
   const activityAttachments = task.attachmentsCount ?? attachmentCount;
@@ -514,6 +533,7 @@ export function TaskCard({
         isSelected && "border-primary/30 bg-violet-50/40 ring-2 ring-primary/25 dark:bg-primary/[0.06]",
         isMoving && "opacity-65",
         task.id.startsWith("temp-") && "border-dashed",
+        isRecurring && SERIES_CARD_CHROME,
         !canWorkflowEdit && "cursor-default hover:translate-y-0",
       )}
       data-cy={`task-card-${task.id}`}
@@ -534,6 +554,25 @@ export function TaskCard({
         )}
         aria-hidden
       />
+      {isRecurring ? (
+        <span
+          className="pointer-events-none absolute left-2 top-3 bottom-3 w-0.5 rounded-full bg-indigo-500/70 shadow-sm dark:bg-indigo-400/60"
+          aria-hidden
+        />
+      ) : null}
+
+      {ribbonLabel ? (
+        <div
+          className={cn(
+            "pointer-events-none absolute right-3 top-3 z-[15] flex items-center gap-1 rounded-lg border border-indigo-500/25 bg-indigo-500/[0.09] px-2 py-1 text-[10px] font-semibold text-indigo-800 backdrop-blur-sm dark:border-indigo-400/30 dark:bg-indigo-500/15 dark:text-indigo-200",
+            showQuickActions && "group-hover/card:opacity-0"
+          )}
+          aria-label={`Recurring series: ${ribbonLabel}`}
+        >
+          <Repeat className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
+          {ribbonLabel}
+        </div>
+      ) : null}
 
       {isSelectionMode && (
         <button
@@ -554,6 +593,22 @@ export function TaskCard({
 
       {showQuickActions && (
         <div className="absolute right-3 top-3 z-20 flex items-center gap-1 opacity-0 transition-all duration-300 group-hover/card:opacity-100">
+          {isRecurring && quickActions?.onCompleteOccurrence ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className={cn(QUICK_ACTION_BTN, "border-indigo-200/80 text-indigo-700 hover:border-indigo-300 hover:bg-indigo-50 dark:border-indigo-500/30 dark:text-indigo-300 dark:hover:bg-indigo-500/10")}
+              data-quick-action
+              aria-label="Complete occurrence"
+              onClick={(e) => {
+                e.stopPropagation();
+                quickActions.onCompleteOccurrence?.(task);
+              }}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="outline"
@@ -666,6 +721,36 @@ export function TaskCard({
                     {s.name}
                   </DropdownMenuItem>
                 ))}
+                {task.recurrenceType && task.recurrenceType !== "NONE" ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="text-xs">Recurring</DropdownMenuLabel>
+                    {quickActions?.onCompleteOccurrence ? (
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          suppressOpenRef.current = true;
+                          quickActions.onCompleteOccurrence?.(task);
+                        }}
+                        className="text-xs"
+                      >
+                        <CheckCircle2 className="mr-2 h-3.5 w-3.5" />
+                        Complete occurrence
+                      </DropdownMenuItem>
+                    ) : null}
+                    {quickActions?.onSkipNextOccurrence ? (
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          suppressOpenRef.current = true;
+                          quickActions.onSkipNextOccurrence?.(task);
+                        }}
+                        className="text-xs"
+                      >
+                        <SkipForward className="mr-2 h-3.5 w-3.5" />
+                        Skip next occurrence
+                      </DropdownMenuItem>
+                    ) : null}
+                  </>
+                ) : null}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
@@ -713,9 +798,18 @@ export function TaskCard({
           </p>
         )}
 
+        {cadenceLine ? (
+          <p className="mt-2 text-[11px] font-medium text-indigo-700/80 dark:text-indigo-300/80">
+            {cadenceLine}
+            {task.dueDate
+              ? ` · due ${new Date(task.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
+              : ""}
+          </p>
+        ) : null}
+
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <TaskPriorityBadge priority={task.priority} />
-          {dueTone && (
+          {showDueChip && dueTone && (
             <TooltipProvider delayDuration={200}>
               <Tooltip>
                 <TooltipTrigger asChild>

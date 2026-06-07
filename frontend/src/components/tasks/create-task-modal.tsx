@@ -31,6 +31,9 @@ import {
   X, Sparkles, ArrowRight, Flag, AlignLeft,
   Layers, AlertCircle, Download,
 } from "lucide-react";
+import { RecurrenceEditor } from "@/components/tasks/recurrence/recurrence-editor";
+import type { TaskRecurrenceConfig } from "@/types/api";
+import { recurrenceSummary } from "@/lib/recurrence-display";
 
 const PRIORITIES = [
   { value: "LOW", label: "Low", color: "bg-emerald-500", ring: "ring-emerald-500/30" },
@@ -78,6 +81,7 @@ const schema = z.object({
       })
     )
     .default([]),
+  recurrence: z.custom<TaskRecurrenceConfig>().optional(),
 });
 
 export type CreateTaskFormData = z.infer<typeof schema>;
@@ -146,6 +150,7 @@ export function CreateTaskModal({
       dueDate: "",
       labels: [],
       subtasks: [],
+      recurrence: { repeat: "NONE" },
     },
   });
 
@@ -157,6 +162,7 @@ export function CreateTaskModal({
   const selectedPriority = watch("priority");
   const selectedStatusId = watch("statusId");
   const watchedSubtasks = watch("subtasks");
+  const watchedRecurrence = watch("recurrence");
 
   useEffect(() => {
     if (!open) return;
@@ -185,6 +191,7 @@ export function CreateTaskModal({
         dueDate: "",
         labels: [],
         subtasks: [],
+        recurrence: { repeat: "NONE" },
       });
       descriptionFieldRef.current?.resetPendingImages();
       setPendingSubtaskAttachments({});
@@ -195,6 +202,14 @@ export function CreateTaskModal({
   if (!open || !mounted) return null;
 
   function handleFormSubmit(data: CreateTaskFormData) {
+    if (data.recurrence?.repeat && data.recurrence.repeat !== "NONE" && !data.dueDate) {
+      toast({
+        title: "Due date required for recurring task",
+        description: "Set a due date so the recurring series can generate occurrences accurately.",
+        variant: "error",
+      });
+      return;
+    }
     const imageFiles = descriptionFieldRef.current?.getPendingImageFiles() ?? [];
     const hasSubtaskFiles = Object.values(pendingSubtaskAttachments).some((list) => list.length > 0);
     onSubmit(
@@ -378,6 +393,11 @@ export function CreateTaskModal({
                   value={field.value}
                   onChange={field.onChange}
                   disabled={isSubmitting}
+                  hint={
+                    watchedRecurrence?.repeat && watchedRecurrence.repeat !== "NONE"
+                      ? "First occurrence due date — the series repeats from this anchor."
+                      : undefined
+                  }
                 />
               )}
             />
@@ -417,6 +437,23 @@ export function CreateTaskModal({
               setPendingSubtaskAttachments((prev) => ({ ...prev, [subtaskKey]: items }))
             }
           />
+
+          <Controller
+            control={control}
+            name="recurrence"
+            render={({ field }) => (
+              <RecurrenceEditor
+                value={field.value}
+                onChange={field.onChange}
+                disabled={isSubmitting}
+              />
+            )}
+          />
+          {watchedRecurrence?.repeat && watchedRecurrence.repeat !== "NONE" ? (
+            <p className="rounded-xl bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+              {recurrenceSummary(watchedRecurrence) ?? "Recurring schedule enabled"}
+            </p>
+          ) : null}
 
           {errors.dueDate && (
             <p className="flex items-center gap-1 text-xs text-destructive">

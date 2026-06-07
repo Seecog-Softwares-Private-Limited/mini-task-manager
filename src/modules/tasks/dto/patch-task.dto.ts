@@ -14,6 +14,7 @@ import {
   Matches,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
+import { TaskRecurrenceDto } from './recurrence.dto';
 
 /** Avoid IsUUID / IsDateString failures on "" from clients; omit after transform. */
 const emptyStrToUndef = ({ value }: { value: unknown }) =>
@@ -159,4 +160,9 @@ export class PatchTaskDto {
   @ValidateNested({ each: true })
   @Type(() => PatchTaskSubtaskDto)
   subtasks?: PatchTaskSubtaskDto[];
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TaskRecurrenceDto)
+  recurrence?: TaskRecurrenceDto;
 }

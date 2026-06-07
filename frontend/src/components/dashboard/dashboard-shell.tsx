@@ -23,7 +23,7 @@ import type { AppRole } from "@/hooks/use-auth";
 import {
   LayoutDashboard, Building2, FolderKanban, ListTodo, Bell,
   CreditCard, Activity, BarChart3, ClipboardList, Settings,
-  Menu, PanelLeftClose, PanelLeft, LogOut, Sparkles, Shield,
+  Menu, PanelLeftClose, PanelLeft, LogOut, Sparkles, Shield, Repeat,
 } from "lucide-react";
 
 const nav: {
@@ -40,6 +40,7 @@ const nav: {
   { href: "/dashboard/workspaces", label: "Workspaces", icon: Building2 },
   { href: "/dashboard/projects", label: "Projects", icon: FolderKanban },
   { href: "/dashboard/tasks", label: "Tasks", icon: ListTodo },
+  { href: "/dashboard/recurring-tasks", label: "Recurring Tasks", icon: Repeat },
   { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
   { href: "/dashboard/activity", label: "Activity", icon: Activity },
   { href: "/dashboard/audit", label: "Audit log", icon: ClipboardList, adminOnly: true },

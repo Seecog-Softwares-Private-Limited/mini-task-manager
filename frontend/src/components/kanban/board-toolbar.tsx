@@ -27,6 +27,7 @@ import {
   BookmarkPlus,
   CheckSquare2,
   Rocket,
+  Repeat,
 } from "lucide-react";
 
 // ─── Constants ────────────────────────────────────────────────
@@ -65,6 +66,7 @@ interface BoardToolbarProps {
   onViewModeChange: (mode: ViewMode) => void;
   taskCount?: number;
   filteredCount?: number;
+  recurringCount?: number;
   savedViews?: SavedView[];
   onSaveView?: (name: string, filters: BoardFilters) => void;
   onLoadView?: (view: SavedView) => void;
@@ -84,6 +86,7 @@ export function BoardToolbar({
   onViewModeChange,
   taskCount = 0,
   filteredCount,
+  recurringCount = 0,
   savedViews = [],
   onSaveView,
   onLoadView,
@@ -100,6 +103,7 @@ export function BoardToolbar({
     filters.search.length > 0 ||
     filters.priority.length > 0 ||
     filters.assignee.length > 0 ||
+    filters.recurrence !== "all" ||
     filters.sortBy !== "created";
 
   const updateFilter = useCallback(<K extends keyof BoardFilters>(key: K, value: BoardFilters[K]) => {
@@ -119,6 +123,7 @@ export function BoardToolbar({
       search: "",
       priority: [],
       assignee: [],
+      recurrence: "all",
       sortBy: "created",
       sortDir: "desc",
     });
@@ -313,6 +318,42 @@ export function BoardToolbar({
             </DropdownMenuCheckboxItem>
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <div className="inline-flex items-center gap-1 rounded-lg border bg-background p-1">
+          <Button
+            type="button"
+            variant={filters.recurrence === "all" ? "default" : "ghost"}
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={() => updateFilter("recurrence", "all")}
+          >
+            All
+          </Button>
+          <Button
+            type="button"
+            variant={filters.recurrence === "normal" ? "default" : "ghost"}
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={() => updateFilter("recurrence", "normal")}
+          >
+            Normal
+          </Button>
+          <Button
+            type="button"
+            variant={filters.recurrence === "recurring" ? "default" : "ghost"}
+            size="sm"
+            className="h-7 gap-1 px-2 text-xs"
+            onClick={() => updateFilter("recurrence", "recurring")}
+          >
+            <Repeat className="h-3 w-3" />
+            Recurring
+            {recurringCount > 0 ? (
+              <span className="rounded-full bg-indigo-500/15 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-indigo-700 dark:text-indigo-300">
+                {recurringCount}
+              </span>
+            ) : null}
+          </Button>
+        </div>
 
         {/* Saved views dropdown */}
         {(savedViews.length > 0 || onSaveView) && (
@@ -529,6 +570,20 @@ export function BoardToolbar({
               </Badge>
             );
           })}
+
+          {/* Recurrence chip */}
+          {filters.recurrence !== "all" && (
+            <Badge variant="secondary" className="h-6 gap-1 pl-2 pr-1 text-[11px] font-medium">
+              <Repeat className="h-2.5 w-2.5" />
+              {filters.recurrence === "recurring" ? "Recurring tasks" : "Normal tasks"}
+              <button
+                onClick={() => updateFilter("recurrence", "all")}
+                className="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5 transition-colors"
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            </Badge>
+          )}
 
           {/* Sort chip */}
           {filters.sortBy !== "created" && (

@@ -8,9 +8,10 @@ interface DueDateFieldProps {
   value?: string;
   onChange: (value: string) => void;
   disabled?: boolean;
+  hint?: string;
 }
 
-export function DueDateField({ value, onChange, disabled }: DueDateFieldProps) {
+export function DueDateField({ value, onChange, disabled, hint }: DueDateFieldProps) {
   return (
     <div className="space-y-2">
       <label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -38,6 +39,9 @@ export function DueDateField({ value, onChange, disabled }: DueDateFieldProps) {
           </Button>
         )}
       </div>
+      {hint ? (
+        <p className="text-[11px] leading-relaxed text-muted-foreground">{hint}</p>
+      ) : null}
     </div>
   );
 }

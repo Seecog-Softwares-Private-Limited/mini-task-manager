@@ -20,7 +20,9 @@ import {
   GitBranch,
   CheckSquare2,
   Inbox,
+  Repeat,
 } from "lucide-react";
+import { isRecurringTask, recurrenceTypeColumnLabel } from "@/lib/recurrence-display";
 
 const PRIORITY_CONFIG: Record<string, { color: string; bg: string; label: string }> = {
   CRITICAL: { color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-500", label: "Critical" },
@@ -89,7 +91,8 @@ export function BoardTableView({
                     <span className="sr-only">Select</span>
                   </th>
                 )}
-                <th className="text-left font-semibold text-muted-foreground text-xs py-3 px-4 w-[35%]">Task</th>
+                <th className="text-left font-semibold text-muted-foreground text-xs py-3 px-4 w-[30%]">Task</th>
+                <th className="text-left font-semibold text-muted-foreground text-xs py-3 px-4">Type</th>
                 <th className="text-left font-semibold text-muted-foreground text-xs py-3 px-4">Status</th>
                 <th className="text-left font-semibold text-muted-foreground text-xs py-3 px-4">Priority</th>
                 <th className="text-left font-semibold text-muted-foreground text-xs py-3 px-4">Assignee</th>
@@ -157,6 +160,18 @@ export function BoardTableView({
                           )}
                         </div>
                       </div>
+                    </td>
+
+                    {/* Type */}
+                    <td className="py-3 px-4">
+                      {isRecurringTask(task) ? (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-indigo-500/25 bg-indigo-500/10 px-2 py-0.5 text-[10px] font-semibold text-indigo-800 dark:text-indigo-200">
+                          <Repeat className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
+                          {recurrenceTypeColumnLabel(task)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">One-time</span>
+                      )}
                     </td>
 
                     {/* Status */}

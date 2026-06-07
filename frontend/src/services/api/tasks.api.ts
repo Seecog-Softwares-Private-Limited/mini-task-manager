@@ -3,6 +3,7 @@ import { normalizeTaskId } from "@/lib/task-id";
 import type { Task } from "@/types/api";
 import type { PaginatedResult } from "@/types/api";
 import type { TaskSubtask } from "@/types/api";
+import type { TaskRecurrenceConfig } from "@/types/api";
 import { clampSubtaskTitle } from "@/lib/subtask-limits";
 
 /** Fields accepted by backend CreateTaskDto. */
@@ -28,6 +29,7 @@ export interface CreateTaskPayload {
   tags?: Array<{ name: string; color: string }>;
   storyPoints?: number;
   dueDate?: string;
+  recurrence?: TaskRecurrenceConfig;
 }
 
 /** Backend PatchTaskSubtaskDto only accepts whitelisted fields with strict formats. */
@@ -114,6 +116,7 @@ export interface UpdateTaskPayload {
   storyPoints?: number | null;
   tags?: Array<{ name: string; color: string }>;
   subtasks?: TaskSubtask[];
+  recurrence?: TaskRecurrenceConfig;
 }
 
 export async function updateTask(
@@ -134,6 +137,7 @@ export async function updateTask(
   if (payload.subtasks !== undefined) {
     body.subtasks = serializeSubtasksForApi(payload.subtasks);
   }
+  if (payload.recurrence !== undefined) body.recurrence = payload.recurrence;
   const { data } = await apiClient.patch<Task>(`/tasks/${taskId}`, body);
   return data;
 }

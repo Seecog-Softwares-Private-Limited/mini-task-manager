@@ -91,10 +91,64 @@ export interface Task {
   estimatedMinutes?: number;
   loggedMinutes: number;
   sprintId?: string;
+  recurringTemplateId?: string;
+  recurrenceType?: "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY" | "CUSTOM" | "NONE";
+  recurrenceSequence?: number;
   tags?: Array<{ name: string; color: string }>;
   subtasks?: TaskSubtask[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface TaskRecurrenceConfig {
+  repeat?: "NONE" | "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY" | "CUSTOM";
+  interval?: number;
+  weeklyDays?: number[];
+  monthlyMode?: "DAY_OF_MONTH" | "LAST_DAY" | "NTH_WEEKDAY";
+  dayOfMonth?: number;
+  nthWeek?: number;
+  weekday?: number;
+  monthOfYear?: number;
+  dayOfYearMonth?: number;
+  customUnit?: "DAY" | "WEEK" | "MONTH" | "YEAR";
+  endType?: "NEVER" | "ON_DATE" | "AFTER_OCCURRENCES";
+  endDate?: string;
+  endAfterOccurrences?: number;
+  createDaysBeforeDue?: number;
+  dueLogic?: "DUE_DATE" | "DUE_TIME";
+  dueTime?: string;
+}
+
+export interface RecurringTemplateSummary {
+  id: string;
+  title: string;
+  repeatType: "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY" | "CUSTOM";
+  nextDueDate: string;
+  isPaused: boolean;
+  generatedCount: number;
+  upcoming: number;
+  completed: number;
+  endType: "NEVER" | "ON_DATE" | "AFTER_OCCURRENCES";
+  createDaysBeforeDue: number;
+}
+
+export interface RecurringTaskSummary {
+  totalRecurringTasks: number;
+  dueThisWeek: number;
+  overdue: number;
+  completedThisMonth: number;
+  paused: number;
+}
+
+export interface RecurringTaskOccurrence {
+  id: string;
+  templateId: string;
+  taskId?: string | null;
+  sequenceNumber: number;
+  dueDate: string;
+  state: "PENDING" | "COMPLETED" | "SKIPPED";
+  completedAt?: string | null;
+  createdAt: string;
 }
 
 export interface TaskSubtask {

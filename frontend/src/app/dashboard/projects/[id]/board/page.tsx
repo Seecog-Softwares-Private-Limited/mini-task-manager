@@ -10,6 +10,10 @@ import { fetchOrgMembers, fetchProjectMembers } from "@/services/api/members.api
 import { fetchCommentCounts } from "@/services/api/comments.api";
 import { fetchSubscription } from "@/services/api/billing.api";
 import { parseApiError, isRateLimited, getStoredToken } from "@/services/api/client";
+import {
+  completeRecurringTaskWithAction,
+  skipNextRecurringOccurrence,
+} from "@/services/api/recurring-tasks.api";
 import { createTaskWithDescriptionImages } from "@/lib/upload-task-description-images";
 import { useTenant } from "@/context/tenant-context";
 import {
@@ -212,7 +216,11 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
   const subtaskMap = useMemo(() => computeSubtaskMap(tasks, doneStatusId), [tasks, doneStatusId]);
 
   const filteredTaskCount = useMemo(() => {
-    const hasFilter = filters.search || filters.priority.length > 0 || filters.assignee.length > 0;
+    const hasFilter =
+      filters.search ||
+      filters.priority.length > 0 ||
+      filters.assignee.length > 0 ||
+      filters.recurrence !== "all";
     if (!hasFilter) return undefined;
     let count = 0;
     for (const statusTasks of Object.values(tasksByStatus)) {
@@ -226,6 +234,8 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
           const taskAssignees = t.assigneeIds?.length ? t.assigneeIds : (t.assigneeId ? [t.assigneeId] : []);
           if (!taskAssignees.some((id) => filters.assignee.includes(id))) return false;
         }
+        if (filters.recurrence === "normal" && t.recurrenceType && t.recurrenceType !== "NONE") return false;
+        if (filters.recurrence === "recurring" && (!t.recurrenceType || t.recurrenceType === "NONE")) return false;
         return true;
       }).length;
     }
@@ -424,6 +434,41 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
     },
   });
 
+  const recurringActionMutation = useMutation({
+    mutationFn: async ({ type, task }: { type: "complete" | "skip"; task: Task }) => {
+      const recurringTemplateId = task.recurringTemplateId;
+      if (!recurringTemplateId) {
+        throw new Error("Recurring template was not found for this task.");
+      }
+      if (type === "skip") {
+        await skipNextRecurringOccurrence(recurringTemplateId);
+        return;
+      }
+      const doneStatusId = statuses.find((s) => s.type === "DONE")?.id;
+      await completeRecurringTaskWithAction(task.id, {
+        action: "ONLY_THIS",
+        doneStatusId,
+      });
+    },
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["tasks", id] });
+      queryClient.invalidateQueries({ queryKey: ["task", vars.task.id] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-templates"] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-summary"] });
+      toast({
+        title: vars.type === "skip" ? "Next occurrence skipped" : "Occurrence completed",
+        variant: "success",
+      });
+    },
+    onError: (err) => {
+      toast({
+        title: "Recurring action failed",
+        description: parseApiError(err),
+        variant: "error",
+      });
+    },
+  });
+
   const createSprintMutation = useMutation({
     mutationFn: (payload: CreateSprintFormData) =>
       createSprint({ projectId: id, ...payload }),
@@ -480,7 +525,10 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
       assigneeNameById[userId] = info.name;
     }
     const hasActiveFilters =
-      filters.search.length > 0 || filters.priority.length > 0 || filters.assignee.length > 0;
+      filters.search.length > 0 ||
+      filters.priority.length > 0 ||
+      filters.assignee.length > 0 ||
+      filters.recurrence !== "all";
     setExportingZip(true);
     try {
       const { count, filename, mediaFiles } = await exportTasksToZipFile(tasks, {
@@ -538,6 +586,10 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
               priority: s.priority ?? "MEDIUM",
             }))
             .filter((s) => s.title.length > 0),
+          recurrence:
+            data.recurrence?.repeat && data.recurrence.repeat !== "NONE"
+              ? data.recurrence
+              : undefined,
         },
         imageFiles: descriptionImageFiles,
         subtaskPendingAttachments,
@@ -552,10 +604,14 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
     onChangeStatus: (task: Task, statusId: string) => {
       updateStatusMutation.mutate({ taskId: task.id, statusId });
     },
+    onCompleteOccurrence: (task: Task) =>
+      recurringActionMutation.mutate({ type: "complete", task }),
+    onSkipNextOccurrence: (task: Task) =>
+      recurringActionMutation.mutate({ type: "skip", task }),
     ...(permissions.canDeleteTask && {
       onDelete: (task: Task) => setDeleteTarget(task),
     }),
-  }), [updateStatusMutation, permissions.canDeleteTask]);
+  }), [updateStatusMutation, recurringActionMutation, permissions.canDeleteTask]);
 
   const toggleColumnCollapse = useCallback((statusId: string) => {
     setCollapsedColumns((prev) => ({ ...prev, [statusId]: !prev[statusId] }));
@@ -804,7 +860,14 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
 
       <div className="shrink-0 space-y-4">
         {/* Stats */}
-        {tasks.length > 0 && <BoardStatsBar stats={boardStats} />}
+        {tasks.length > 0 && (
+          <BoardStatsBar
+            stats={boardStats}
+            onRecurringFilterClick={() =>
+              setFilters((prev) => ({ ...prev, recurrence: "recurring" }))
+            }
+          />
+        )}
 
         {/* Toolbar */}
         <BoardToolbar
@@ -815,6 +878,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
           onViewModeChange={setViewMode}
           taskCount={tasks.length}
           filteredCount={filteredTaskCount}
+          recurringCount={boardStats.recurring}
           savedViews={savedViews}
           onSaveView={handleSaveView}
           onLoadView={handleLoadView}
