@@ -3,6 +3,10 @@ import type { BoardFilters } from "@/components/kanban/kanban-board";
 import type { Task, WorkflowStatus } from "@/types/api";
 import { fetchAttachments, fetchAttachmentBlob } from "@/services/api/attachments.api";
 import {
+  fetchEntityAttachmentBlob,
+  fetchEntityAttachments,
+} from "@/services/api/entity-attachments.api";
+import {
   buildTaskCsvRowCells,
   filterTasksByBoardFilters,
   sanitizeExportFilename,
@@ -13,6 +17,22 @@ export interface TaskZipExportEntry {
   task: Task;
   exportKey: string;
   mediaFileNames: string[];
+}
+
+type MediaTarget = "task" | "subtask";
+
+interface TaskZipMediaMapItem {
+  path: string;
+  fileName: string;
+  target: MediaTarget;
+  subtaskIndex?: number;
+  subtaskTitle?: string;
+}
+
+interface TaskZipMediaMap {
+  version: 1;
+  generatedAt: string;
+  byTask: Record<string, TaskZipMediaMapItem[]>;
 }
 
 function escapeCsvCell(value: string | number | null | undefined): string {
@@ -28,6 +48,24 @@ function sanitizeZipFileName(name: string, index: number): string {
     .replace(/\s+/g, "-")
     .slice(0, 120);
   return base || `file-${index}`;
+}
+
+function toUniqueFileName(fileName: string, usedNames: Set<string>): string {
+  if (!usedNames.has(fileName)) {
+    usedNames.add(fileName);
+    return fileName;
+  }
+  const dot = fileName.lastIndexOf(".");
+  const stem = dot > 0 ? fileName.slice(0, dot) : fileName;
+  const ext = dot > 0 ? fileName.slice(dot) : "";
+  let suffix = 2;
+  let next = `${stem}-${suffix}${ext}`;
+  while (usedNames.has(next)) {
+    suffix += 1;
+    next = `${stem}-${suffix}${ext}`;
+  }
+  usedNames.add(next);
+  return next;
 }
 
 function buildTasksCsvWithMedia(
@@ -88,6 +126,7 @@ export async function exportTasksToZipFile(
   const zip = new JSZip();
   const mediaRoot = zip.folder("media");
   const entries: TaskZipExportEntry[] = [];
+  const mediaMapByTask: Record<string, TaskZipMediaMapItem[]> = {};
   let mediaFiles = 0;
 
   for (let i = 0; i < list.length; i++) {
@@ -96,26 +135,83 @@ export async function exportTasksToZipFile(
     options.onProgress?.(`Exporting media for "${task.title}"…`, i + 1, list.length);
 
     const mediaFileNames: string[] = [];
+    const mediaMapItems: TaskZipMediaMapItem[] = [];
+    const usedFileNames = new Set<string>();
     try {
-      const attachments = await fetchAttachments(task.id);
-      const folder = mediaRoot?.folder(exportKey);
-      for (let j = 0; j < attachments.length; j++) {
-        const att = attachments[j];
-        const fileName = sanitizeZipFileName(att.fileName, j + 1);
-        if (mediaFileNames.includes(fileName)) continue;
+      const taskFolder = mediaRoot?.folder(exportKey);
+      const taskMediaFolder = taskFolder?.folder("task");
+      const subtaskMediaRoot = taskFolder?.folder("subtasks");
+
+      const [legacyTaskAttachments, entityTaskAttachments] = await Promise.allSettled([
+        fetchAttachments(task.id),
+        fetchEntityAttachments("TASK", task.id, task.id),
+      ]);
+      const taskAttachments = [
+        ...(legacyTaskAttachments.status === "fulfilled" ? legacyTaskAttachments.value : []),
+        ...(entityTaskAttachments.status === "fulfilled" ? entityTaskAttachments.value : []),
+      ];
+
+      for (let j = 0; j < taskAttachments.length; j++) {
+        const attachment = taskAttachments[j];
+        const rawName =
+          "fileName" in attachment ? attachment.fileName : attachment.originalFileName;
+        const safeName = sanitizeZipFileName(rawName, j + 1);
+        const fileName = toUniqueFileName(safeName, usedFileNames);
         try {
-          const blob = await fetchAttachmentBlob(att.id);
-          folder?.file(fileName, blob);
+          const blob =
+            "fileName" in attachment
+              ? await fetchAttachmentBlob(attachment.id, attachment.fileName)
+              : await fetchEntityAttachmentBlob(attachment.id);
+          const path = `media/${exportKey}/task/${fileName}`;
+          taskMediaFolder?.file(fileName, blob);
           mediaFileNames.push(fileName);
+          mediaMapItems.push({ path, fileName, target: "task" });
           mediaFiles++;
         } catch {
           // Skip attachments that fail to download
+        }
+      }
+
+      const subtasks = task.subtasks ?? [];
+      for (let subtaskIndex = 0; subtaskIndex < subtasks.length; subtaskIndex++) {
+        const subtask = subtasks[subtaskIndex];
+        let subtaskAttachments: Awaited<ReturnType<typeof fetchEntityAttachments>> = [];
+        try {
+          subtaskAttachments = await fetchEntityAttachments("SUBTASK", subtask.id, task.id);
+        } catch {
+          subtaskAttachments = [];
+        }
+        if (!subtaskAttachments.length) continue;
+
+        const subtaskFolderName = `${String(subtaskIndex + 1).padStart(2, "0")}-${sanitizeZipFileName(subtask.title, subtaskIndex + 1)}`;
+        const subtaskFolder = subtaskMediaRoot?.folder(subtaskFolderName);
+        for (let j = 0; j < subtaskAttachments.length; j++) {
+          const attachment = subtaskAttachments[j];
+          const safeName = sanitizeZipFileName(attachment.originalFileName, j + 1);
+          const fileName = toUniqueFileName(safeName, usedFileNames);
+          try {
+            const blob = await fetchEntityAttachmentBlob(attachment.id);
+            const path = `media/${exportKey}/subtasks/${subtaskFolderName}/${fileName}`;
+            subtaskFolder?.file(fileName, blob);
+            mediaFileNames.push(fileName);
+            mediaMapItems.push({
+              path,
+              fileName,
+              target: "subtask",
+              subtaskIndex,
+              subtaskTitle: subtask.title,
+            });
+            mediaFiles++;
+          } catch {
+            // Skip attachments that fail to download
+          }
         }
       }
     } catch {
       // Task may have no attachments endpoint access — continue
     }
 
+    mediaMapByTask[exportKey] = mediaMapItems;
     entries.push({ task, exportKey, mediaFileNames });
   }
 
@@ -126,6 +222,12 @@ export async function exportTasksToZipFile(
   });
 
   zip.file("tasks.csv", "\uFEFF" + csv);
+  const mediaMap: TaskZipMediaMap = {
+    version: 1,
+    generatedAt: new Date().toISOString(),
+    byTask: mediaMapByTask,
+  };
+  zip.file("media-map.json", JSON.stringify(mediaMap, null, 2));
   zip.file(
     "README.txt",
     [
@@ -133,7 +235,8 @@ export async function exportTasksToZipFile(
       "",
       "Contents:",
       "- tasks.csv — task details (open in Excel or re-import)",
-      "- media/ — images and files attached to each task",
+      "- media/ — images and files for task + subtask attachments",
+      "- media-map.json — attachment-to-task/subtask mapping used during import",
       "",
       "Each task folder is named like task-0001 and matches the Export Key column in tasks.csv.",
       "To import into another project, use Import ZIP in the Tasks page.",

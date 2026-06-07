@@ -105,8 +105,7 @@ export function ImportTasksZipModal({
           defaultStatusId: statuses[0]?.id,
         },
         createTask: async (payload) => {
-          const task = await createTask(payload);
-          return { id: task.id };
+          return createTask(payload);
         },
         onProgress: (done, total, message) =>
           setProgress({ done, total, message: message ?? "" }),
