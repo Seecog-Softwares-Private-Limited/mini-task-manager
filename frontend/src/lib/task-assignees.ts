@@ -37,6 +37,76 @@ export function isUserAssignedToTask(
   return getTaskAssigneeUserIds(task).includes(uid);
 }
 
+export interface ResolvedTaskAssignee {
+  id: string;
+  name: string;
+  email?: string;
+  avatarUrl?: string;
+  lastSeenAt?: string;
+}
+
+type AssignableMember = {
+  userId: string;
+  user?: {
+    fullName?: string;
+    email?: string;
+    avatarUrl?: string;
+    lastSeenAt?: string;
+  };
+};
+
+/** Resolve display profiles for all assignees on a task. */
+export function resolveTaskAssignees(
+  task: TaskAssigneeSource,
+  members: AssignableMember[]
+): ResolvedTaskAssignee[] {
+  const rawIds = task.assigneeIds?.length
+    ? task.assigneeIds
+    : task.assigneeId
+      ? [task.assigneeId]
+      : [];
+  const seen = new Set<string>();
+  const resolved: ResolvedTaskAssignee[] = [];
+
+  for (const rawId of rawIds) {
+    const key = normalizeAssigneeUserId(rawId);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+
+    const member = members.find((m) => normalizeAssigneeUserId(m.userId) === key);
+    if (member?.user) {
+      resolved.push({
+        id: member.userId,
+        name: member.user.fullName ?? member.user.email ?? "User",
+        email: member.user.email,
+        avatarUrl: member.user.avatarUrl,
+        lastSeenAt: member.user.lastSeenAt,
+      });
+      continue;
+    }
+
+    if (task.assignee && normalizeAssigneeUserId(task.assignee.id) === key) {
+      resolved.push({
+        id: task.assignee.id,
+        name: task.assignee.fullName ?? task.assignee.email ?? "User",
+        email: task.assignee.email,
+        avatarUrl: task.assignee.avatarUrl,
+      });
+      continue;
+    }
+
+    resolved.push({ id: rawId, name: "User" });
+  }
+
+  return resolved;
+}
+
+export function getTaskAssigneeIdList(task: TaskAssigneeSource): string[] {
+  if (task.assigneeIds?.length) return task.assigneeIds;
+  if (task.assigneeId) return [task.assigneeId];
+  return [];
+}
+
 export function canUserMoveTask(
   task: TaskAssigneeSource,
   userId: string | null | undefined,

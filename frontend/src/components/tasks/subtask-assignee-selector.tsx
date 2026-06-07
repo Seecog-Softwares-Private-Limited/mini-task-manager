@@ -38,6 +38,8 @@ interface SubtaskAssigneeSelectorProps {
   disabled?: boolean;
   /** Pre-resolved members from the task modal (project + org + task assignee). */
   knownMembers?: MemberOption[];
+  /** When true, only parent task assignees appear in the dropdown. */
+  taskAssigneesOnly?: boolean;
 }
 
 function mergeMemberOptions(
@@ -82,6 +84,7 @@ export function SubtaskAssigneeSelector({
   onChange,
   disabled,
   knownMembers = [],
+  taskAssigneesOnly = false,
 }: SubtaskAssigneeSelectorProps) {
   const { orgId: tenantOrgId } = useTenant();
   const orgId = organizationId ?? tenantOrgId ?? "";
@@ -91,23 +94,28 @@ export function SubtaskAssigneeSelector({
   const { data: projectMembers = [], isLoading: projectLoading } = useQuery({
     queryKey: ["project-members", projectId],
     queryFn: () => fetchProjectMembers(projectId),
-    enabled: !!projectId,
+    enabled: !!projectId && !taskAssigneesOnly,
     staleTime: 60_000,
   });
 
   const { data: fetchedOrgMembers = [], isLoading: orgLoading } = useQuery({
     queryKey: ["org-members", orgId],
     queryFn: () => fetchOrgMembers(orgId),
-    enabled: !!orgId && prefetchedOrgMembers === undefined,
+    enabled: !!orgId && !taskAssigneesOnly && prefetchedOrgMembers === undefined,
     staleTime: 60_000,
   });
 
   const orgMembers = prefetchedOrgMembers ?? fetchedOrgMembers;
-  const isLoading = projectLoading || (prefetchedOrgMembers === undefined && orgLoading);
+  const isLoading = taskAssigneesOnly
+    ? false
+    : projectLoading || (prefetchedOrgMembers === undefined && orgLoading);
 
   const options = useMemo(
-    () => mergeMemberOptions(projectMembers, orgMembers, knownMembers),
-    [projectMembers, orgMembers, knownMembers]
+    () =>
+      taskAssigneesOnly
+        ? [...knownMembers].sort((a, b) => a.name.localeCompare(b.name))
+        : mergeMemberOptions(projectMembers, orgMembers, knownMembers),
+    [taskAssigneesOnly, projectMembers, orgMembers, knownMembers]
   );
 
   const filtered = useMemo(() => {
@@ -156,7 +164,7 @@ export function SubtaskAssigneeSelector({
       >
         <div className="p-3">
           <DropdownMenuLabel className="px-0 pb-2 text-xs font-semibold">
-            Assign Subtask
+            {taskAssigneesOnly ? "Assign to task member" : "Assign Subtask"}
           </DropdownMenuLabel>
           <div className="relative">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/70" />
@@ -228,7 +236,11 @@ export function SubtaskAssigneeSelector({
           )}
           {!isLoading && filtered.length === 0 && (
             <div className="px-2 py-3 text-center text-xs text-muted-foreground">
-              {options.length === 0 ? "No members available" : "No matching members"}
+              {options.length === 0
+                ? taskAssigneesOnly
+                  ? "Assign members to the task first"
+                  : "No members available"
+                : "No matching members"}
             </div>
           )}
         </div>

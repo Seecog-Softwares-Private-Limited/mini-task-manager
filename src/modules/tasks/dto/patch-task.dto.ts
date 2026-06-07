@@ -123,6 +123,11 @@ export class PatchTaskDto {
   @IsUUID('4', { message: 'assigneeId must be a valid UUID' })
   assigneeId?: string | null;
 
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  assigneeIds?: string[];
+
   /** Clear with null; accept YYYY-MM-DD or ISO datetime from clients. */
   @IsOptional()
   @Transform(patchTaskDueDate)

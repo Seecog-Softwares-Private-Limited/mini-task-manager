@@ -23,8 +23,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { parseApiError } from "@/services/api/client";
 import { useAuth } from "@/hooks/use-auth";
-import { isUserAssignedToTask } from "@/lib/task-assignees";
-import { fetchTask, updateTask, updateTaskAssignee, deleteTask } from "@/services/api/tasks.api";
+import {
+  getTaskAssigneeIdList,
+  isUserAssignedToTask,
+  normalizeAssigneeUserId,
+  resolveTaskAssignees,
+} from "@/lib/task-assignees";
+import { fetchTask, updateTask, updateTaskAssignees, deleteTask } from "@/services/api/tasks.api";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { fetchComments, addComment, deleteComment } from "@/services/api/comments.api";
 import { fetchOrgMembers, fetchProjectMembers } from "@/services/api/members.api";
@@ -33,6 +38,7 @@ import { fetchAttachments } from "@/services/api/attachments.api";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
 import { generateClientId } from "@/lib/generate-client-id";
+import { SUBTASK_TITLE_MAX_LENGTH, clampSubtaskTitle } from "@/lib/subtask-limits";
 
 import {
   defaultDoneStatusId,
@@ -294,6 +300,7 @@ export function TaskDetailModal({
   const [activityPage, setActivityPage] = React.useState(1);
   const [assigneeDropdownOpen, setAssigneeDropdownOpen] = React.useState(false);
   const [assigneeSearch, setAssigneeSearch] = React.useState("");
+  const [optimisticAssigneeIds, setOptimisticAssigneeIds] = React.useState<string[] | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false);
   const [subtaskDeleteTarget, setSubtaskDeleteTarget] = React.useState<{
     id: string;
@@ -376,30 +383,41 @@ export function TaskDetailModal({
     );
   }, [assignableMembers, assigneeSearch]);
 
-  const resolvedAssignee = React.useMemo(() => {
-    if (!task?.assigneeId) return null;
-    const member = assignableMembers.find((m) => m.userId === task.assigneeId);
-    if (member?.user) {
-      return {
-        name: member.user.fullName ?? member.user.email ?? "User",
-        avatarUrl: member.user.avatarUrl,
-        lastSeenAt: member.user.lastSeenAt,
-      };
-    }
-    if (task.assignee) {
-      return {
-        name: task.assignee.fullName ?? task.assignee.email ?? "User",
-        avatarUrl: task.assignee.avatarUrl,
-        lastSeenAt: undefined as string | undefined,
-      };
-    }
-    return { name: "User", avatarUrl: undefined, lastSeenAt: undefined };
-  }, [task?.assigneeId, task?.assignee, assignableMembers]);
+  React.useEffect(() => {
+    setOptimisticAssigneeIds(null);
+  }, [task?.id, task?.assigneeIds, task?.assigneeId]);
 
-  const isOwner = React.useMemo(
-    () => orgMembers.find((m) => m.userId === currentUserId)?.role?.toUpperCase() === "OWNER",
+  const taskForAssigneeDisplay = React.useMemo(() => {
+    if (!task) return null;
+    if (!optimisticAssigneeIds) return task;
+    return {
+      ...task,
+      assigneeIds: optimisticAssigneeIds,
+      assigneeId: optimisticAssigneeIds[0],
+    };
+  }, [task, optimisticAssigneeIds]);
+
+  const resolvedAssignees = React.useMemo(
+    () => (taskForAssigneeDisplay ? resolveTaskAssignees(taskForAssigneeDisplay, assignableMembers) : []),
+    [taskForAssigneeDisplay, assignableMembers]
+  );
+
+  const taskAssigneeIds = React.useMemo(
+    () => (taskForAssigneeDisplay ? getTaskAssigneeIdList(taskForAssigneeDisplay) : []),
+    [taskForAssigneeDisplay]
+  );
+
+  const currentMember = React.useMemo(
+    () =>
+      orgMembers.find(
+        (m) => normalizeAssigneeUserId(m.userId) === normalizeAssigneeUserId(currentUserId)
+      ),
     [orgMembers, currentUserId]
   );
+
+  const isOwner = currentMember?.role?.toUpperCase() === "OWNER";
+  const isAdmin = currentMember?.role?.toUpperCase() === "ADMIN";
+  const canManageAssignees = isOwner || isAdmin;
 
   const isAssignee = React.useMemo(
     () => (task ? isUserAssignedToTask(task, currentUserId) : false),
@@ -407,36 +425,22 @@ export function TaskDetailModal({
   );
 
   /** Owner can edit every field; assignees can update status, priority, and subtasks only. */
-  const canEditAll = isOwner;
-  const canEditWorkflowFields = isOwner || isAssignee;
+  const canEditAll = isOwner || isAdmin;
+  const canEditWorkflowFields = isOwner || isAdmin || isAssignee;
+  const canEditSubtasks = canManageAssignees || isAssignee;
   const isViewOnly = !canEditWorkflowFields;
 
-  const subtaskMemberHints = React.useMemo(() => {
-    const byId = new Map<
-      string,
-      { id: string; name: string; email?: string; avatarUrl?: string }
-    >();
-    for (const m of assignableMembers) {
-      byId.set(m.userId, {
-        id: m.userId,
-        name: m.user?.fullName ?? m.user?.email ?? "User",
-        email: m.user?.email,
-        avatarUrl: m.user?.avatarUrl,
-      });
-    }
-    if (task?.assignee) {
-      const a = task.assignee;
-      if (!byId.has(a.id)) {
-        byId.set(a.id, {
-          id: a.id,
-          name: a.fullName ?? a.email ?? "User",
-          email: a.email,
-          avatarUrl: a.avatarUrl,
-        });
-      }
-    }
-    return Array.from(byId.values());
-  }, [assignableMembers, task?.assignee]);
+  /** Subtask assignees are limited to members assigned on the parent task. */
+  const subtaskMemberHints = React.useMemo(
+    () =>
+      resolvedAssignees.map((a) => ({
+        id: a.id,
+        name: a.name,
+        email: a.email,
+        avatarUrl: a.avatarUrl,
+      })),
+    [resolvedAssignees]
+  );
 
   const { data: comments = [], isLoading: commentsLoading } = useQuery({
     queryKey: ["task-comments", taskId],
@@ -614,22 +618,61 @@ export function TaskDetailModal({
   });
 
   const assigneeMutation = useMutation({
-    mutationFn: (assigneeId: string | null) => {
-      if (!canEditAll) {
-        return Promise.reject(new Error("Only the workspace owner can change the assignee"));
+    mutationFn: (assigneeIds: string[]) => {
+      if (!canManageAssignees) {
+        return Promise.reject(new Error("Only the workspace owner or admin can change assignees"));
       }
-      return updateTaskAssignee(taskId!, assigneeId);
+      return updateTaskAssignees(taskId!, assigneeIds);
+    },
+    onMutate: async (assigneeIds) => {
+      setOptimisticAssigneeIds(assigneeIds);
+      await queryClient.cancelQueries({ queryKey: ["task", taskId] });
+      const previous = queryClient.getQueryData<Task>(["task", taskId]);
+      if (previous) {
+        const optimistic = {
+          ...previous,
+          assigneeIds,
+          assigneeId: assigneeIds[0],
+        } as Task;
+        queryClient.setQueryData(["task", taskId], optimistic);
+        syncTaskIntoListCache(optimistic);
+      }
+      return { previous };
     },
     onSuccess: (updated) => {
+      setOptimisticAssigneeIds(null);
       queryClient.setQueryData(["task", taskId], updated);
       syncTaskIntoListCache(updated);
       onTaskUpdated?.(updated);
-      toast({ title: "Assignee updated", variant: "success" });
+      toast({ title: "Assignees updated", variant: "success" });
     },
-    onError: () => {
-      toast({ title: "Failed to update assignee", variant: "error" });
+    onError: (err, _assigneeIds, ctx) => {
+      setOptimisticAssigneeIds(null);
+      if (ctx?.previous) {
+        queryClient.setQueryData(["task", taskId], ctx.previous);
+      }
+      toast({
+        title: "Failed to update assignees",
+        description: parseApiError(err),
+        variant: "error",
+      });
     },
   });
+
+  const toggleTaskAssignee = React.useCallback(
+    (memberUserId: string) => {
+      const isSelected = taskAssigneeIds.some(
+        (id) => normalizeAssigneeUserId(id) === normalizeAssigneeUserId(memberUserId)
+      );
+      const next = isSelected
+        ? taskAssigneeIds.filter(
+            (id) => normalizeAssigneeUserId(id) !== normalizeAssigneeUserId(memberUserId)
+          )
+        : [...taskAssigneeIds, memberUserId];
+      assigneeMutation.mutate(next);
+    },
+    [assigneeMutation, taskAssigneeIds]
+  );
 
   const deleteTaskMutation = useMutation({
     mutationFn: () => deleteTask(taskId!),
@@ -698,9 +741,12 @@ export function TaskDetailModal({
       if (ctx?.previous) {
         queryClient.setQueryData(["task", taskId], ctx.previous);
       }
+      const description = parseApiError(err);
       toast({
         title: "Failed to update subtasks",
-        description: parseApiError(err),
+        description: description.includes("200 characters")
+          ? `Each subtask title must be ${SUBTASK_TITLE_MAX_LENGTH} characters or fewer.`
+          : description,
         variant: "error",
       });
     },
@@ -713,7 +759,7 @@ export function TaskDetailModal({
 
   const appendSubtask = React.useCallback(
     (title: string) => {
-      const trimmed = title.trim();
+      const trimmed = clampSubtaskTitle(title.trim());
       if (!trimmed) return;
       updateSubtasksMutation.mutate([
         ...checklist,
@@ -765,12 +811,18 @@ export function TaskDetailModal({
   const saveSubtaskDetail = React.useCallback(
     (draft: SubtaskDraft) => {
       const status = statuses.find((s) => s.id === draft.statusId);
+      const safeTitle = clampSubtaskTitle(draft.title.trim());
+      if (!safeTitle) {
+        toast({ title: "Subtask title is required", variant: "error" });
+        return;
+      }
       updateSubtasksMutation.mutate(
         checklist.map((item) =>
           item.id === draft.id
             ? {
                 ...item,
                 ...draft,
+                title: safeTitle,
                 completed: status ? isDoneWorkflowStatus(status) : draft.completed,
               }
             : item
@@ -1180,8 +1232,9 @@ export function TaskDetailModal({
                               organizationId={organizationId}
                               prefetchedOrgMembers={orgMembers}
                               knownMembers={subtaskMemberHints}
+                              taskAssigneesOnly
                               expanded={expanded}
-                              editDisabled={!canEditWorkflowFields || updateSubtasksMutation.isPending}
+                              editDisabled={!canEditSubtasks || updateSubtasksMutation.isPending}
                               onToggleComplete={() => {
                                 const nextCompleted = !item.completed;
                                 const doneId = defaultDoneStatusId(statuses);
@@ -1241,8 +1294,9 @@ export function TaskDetailModal({
                                 statuses={statuses}
                                 prefetchedOrgMembers={orgMembers}
                                 knownMembers={subtaskMemberHints}
+                                taskAssigneesOnly
                                 persistAttachments
-                                disabled={!canEditWorkflowFields}
+                                disabled={!canEditSubtasks}
                                 readOnly={isViewOnly}
                                 saving={updateSubtasksMutation.isPending}
                                 onSave={saveSubtaskDetail}
@@ -1262,8 +1316,9 @@ export function TaskDetailModal({
                           <Input
                             placeholder="Add an item…"
                             value={newCheckItem}
-                            disabled={!canEditWorkflowFields || updateSubtasksMutation.isPending}
-                            onChange={(e) => setNewCheckItem(e.target.value)}
+                            maxLength={SUBTASK_TITLE_MAX_LENGTH}
+                            disabled={!canEditSubtasks || updateSubtasksMutation.isPending}
+                            onChange={(e) => setNewCheckItem(clampSubtaskTitle(e.target.value))}
                             onKeyDown={(e) => {
                               if (e.key === "Enter" && newCheckItem.trim()) {
                                 e.preventDefault();
@@ -1277,7 +1332,7 @@ export function TaskDetailModal({
                           type="button"
                           size="default"
                           className="h-11 shrink-0 rounded-xl px-6 font-semibold shadow-[0_4px_14px_-2px_hsl(var(--primary)/0.45)] transition-[transform,box-shadow] hover:shadow-[0_8px_22px_-4px_hsl(var(--primary)/0.5)] active:scale-[0.98]"
-                          disabled={!canEditWorkflowFields || !newCheckItem.trim() || updateSubtasksMutation.isPending}
+                          disabled={!canEditSubtasks || !newCheckItem.trim() || updateSubtasksMutation.isPending}
                           onClick={() => appendSubtask(newCheckItem)}
                         >
                           Add
@@ -1509,45 +1564,88 @@ export function TaskDetailModal({
                 <aside className="flex min-w-0 flex-col gap-3 lg:sticky lg:top-0 lg:self-start lg:border-l lg:border-[#E5E7EB] lg:pl-8 dark:lg:border-border/40">
                   <div className={tdSidebarSurface}>
                     <span className={tdSidebarHeading}>Assignee</span>
-                    <DropdownMenu open={assigneeDropdownOpen} onOpenChange={(o) => { setAssigneeDropdownOpen(o); if (!o) setAssigneeSearch(""); }}>
+                    <DropdownMenu
+                      modal={false}
+                      open={assigneeDropdownOpen}
+                      onOpenChange={(o) => {
+                        setAssigneeDropdownOpen(o);
+                        if (!o) setAssigneeSearch("");
+                      }}
+                    >
                       <DropdownMenuTrigger asChild>
                         <button
                           type="button"
-                          disabled={!canEditAll}
+                          disabled={!canManageAssignees || assigneeMutation.isPending}
                           className="flex w-full items-center gap-3 rounded-xl bg-white/85 px-4 py-3.5 text-left text-sm font-medium outline-none shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)] transition-[box-shadow,background-color] hover:bg-white hover:shadow-[inset_0_0_0_1px_rgba(15,23,42,0.09),0_4px_14px_-6px_rgba(15,23,42,0.1)] focus-visible:ring-2 focus-visible:ring-primary/25 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white/[0.06] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)] dark:hover:bg-white/[0.1]"
                           aria-label="Change assignee"
                         >
-                          {(() => {
-                            const name = resolvedAssignee?.name ?? (task.assigneeId ? "User" : "Unassigned");
-                            const online = resolvedAssignee?.lastSeenAt ? isOnline(resolvedAssignee.lastSeenAt) : false;
-                            return (
-                              <>
-                                <div className="relative shrink-0">
-                                  <Avatar className="h-10 w-10 ring-2 ring-background shadow-sm">
-                                    <AvatarImage src={resolvedAssignee?.avatarUrl} />
-                                    <AvatarFallback className="text-xs">
-                                      {name.slice(0, 2).toUpperCase()}
+                          {resolvedAssignees.length === 0 ? (
+                            <>
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted ring-2 ring-background">
+                                <User className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                              <span className="min-w-0 flex-1 truncate font-medium text-muted-foreground">Unassigned</span>
+                              <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground/60" />
+                            </>
+                          ) : resolvedAssignees.length === 1 ? (
+                            <>
+                              <div className="relative shrink-0">
+                                <Avatar className="h-10 w-10 ring-2 ring-background shadow-sm">
+                                  <AvatarImage src={resolvedAssignees[0].avatarUrl} />
+                                  <AvatarFallback className="text-xs">
+                                    {resolvedAssignees[0].name.slice(0, 2).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <span
+                                  className={cn(
+                                    "absolute bottom-0 right-0 h-2 w-2 rounded-full border-2 border-background",
+                                    resolvedAssignees[0].lastSeenAt && isOnline(resolvedAssignees[0].lastSeenAt)
+                                      ? "bg-emerald-500"
+                                      : "bg-muted-foreground/50"
+                                  )}
+                                  title={
+                                    resolvedAssignees[0].lastSeenAt && isOnline(resolvedAssignees[0].lastSeenAt)
+                                      ? "Online"
+                                      : "Offline"
+                                  }
+                                  aria-hidden
+                                />
+                              </div>
+                              <span className="min-w-0 flex-1 truncate font-medium">{resolvedAssignees[0].name}</span>
+                              <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground/60" />
+                            </>
+                          ) : (
+                            <>
+                              <div className="flex shrink-0 -space-x-2">
+                                {resolvedAssignees.slice(0, 3).map((assignee) => (
+                                  <Avatar
+                                    key={assignee.id}
+                                    className="h-9 w-9 border-2 border-background ring-1 ring-black/[0.04]"
+                                  >
+                                    <AvatarImage src={assignee.avatarUrl} />
+                                    <AvatarFallback className="text-[10px]">
+                                      {assignee.name.slice(0, 2).toUpperCase()}
                                     </AvatarFallback>
                                   </Avatar>
-                                  <span
-                                    className={cn(
-                                      "absolute bottom-0 right-0 h-2 w-2 rounded-full border-2 border-background",
-                                      online ? "bg-emerald-500" : "bg-muted-foreground/50"
-                                    )}
-                                    title={online ? "Online" : "Offline"}
-                                    aria-hidden
-                                  />
-                                </div>
-                                <span className="min-w-0 flex-1 truncate font-medium">{name}</span>
-                                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground/60" />
-                              </>
-                            );
-                          })()}
+                                ))}
+                              </div>
+                              <span className="min-w-0 flex-1 truncate font-medium">
+                                {resolvedAssignees.length} assigned
+                              </span>
+                              <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground/60" />
+                            </>
+                          )}
                         </button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start" className="w-72 p-0" sideOffset={6} onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+                      <DropdownMenuContent
+                        align="start"
+                        className={cn("w-72 p-0", TASK_MODAL_DROPDOWN_Z)}
+                        sideOffset={6}
+                        onClick={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
                         <div className="p-3">
-                          <DropdownMenuLabel className="px-0 pb-2 text-xs font-semibold">Reassign</DropdownMenuLabel>
+                          <DropdownMenuLabel className="px-0 pb-2 text-xs font-semibold">Assign members</DropdownMenuLabel>
                           <div className="relative">
                             <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/70" />
                             <Input
@@ -1562,21 +1660,31 @@ export function TaskDetailModal({
                         <DropdownMenuSeparator />
                         <div className="max-h-72 overflow-y-auto p-1">
                           <DropdownMenuItem
-                            onSelect={(e) => { e.preventDefault(); assigneeMutation.mutate(null); setAssigneeDropdownOpen(false); }}
+                            onSelect={(e) => {
+                              e.preventDefault();
+                              assigneeMutation.mutate([]);
+                            }}
                             className="rounded-md text-xs"
                           >
                             <UserRoundX className="mr-2 h-3.5 w-3.5" />
-                            Unassigned
+                            Clear assignment
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           {assigneeFilteredMembers.map((m) => {
-                            const checked = m.userId === task.assigneeId;
+                            const checked = taskAssigneeIds.some(
+                              (id) =>
+                                normalizeAssigneeUserId(id) === normalizeAssigneeUserId(m.userId)
+                            );
                             const online = m.user?.lastSeenAt ? isOnline(m.user.lastSeenAt) : false;
                             const displayName = m.user?.fullName ?? m.user?.email ?? "User";
                             return (
                               <DropdownMenuItem
                                 key={m.id}
-                                onSelect={(e) => { e.preventDefault(); assigneeMutation.mutate(m.userId); setAssigneeDropdownOpen(false); }}
+                                disabled={assigneeMutation.isPending}
+                                onSelect={(e) => {
+                                  e.preventDefault();
+                                  toggleTaskAssignee(m.userId);
+                                }}
                                 className="rounded-md py-2"
                               >
                                 <div className="flex w-full items-center gap-2.5">

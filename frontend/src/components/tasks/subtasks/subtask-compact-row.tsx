@@ -37,6 +37,7 @@ interface SubtaskCompactRowProps {
   organizationId?: string;
   prefetchedOrgMembers?: OrgMember[];
   knownMembers?: MemberHint[];
+  taskAssigneesOnly?: boolean;
   expanded?: boolean;
   /** Disables checkbox and delete — row expand stays enabled. */
   editDisabled?: boolean;
@@ -57,6 +58,7 @@ export function SubtaskCompactRow({
   organizationId,
   prefetchedOrgMembers,
   knownMembers,
+  taskAssigneesOnly,
   expanded,
   editDisabled,
   onToggleComplete,
@@ -124,6 +126,7 @@ export function SubtaskCompactRow({
             organizationId={organizationId}
             prefetchedOrgMembers={prefetchedOrgMembers}
             knownMembers={knownMembers}
+            taskAssigneesOnly={taskAssigneesOnly}
             value={assigneeId}
             onChange={onAssigneeChange}
             disabled={editDisabled}
@@ -134,6 +137,7 @@ export function SubtaskCompactRow({
             organizationId={organizationId}
             prefetchedOrgMembers={prefetchedOrgMembers}
             knownMembers={knownMembers}
+            taskAssigneesOnly={taskAssigneesOnly}
             value={assigneeId}
             onChange={() => {}}
             disabled

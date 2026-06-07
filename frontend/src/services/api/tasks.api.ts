@@ -3,6 +3,7 @@ import { normalizeTaskId } from "@/lib/task-id";
 import type { Task } from "@/types/api";
 import type { PaginatedResult } from "@/types/api";
 import type { TaskSubtask } from "@/types/api";
+import { clampSubtaskTitle } from "@/lib/subtask-limits";
 
 /** Fields accepted by backend CreateTaskDto. */
 export interface CreateTaskPayload {
@@ -34,7 +35,7 @@ export function serializeSubtasksForApi(subtasks: TaskSubtask[]): TaskSubtask[] 
   return subtasks.map((s) => {
     const item: TaskSubtask = {
       id: s.id,
-      title: s.title,
+      title: clampSubtaskTitle(String(s.title ?? "").trim()),
       completed: Boolean(s.completed),
     };
     if (s.description?.trim()) item.description = s.description.trim();
@@ -108,6 +109,7 @@ export interface UpdateTaskPayload {
   sprintId?: string | null;
   priority?: string;
   assigneeId?: string | null;
+  assigneeIds?: string[];
   dueDate?: string | null;
   storyPoints?: number | null;
   tags?: Array<{ name: string; color: string }>;
@@ -124,6 +126,7 @@ export async function updateTask(
   if (payload.statusId !== undefined) body.statusId = payload.statusId;
   if (payload.sprintId !== undefined) body.sprintId = payload.sprintId;
   if (payload.assigneeId !== undefined) body.assigneeId = payload.assigneeId;
+  if (payload.assigneeIds !== undefined) body.assigneeIds = payload.assigneeIds;
   if (payload.dueDate !== undefined) body.dueDate = payload.dueDate;
   if (payload.priority !== undefined) body.priority = payload.priority;
   if (payload.storyPoints !== undefined) body.storyPoints = payload.storyPoints;
@@ -161,6 +164,14 @@ export async function updateTaskAssignee(
   assigneeId: string | null
 ): Promise<Task> {
   const { data } = await apiClient.patch<Task>(`/tasks/${taskId}/assignee`, { assigneeId });
+  return data;
+}
+
+export async function updateTaskAssignees(
+  taskId: string,
+  assigneeIds: string[]
+): Promise<Task> {
+  const { data } = await apiClient.patch<Task>(`/tasks/${taskId}/assignee`, { assigneeIds });
   return data;
 }
 
