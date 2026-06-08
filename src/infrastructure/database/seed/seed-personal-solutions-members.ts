@@ -16,6 +16,7 @@ dotenv.config({ path: path.join(process.cwd(), 'properties.env') });
 import { DataSource, Repository } from 'typeorm';
 import { configuration } from '../../../config/configuration';
 import { generateUuid } from '../../../common/utils/uuid.util';
+import { hashPassword } from '../../../modules/users/password-storage.util';
 import { UserEntity } from '../../../modules/users/entities/user.entity';
 import { OrganizationEntity } from '../../../modules/organizations/entities/organization.entity';
 import { OrganizationMemberEntity } from '../../../modules/organizations/entities/organization-member.entity';
@@ -77,6 +78,8 @@ async function run() {
   await dataSource.initialize();
   console.log('Database connected. Seeding Personal Solutions members...');
 
+  const passwordHash = await hashPassword(PASSWORD);
+
   await dataSource.transaction(async (manager) => {
     const userRepo = manager.getRepository(UserEntity);
     const orgRepo = manager.getRepository(OrganizationEntity);
@@ -108,7 +111,7 @@ async function run() {
             id: userId,
             email,
             fullName: row.fullName,
-            passwordHash: PASSWORD,
+            passwordHash,
             avatarUrl,
             isEmailVerified: true,
             isActive: true,
@@ -120,7 +123,7 @@ async function run() {
         await userRepo.update(userId, {
           fullName: row.fullName,
           avatarUrl,
-          passwordHash: PASSWORD,
+          passwordHash,
           isEmailVerified: true,
           isActive: true,
         });

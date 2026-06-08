@@ -1,4 +1,5 @@
 import dataSource from '../../infrastructure/database/data-source';
+import { hashPassword } from '../users/password-storage.util';
 
 const SUPER_ADMIN_EMAIL = (process.env.SUPER_ADMIN_EMAIL || 'superadmin@example.com')
   .toLowerCase()
@@ -8,6 +9,8 @@ const SUPER_ADMIN_PASSWORD = process.env.SEED_USER_PASSWORD || 'Password123!';
 async function main() {
   await dataSource.initialize();
   try {
+    const passwordHash = await hashPassword(SUPER_ADMIN_PASSWORD);
+
     await dataSource.query(`
       CREATE TABLE IF NOT EXISTS super_admins (
         id INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -31,7 +34,6 @@ async function main() {
       )
     `);
 
-    // Create dedicated super-admin login if missing.
     await dataSource.query(
       `
         INSERT INTO users (
@@ -56,20 +58,20 @@ async function main() {
           SELECT 1 FROM users WHERE email = ?
         )
       `,
-      [SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASSWORD, SUPER_ADMIN_EMAIL],
+      [SUPER_ADMIN_EMAIL, passwordHash, SUPER_ADMIN_EMAIL],
     );
 
-    // Ensure the dedicated account has platform-admin access enabled.
     await dataSource.query(
       `
         UPDATE users
         SET
           is_platform_admin = 1,
           is_active = 1,
-          is_email_verified = 1
+          is_email_verified = 1,
+          password_hash = ?
         WHERE email = ?
       `,
-      [SUPER_ADMIN_EMAIL],
+      [passwordHash, SUPER_ADMIN_EMAIL],
     );
 
     await dataSource.query(`
@@ -101,4 +103,3 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
-

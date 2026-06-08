@@ -79,7 +79,7 @@ export class UsersService {
     return this.usersRepository.create({
       email: data.email.toLowerCase(),
       fullName: data.fullName,
-      passwordHash: toStoredPassword(data.password),
+      passwordHash: await toStoredPassword(data.password),
       currentPlan: 'free',
       planStartedAt: now,
       planExpiresAt: null,
@@ -127,9 +127,11 @@ export class UsersService {
     await this.usersRepository.update(userId, { fullName });
   }
 
-  /** Stores password as plain text in `password_hash`. */
+  /** Stores bcrypt hash in `password_hash`. */
   async updatePassword(userId: string, plainPassword: string): Promise<void> {
-    await this.usersRepository.update(userId, { passwordHash: toStoredPassword(plainPassword) });
+    await this.usersRepository.update(userId, {
+      passwordHash: await toStoredPassword(plainPassword),
+    });
   }
 
   async linkGoogleId(userId: string, googleId: string): Promise<void> {

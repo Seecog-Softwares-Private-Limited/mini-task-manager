@@ -12,6 +12,7 @@ dotenv.config({ path: path.join(process.cwd(), 'properties.env') });
 import { DataSource } from 'typeorm';
 import { configuration } from '../../../config/configuration';
 import { generateUuid } from '../../../common/utils/uuid.util';
+import { hashPassword } from '../../../modules/users/password-storage.util';
 import { UserEntity } from '../../../modules/users/entities/user.entity';
 import { OrganizationMemberEntity } from '../../../modules/organizations/entities/organization-member.entity';
 import { ProjectMemberEntity } from '../../../modules/projects/entities/project-member.entity';
@@ -44,6 +45,8 @@ async function addAdmin() {
   await dataSource.initialize();
   console.log('Database connected. Adding admin...');
 
+  const passwordHash = await hashPassword(PASSWORD);
+
   await dataSource.transaction(async (manager) => {
     const userRepo = manager.getRepository(UserEntity);
     const orgRepo = manager.getRepository(OrganizationEntity);
@@ -60,7 +63,7 @@ async function addAdmin() {
           id: adminId,
           email: ADMIN_EMAIL,
           fullName: 'Seed Admin',
-          passwordHash: PASSWORD,
+          passwordHash,
         }),
       );
       console.log('  Created user: superadmin@example.com');

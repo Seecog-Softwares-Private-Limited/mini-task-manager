@@ -198,7 +198,7 @@ export class AuthService {
         id: userId,
         email,
         fullName,
-        passwordHash: toStoredPassword(dto.password),
+        passwordHash: await toStoredPassword(dto.password),
         isEmailVerified: skipVerification,
       } as Partial<UserEntity>);
       await queryRunner.commitTransaction();
@@ -491,7 +491,7 @@ export class AuthService {
         id: userId,
         email,
         fullName: dto.fullName,
-        passwordHash: toStoredPassword(dto.password),
+        passwordHash: await toStoredPassword(dto.password),
         isEmailVerified: true,
       } as Partial<UserEntity>);
 
