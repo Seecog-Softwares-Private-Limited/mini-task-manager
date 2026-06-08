@@ -1,9 +1,6 @@
 /**
  * Adds an invited user so they can login and accept their invitation.
- * Usage: npx ts-node -r tsconfig-paths/register src/infrastructure/database/seed/add-invited-user.ts
- * Loads env from properties.env at repo root. Configure SEED_INVITED_EMAIL / SEED_USER_PASSWORD there.
  */
-
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 dotenv.config({ path: path.join(process.cwd(), 'properties.env') });
@@ -12,6 +9,7 @@ import { DataSource } from 'typeorm';
 import { configuration } from '../../../config/configuration';
 import { generateUuid } from '../../../common/utils/uuid.util';
 import { UserEntity } from '../../../modules/users/entities/user.entity';
+import { hashPassword } from '../../../modules/users/password-storage.util';
 
 const EMAIL = process.env.SEED_INVITED_EMAIL || 'invitee@example.com';
 const PASSWORD = process.env.SEED_USER_PASSWORD || 'Password123!';
@@ -42,20 +40,19 @@ async function addUser() {
     return;
   }
 
+  const passwordHash = await hashPassword(PASSWORD);
+
   await userRepo.save(
     userRepo.create({
       id: generateUuid(),
       email: EMAIL.toLowerCase(),
       fullName: EMAIL.split('@')[0],
-      passwordHash: PASSWORD,
+      passwordHash,
     }),
   );
 
   await dataSource.destroy();
-  console.log(`\nUser created. Login with:`);
-  console.log(`  Email:    ${EMAIL}`);
-  console.log(`  Password: ${PASSWORD}`);
-  console.log(`\nThen open your invitation link and click "Accept Invitation".`);
+  console.log(`\nUser created. Login with email ${EMAIL} and SEED_USER_PASSWORD (or Password123! if unset).`);
 }
 
 addUser().catch((err) => {

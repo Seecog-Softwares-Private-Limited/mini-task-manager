@@ -1,7 +1,7 @@
 /**
  * Fixes seed users so they can log in:
- * - Sets is_email_verified = true (required by auth; login is blocked if false)
- * - Resets password (plain text in password_hash) to SEED_USER_PASSWORD or Password123!
+ * - Sets is_email_verified = true
+ * - Resets password_hash to bcrypt hash of SEED_USER_PASSWORD or Password123!
  *
  * Run: npm run seed:fix-login (from repo root)
  */
@@ -12,6 +12,7 @@ dotenv.config({ path: path.join(process.cwd(), 'properties.env') });
 import { DataSource } from 'typeorm';
 import { configuration } from '../../../config/configuration';
 import { UserEntity } from '../../../modules/users/entities/user.entity';
+import { hashPassword } from '../../../modules/users/password-storage.util';
 
 const SEED_EMAILS = ['owner@example.com', 'member@example.com', 'admin@example.com'] as const;
 const PASSWORD = process.env.SEED_USER_PASSWORD || 'Password123!';
@@ -31,6 +32,7 @@ async function main() {
 
   await dataSource.initialize();
   const repo = dataSource.getRepository(UserEntity);
+  const passwordHash = await hashPassword(PASSWORD);
 
   for (const email of SEED_EMAILS) {
     const user = await repo.findOne({ where: { email } });
@@ -38,16 +40,12 @@ async function main() {
       console.log(`  Skip (not found): ${email}`);
       continue;
     }
-    await repo.update(user.id, {
-      passwordHash: PASSWORD,
-      isEmailVerified: true,
-    });
-    console.log(`  Updated: ${email} (verified + password from SEED_USER_PASSWORD or default)`);
+    await repo.update(user.id, { passwordHash, isEmailVerified: true });
+    console.log(`  Updated: ${email} (verified + password reset)`);
   }
 
   await dataSource.destroy();
-  console.log('\nDone. Login with any of:', SEED_EMAILS.join(', '));
-  console.log(`Password: ${PASSWORD === 'Password123!' ? 'Password123! (default)' : '(value of SEED_USER_PASSWORD in properties.env)'}\n`);
+  console.log('\nDone. Use SEED_USER_PASSWORD from properties.env, or Password123! if unset.\n');
 }
 
 main().catch((e) => {

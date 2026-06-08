@@ -17,6 +17,7 @@ dotenv.config({ path: path.join(process.cwd(), 'properties.env') });
 import { DataSource } from 'typeorm';
 import { configuration } from '../../../config/configuration';
 import { generateUuid } from '../../../common/utils/uuid.util';
+import { hashPassword } from '../../../modules/users/password-storage.util';
 import { UserEntity } from '../../../modules/users/entities/user.entity';
 import { OrganizationEntity } from '../../../modules/organizations/entities/organization.entity';
 import { OrganizationMemberEntity } from '../../../modules/organizations/entities/organization-member.entity';
@@ -67,6 +68,8 @@ async function runSeed() {
   await dataSource.initialize();
   console.log('Database connected. Running seed...');
 
+  const passwordHash = await hashPassword(PASSWORD);
+
   await dataSource.transaction(async (manager) => {
     const userRepo = manager.getRepository(UserEntity);
     const orgRepo = manager.getRepository(OrganizationEntity);
@@ -94,12 +97,12 @@ async function runSeed() {
           id: ownerId,
           email: OWNER_EMAIL,
           fullName: 'Seed Owner',
-          passwordHash: PASSWORD,
+          passwordHash,
           isEmailVerified: true,
         }),
       );
     } else {
-      await userRepo.update(owner.id, { passwordHash: PASSWORD, isEmailVerified: true });
+      await userRepo.update(owner.id, { passwordHash, isEmailVerified: true });
     }
     if (!member) {
       const memberId = generateUuid();
@@ -108,12 +111,12 @@ async function runSeed() {
           id: memberId,
           email: MEMBER_EMAIL,
           fullName: 'Seed Member',
-          passwordHash: PASSWORD,
+          passwordHash,
           isEmailVerified: true,
         }),
       );
     } else {
-      await userRepo.update(member.id, { passwordHash: PASSWORD, isEmailVerified: true });
+      await userRepo.update(member.id, { passwordHash, isEmailVerified: true });
     }
     if (!admin) {
       const adminId = generateUuid();
@@ -122,12 +125,12 @@ async function runSeed() {
           id: adminId,
           email: ADMIN_EMAIL,
           fullName: 'Seed Admin',
-          passwordHash: PASSWORD,
+          passwordHash,
           isEmailVerified: true,
         }),
       );
     } else {
-      await userRepo.update(admin.id, { passwordHash: PASSWORD, isEmailVerified: true });
+      await userRepo.update(admin.id, { passwordHash, isEmailVerified: true });
     }
 
     const ownerId = owner.id;
