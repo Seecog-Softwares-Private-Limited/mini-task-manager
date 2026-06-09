@@ -31,10 +31,13 @@ const jwtOkForProduction = jwtSecret && jwtSecret !== defaultJwt;
 /** Base env from properties.env (DB, SMTP, ports, etc.) */
 const baseEnv = { ...process.env };
 
+/** Respect APP_MODE from properties.env when already set to production. */
+const appModeFromFile = baseEnv.APP_MODE === 'production' ? 'production' : 'development';
+
 const localEnv = {
   ...baseEnv,
   NODE_ENV: 'development',
-  APP_MODE: 'development',
+  APP_MODE: appModeFromFile,
   PORT: apiPort,
   MINI_TM_BACKEND_URL: backendUrl,
 };
