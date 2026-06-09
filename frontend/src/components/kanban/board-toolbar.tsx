@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -95,7 +95,7 @@ export function BoardToolbar({
   onToggleSelectionMode,
   canBulkSelect,
 }: BoardToolbarProps) {
-  const [searchOpen, setSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [saveViewName, setSaveViewName] = useState("");
   const [showSaveInput, setShowSaveInput] = useState(false);
 
@@ -148,51 +148,35 @@ export function BoardToolbar({
   const assigneeEntries = Object.entries(assigneeMap ?? {});
 
   return (
-    <div className="space-y-2">
+    <div className="min-w-0 space-y-2">
       {/* Main toolbar row */}
-      <div className="flex flex-wrap items-center gap-2">
-        {/* Search */}
-        <div className={cn(
-          "relative transition-all duration-300",
-          searchOpen || filters.search ? "w-64" : "w-auto"
-        )}>
-          {searchOpen || filters.search ? (
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/50" />
-              <Input
-                autoFocus
-                placeholder="Search tasks..."
-                value={filters.search}
-                onChange={(e) => updateFilter("search", e.target.value)}
-                className="h-9 pl-9 pr-8 text-sm"
-                onBlur={() => {
-                  if (!filters.search) setSearchOpen(false);
-                }}
-                data-cy="board-search"
-              />
-              {filters.search && (
-                <button
-                  onClick={() => {
-                    updateFilter("search", "");
-                    setSearchOpen(false);
-                  }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 gap-2 text-muted-foreground"
-              onClick={() => setSearchOpen(true)}
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        {/* Search — always visible so tap/focus does not collapse the field */}
+        <div className="relative w-full min-w-[12rem] shrink-0 sm:w-56 md:w-64">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/50" />
+          <Input
+            ref={searchInputRef}
+            placeholder="Search tasks..."
+            value={filters.search}
+            onChange={(e) => updateFilter("search", e.target.value)}
+            className="h-9 pl-9 pr-8 text-sm"
+            data-cy="board-search"
+            aria-label="Search tasks"
+          />
+          {filters.search ? (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                updateFilter("search", "");
+                searchInputRef.current?.focus({ preventScroll: true });
+              }}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 transition-colors hover:text-foreground"
             >
-              <Search className="h-3.5 w-3.5" />
-              Search
-            </Button>
-          )}
+              <X className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
         </div>
 
         {/* Priority filter */}
@@ -523,8 +507,8 @@ export function BoardToolbar({
               <Search className="h-2.5 w-2.5" />
               &quot;{filters.search}&quot;
               <button
-                onClick={() => { updateFilter("search", ""); setSearchOpen(false); }}
-                className="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5 transition-colors"
+                onClick={() => updateFilter("search", "")}
+                className="ml-0.5 rounded-full p-0.5 transition-colors hover:bg-muted-foreground/20"
               >
                 <X className="h-2.5 w-2.5" />
               </button>
