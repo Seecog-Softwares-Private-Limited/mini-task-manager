@@ -22,29 +22,6 @@ export function getAppMode(): AppMode {
   return 'development';
 }
 
-/**
- * Public browser URL for the Next.js app (invite, verify-email, reset-password links).
- * Prefer FRONTEND_URL_PRODUCTION when APP_MODE=production (do not rely on localhost in prod).
- */
-export function resolveFrontendPublicUrl(): string {
-  const mode = getAppMode();
-  const frontendPort = process.env.FRONTEND_PORT || '3001';
-  const local =
-    process.env.FRONTEND_URL_LOCAL?.trim() || `http://localhost:${frontendPort}`;
-  const production = process.env.FRONTEND_URL_PRODUCTION?.trim();
-
-  if (mode === 'production') {
-    if (production) return stripTrailingSlash(production);
-    const explicit = process.env.FRONTEND_URL?.trim();
-    if (explicit && !isLocalhostUrl(explicit)) return stripTrailingSlash(explicit);
-    return stripTrailingSlash(local);
-  }
-
-  const explicit = process.env.FRONTEND_URL?.trim();
-  if (explicit) return stripTrailingSlash(explicit);
-  return stripTrailingSlash(local);
-}
-
 /** Optional public API base (no trailing slash), e.g. http://3.110.214.243:3007 */
 export function resolvePublicApiBaseUrl(): string | undefined {
   const raw =
@@ -55,6 +32,63 @@ export function resolvePublicApiBaseUrl(): string | undefined {
   return stripTrailingSlash(raw);
 }
 
+/**
+ * When FRONTEND_URL_PRODUCTION is unset but PUBLIC_API_URL points at a public host,
+ * derive the browser app URL (same host, public frontend port — default 3000).
+ */
+export function deriveFrontendUrlFromPublicApi(): string | undefined {
+  const apiBase = resolvePublicApiBaseUrl();
+  if (!apiBase || isLocalhostUrl(apiBase)) return undefined;
+
+  try {
+    const api = new URL(apiBase);
+    const productionUrl = process.env.FRONTEND_URL_PRODUCTION?.trim();
+    if (productionUrl) {
+      try {
+        const prod = new URL(productionUrl);
+        return `${api.protocol}//${api.hostname}:${prod.port || (prod.protocol === 'https:' ? '443' : '80')}`;
+      } catch {
+        /* fall through */
+      }
+    }
+
+    const publicFrontendPort =
+      process.env.FRONTEND_PUBLIC_PORT?.trim() ||
+      process.env.FRONTEND_URL_PRODUCTION?.match(/:(\d+)/)?.[1] ||
+      '3000';
+
+    return `${api.protocol}//${api.hostname}:${publicFrontendPort}`;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Public browser URL for the Next.js app (invite, verify-email, reset-password links).
+ * Prefers FRONTEND_URL_PRODUCTION; falls back to PUBLIC_API_URL host when localhost would be used.
+ */
+export function resolveFrontendPublicUrl(): string {
+  const mode = getAppMode();
+  const frontendPort = process.env.FRONTEND_PORT || '3001';
+  const local =
+    process.env.FRONTEND_URL_LOCAL?.trim() || `http://localhost:${frontendPort}`;
+  const production = process.env.FRONTEND_URL_PRODUCTION?.trim();
+  const explicit = process.env.FRONTEND_URL?.trim();
+  const fromApi = deriveFrontendUrlFromPublicApi();
+
+  if (mode === 'production') {
+    if (production) return stripTrailingSlash(production);
+    if (explicit && !isLocalhostUrl(explicit)) return stripTrailingSlash(explicit);
+    if (fromApi) return stripTrailingSlash(fromApi);
+    return stripTrailingSlash(local);
+  }
+
+  if (explicit && !isLocalhostUrl(explicit)) return stripTrailingSlash(explicit);
+  if (production && !isLocalhostUrl(production)) return stripTrailingSlash(production);
+  if (fromApi) return stripTrailingSlash(fromApi);
+  return stripTrailingSlash(local);
+}
+
 export function buildInviteAcceptUrls(token: string): {
   /** Link in the email button — same as directAppUrl (app /invite page). */
   acceptUrl: string;
@@ -62,8 +96,6 @@ export function buildInviteAcceptUrls(token: string): {
   directAppUrl: string;
 } {
   const directAppUrl = `${resolveFrontendPublicUrl()}/invite/${encodeURIComponent(token)}`;
-  // Always use the frontend /invite URL. API redirect via /api/v1/invitations/join
-  // breaks behind Next proxy (server-side fetch cannot follow redirects to the public IP).
   return { acceptUrl: directAppUrl, directAppUrl };
 }
 
