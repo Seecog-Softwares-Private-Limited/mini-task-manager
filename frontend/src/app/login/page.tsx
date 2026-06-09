@@ -12,7 +12,7 @@ import { config } from "@/config/env";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Lock, Mail, ArrowRight, Eye, EyeOff, Smartphone } from "lucide-react";
+import { Lock, Mail, ArrowRight, Eye, EyeOff } from "lucide-react";
 import {
   AuthDivider,
   PremiumAuthCard,
@@ -22,6 +22,8 @@ import {
   authPrimaryButtonClass,
   authSecondaryButtonClass,
 } from "@/components/auth/premium-auth-shell";
+import { PhoneInput } from "@/components/auth/phone-input";
+import { DEFAULT_COUNTRY_ISO, formatFullPhone } from "@/lib/country-codes";
 
 const schema = z.object({
   email: z.string().email("Invalid email"),
@@ -40,7 +42,9 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [mode, setMode] = useState<"email" | "otp">("email");
-  const [otpPhone, setOtpPhone] = useState("");
+  const [otpCountryIso, setOtpCountryIso] = useState(DEFAULT_COUNTRY_ISO);
+  const [otpPhoneNumber, setOtpPhoneNumber] = useState("");
+  const otpPhone = formatFullPhone(otpCountryIso, otpPhoneNumber);
   const [otpCode, setOtpCode] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otpSubmitting, setOtpSubmitting] = useState(false);
@@ -261,17 +265,13 @@ function LoginForm() {
                 <Label htmlFor="otp-phone" className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                   Phone number
                 </Label>
-                <div className="relative">
-                  <Smartphone className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <Input
-                    id="otp-phone"
-                    type="tel"
-                    placeholder="+1234567890"
-                    value={otpPhone}
-                    onChange={(e) => setOtpPhone(e.target.value)}
-                    className={`pl-10 ${authInputClass}`}
-                  />
-                </div>
+                <PhoneInput
+                  id="otp-phone"
+                  countryIso={otpCountryIso}
+                  phoneNumber={otpPhoneNumber}
+                  onCountryChange={setOtpCountryIso}
+                  onPhoneNumberChange={setOtpPhoneNumber}
+                />
               </div>
               {(error || urlError) && (
                 <div className="rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3">
@@ -282,7 +282,7 @@ function LoginForm() {
                 type="button"
                 variant="secondary"
                 className={authPrimaryButtonClass}
-                disabled={otpSubmitting || otpPhone.length < 10}
+                disabled={otpSubmitting || otpPhoneNumber.replace(/\D/g, "").length < 7}
                 onClick={async () => {
                   setError(null);
                   setOtpSubmitting(true);
@@ -361,7 +361,8 @@ function LoginForm() {
             onClick={() => {
               setMode("email");
               setOtpSent(false);
-              setOtpPhone("");
+              setOtpCountryIso(DEFAULT_COUNTRY_ISO);
+              setOtpPhoneNumber("");
               setOtpCode("");
               setError(null);
             }}
