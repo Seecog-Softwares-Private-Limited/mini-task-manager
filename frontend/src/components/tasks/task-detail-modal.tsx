@@ -158,7 +158,7 @@ const tdEyebrow =
 const tdMainSectionHeading =
   "text-[0.9375rem] font-semibold tracking-[-0.01em] text-foreground/95";
 const tdMainSurface = cn("td-main-card rounded-2xl p-6 sm:p-8");
-const tdWorkUnified = cn("td-main-card overflow-hidden rounded-2xl");
+const tdWorkUnified = cn("td-main-card shrink-0 rounded-2xl");
 const tdWorkSection = "px-6 py-6 sm:px-8 sm:py-7";
 const tdWorkSectionDivider = "h-px bg-[#E5E7EB] dark:bg-border";
 const tdSidebarSurface = cn(
@@ -1175,7 +1175,7 @@ export function TaskDetailModal({
             <div className="td-modal-body-scroll min-h-0 flex-1 overflow-y-auto lg:flex lg:flex-row lg:overflow-hidden">
               {/* Left: unified work + comments + activity */}
               <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-6 overscroll-y-contain p-5 pb-10 lg:overflow-y-auto lg:p-8 lg:pb-10">
-                  <div className={tdWorkUnified}>
+                  <div className={cn(tdWorkUnified, "min-w-0")}>
                     <div className={tdWorkSection}>
                       <h3 className={cn(tdMainSectionHeading, "mb-4 flex items-center gap-2")}>
                         <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary ring-1 ring-primary/15">
@@ -1450,7 +1450,7 @@ export function TaskDetailModal({
                     </div>
                   </div>
 
-                  <div className={tdMainSurface}>
+                  <div className={cn(tdMainSurface, "shrink-0 min-w-0")}>
                     <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                       <div className="flex items-center gap-2.5">
                         <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-sky-500/10 text-sky-600 ring-1 ring-sky-500/15 dark:text-sky-400">
@@ -1559,7 +1559,7 @@ export function TaskDetailModal({
                     )}
                   </div>
 
-                  <div className={tdMainSurface}>
+                  <div className={cn(tdMainSurface, "shrink-0 min-w-0")}>
                     <div className="mb-4 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2.5">
                         <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 ring-1 ring-amber-500/15 dark:text-amber-400">
