@@ -15,6 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DropdownScrollList } from "@/components/ui/dropdown-scroll-list";
 import { Check, Loader2, Search, UserRound, UserRoundPlus, UserRoundX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { OrgMember } from "@/types/api";
@@ -178,7 +179,7 @@ export function SubtaskAssigneeSelector({
           </div>
         </div>
         <DropdownMenuSeparator />
-        <div className="max-h-72 overflow-y-auto p-1">
+        <DropdownScrollList>
           <DropdownMenuItem
             onSelect={(event) => {
               event.preventDefault();
@@ -243,7 +244,7 @@ export function SubtaskAssigneeSelector({
                 : "No matching members"}
             </div>
           )}
-        </div>
+        </DropdownScrollList>
       </DropdownMenuContent>
     </DropdownMenu>
   );

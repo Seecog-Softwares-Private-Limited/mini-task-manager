@@ -14,6 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DropdownScrollList } from "@/components/ui/dropdown-scroll-list";
 import { Check, Search, UserRoundX } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -165,7 +166,7 @@ export function TaskAssigneePopover({
           </div>
         </div>
         <DropdownMenuSeparator />
-        <div className="max-h-72 overflow-y-auto p-1">
+        <DropdownScrollList>
           <DropdownMenuItem
             onClick={() => {
               assignMutation.mutate([]);
@@ -214,7 +215,7 @@ export function TaskAssigneePopover({
           {filtered.length === 0 && (
             <div className="px-2 py-3 text-center text-xs text-muted-foreground">No matching members</div>
           )}
-        </div>
+        </DropdownScrollList>
       </DropdownMenuContent>
     </DropdownMenu>
   );

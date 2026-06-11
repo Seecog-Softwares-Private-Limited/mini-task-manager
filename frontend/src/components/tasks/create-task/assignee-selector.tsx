@@ -15,6 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DropdownScrollList } from "@/components/ui/dropdown-scroll-list";
 import { Check, Loader2, Search, UserRoundX, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -157,7 +158,7 @@ export function AssigneeSelector({
           </div>
         </div>
         <DropdownMenuSeparator />
-        <div className="max-h-72 overflow-y-auto p-1">
+        <DropdownScrollList>
           <DropdownMenuItem
             onSelect={(event) => {
               event.preventDefault();
@@ -222,7 +223,7 @@ export function AssigneeSelector({
               )}
             </>
           )}
-        </div>
+        </DropdownScrollList>
       </DropdownMenuContent>
     </DropdownMenu>
   );
