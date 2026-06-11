@@ -419,6 +419,22 @@ export function TaskDetailModal({
     [taskForAssigneeDisplay, assignableMembers]
   );
 
+  const resolvedReporter = React.useMemo(() => {
+    if (!task?.reporterId) return null;
+    const member = assignableMembers.find(
+      (m) => normalizeAssigneeUserId(m.userId) === normalizeAssigneeUserId(task.reporterId)
+    );
+    if (member?.user) {
+      return {
+        id: member.userId,
+        name: member.user.fullName ?? member.user.email ?? "User",
+        avatarUrl: member.user.avatarUrl,
+        lastSeenAt: member.user.lastSeenAt,
+      };
+    }
+    return { id: task.reporterId, name: "User", lastSeenAt: undefined };
+  }, [task?.reporterId, assignableMembers]);
+
   const taskAssigneeIds = React.useMemo(
     () => (taskForAssigneeDisplay ? getTaskAssigneeIdList(taskForAssigneeDisplay) : []),
     [taskForAssigneeDisplay]
@@ -1636,7 +1652,45 @@ export function TaskDetailModal({
                 {/* Right column: metadata modules */}
                 <aside className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-0 lg:self-start lg:border-l lg:border-[#E5E7EB] lg:pl-8 dark:lg:border-border/40">
                   <div className={tdSidebarSurface}>
-                    <span className={tdSidebarHeading}>Assignee</span>
+                    <span className={tdSidebarHeading}>Assigned by</span>
+                    <div
+                      className="flex w-full items-center gap-3 rounded-xl bg-white/85 px-4 py-3.5 text-left text-sm font-medium shadow-[inset_0_0_0_1px_rgba(15,23,42,0.06)] dark:bg-white/[0.06] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
+                      aria-label="Assigned by"
+                    >
+                      {resolvedReporter ? (
+                        <>
+                          <div className="relative shrink-0">
+                            <Avatar className="h-10 w-10 ring-2 ring-background shadow-sm">
+                              <AvatarImage src={resolvedReporter.avatarUrl} />
+                              <AvatarFallback className="text-xs">
+                                {resolvedReporter.name.slice(0, 2).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            {resolvedReporter.lastSeenAt ? (
+                              <span
+                                className={cn(
+                                  "absolute bottom-0 right-0 h-2 w-2 rounded-full border-2 border-background",
+                                  isOnline(resolvedReporter.lastSeenAt)
+                                    ? "bg-emerald-500"
+                                    : "bg-muted-foreground/50"
+                                )}
+                                aria-hidden
+                              />
+                            ) : null}
+                          </div>
+                          <span className="min-w-0 flex-1 truncate font-medium">{resolvedReporter.name}</span>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted ring-2 ring-background">
+                            <User className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                          <span className="min-w-0 flex-1 truncate font-medium text-muted-foreground">Unknown</span>
+                        </>
+                      )}
+                    </div>
+
+                    <span className={cn(tdSidebarHeading, "mt-5")}>Assigned to</span>
                     <DropdownMenu
                       modal={false}
                       open={assigneeDropdownOpen}
