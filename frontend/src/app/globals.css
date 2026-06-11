@@ -142,14 +142,13 @@
   }
   .td-modal-shell {
     background-color: #f8fafc;
-    border-radius: 18px;
-    box-shadow: 0 24px 80px rgba(15, 23, 42, 0.22);
+    box-shadow: -12px 0 48px rgba(15, 23, 42, 0.14);
   }
   .dark .td-modal-shell {
     background-color: hsl(var(--background));
     box-shadow:
-      0 0 0 1px rgba(255, 255, 255, 0.07),
-      0 24px 80px rgba(0, 0, 0, 0.55);
+      -12px 0 48px rgba(0, 0, 0, 0.45),
+      0 0 0 1px rgba(255, 255, 255, 0.07);
   }
   .td-modal-header-shade {
     background-color: #ffffff;
