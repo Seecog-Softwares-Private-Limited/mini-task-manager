@@ -8,6 +8,11 @@ import {
   DialogContent,
   DialogHeader,
 } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -284,6 +289,7 @@ export function TaskDetailModal({
   const [expandedSubtaskId, setExpandedSubtaskId] = React.useState<string | null>(null);
   const [isEditingTitle, setIsEditingTitle] = React.useState(false);
   const [editingTitle, setEditingTitle] = React.useState("");
+  const closeRef = React.useRef<HTMLButtonElement>(null);
   const titleInputRef = React.useRef<HTMLInputElement | null>(null);
   const [isEditingDescription, setIsEditingDescription] = React.useState(false);
   const [editingDescription, setEditingDescription] = React.useState("");
@@ -1009,11 +1015,10 @@ export function TaskDetailModal({
 
   return (
     <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        overlayClassName="td-modal-overlay"
-        showClose={!updateMutation.isPending}
-        closeButtonClassName="h-10 w-10 rounded-xl bg-white/90 text-muted-foreground shadow-sm ring-1 ring-[#E5E7EB] backdrop-blur-sm transition-all hover:bg-white hover:text-foreground hover:shadow-md dark:bg-card/90 dark:ring-border"
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="right"
+        showClose={false}
         onEscapeKeyDown={() => onOpenChange(false)}
         onFocusOutside={(event) => {
           if (isTinyMceUiTarget(event.target)) {
@@ -1025,15 +1030,18 @@ export function TaskDetailModal({
             event.preventDefault();
           }
         }}
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          closeRef.current?.focus();
+        }}
         className={cn(
-          "td-modal-shell max-w-6xl max-h-[92vh] overflow-hidden flex flex-col gap-0 border-0 p-0 rounded-[18px]",
-          "duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-[0.98] data-[state=closed]:zoom-out-95",
+          "td-modal-shell flex h-full w-full flex-col gap-0 overflow-hidden border-0 p-0 sm:max-w-2xl lg:max-w-4xl xl:max-w-5xl",
           "border-l-[5px]",
           selectedPriority.border
         )}
         aria-labelledby="task-detail-title"
         aria-describedby="task-detail-desc"
-        aria-modal="true"
+        data-cy="task-detail-modal"
       >
         {taskLoading || !task ? (
           <div className="flex items-center justify-center min-h-[200px] p-8">
@@ -1051,8 +1059,8 @@ export function TaskDetailModal({
                 Assigned to you — you can update <strong>status</strong>, <strong>priority</strong>, and <strong>subtasks</strong>. Other fields are owner-only.
               </div>
             )}
-            <DialogHeader className="td-modal-header-shade shrink-0 px-6 pb-6 pt-7 sm:px-8 sm:pb-7 sm:pt-8">
-              <div className="flex items-start gap-4 pr-12">
+            <SheetHeader className="td-modal-header-shade shrink-0 space-y-0 px-6 pb-6 pt-7 text-left sm:px-8 sm:pb-7 sm:pt-8">
+              <div className="flex items-start justify-between gap-4">
                 <div className="flex min-w-0 flex-1 flex-col gap-3">
                   {isEditingTitle ? (
                     <Input
@@ -1149,13 +1157,24 @@ export function TaskDetailModal({
                     <p className="text-xs text-muted-foreground">{recurrenceMetaSummary}</p>
                   ) : null}
                 </div>
+                <Button
+                  ref={closeRef}
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 shrink-0 rounded-full"
+                  onClick={() => onOpenChange(false)}
+                  type="button"
+                  aria-label="Close"
+                  disabled={updateMutation.isPending}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
-            </DialogHeader>
+            </SheetHeader>
 
-            <div className="td-modal-body-scroll min-h-0 flex-1 overflow-y-auto">
-              <div className="grid grid-cols-1 gap-6 p-5 pb-10 lg:grid-cols-[minmax(0,1fr),minmax(280px,320px)] lg:gap-x-8 lg:gap-y-6 lg:p-8">
-                {/* Left: unified work + comments + activity */}
-                <div className="flex min-w-0 flex-col gap-6">
+            <div className="td-modal-body-scroll min-h-0 flex-1 overflow-y-auto lg:flex lg:flex-row lg:overflow-hidden">
+              {/* Left: unified work + comments + activity */}
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-6 overscroll-y-contain p-5 pb-10 lg:overflow-y-auto lg:p-8 lg:pb-10">
                   <div className={tdWorkUnified}>
                     <div className={tdWorkSection}>
                       <h3 className={cn(tdMainSectionHeading, "mb-4 flex items-center gap-2")}>
@@ -1650,7 +1669,7 @@ export function TaskDetailModal({
                 </div>
 
                 {/* Right column: metadata modules */}
-                <aside className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-0 lg:self-start lg:border-l lg:border-[#E5E7EB] lg:pl-8 dark:lg:border-border/40">
+                <aside className="flex min-h-0 min-w-0 flex-col gap-4 overscroll-y-contain p-5 pt-0 lg:w-[min(320px,32%)] lg:shrink-0 lg:overflow-y-auto lg:border-l lg:border-[#E5E7EB] lg:p-8 dark:lg:border-border/40">
                   <div className={tdSidebarSurface}>
                     <span className={tdSidebarHeading}>Assigned by</span>
                     <div
@@ -2300,7 +2319,6 @@ export function TaskDetailModal({
                     </div>
                   )}
                 </aside>
-              </div>
             </div>
 
             <div className="td-modal-footer flex shrink-0 flex-wrap justify-end gap-x-8 gap-y-1 px-6 py-3.5 text-[11px] font-medium tracking-wide text-muted-foreground/60 sm:px-8">
@@ -2313,8 +2331,8 @@ export function TaskDetailModal({
             </div>
           </>
         )}
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
 
     <ConfirmDialog
       open={deleteConfirmOpen}
