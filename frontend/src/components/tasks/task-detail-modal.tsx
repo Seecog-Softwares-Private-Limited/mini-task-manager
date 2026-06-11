@@ -21,6 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DropdownScrollList } from "@/components/ui/dropdown-scroll-list";
 import { parseApiError } from "@/services/api/client";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -1730,7 +1731,7 @@ export function TaskDetailModal({
                           </div>
                         </div>
                         <DropdownMenuSeparator />
-                        <div className="max-h-72 overflow-y-auto p-1">
+                        <DropdownScrollList>
                           <DropdownMenuItem
                             onSelect={(e) => {
                               e.preventDefault();
@@ -1787,7 +1788,7 @@ export function TaskDetailModal({
                           {assigneeFilteredMembers.length === 0 && (
                             <div className="px-2 py-3 text-center text-xs text-muted-foreground">No matching members</div>
                           )}
-                        </div>
+                        </DropdownScrollList>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
