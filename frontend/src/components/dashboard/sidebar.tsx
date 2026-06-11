@@ -32,9 +32,10 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile, visibleNav }: Si
   const billingNav = visibleNav.filter((item) => item.section === "billing");
 
   const renderNavItem = (item: typeof visibleNav[0]) => {
+    const itemPath = item.href.split("?")[0];
     const isActive =
-      pathname === item.href ||
-      (item.href !== "/dashboard" && pathname.startsWith(item.href));
+      pathname === itemPath ||
+      (itemPath !== "/dashboard" && pathname.startsWith(itemPath));
     const Icon = item.icon;
     return (
       <Link

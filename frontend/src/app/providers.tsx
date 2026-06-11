@@ -5,6 +5,7 @@ import { useState } from "react";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { ErrorProvider } from "@/context/error-context";
 import { TenantProvider } from "@/context/tenant-context";
+import { ProjectSelectionProvider } from "@/context/project-selection-context";
 import { PlanProvider } from "@/context/plan-context";
 import { UpgradeModalProvider } from "@/context/upgrade-modal-context";
 import { OnboardingProvider } from "@/context/onboarding-context";
@@ -47,6 +48,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <QueryClientProvider client={queryClient}>
           <ErrorProvider>
             <TenantProvider>
+              <ProjectSelectionProvider>
               <PlanProvider>
                 <UpgradeModalProvider>
                   <UpgradePlanModalProvider>
@@ -67,6 +69,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
                   <SessionExpiredModal />
                 </UpgradeModalProvider>
               </PlanProvider>
+              </ProjectSelectionProvider>
             </TenantProvider>
           </ErrorProvider>
         </QueryClientProvider>
