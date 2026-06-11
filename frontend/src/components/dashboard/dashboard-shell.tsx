@@ -7,6 +7,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { usePlatformAdmin } from "@/hooks/use-platform-admin";
 import { usePermissions } from "@/hooks/use-permissions";
 import { usePlanOptional } from "@/context/plan-context";
+import { useProjectSelectionOptional } from "@/context/project-selection-context";
+import { buildTasksPageHref } from "@/lib/tasks-page-href";
 import { logout } from "@/services/api/auth.api";
 import { clearAuth } from "@/services/api/client";
 import { TenantGuard } from "@/components/tenant-guard";
@@ -61,8 +63,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const { isPlatformAdmin } = usePlatformAdmin();
   const { canManageBilling, canViewAudit } = usePermissions();
   const planContext = usePlanOptional();
+  const projectSelection = useProjectSelectionOptional();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const tasksHref = buildTasksPageHref(projectSelection?.selectedProjectId);
 
   const visibleNav = nav
     .filter((item) => {
@@ -72,7 +77,12 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       if (item.requiredRole) return hasRole(item.requiredRole);
       return true;
     })
-    .map(({ href, label, icon, section }) => ({ href, label, icon, section }));
+    .map(({ href, label, icon, section }) => ({
+      href: href === "/dashboard/tasks" ? tasksHref : href,
+      label,
+      icon,
+      section,
+    }));
 
   async function handleLogout() {
     try {

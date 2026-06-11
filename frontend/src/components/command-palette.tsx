@@ -13,6 +13,8 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { fetchProjects } from "@/services/api/projects.api";
 import { useTenant } from "@/context/tenant-context";
+import { useProjectSelectionOptional } from "@/context/project-selection-context";
+import { buildTasksPageHref } from "@/lib/tasks-page-href";
 import {
   LayoutDashboard, Building2, FolderKanban, ListTodo, Bell,
   CreditCard, Activity, BarChart3, ClipboardList, Settings, Search, Repeat,
@@ -35,6 +37,8 @@ const navItems: { href: string; label: string; icon: React.ComponentType<{ class
 export function CommandPalette() {
   const router = useRouter();
   const { orgId } = useTenant();
+  const projectSelection = useProjectSelectionOptional();
+  const tasksHref = buildTasksPageHref(projectSelection?.selectedProjectId);
   const [open, setOpen] = useState(false);
 
   const { data: projects = [] } = useQuery({
@@ -77,12 +81,13 @@ export function CommandPalette() {
           <CommandGroup heading="Pages">
             {navItems.map((item) => {
               const Icon = item.icon;
+              const href = item.href === "/dashboard/tasks" ? tasksHref : item.href;
               return (
                 <CommandItem
                   key={item.href}
                   value={item.label}
                   onSelect={() => {
-                    router.push(item.href);
+                    router.push(href);
                     setOpen(false);
                   }}
                 >

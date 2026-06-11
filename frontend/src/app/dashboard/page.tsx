@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenant } from "@/context/tenant-context";
+import { useProjectSelection } from "@/context/project-selection-context";
+import { buildTasksPageHref } from "@/lib/tasks-page-href";
 import { fetchProjects } from "@/services/api/projects.api";
 import { fetchOrganizations } from "@/services/api/organizations.api";
 import { fetchTasksByProject } from "@/services/api/tasks.api";
@@ -53,6 +55,8 @@ function StatCard({
 export default function DashboardPage() {
   const { user, canManageBilling } = useAuth();
   const { orgId } = useTenant();
+  const { selectedProjectId } = useProjectSelection();
+  const tasksHref = buildTasksPageHref(selectedProjectId);
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ["projects", orgId ?? ""],
     queryFn: fetchProjects,
@@ -367,7 +371,7 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             </Link>
-            <Link href="/dashboard/tasks" className="group">
+            <Link href={tasksHref} className="group">
               <Card className="h-full border-dashed border-2 hover:border-blue-500/30 transition-colors">
                 <CardContent className="flex items-center gap-4 p-6">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors">

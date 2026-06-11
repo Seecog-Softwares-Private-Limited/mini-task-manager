@@ -27,6 +27,7 @@ import {
 import { parseApiError, isRateLimited, getStoredToken } from "@/services/api/client";
 import { createTaskWithDescriptionImages } from "@/lib/upload-task-description-images";
 import { useTenant } from "@/context/tenant-context";
+import { useProjectSelection } from "@/context/project-selection-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -95,6 +96,8 @@ function getCurrentUserId(): string | null {
 
 export default function TasksPage() {
   const { orgId } = useTenant();
+  const { selectedProjectId: storedProjectId, setSelectedProjectId, ready: projectSelectionReady } =
+    useProjectSelection();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -104,7 +107,6 @@ export default function TasksPage() {
   const { triggerTaskCreatedCelebration, celebrationLayer } = useTaskCreatedCelebration();
   const currentUserId = useMemo(() => getCurrentUserId(), []);
 
-  // URL-driven project selection
   const selectedProjectIdFromUrl = searchParams.get("projectId");
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
@@ -133,36 +135,76 @@ export default function TasksPage() {
     [projects]
   );
 
-  const selectedProject = useMemo(
-    () => selectableProjects.find((p) => p.id === selectedProjectIdFromUrl) ?? null,
-    [selectableProjects, selectedProjectIdFromUrl]
+  const isProjectInList = useCallback(
+    (projectId: string | null | undefined) =>
+      !!projectId && selectableProjects.some((p) => p.id === projectId),
+    [selectableProjects]
   );
-  const selectedProjectId = selectedProject?.id ?? null;
+
+  const selectedProjectId = useMemo(() => {
+    if (isProjectInList(selectedProjectIdFromUrl)) return selectedProjectIdFromUrl;
+    if (isProjectInList(storedProjectId)) return storedProjectId;
+    return null;
+  }, [selectedProjectIdFromUrl, storedProjectId, isProjectInList]);
+
+  const selectedProject = useMemo(
+    () => selectableProjects.find((p) => p.id === selectedProjectId) ?? null,
+    [selectableProjects, selectedProjectId]
+  );
 
   const { savedViews, saveView, deleteView } = useSavedViews(selectedProjectId ?? "__none__");
   const bulk = useBulkSelection();
 
   const setProjectInUrl = useCallback(
-    (projectId: string) => {
+    (projectId: string, replace = false) => {
       const params = new URLSearchParams(searchParams.toString());
       params.set("projectId", projectId);
-      router.push(`${pathname}?${params.toString()}`);
+      const url = `${pathname}?${params.toString()}`;
+      if (replace) router.replace(url);
+      else router.push(url);
     },
     [pathname, router, searchParams]
   );
 
-  // Auto-select first project if URL is empty/invalid.
+  const handleProjectChange = useCallback(
+    (projectId: string) => {
+      setSelectedProjectId(projectId);
+      setProjectInUrl(projectId);
+    },
+    [setSelectedProjectId, setProjectInUrl]
+  );
+
+  // Resolve selection: prefer URL (deep link), then persisted context; default only when neither is valid.
   useEffect(() => {
-    if (projectsLoading || selectableProjects.length === 0) return;
-    const hasValidProject =
-      !!selectedProjectIdFromUrl &&
-      selectableProjects.some((p) => p.id === selectedProjectIdFromUrl);
-    if (!hasValidProject) {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("projectId", selectableProjects[0].id);
-      router.replace(`${pathname}?${params.toString()}`);
+    if (!projectSelectionReady || projectsLoading || selectableProjects.length === 0) return;
+
+    if (isProjectInList(selectedProjectIdFromUrl)) {
+      if (selectedProjectIdFromUrl !== storedProjectId) {
+        setSelectedProjectId(selectedProjectIdFromUrl!);
+      }
+      return;
     }
-  }, [selectableProjects, projectsLoading, selectedProjectIdFromUrl, searchParams, router, pathname]);
+
+    if (isProjectInList(storedProjectId)) {
+      if (selectedProjectIdFromUrl !== storedProjectId) {
+        setProjectInUrl(storedProjectId!, true);
+      }
+      return;
+    }
+
+    const defaultId = selectableProjects[0].id;
+    setSelectedProjectId(defaultId);
+    setProjectInUrl(defaultId, true);
+  }, [
+    projectSelectionReady,
+    selectableProjects,
+    projectsLoading,
+    selectedProjectIdFromUrl,
+    storedProjectId,
+    isProjectInList,
+    setSelectedProjectId,
+    setProjectInUrl,
+  ]);
 
   // Reset board-local UI state when project changes.
   useEffect(() => {
@@ -771,7 +813,7 @@ export default function TasksPage() {
                 projects={selectableProjects}
                 selectedProjectId={selectedProjectId}
                 selectedTaskCount={projectTasks.length}
-                onProjectChange={setProjectInUrl}
+                onProjectChange={handleProjectChange}
                 disabled={projectsLoading}
               />
             </div>
