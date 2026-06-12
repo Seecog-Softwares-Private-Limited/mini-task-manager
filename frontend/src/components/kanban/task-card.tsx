@@ -208,9 +208,16 @@ const STATUS_CARD_SHINE = {
 } as const;
 
 const QUICK_ACTION_BTN = cn(
-  "h-7 w-7 rounded-lg border border-white/70 bg-white/75 shadow-sm backdrop-blur-md",
-  "hover:border-white hover:bg-white hover:shadow-md",
-  "dark:border-white/15 dark:bg-white/10 dark:hover:bg-white/20",
+  "h-7 w-7 rounded-lg border border-[#E7EAF0] bg-[#FCFCFD]/95 shadow-sm",
+  "hover:border-[#D5DAE3] hover:bg-white hover:shadow-md",
+  "dark:border-border dark:bg-card/95 dark:hover:bg-card",
+);
+
+const QUICK_ACTIONS_BAR = cn(
+  "absolute right-2.5 top-2.5 z-20 flex items-center gap-0.5",
+  "pointer-events-none opacity-0 transition-opacity duration-200",
+  "group-hover/card:pointer-events-auto group-hover/card:opacity-100",
+  "group-focus-within/card:pointer-events-auto group-focus-within/card:opacity-100",
 );
 
 function getDueDateTone(dueDate?: string) {
@@ -426,8 +433,14 @@ export function TaskCard({
   onToggleSelect,
 }: TaskCardProps) {
   const canManageTask = !!permissions?.canEditTask;
-  const canWorkflowEdit = canManageTask || isUserAssignedToTask(task, currentUserId);
+  /** Owners/admins (non-viewers) + assignees can use card hover actions. */
+  const canWorkflowEdit =
+    !permissions?.isViewer || isUserAssignedToTask(task, currentUserId);
   const showQuickActions = canWorkflowEdit && !isSelectionMode;
+  const otherStatuses = useMemo(
+    () => (statuses ?? []).filter((s) => s.id !== task.statusId),
+    [statuses, task.statusId]
+  );
   const isRecurring = isRecurringTask(task);
   const ribbonLabel = recurrenceRibbonLabel(task);
   const cadenceLine = recurrenceCadenceShort(task.recurrenceType);
@@ -592,7 +605,7 @@ export function TaskCard({
       )}
 
       {showQuickActions && (
-        <div className="absolute right-3 top-3 z-20 flex items-center gap-1 opacity-0 transition-all duration-300 group-hover/card:opacity-100">
+        <div className={QUICK_ACTIONS_BAR}>
           {isRecurring && quickActions?.onCompleteOccurrence ? (
             <Button
               type="button"
@@ -783,7 +796,12 @@ export function TaskCard({
               #{task.id.slice(0, 4).toUpperCase()}
             </span>
           </div>
-          <span className="flex h-6 w-6 items-center justify-center rounded-md border border-white/50 bg-white/40 backdrop-blur-sm dark:border-white/10 dark:bg-white/5">
+          <span
+            className={cn(
+              "flex h-6 w-6 items-center justify-center rounded-md border border-white/50 bg-white/40 backdrop-blur-sm transition-opacity duration-200 dark:border-white/10 dark:bg-white/5",
+              showQuickActions && "group-hover/card:opacity-0 group-focus-within/card:opacity-0"
+            )}
+          >
             <TypeIcon type={task.type} />
           </span>
         </div>
@@ -870,6 +888,46 @@ export function TaskCard({
         </div>
 
         {typeof progressPct === "number" && <TaskProgressBar value={progressPct} />}
+
+        {showQuickActions && !!quickActions?.onChangeStatus && otherStatuses.length > 0 ? (
+          <div
+            className={cn(
+              "mt-3 flex flex-wrap gap-1.5 border-t border-white/50 pt-3 dark:border-white/10",
+              "pointer-events-none max-h-0 overflow-hidden opacity-0 transition-all duration-200",
+              "group-hover/card:pointer-events-auto group-hover/card:max-h-24 group-hover/card:opacity-100",
+              "group-focus-within/card:pointer-events-auto group-focus-within/card:max-h-24 group-focus-within/card:opacity-100"
+            )}
+            data-quick-action
+          >
+            {otherStatuses.map((status) => {
+              const category = getWorkflowStatusCategory(status);
+              const dotClass =
+                category === "done"
+                  ? STATUS_BULB.done
+                  : category === "in_progress"
+                    ? STATUS_BULB.in_progress
+                    : category === "todo"
+                      ? STATUS_BULB.todo
+                      : "bg-neutral-400 ring-2 ring-neutral-200/80";
+              return (
+                <button
+                  key={status.id}
+                  type="button"
+                  data-quick-action
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#E7EAF0] bg-[#FCFCFD]/95 px-2 py-1 text-[10px] font-medium text-foreground shadow-sm transition-colors hover:border-primary/30 hover:bg-white dark:border-border dark:bg-card/95 dark:hover:bg-card"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    suppressOpenRef.current = true;
+                    quickActions.onChangeStatus?.(task, status.id);
+                  }}
+                >
+                  <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dotClass)} aria-hidden />
+                  {status.name}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
     </div>
   );
