@@ -608,10 +608,8 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
       recurringActionMutation.mutate({ type: "complete", task }),
     onSkipNextOccurrence: (task: Task) =>
       recurringActionMutation.mutate({ type: "skip", task }),
-    ...(permissions.canDeleteTask && {
-      onDelete: (task: Task) => setDeleteTarget(task),
-    }),
-  }), [updateStatusMutation, recurringActionMutation, permissions.canDeleteTask]);
+    onDelete: (task: Task) => setDeleteTarget(task),
+  }), [updateStatusMutation, recurringActionMutation]);
 
   const toggleColumnCollapse = useCallback((statusId: string) => {
     setCollapsedColumns((prev) => ({ ...prev, [statusId]: !prev[statusId] }));

@@ -115,3 +115,34 @@ export function canUserMoveTask(
   if (canMoveAllTasks) return true;
   return isUserAssignedToTask(task, userId);
 }
+
+type TaskReporterSource = TaskAssigneeSource & { reporterId?: string };
+
+/** True when the user created the task (shown as "Assigned by" in the UI). */
+export function isUserTaskReporter(
+  task: TaskReporterSource,
+  userId: string | null | undefined
+): boolean {
+  const uid = normalizeAssigneeUserId(userId);
+  if (!uid) return false;
+  return uid === normalizeAssigneeUserId(task.reporterId);
+}
+
+export function canUserDeleteTask(
+  task: TaskReporterSource,
+  userId: string | null | undefined,
+  canDeleteAllTasks: boolean
+): boolean {
+  if (canDeleteAllTasks) return true;
+  return isUserTaskReporter(task, userId);
+}
+
+/** Full edit when owner/admin, or when assigned-by user is also assigned to the task. */
+export function canUserEditTaskFully(
+  task: TaskReporterSource,
+  userId: string | null | undefined,
+  canEditAllTasks: boolean
+): boolean {
+  if (canEditAllTasks) return true;
+  return isUserTaskReporter(task, userId) && isUserAssignedToTask(task, userId);
+}

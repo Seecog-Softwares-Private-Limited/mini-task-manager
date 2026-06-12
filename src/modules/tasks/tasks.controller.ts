@@ -238,8 +238,6 @@ export class TasksController {
     return this.toResponse(task);
   }
 
-  @UseGuards(RolesGuard)
-  @Roles('owner')
   @Delete(':id')
   async remove(
     @Param('id') id: string,

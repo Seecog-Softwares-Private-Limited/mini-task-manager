@@ -30,8 +30,11 @@ import { DropdownScrollList } from "@/components/ui/dropdown-scroll-list";
 import { parseApiError } from "@/services/api/client";
 import { useAuth } from "@/hooks/use-auth";
 import {
+  canUserDeleteTask,
+  canUserEditTaskFully,
   getTaskAssigneeIdList,
   isUserAssignedToTask,
+  isUserTaskReporter,
   normalizeAssigneeUserId,
   resolveTaskAssignees,
 } from "@/lib/task-assignees";
@@ -457,15 +460,22 @@ export function TaskDetailModal({
 
   const isOwner = currentMember?.role?.toUpperCase() === "OWNER";
   const isAdmin = currentMember?.role?.toUpperCase() === "ADMIN";
-  const canManageAssignees = isOwner || isAdmin;
 
   const isAssignee = React.useMemo(
     () => (task ? isUserAssignedToTask(task, currentUserId) : false),
     [task, currentUserId]
   );
 
-  /** Owner can edit every field; assignees can update status, priority, and subtasks only. */
-  const canEditAll = isOwner || isAdmin;
+  const isReporter = React.useMemo(
+    () => (task ? isUserTaskReporter(task, currentUserId) : false),
+    [task, currentUserId]
+  );
+
+  const canManageAssignees = isOwner || isAdmin || (isReporter && isAssignee);
+
+  /** Owner/admin or assigned-by user (when also assigned) can edit every field; other assignees get limited fields. */
+  const canEditAll = canUserEditTaskFully(task ?? {}, currentUserId, isOwner || isAdmin);
+  const canDeleteTask = canUserDeleteTask(task ?? {}, currentUserId, isOwner);
   const canEditWorkflowFields = isOwner || isAdmin || isAssignee;
   const canEditSubtasks = canManageAssignees || isAssignee;
   const isViewOnly = !canEditWorkflowFields;
@@ -1057,7 +1067,7 @@ export function TaskDetailModal({
             )}
             {canEditWorkflowFields && !canEditAll && (
               <div className="mx-6 mt-4 rounded-lg border border-sky-500/30 bg-sky-500/10 px-4 py-2.5 text-sm text-sky-950 dark:text-sky-100 sm:mx-8">
-                Assigned to you — you can update <strong>status</strong>, <strong>priority</strong>, and <strong>subtasks</strong>. Other fields are owner-only.
+                Assigned to you — you can update <strong>status</strong>, <strong>priority</strong>, and <strong>subtasks</strong>. Other fields are restricted to the workspace owner or assigned-by user when also assigned.
               </div>
             )}
             <SheetHeader className="td-modal-header-shade shrink-0 space-y-0 px-6 pb-6 pt-7 text-left sm:px-8 sm:pb-7 sm:pt-8">
@@ -2299,7 +2309,7 @@ export function TaskDetailModal({
                     </div>
                     </div>
                   </div>
-                  {isOwner && (
+                  {canDeleteTask && (
                     <div className={tdSidebarSurface}>
                       <Button
                         type="button"

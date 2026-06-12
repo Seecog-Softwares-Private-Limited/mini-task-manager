@@ -44,7 +44,11 @@ import {
   Wrench,
 } from "lucide-react";
 import { TaskAssigneePopover } from "@/components/tasks/task-assignee-popover";
-import { isUserAssignedToTask } from "@/lib/task-assignees";
+import {
+  canUserDeleteTask,
+  canUserEditTaskFully,
+  isUserAssignedToTask,
+} from "@/lib/task-assignees";
 import {
   isRecurringTask,
   recurrenceCadenceShort,
@@ -436,7 +440,14 @@ export function TaskCard({
   onTaskClick,
   onToggleSelect,
 }: TaskCardProps) {
-  const canManageTask = !!permissions?.canEditTask;
+  const canManageTask =
+    !!permissions?.canEditTask ||
+    canUserEditTaskFully(task, currentUserId, false);
+  const canDeleteThisTask = canUserDeleteTask(
+    task,
+    currentUserId,
+    !!permissions?.canDeleteTask
+  );
   /** Owners/admins (non-viewers) + assignees can use card hover actions. */
   const canWorkflowEdit =
     !permissions?.isViewer || isUserAssignedToTask(task, currentUserId);
@@ -685,7 +696,7 @@ export function TaskCard({
               <Calendar className="h-3.5 w-3.5" />
             </Button>
           ) : null}
-          {permissions?.canDeleteTask && quickActions?.onDelete && (
+          {canDeleteThisTask && quickActions?.onDelete && (
             <Button
               type="button"
               variant="outline"
