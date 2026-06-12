@@ -2,6 +2,7 @@ import { apiClient } from "@/services/api/client";
 import { normalizeTaskId } from "@/lib/task-id";
 import type { Task } from "@/types/api";
 import type { PaginatedResult } from "@/types/api";
+import { resolveSubtaskStatus } from "@/lib/subtask-status";
 import type { TaskSubtask } from "@/types/api";
 import type { TaskRecurrenceConfig } from "@/types/api";
 import { clampSubtaskTitle } from "@/lib/subtask-limits";
@@ -42,8 +43,9 @@ export function serializeSubtasksForApi(subtasks: TaskSubtask[]): TaskSubtask[] 
     };
     if (s.description?.trim()) item.description = s.description.trim();
     if (s.assigneeId) item.assigneeId = s.assigneeId;
-    if (s.priority) item.priority = s.priority;
-    if (s.statusId) item.statusId = s.statusId;
+    const status = resolveSubtaskStatus(s);
+    item.status = status;
+    item.completed = status === "DONE";
     if (s.dueDate) {
       const match = String(s.dueDate).match(/^(\d{4}-\d{2}-\d{2})/);
       if (match) item.dueDate = match[1];

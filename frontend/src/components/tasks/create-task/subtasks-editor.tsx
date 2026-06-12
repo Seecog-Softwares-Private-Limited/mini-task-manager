@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
 import type {
   FieldErrors,
   UseFieldArrayAppend,
@@ -19,6 +18,12 @@ import {
   type SubtaskDraft,
 } from "@/components/tasks/subtasks/subtask-detail-panel";
 import type { PendingSubtaskAttachment } from "@/components/tasks/subtasks/subtask-attachments-section";
+import {
+  resolveSubtaskStatus,
+  subtaskWithCompleted,
+  subtaskWithStatus,
+  type SubtaskStatus,
+} from "@/lib/subtask-status";
 import { generateClientId } from "@/lib/generate-client-id";
 
 export interface SubtaskItem {
@@ -28,7 +33,7 @@ export interface SubtaskItem {
   description?: string;
   assigneeId?: string;
   dueDate?: string;
-  priority?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  status?: SubtaskStatus;
 }
 
 interface SubtasksEditorProps {
@@ -71,7 +76,9 @@ export function SubtasksEditor({
   const progress = useMemo(() => {
     const list = values ?? [];
     const total = list.filter((s) => s.title.trim().length > 0).length;
-    const completed = list.filter((s) => s.title.trim().length > 0 && s.completed).length;
+    const completed = list.filter(
+      (s) => s.title.trim().length > 0 && resolveSubtaskStatus(s) === "DONE"
+    ).length;
     return { completed, total };
   }, [values]);
 
@@ -85,12 +92,17 @@ export function SubtasksEditor({
   }, [fields.length]);
 
   const syncDraftToForm = (index: number, draft: SubtaskDraft) => {
+    const status = resolveSubtaskStatus(draft);
     setValue(`subtasks.${index}.title`, draft.title, { shouldDirty: true, shouldTouch: true });
     setValue(`subtasks.${index}.description`, draft.description ?? "", {
       shouldDirty: true,
       shouldTouch: true,
     });
-    setValue(`subtasks.${index}.priority`, draft.priority ?? "MEDIUM", {
+    setValue(`subtasks.${index}.status`, status, {
+      shouldDirty: true,
+      shouldTouch: true,
+    });
+    setValue(`subtasks.${index}.completed`, status === "DONE", {
       shouldDirty: true,
       shouldTouch: true,
     });
@@ -107,6 +119,32 @@ export function SubtasksEditor({
   const saveDraft = (index: number, draft: SubtaskDraft) => {
     syncDraftToForm(index, draft);
     setExpandedKey(null);
+  };
+
+  const applySubtaskPatch = (index: number, patch: Partial<SubtaskItem>) => {
+    const current = values?.[index];
+    if (!current) return;
+    const next = { ...current, ...patch };
+    if (patch.status !== undefined || patch.completed !== undefined) {
+      const normalized = patch.status
+        ? subtaskWithStatus(next, patch.status)
+        : subtaskWithCompleted(next, Boolean(patch.completed));
+      setValue(`subtasks.${index}.status`, normalized.status, {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+      setValue(`subtasks.${index}.completed`, normalized.completed, {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+      return;
+    }
+    Object.entries(patch).forEach(([key, value]) => {
+      setValue(`subtasks.${index}.${key}` as const, value, {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+    });
   };
 
   return (
@@ -134,7 +172,7 @@ export function SubtasksEditor({
               description: "",
               assigneeId: undefined,
               dueDate: undefined,
-              priority: "MEDIUM",
+              status: "TODO",
             });
             setExpandedKey(clientId);
           }}
@@ -153,7 +191,7 @@ export function SubtasksEditor({
           fields.map((field, index) => {
             const message = subtaskErrors[index]?.title?.message ?? "";
             const value = values?.[index];
-            const completed = Boolean(value?.completed);
+            const completed = resolveSubtaskStatus(value ?? { completed: false }) === "DONE";
             const subtaskKey = value?.id ?? field.id;
             const attachmentCount = (pendingAttachmentsBySubtask[subtaskKey] ?? []).length;
             const expanded = expandedKey === subtaskKey;
@@ -162,10 +200,11 @@ export function SubtasksEditor({
               <div key={field.id} className="space-y-0">
                 <input type="hidden" {...register(`subtasks.${index}.id` as const)} />
                 <input type="hidden" {...register(`subtasks.${index}.description` as const)} />
+                <input type="hidden" {...register(`subtasks.${index}.status` as const)} />
                 <SubtaskCompactRow
                   title={value?.title ?? ""}
                   completed={completed}
-                  priority={value?.priority ?? "MEDIUM"}
+                  status={resolveSubtaskStatus(value ?? { status: "TODO" })}
                   dueDate={value?.dueDate}
                   assigneeId={value?.assigneeId}
                   attachmentCount={attachmentCount}
@@ -173,11 +212,9 @@ export function SubtasksEditor({
                   expanded={expanded}
                   editDisabled={disabled}
                   onToggleComplete={() =>
-                    setValue(`subtasks.${index}.completed`, !completed, {
-                      shouldDirty: true,
-                      shouldTouch: true,
-                    })
+                    applySubtaskPatch(index, { completed: !completed })
                   }
+                  onStatusChange={(status) => applySubtaskPatch(index, { status })}
                   onRowClick={() =>
                     setExpandedKey((prev) => (prev === subtaskKey ? null : subtaskKey))
                   }
@@ -186,10 +223,7 @@ export function SubtasksEditor({
                     remove(index);
                   }}
                   onAssigneeChange={(assigneeId) =>
-                    setValue(`subtasks.${index}.assigneeId`, assigneeId, {
-                      shouldDirty: true,
-                      shouldTouch: true,
-                    })
+                    applySubtaskPatch(index, { assigneeId })
                   }
                 />
                 {expanded ? (
@@ -201,7 +235,7 @@ export function SubtasksEditor({
                       completed,
                       assigneeId: value?.assigneeId,
                       dueDate: value?.dueDate,
-                      priority: value?.priority ?? "MEDIUM",
+                      status: resolveSubtaskStatus(value ?? { status: "TODO" }),
                     }}
                     projectId={projectId}
                     persistAttachments={false}
@@ -241,7 +275,7 @@ export function SubtasksEditor({
                   description: "",
                   assigneeId: undefined,
                   dueDate: undefined,
-                  priority: "MEDIUM",
+                  status: "TODO",
                 });
                 pendingFocusIndexRef.current = fields.length;
                 setExpandedKey(clientId);

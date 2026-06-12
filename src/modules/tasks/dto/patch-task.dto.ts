@@ -75,6 +75,11 @@ class PatchTaskSubtaskDto {
   priority?: string;
 
   @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.toUpperCase() : value))
+  @IsIn(['TODO', 'IN_PROGRESS', 'DONE'])
+  status?: string;
+
+  @IsOptional()
   @Transform(emptyStrToUndef)
   @ValidateIf((_o, v) => v != null && v !== '')
   @IsUUID('4')

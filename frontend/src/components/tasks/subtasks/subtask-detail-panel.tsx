@@ -7,19 +7,16 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-selector";
 import { SubtaskDueDatePicker } from "@/components/tasks/subtask-due-date-picker";
-import { SubtaskPrioritySelector } from "@/components/tasks/subtask-priority-selector";
-import {
-  SubtaskStatusSelector,
-  resolveSubtaskStatusId,
-} from "@/components/tasks/subtask-status-selector";
+import { SubtaskStatusSelector } from "@/components/tasks/subtask-status-selector";
 import {
   SubtaskAttachmentsSection,
   type PendingSubtaskAttachment,
 } from "@/components/tasks/subtasks/subtask-attachments-section";
 import { getClipboardImageFile, validateTaskPasteImageFile } from "@/lib/task-clipboard-image";
 import { normalizePastedScreenshotFile } from "@/lib/screenshot-filename";
+import { resolveSubtaskStatus, subtaskWithStatus, type SubtaskStatus } from "@/lib/subtask-status";
 import { useToast } from "@/components/ui/use-toast";
-import type { TaskSubtask, WorkflowStatus, OrgMember } from "@/types/api";
+import type { TaskSubtask, OrgMember } from "@/types/api";
 import { generateClientId } from "@/lib/generate-client-id";
 import { uploadEntityAttachment } from "@/services/api/entity-attachments.api";
 import { useQueryClient } from "@tanstack/react-query";
@@ -32,7 +29,7 @@ type MemberHint = { id: string; name: string; email?: string; avatarUrl?: string
 
 export type SubtaskDraft = Pick<
   TaskSubtask,
-  "id" | "title" | "description" | "completed" | "assigneeId" | "dueDate" | "priority" | "statusId"
+  "id" | "title" | "description" | "completed" | "assigneeId" | "dueDate" | "status"
 >;
 
 interface SubtaskDetailPanelProps {
@@ -40,7 +37,6 @@ interface SubtaskDetailPanelProps {
   projectId: string;
   organizationId?: string;
   taskId?: string;
-  statuses?: WorkflowStatus[];
   prefetchedOrgMembers?: OrgMember[];
   knownMembers?: MemberHint[];
   taskAssigneesOnly?: boolean;
@@ -64,7 +60,6 @@ export function SubtaskDetailPanel({
   projectId,
   organizationId,
   taskId,
-  statuses = [],
   prefetchedOrgMembers,
   knownMembers,
   taskAssigneesOnly,
@@ -96,16 +91,16 @@ export function SubtaskDetailPanel({
       a.completed === b.completed &&
       a.assigneeId === b.assigneeId &&
       a.dueDate === b.dueDate &&
-      (a.priority ?? "MEDIUM") === (b.priority ?? "MEDIUM") &&
-      a.statusId === b.statusId
+      resolveSubtaskStatus(a) === resolveSubtaskStatus(b)
     );
   }, []);
 
-  // Reset local draft when switching subtasks or when parent syncs saved data.
   React.useEffect(() => {
     const normalized = {
       ...initialDraft,
       title: clampSubtaskTitle(initialDraft.title),
+      status: resolveSubtaskStatus(initialDraft),
+      completed: resolveSubtaskStatus(initialDraft) === "DONE",
     };
     setDraft(normalized);
     baselineRef.current = normalized;
@@ -116,8 +111,7 @@ export function SubtaskDetailPanel({
     initialDraft.completed,
     initialDraft.assigneeId,
     initialDraft.dueDate,
-    initialDraft.priority,
-    initialDraft.statusId,
+    initialDraft.status,
   ]);
 
   React.useEffect(() => {
@@ -127,6 +121,14 @@ export function SubtaskDetailPanel({
   const update = <K extends keyof SubtaskDraft>(key: K, value: SubtaskDraft[K]) => {
     setDraft((prev) => {
       const next = { ...prev, [key]: value };
+      onDraftChange?.(next);
+      return next;
+    });
+  };
+
+  const handleStatusChange = (status: SubtaskStatus) => {
+    setDraft((prev) => {
+      const next = subtaskWithStatus(prev, status);
       onDraftChange?.(next);
       return next;
     });
@@ -223,11 +225,15 @@ export function SubtaskDetailPanel({
       />
 
       <div className="flex flex-wrap items-center gap-2">
-        <SubtaskPrioritySelector
-          value={draft.priority ?? "MEDIUM"}
-          onChange={(priority) => update("priority", priority)}
-          disabled={fieldsDisabled}
-        />
+        <div className="min-w-[220px] flex-1">
+          <SubtaskStatusSelector
+            value={resolveSubtaskStatus(draft)}
+            completed={draft.completed}
+            onChange={handleStatusChange}
+            disabled={fieldsDisabled}
+            variant="field"
+          />
+        </div>
         <SubtaskDueDatePicker
           value={draft.dueDate}
           completed={draft.completed}
@@ -244,15 +250,6 @@ export function SubtaskDetailPanel({
           onChange={(assigneeId) => update("assigneeId", assigneeId)}
           disabled={fieldsDisabled}
         />
-        {statuses.length > 0 ? (
-          <SubtaskStatusSelector
-            statuses={statuses}
-            value={resolveSubtaskStatusId(draft, statuses)}
-            completed={draft.completed}
-            onChange={(statusId) => update("statusId", statusId)}
-            disabled={fieldsDisabled}
-          />
-        ) : null}
       </div>
 
       <div className="flex items-center justify-end gap-2 border-t border-border/40 pt-3">
@@ -294,6 +291,8 @@ export function SubtaskDetailPanel({
                 onSave({
                   ...draft,
                   title: clampSubtaskTitle(draft.title.trim()),
+                  status: resolveSubtaskStatus(draft),
+                  completed: resolveSubtaskStatus(draft) === "DONE",
                 })
               }
             >

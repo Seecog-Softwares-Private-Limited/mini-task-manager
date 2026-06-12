@@ -4,14 +4,9 @@ import { Paperclip, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-selector";
+import { SubtaskStatusSelector } from "@/components/tasks/subtask-status-selector";
+import type { SubtaskStatus } from "@/lib/subtask-status";
 import type { OrgMember } from "@/types/api";
-
-const PRIORITY_LABELS: Record<string, { label: string; dot: string }> = {
-  LOW: { label: "Low", dot: "bg-emerald-500" },
-  MEDIUM: { label: "Medium", dot: "bg-amber-500" },
-  HIGH: { label: "High", dot: "bg-red-500" },
-  CRITICAL: { label: "Critical", dot: "bg-purple-500" },
-};
 
 function formatCompactDueDate(value?: string): string {
   if (!value) return "";
@@ -29,7 +24,7 @@ type MemberHint = { id: string; name: string; email?: string; avatarUrl?: string
 interface SubtaskCompactRowProps {
   title: string;
   completed: boolean;
-  priority?: string;
+  status?: SubtaskStatus | string;
   dueDate?: string;
   assigneeId?: string;
   attachmentCount: number;
@@ -39,9 +34,10 @@ interface SubtaskCompactRowProps {
   knownMembers?: MemberHint[];
   taskAssigneesOnly?: boolean;
   expanded?: boolean;
-  /** Disables checkbox and delete — row expand stays enabled. */
+  /** Disables checkbox, status, and delete — row expand stays enabled. */
   editDisabled?: boolean;
   onToggleComplete: () => void;
+  onStatusChange?: (status: SubtaskStatus) => void;
   onRowClick: () => void;
   onDelete: () => void;
   onAssigneeChange?: (assigneeId?: string) => void;
@@ -50,7 +46,7 @@ interface SubtaskCompactRowProps {
 export function SubtaskCompactRow({
   title,
   completed,
-  priority = "MEDIUM",
+  status,
   dueDate,
   assigneeId,
   attachmentCount,
@@ -62,11 +58,11 @@ export function SubtaskCompactRow({
   expanded,
   editDisabled,
   onToggleComplete,
+  onStatusChange,
   onRowClick,
   onDelete,
   onAssigneeChange,
 }: SubtaskCompactRowProps) {
-  const priorityMeta = PRIORITY_LABELS[priority] ?? PRIORITY_LABELS.MEDIUM;
   const dueLabel = formatCompactDueDate(dueDate);
 
   return (
@@ -105,21 +101,26 @@ export function SubtaskCompactRow({
         >
           {title || "Untitled subtask"}
         </span>
-        <span className="hidden shrink-0 items-center gap-1.5 sm:inline-flex">
-          <span className="inline-flex items-center gap-1 rounded-full bg-muted/50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground/80 ring-1 ring-border/30">
-            <span className={cn("h-1.5 w-1.5 rounded-full", priorityMeta.dot)} />
-            {priorityMeta.label}
+        {dueLabel ? (
+          <span className="hidden shrink-0 text-[11px] font-medium text-muted-foreground sm:inline">
+            {dueLabel}
           </span>
-          {dueLabel ? (
-            <span className="text-[11px] font-medium text-muted-foreground">{dueLabel}</span>
-          ) : null}
-        </span>
+        ) : null}
       </button>
       <div
         className="flex shrink-0 items-center gap-1"
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
       >
+        {onStatusChange ? (
+          <SubtaskStatusSelector
+            value={status}
+            completed={completed}
+            onChange={onStatusChange}
+            disabled={editDisabled}
+            variant="row"
+          />
+        ) : null}
         {onAssigneeChange ? (
           <SubtaskAssigneeSelector
             projectId={projectId}

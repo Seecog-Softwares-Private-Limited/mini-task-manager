@@ -77,7 +77,7 @@ const schema = z.object({
         description: z.string().max(10000).optional(),
         completed: z.boolean().default(false),
         assigneeId: z.string().uuid().optional(),
-        priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).default("MEDIUM"),
+        status: z.enum(["TODO", "IN_PROGRESS", "DONE"]).default("TODO"),
         dueDate: z
           .string()
           .optional()

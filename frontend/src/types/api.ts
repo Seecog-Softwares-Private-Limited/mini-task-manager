@@ -151,6 +151,8 @@ export interface RecurringTaskOccurrence {
   createdAt: string;
 }
 
+export type SubtaskStatus = "TODO" | "IN_PROGRESS" | "DONE";
+
 export interface TaskSubtask {
   id: string;
   title: string;
@@ -158,7 +160,10 @@ export interface TaskSubtask {
   description?: string;
   assigneeId?: string;
   dueDate?: string;
+  status?: SubtaskStatus;
+  /** @deprecated Legacy field — kept for old data; UI uses `status` instead. */
   priority?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  /** @deprecated Legacy workflow status id — superseded by `status`. */
   statusId?: string;
 }
 

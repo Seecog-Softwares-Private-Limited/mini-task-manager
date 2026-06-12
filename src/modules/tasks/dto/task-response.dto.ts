@@ -12,6 +12,7 @@ export class TaskSubtaskResponseDto {
   description?: string;
   assigneeId?: string;
   dueDate?: string;
+  status?: string;
   priority?: string;
   statusId?: string;
 }

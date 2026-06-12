@@ -47,10 +47,11 @@ import { generateClientId } from "@/lib/generate-client-id";
 import { SUBTASK_TITLE_MAX_LENGTH, clampSubtaskTitle } from "@/lib/subtask-limits";
 
 import {
-  defaultDoneStatusId,
-  defaultTodoStatusId,
-  isDoneWorkflowStatus,
-} from "@/components/tasks/subtask-status-selector";
+  resolveSubtaskStatus,
+  subtaskWithCompleted,
+  subtaskWithStatus,
+  type SubtaskStatus,
+} from "@/lib/subtask-status";
 import { SubtaskCompactRow } from "@/components/tasks/subtasks/subtask-compact-row";
 import {
   SubtaskDetailPanel,
@@ -562,7 +563,7 @@ export function TaskDetailModal({
 
   const checklistStats = React.useMemo(() => {
     const total = checklist.length;
-    const completed = checklist.filter((item) => item.completed).length;
+    const completed = checklist.filter((item) => resolveSubtaskStatus(item) === "DONE").length;
     const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
     return { total, completed, percent };
   }, [checklist]);
@@ -827,14 +828,13 @@ export function TaskDetailModal({
           id: generateClientId(),
           title: trimmed,
           completed: false,
-          priority: "MEDIUM",
-          statusId: defaultTodoStatusId(statuses),
+          status: "TODO",
           dueDate: undefined,
         },
       ]);
       setNewCheckItem("");
     },
-    [checklist, statuses, updateSubtasksMutation]
+    [checklist, updateSubtasksMutation]
   );
 
   const handleFieldChange = (field: keyof Task, value: unknown) => {
@@ -887,12 +887,12 @@ export function TaskDetailModal({
 
   const saveSubtaskDetail = React.useCallback(
     (draft: SubtaskDraft) => {
-      const status = statuses.find((s) => s.id === draft.statusId);
       const safeTitle = clampSubtaskTitle(draft.title.trim());
       if (!safeTitle) {
         toast({ title: "Subtask title is required", variant: "error" });
         return;
       }
+      const status = resolveSubtaskStatus(draft);
       updateSubtasksMutation.mutate(
         checklist.map((item) =>
           item.id === draft.id
@@ -900,7 +900,8 @@ export function TaskDetailModal({
                 ...item,
                 ...draft,
                 title: safeTitle,
-                completed: status ? isDoneWorkflowStatus(status) : draft.completed,
+                status,
+                completed: status === "DONE",
               }
             : item
         ),
@@ -912,7 +913,7 @@ export function TaskDetailModal({
         }
       );
     },
-    [checklist, statuses, updateSubtasksMutation, toast]
+    [checklist, updateSubtasksMutation, toast]
   );
 
   const confirmRemoveSubtask = React.useCallback(() => {
@@ -1331,8 +1332,8 @@ export function TaskDetailModal({
                           <div key={item.id} className="space-y-0">
                             <SubtaskCompactRow
                               title={item.title}
-                              completed={item.completed}
-                              priority={item.priority ?? "MEDIUM"}
+                              completed={resolveSubtaskStatus(item) === "DONE"}
+                              status={resolveSubtaskStatus(item)}
                               dueDate={item.dueDate}
                               assigneeId={item.assigneeId}
                               attachmentCount={attachmentCountBySubtaskId.get(item.id) ?? 0}
@@ -1344,20 +1345,17 @@ export function TaskDetailModal({
                               expanded={expanded}
                               editDisabled={!canEditSubtasks || updateSubtasksMutation.isPending}
                               onToggleComplete={() => {
-                                const nextCompleted = !item.completed;
-                                const doneId = defaultDoneStatusId(statuses);
-                                const todoId = defaultTodoStatusId(statuses);
+                                const isDone = resolveSubtaskStatus(item) === "DONE";
                                 updateSubtasksMutation.mutate(
                                   checklist.map((i) =>
-                                    i.id === item.id
-                                      ? {
-                                          ...i,
-                                          completed: nextCompleted,
-                                          statusId: nextCompleted
-                                            ? (doneId ?? i.statusId)
-                                            : (todoId ?? i.statusId),
-                                        }
-                                      : i
+                                    i.id === item.id ? subtaskWithCompleted(i, !isDone) : i
+                                  )
+                                );
+                              }}
+                              onStatusChange={(nextStatus: SubtaskStatus) => {
+                                updateSubtasksMutation.mutate(
+                                  checklist.map((i) =>
+                                    i.id === item.id ? subtaskWithStatus(i, nextStatus) : i
                                   )
                                 );
                               }}
@@ -1390,16 +1388,14 @@ export function TaskDetailModal({
                                   id: item.id,
                                   title: item.title,
                                   description: item.description,
-                                  completed: item.completed,
+                                  completed: resolveSubtaskStatus(item) === "DONE",
                                   assigneeId: item.assigneeId,
                                   dueDate: item.dueDate,
-                                  priority: item.priority ?? "MEDIUM",
-                                  statusId: item.statusId,
+                                  status: resolveSubtaskStatus(item),
                                 }}
                                 projectId={projectId}
                                 organizationId={organizationId}
                                 taskId={taskId ?? undefined}
-                                statuses={statuses}
                                 prefetchedOrgMembers={orgMembers}
                                 knownMembers={subtaskMemberHints}
                                 taskAssigneesOnly

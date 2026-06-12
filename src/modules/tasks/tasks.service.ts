@@ -332,6 +332,18 @@ export class TasksService {
       });
   }
 
+  private normalizeSubtaskStatus(subtask: {
+    status?: string;
+    completed?: boolean;
+  }): 'TODO' | 'IN_PROGRESS' | 'DONE' {
+    const raw = typeof subtask.status === 'string' ? subtask.status.toUpperCase() : '';
+    if (raw === 'TODO' || raw === 'IN_PROGRESS' || raw === 'DONE') {
+      return raw;
+    }
+    if (subtask.completed) return 'DONE';
+    return 'TODO';
+  }
+
   private normalizeSubtasks(
     subtasks?: Array<{
       id?: string;
@@ -341,6 +353,7 @@ export class TasksService {
       assigneeId?: string;
       dueDate?: string;
       priority?: string;
+      status?: string;
       statusId?: string;
     }>,
   ): Array<{
@@ -350,6 +363,7 @@ export class TasksService {
     description?: string;
     assigneeId?: string;
     dueDate?: string;
+    status: 'TODO' | 'IN_PROGRESS' | 'DONE';
     priority?: string;
     statusId?: string;
   }> {
@@ -357,15 +371,17 @@ export class TasksService {
     return subtasks
       .map((s) => {
         const description = s.description?.trim();
+        const status = this.normalizeSubtaskStatus(s);
         return {
           id: s.id ?? generateUuid(),
           title: s.title?.trim() ?? '',
-          completed: Boolean(s.completed),
+          completed: status === 'DONE',
+          status,
           ...(description ? { description } : {}),
           assigneeId: s.assigneeId || undefined,
           dueDate: s.dueDate ? String(s.dueDate).slice(0, 10) : undefined,
-          priority: s.priority ?? 'MEDIUM',
-          statusId: s.statusId || undefined,
+          ...(s.priority ? { priority: s.priority } : {}),
+          ...(s.statusId ? { statusId: s.statusId } : {}),
         };
       })
       .filter((s) => s.title.length > 0);
