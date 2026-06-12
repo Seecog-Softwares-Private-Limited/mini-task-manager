@@ -57,8 +57,12 @@ const nav: {
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const isBoardView =
-    pathname === "/dashboard/tasks" || pathname.includes("/board");
+  const isInternalScrollView =
+    pathname === "/dashboard/tasks" ||
+    pathname === "/dashboard/activity" ||
+    pathname === "/dashboard/audit" ||
+    pathname === "/dashboard/notifications" ||
+    pathname.includes("/board");
   const { hasRole } = useAuth();
   const { isPlatformAdmin } = usePlatformAdmin();
   const { canManageBilling, canViewAudit } = usePermissions();
@@ -169,7 +173,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <main
           className={cn(
             "flex min-h-0 flex-1 flex-col p-4 md:p-8 animate-fade-in",
-            isBoardView ? "overflow-hidden" : "overflow-y-auto",
+            isInternalScrollView ? "overflow-hidden" : "overflow-y-auto",
           )}
         >
           <TenantGuard>{children}</TenantGuard>
