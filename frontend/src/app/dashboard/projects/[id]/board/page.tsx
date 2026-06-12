@@ -757,7 +757,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
   }
 
   return (
-    <div className="flex min-h-0 flex-1 basis-0 flex-col gap-4 overflow-hidden">
+    <div className="flex h-0 min-h-0 flex-1 flex-col gap-4 overflow-hidden">
       {celebrationLayer}
       {/* Header */}
       <div className="flex shrink-0 items-center justify-between gap-4">
@@ -890,10 +890,10 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
       </div>
 
       {/* Board / Table */}
-      <div className="flex min-h-0 flex-1 basis-0 flex-col overflow-hidden">
+      <div className="flex h-0 min-h-0 flex-1 flex-col overflow-hidden">
       {viewMode === "kanban" ? (
         <KanbanBoard
-          className="min-h-0 flex-1 basis-0"
+          className="min-h-0 flex-1"
           statuses={statuses}
           tasksByStatus={tasksByStatus}
           onMoveTask={handleMoveTask}

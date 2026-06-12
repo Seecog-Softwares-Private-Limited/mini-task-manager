@@ -31,6 +31,7 @@ import {
   CheckCircle2,
   CircleDot,
   Clock3,
+  ListChecks,
   MessageSquare,
   MoreHorizontal,
   Paperclip,
@@ -311,12 +312,15 @@ export function TaskMetaRow({
         <Paperclip className={iconClass} strokeWidth={2} />
         {attachmentsCount}
       </span>
-      {typeof checklistTotal === "number" && checklistTotal > 0 && (
-        <span className="inline-flex items-center gap-1.5" aria-label={`Checklist ${checklistCompleted ?? 0} of ${checklistTotal}`}>
-          <CheckCircle2 className={iconClass} strokeWidth={2} />
-          {checklistCompleted ?? 0}/{checklistTotal}
-        </span>
-      )}
+      <span
+        className="inline-flex items-center gap-1.5"
+        aria-label={`${checklistCompleted ?? 0} of ${checklistTotal ?? 0} subtasks`}
+      >
+        <ListChecks className={iconClass} strokeWidth={2} />
+        {(checklistTotal ?? 0) > 0
+          ? `${checklistCompleted ?? 0}/${checklistTotal}`
+          : 0}
+      </span>
     </div>
   );
 }
@@ -473,11 +477,14 @@ export function TaskCard({
     setLocalAssignees(initialAssignees);
   }, [initialAssignees]);
 
-  const progressPct = subtaskInfo && subtaskInfo.total > 0
-    ? Math.round((subtaskInfo.completed / subtaskInfo.total) * 100)
-    : task.checklistTotal && task.checklistTotal > 0
-      ? Math.round(((task.checklistCompleted ?? 0) / task.checklistTotal) * 100)
-      : null;
+  const checklistTotal =
+    subtaskInfo?.total ??
+    task.checklistTotal ??
+    (Array.isArray(task.subtasks) ? task.subtasks.length : 0);
+  const checklistCompleted =
+    subtaskInfo?.completed ??
+    task.checklistCompleted ??
+    (Array.isArray(task.subtasks) ? task.subtasks.filter((s) => s.completed).length : 0);
 
   const prioCfg = PRIORITY[normalizePriority(task.priority)] ?? PRIORITY.medium;
   const statusForLane =
@@ -537,7 +544,7 @@ export function TaskCard({
         }
       }}
       className={cn(
-        "group/card relative cursor-pointer overflow-hidden rounded-2xl border",
+        "group/card relative flex min-h-[11.25rem] cursor-pointer flex-col overflow-hidden rounded-2xl border",
         statusSurfaceClass,
         "transition-[box-shadow,transform,border-color,background-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
         "hover:-translate-y-1",
@@ -776,7 +783,12 @@ export function TaskCard({
         </div>
       )}
 
-      <div className={cn("relative z-10 px-4 pb-4 pt-4 pl-5", isSelectionMode && "pl-9")}>
+      <div
+        className={cn(
+          "relative z-10 flex min-h-0 flex-1 flex-col px-4 pb-4 pt-4 pl-5",
+          isSelectionMode && "pl-9"
+        )}
+      >
         <div className="mb-3 flex items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
             <span
@@ -806,15 +818,17 @@ export function TaskCard({
           </span>
         </div>
 
-        <h3 className="line-clamp-2 text-[15px] font-semibold leading-[1.35] tracking-[-0.02em] text-neutral-900 dark:text-neutral-50">
+        <h3 className="line-clamp-2 min-h-[2.5rem] text-[15px] font-semibold leading-[1.35] tracking-[-0.02em] text-neutral-900 dark:text-neutral-50">
           {task.title}
         </h3>
 
-        {task.description && (
-          <p className="mt-2.5 line-clamp-2 text-[12px] leading-[1.55] text-neutral-600/90 dark:text-neutral-400">
-            {task.description}
-          </p>
-        )}
+        <div className="mt-1.5 min-h-[1.125rem]">
+          {task.description ? (
+            <p className="line-clamp-1 text-[12px] leading-[1.55] text-neutral-600/90 dark:text-neutral-400">
+              {task.description}
+            </p>
+          ) : null}
+        </div>
 
         {cadenceLine ? (
           <p className="mt-2 text-[11px] font-medium text-indigo-700/80 dark:text-indigo-300/80">
@@ -849,18 +863,18 @@ export function TaskCard({
           )}
         </div>
 
-        {labels.length > 0 && (
+        {labels.length > 0 ? (
           <div className="mt-3">
             <TaskLabelGroup labels={labels} />
           </div>
-        )}
+        ) : null}
 
-        <div className="mt-4 flex items-end justify-between gap-3 rounded-xl border border-white/50 bg-white/40 px-2.5 py-2.5 backdrop-blur-sm dark:border-white/[0.08] dark:bg-black/10">
+        <div className="mt-auto flex items-end justify-between gap-3 rounded-xl border border-white/50 bg-white/40 px-2.5 py-2.5 backdrop-blur-sm dark:border-white/[0.08] dark:bg-black/10">
           <TaskMetaRow
             commentsCount={activityComments}
             attachmentsCount={activityAttachments}
-            checklistCompleted={task.checklistCompleted}
-            checklistTotal={task.checklistTotal}
+            checklistCompleted={checklistCompleted}
+            checklistTotal={checklistTotal}
             className="min-w-0 flex-1"
           />
           <TaskAssigneePopover
@@ -886,48 +900,6 @@ export function TaskCard({
             }
           />
         </div>
-
-        {typeof progressPct === "number" && <TaskProgressBar value={progressPct} />}
-
-        {showQuickActions && !!quickActions?.onChangeStatus && otherStatuses.length > 0 ? (
-          <div
-            className={cn(
-              "mt-3 flex flex-wrap gap-1.5 border-t border-white/50 pt-3 dark:border-white/10",
-              "pointer-events-none max-h-0 overflow-hidden opacity-0 transition-all duration-200",
-              "group-hover/card:pointer-events-auto group-hover/card:max-h-24 group-hover/card:opacity-100",
-              "group-focus-within/card:pointer-events-auto group-focus-within/card:max-h-24 group-focus-within/card:opacity-100"
-            )}
-            data-quick-action
-          >
-            {otherStatuses.map((status) => {
-              const category = getWorkflowStatusCategory(status);
-              const dotClass =
-                category === "done"
-                  ? STATUS_BULB.done
-                  : category === "in_progress"
-                    ? STATUS_BULB.in_progress
-                    : category === "todo"
-                      ? STATUS_BULB.todo
-                      : "bg-neutral-400 ring-2 ring-neutral-200/80";
-              return (
-                <button
-                  key={status.id}
-                  type="button"
-                  data-quick-action
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#E7EAF0] bg-[#FCFCFD]/95 px-2 py-1 text-[10px] font-medium text-foreground shadow-sm transition-colors hover:border-primary/30 hover:bg-white dark:border-border dark:bg-card/95 dark:hover:bg-card"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    suppressOpenRef.current = true;
-                    quickActions.onChangeStatus?.(task, status.id);
-                  }}
-                >
-                  <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", dotClass)} aria-hidden />
-                  {status.name}
-                </button>
-              );
-            })}
-          </div>
-        ) : null}
       </div>
     </div>
   );

@@ -793,7 +793,7 @@ export default function TasksPage() {
   const isBoardLoading = workflowsLoading || statusesLoading || tasksLoading || setupWorkflowMutation.isPending;
 
   return (
-    <div className="flex min-h-0 flex-1 basis-0 flex-col gap-4 overflow-hidden animate-slide-up">
+    <div className="flex h-0 min-h-0 flex-1 flex-col gap-4 overflow-hidden animate-slide-up">
       {celebrationLayer}
       <div className="flex shrink-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex min-w-0 flex-1 flex-col gap-3">
@@ -906,10 +906,10 @@ export default function TasksPage() {
             />
           </div>
 
-          <div className="flex min-h-0 flex-1 basis-0 flex-col overflow-hidden">
+          <div className="flex h-0 min-h-0 flex-1 flex-col overflow-hidden">
             {viewMode === "kanban" ? (
               <KanbanBoard
-                className="min-h-0 flex-1 basis-0"
+                className="min-h-0 flex-1"
                 statuses={statuses}
                 tasksByStatus={tasksByStatus}
                 onMoveTask={handleMoveTask}

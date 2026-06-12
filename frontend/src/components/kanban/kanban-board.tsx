@@ -468,7 +468,7 @@ function DroppableColumn({
       ref={setNodeRef}
       data-cy={`kanban-column-${status.id}`}
       className={cn(
-        "group/col flex h-full max-h-full min-h-0 min-w-[310px] flex-1 flex-col rounded-2xl border transition-all duration-300",
+        "group/col flex h-full min-h-0 min-w-[310px] flex-1 flex-col self-stretch rounded-2xl border transition-all duration-300",
         isActiveTarget
           ? "ring-2 ring-primary/40 border-primary/30 bg-primary/[0.03] shadow-lg shadow-primary/10 scale-[1.01]"
           : "bg-muted/15 hover:bg-muted/20",
@@ -525,7 +525,7 @@ function DroppableColumn({
       )}
 
       {/* Cards — only this area scrolls vertically */}
-      <div className="flex min-h-0 flex-1 basis-0 flex-col gap-2.5 overflow-y-auto overscroll-y-contain p-3">
+      <div className="flex min-h-0 flex-1 basis-0 flex-col gap-2.5 overflow-y-auto overscroll-y-contain px-3 pb-2 pt-3">
         {recurring.length > 0 ? (
           <div className="flex flex-col gap-2.5">
             {showSections ? <ColumnSectionHeader label="Recurring" count={recurring.length} /> : null}
@@ -559,7 +559,7 @@ function DroppableColumn({
 
       {/* Quick add */}
       {onQuickAdd && !permissions?.isViewer && (
-        <div className="shrink-0 p-3 pt-0">
+        <div className="shrink-0 border-t border-border/40 px-3 pb-4 pt-3">
           <QuickAddInline onAdd={(title) => onQuickAdd(title, status.id)} />
         </div>
       )}
@@ -800,13 +800,11 @@ export function KanbanBoard({
       }}
     >
       <div
-        className={cn(
-          "flex h-full min-h-0 w-full flex-1 basis-0 gap-4 overflow-x-auto overflow-y-hidden pb-2",
-          className
-        )}
+        className={cn("flex min-h-0 flex-1 flex-col", className)}
         role="region"
         aria-label={ariaLabel}
       >
+        <div className="flex min-h-0 flex-1 items-stretch gap-4 overflow-x-auto overflow-y-hidden pb-3">
         {statuses.map((status, idx) => (
           <DroppableColumn
             key={status.id}
@@ -835,6 +833,7 @@ export function KanbanBoard({
             currentUserId={currentUserId}
           />
         ))}
+        </div>
       </div>
 
       <DragOverlay dropAnimation={{ duration: 250, easing: "cubic-bezier(0.18, 0.67, 0.6, 1.22)" }}>

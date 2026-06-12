@@ -144,15 +144,20 @@ export function SubtaskCompactRow({
             disabled
           />
         )}
-        {attachmentCount > 0 ? (
-          <span
-            className="inline-flex items-center gap-0.5 rounded-full bg-muted/40 px-2 py-1 text-[11px] font-medium text-muted-foreground"
-            title={`${attachmentCount} attachment${attachmentCount === 1 ? "" : "s"}`}
-          >
-            <Paperclip className="h-3 w-3" />
-            {attachmentCount}
-          </span>
-        ) : null}
+        <span
+          className="inline-flex h-7 w-9 shrink-0 items-center justify-center"
+          aria-hidden={attachmentCount === 0}
+        >
+          {attachmentCount > 0 ? (
+            <span
+              className="inline-flex items-center gap-0.5 rounded-full bg-muted/40 px-2 py-1 text-[11px] font-medium text-muted-foreground"
+              title={`${attachmentCount} attachment${attachmentCount === 1 ? "" : "s"}`}
+            >
+              <Paperclip className="h-3 w-3" />
+              {attachmentCount}
+            </span>
+          ) : null}
+        </span>
         <Button
           type="button"
           variant="ghost"
