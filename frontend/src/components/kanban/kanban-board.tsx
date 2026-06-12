@@ -119,6 +119,7 @@ function TaskCard({
   isSelectionMode,
   onToggleSelect,
   permissions,
+  currentUserId,
 }: {
   task: Task;
   isOverlay?: boolean;
@@ -135,6 +136,7 @@ function TaskCard({
   isSelectionMode?: boolean;
   onToggleSelect?: (taskId: string) => void;
   permissions?: BoardPermissions;
+  currentUserId?: string | null;
 }) {
   return (
     <EnterpriseTaskCard
@@ -153,6 +155,7 @@ function TaskCard({
       isSelectionMode={isSelectionMode}
       onToggleSelect={onToggleSelect}
       permissions={permissions}
+      currentUserId={currentUserId}
     />
   );
 }
