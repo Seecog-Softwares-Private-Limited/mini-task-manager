@@ -52,6 +52,10 @@ class CreateTaskSubtaskDto {
   priority?: string;
 
   @IsOptional()
+  @IsIn(['TODO', 'IN_PROGRESS', 'DONE'])
+  status?: string;
+
+  @IsOptional()
   @IsUUID('4')
   statusId?: string;
 

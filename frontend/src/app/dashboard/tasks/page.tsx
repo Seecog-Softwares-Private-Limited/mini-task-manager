@@ -713,7 +713,7 @@ export default function TasksPage() {
             completed: s.completed,
             assigneeId: s.assigneeId || undefined,
             dueDate: s.dueDate || undefined,
-            priority: s.priority ?? "MEDIUM",
+            status: s.status ?? (s.completed ? "DONE" : "TODO"),
           }))
           .filter((s) => s.title.length > 0),
         recurrence:

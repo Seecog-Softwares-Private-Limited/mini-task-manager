@@ -5,145 +5,100 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { WorkflowStatus } from "@/types/api";
-import { Check } from "lucide-react";
+import {
+  SUBTASK_STATUS_OPTIONS,
+  resolveSubtaskStatus,
+  type SubtaskStatus,
+} from "@/lib/subtask-status";
 import { cn } from "@/lib/utils";
+import { Check, ChevronDown } from "lucide-react";
 
+/** Above sheet/drawer overlay (z-50). */
 const DROPDOWN_Z = "z-[110]";
 
-const STATUS_DOT_FALLBACK = [
-  "bg-blue-500",
-  "bg-amber-500",
-  "bg-violet-500",
-  "bg-emerald-500",
-  "bg-rose-500",
-];
+const fieldShell =
+  "h-11 w-full justify-between rounded-xl border-0 bg-white/85 px-4 text-sm font-semibold tracking-tight text-foreground shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08)] transition-[background-color,box-shadow] hover:bg-white hover:!text-foreground hover:shadow-[inset_0_0_0_1px_rgba(15,23,42,0.12),0_4px_12px_-6px_rgba(15,23,42,0.12)] data-[state=open]:!text-foreground focus-visible:!text-foreground dark:bg-white/[0.06] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)] dark:hover:bg-white/[0.1] dark:hover:!text-foreground dark:data-[state=open]:!text-foreground";
+
+const rowShell =
+  "h-8 min-w-[7.25rem] max-w-[9rem] shrink-0 justify-between rounded-xl border-0 bg-white/85 px-2.5 text-xs font-semibold tracking-tight text-foreground shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08)] transition-[background-color,box-shadow] hover:bg-white hover:!text-foreground hover:shadow-[inset_0_0_0_1px_rgba(15,23,42,0.12),0_4px_12px_-6px_rgba(15,23,42,0.12)] data-[state=open]:!text-foreground focus-visible:!text-foreground dark:bg-white/[0.06] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)] dark:hover:bg-white/[0.1] dark:hover:!text-foreground dark:data-[state=open]:!text-foreground";
 
 interface SubtaskStatusSelectorProps {
-  statuses: WorkflowStatus[];
-  value?: string;
-  onChange: (statusId: string) => void;
-  disabled?: boolean;
+  value?: SubtaskStatus | string;
   completed?: boolean;
-}
-
-export function isDoneWorkflowStatus(status: WorkflowStatus): boolean {
-  return status.type === "DONE" || status.name.toLowerCase() === "done";
-}
-
-export function defaultTodoStatusId(statuses: WorkflowStatus[]): string | undefined {
-  return (
-    statuses.find((s) => s.type === "TODO" || s.name.toLowerCase() === "to do")?.id ??
-    statuses[0]?.id
-  );
-}
-
-export function defaultDoneStatusId(statuses: WorkflowStatus[]): string | undefined {
-  return statuses.find(isDoneWorkflowStatus)?.id;
-}
-
-export function resolveSubtaskStatusId(
-  subtask: { statusId?: string; completed?: boolean },
-  statuses: WorkflowStatus[]
-): string | undefined {
-  if (subtask.statusId && statuses.some((s) => s.id === subtask.statusId)) {
-    return subtask.statusId;
-  }
-  if (subtask.completed) {
-    return defaultDoneStatusId(statuses) ?? defaultTodoStatusId(statuses);
-  }
-  return defaultTodoStatusId(statuses);
+  onChange: (status: SubtaskStatus) => void;
+  disabled?: boolean;
+  /** `row` for compact checklist rows; `field` matches task status dropdown in sidebar. */
+  variant?: "row" | "field";
 }
 
 export function SubtaskStatusSelector({
-  statuses,
   value,
+  completed,
   onChange,
   disabled,
-  completed,
+  variant = "row",
 }: SubtaskStatusSelectorProps) {
+  const resolved = resolveSubtaskStatus({ status: value, completed });
   const selected =
-    statuses.find((s) => s.id === value) ??
-    statuses.find((s) => s.id === resolveSubtaskStatusId({ statusId: value, completed }, statuses)) ??
-    statuses[0];
-
-  if (statuses.length === 0) {
-    return (
-      <Button
-        type="button"
-        variant="ghost"
-        disabled
-        className="h-8 rounded-full px-3 text-[11px] font-semibold text-muted-foreground ring-1 ring-dashed ring-muted-foreground/30"
-      >
-        Status
-      </Button>
-    );
-  }
+    SUBTASK_STATUS_OPTIONS.find((option) => option.value === resolved) ??
+    SUBTASK_STATUS_OPTIONS[0];
 
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <Button
           type="button"
-          variant="ghost"
+          variant="outline"
           disabled={disabled}
-          className={cn(
-            "h-8 max-w-[7.5rem] rounded-full px-3 text-[11px] font-semibold shadow-sm ring-1 ring-border/25 transition-[box-shadow] hover:ring-border/40",
-            completed
-              ? "bg-emerald-500/10 text-emerald-700 ring-emerald-500/25 dark:text-emerald-400"
-              : "bg-background/90 text-foreground/90"
-          )}
-          aria-label={selected ? `Subtask status ${selected.name}` : "Subtask status"}
+          className={cn(variant === "field" ? fieldShell : rowShell)}
+          aria-label={selected ? `Subtask status ${selected.label}` : "Subtask status"}
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
         >
-          {selected ? (
-            <>
-              <span
-                className={cn(
-                  "mr-1.5 h-2 w-2 shrink-0 rounded-full",
-                  selected.color ||
-                    STATUS_DOT_FALLBACK[
-                      statuses.findIndex((s) => s.id === selected.id) % STATUS_DOT_FALLBACK.length
-                    ]
-                )}
-              />
-              <span className="truncate">{selected.name}</span>
-            </>
-          ) : (
-            "Status"
-          )}
+          <span className="flex min-w-0 flex-1 items-center gap-2">
+            <span
+              className={cn(
+                "h-2.5 w-2.5 shrink-0 rounded-full shadow-sm ring-2 ring-white/80 dark:ring-black/40",
+                selected.dotClass
+              )}
+              aria-hidden
+            />
+            <span className="truncate">{selected.label}</span>
+          </span>
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
-        align="end"
-        className={cn("w-48 p-1", DROPDOWN_Z)}
-        sideOffset={8}
+        align={variant === "field" ? "start" : "end"}
+        className={cn(
+          "p-1",
+          variant === "field"
+            ? "w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px]"
+            : "min-w-[200px]",
+          DROPDOWN_Z
+        )}
+        sideOffset={6}
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
       >
-        <DropdownMenuLabel className="px-2 pb-1 text-xs font-semibold">Status</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {statuses.map((status, index) => {
-          const isCurrent = status.id === selected?.id;
+        {SUBTASK_STATUS_OPTIONS.map((option) => {
+          const isCurrent = option.value === selected.value;
           return (
             <DropdownMenuItem
-              key={status.id}
+              key={option.value}
               onSelect={(event) => {
                 event.preventDefault();
-                onChange(status.id);
+                onChange(option.value);
               }}
-              className="rounded-md text-xs"
+              className="rounded-lg text-sm"
             >
               <span
-                className={cn(
-                  "mr-2 h-2 w-2 shrink-0 rounded-full",
-                  status.color || STATUS_DOT_FALLBACK[index % STATUS_DOT_FALLBACK.length]
-                )}
+                className={cn("mr-2 h-2.5 w-2.5 shrink-0 rounded-full", option.dotClass)}
+                aria-hidden
               />
-              <span className="flex-1">{status.name}</span>
+              <span className="flex-1">{option.label}</span>
               {isCurrent ? <Check className="h-3.5 w-3.5 shrink-0 text-primary" /> : null}
             </DropdownMenuItem>
           );
