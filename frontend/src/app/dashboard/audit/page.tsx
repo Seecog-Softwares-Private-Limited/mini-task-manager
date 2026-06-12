@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import type { ActivityLog } from "@/types/api";
+import { ScrollablePageLayout } from "@/components/dashboard/scrollable-page-layout";
 import { Shield, Filter, ClipboardList, Building2, ChevronLeft, ChevronRight } from "lucide-react";
 
 const PAGE_SIZE = 20;
@@ -103,45 +104,46 @@ export default function AuditLogPage() {
   }
 
   return (
-    <div className="space-y-6 animate-slide-up" data-cy="audit-log-page">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Audit Log</h1>
-        <p className="mt-1 text-sm text-muted-foreground">View workspace activity. Owner/admin only.</p>
-      </div>
+    <ScrollablePageLayout data-cy="audit-log-page" header={
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Audit Log</h1>
+            <p className="mt-1 text-sm text-muted-foreground">View workspace activity. Owner/admin only.</p>
+          </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Filter className="h-4 w-4 text-primary" />
-            Filters
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Entity type</label>
-            <Input placeholder="e.g. project" value={entityTypeFilter} onChange={(e) => setEntityTypeFilter(e.target.value)} className="h-9" />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Action</label>
-            <Input placeholder="e.g. create" value={actionFilter} onChange={(e) => setActionFilter(e.target.value)} className="h-9" />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">User ID</label>
-            <Input placeholder="Filter by user" value={userFilter} onChange={(e) => setUserFilter(e.target.value)} className="h-9" />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">From</label>
-            <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9" />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">To</label>
-            <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9" />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Activity table */}
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Filter className="h-4 w-4 text-primary" />
+                Filters
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Entity type</label>
+                <Input placeholder="e.g. project" value={entityTypeFilter} onChange={(e) => setEntityTypeFilter(e.target.value)} className="h-9" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Action</label>
+                <Input placeholder="e.g. create" value={actionFilter} onChange={(e) => setActionFilter(e.target.value)} className="h-9" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">User ID</label>
+                <Input placeholder="Filter by user" value={userFilter} onChange={(e) => setUserFilter(e.target.value)} className="h-9" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">From</label>
+                <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">To</label>
+                <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      }
+    >
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -215,6 +217,6 @@ export default function AuditLogPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </ScrollablePageLayout>
   );
 }

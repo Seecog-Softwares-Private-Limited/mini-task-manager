@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ListPagination } from "@/components/ui/list-pagination";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollablePageLayout } from "@/components/dashboard/scrollable-page-layout";
 import { Bell, CheckCheck, RefreshCw } from "lucide-react";
 
 const REFETCH_INTERVAL_MS = 15_000;
@@ -64,37 +65,39 @@ export default function NotificationsPage() {
   const listLoading = isLoading && notifications.length === 0;
 
   return (
-    <div className="space-y-6 animate-slide-up">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Notifications</h1>
-          <p className="mt-1 text-muted-foreground">
-            Your notifications. Updates every 15 seconds.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={isFetching}
-          >
-            <RefreshCw className={`mr-1.5 h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-          {hasUnread && (
+    <ScrollablePageLayout
+      header={
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Notifications</h1>
+            <p className="mt-1 text-muted-foreground">
+              Your notifications. Updates every 15 seconds.
+            </p>
+          </div>
+          <div className="flex gap-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => markAllRead?.()}
-              aria-label="Mark all as read"
+              onClick={handleRefresh}
+              disabled={isFetching}
             >
-              <CheckCheck className="mr-1.5 h-4 w-4" /> Mark all as read
+              <RefreshCw className={`mr-1.5 h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+              Refresh
             </Button>
-          )}
+            {hasUnread && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => markAllRead?.()}
+                aria-label="Mark all as read"
+              >
+                <CheckCheck className="mr-1.5 h-4 w-4" /> Mark all as read
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
-
+      }
+    >
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
@@ -157,6 +160,6 @@ export default function NotificationsPage() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </ScrollablePageLayout>
   );
 }
