@@ -57,6 +57,12 @@ function taskAssigneeUserIds(task: TaskEntity): string[] {
   return Array.from(ids);
 }
 
+function isTaskReporter(task: TaskEntity, userId: string): boolean {
+  const normalizedUserId = normalizeAssigneeUserId(userId);
+  if (!normalizedUserId) return false;
+  return normalizedUserId === normalizeAssigneeUserId(task.reporterId);
+}
+
 function patchDtoKeys(dto: PatchTaskDto): string[] {
   return (Object.keys(dto) as (keyof PatchTaskDto)[]).filter((k) => dto[k] !== undefined);
 }
@@ -265,6 +271,10 @@ export class TasksService {
     const task = await this.tasksRepository.findByIdAndOrganization(taskId, organizationId);
     if (!task) throw new NotFoundException('Task not found');
 
+    if (userId) {
+      await this.assertCanDeleteTask(task, organizationId, userId);
+    }
+
     const attachments = await this.taskAttachmentsRepository.findByTask(taskId);
     const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
     for (const attachment of attachments) {
@@ -287,6 +297,20 @@ export class TasksService {
       .catch(() => {});
   }
 
+  private async assertCanDeleteTask(
+    task: TaskEntity,
+    organizationId: string,
+    userId: string,
+  ): Promise<void> {
+    const membership = await this.organizationsService.getMembership(organizationId, userId);
+    const role = membership?.role?.toLowerCase() ?? '';
+    if (role === 'owner') return;
+
+    if (isTaskReporter(task, userId)) return;
+
+    throw new ForbiddenException('Only the workspace owner or task creator can delete this task');
+  }
+
   private async assertCanUpdateTask(
     task: TaskEntity,
     organizationId: string,
@@ -300,8 +324,15 @@ export class TasksService {
     const assigneeIds = taskAssigneeUserIds(task);
     const normalizedUserId = normalizeAssigneeUserId(userId);
     const isAssignee = normalizedUserId != null && assigneeIds.includes(normalizedUserId);
+    const isReporter = isTaskReporter(task, userId);
+
+    // Assigned-by user who is also assigned gets full edit access.
+    if (isReporter && isAssignee) return;
+
     if (!isAssignee) {
-      throw new ForbiddenException('Only the workspace owner or task assignee can update this task');
+      throw new ForbiddenException(
+        'Only the workspace owner, task assignee, or assigned-by user (when also assigned) can update this task',
+      );
     }
 
     const keys = patchDtoKeys(dto);

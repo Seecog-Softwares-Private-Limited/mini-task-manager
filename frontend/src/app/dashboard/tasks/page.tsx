@@ -734,10 +734,8 @@ export default function TasksPage() {
       recurringActionMutation.mutate({ type: "complete", task }),
     onSkipNextOccurrence: (task: Task) =>
       recurringActionMutation.mutate({ type: "skip", task }),
-    ...(permissions.canDeleteTask && {
-      onDelete: (task: Task) => setDeleteTarget(task),
-    }),
-  }), [updateMutation, recurringActionMutation, permissions.canDeleteTask]);
+    onDelete: (task: Task) => setDeleteTarget(task),
+  }), [updateMutation, recurringActionMutation]);
 
   const handleToggleSelectionMode = useCallback(() => {
     if (bulk.state.isSelectionMode) bulk.exitSelectionMode();
