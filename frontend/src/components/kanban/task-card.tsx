@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
+import { cn, formatRelativeTime } from "@/lib/utils";
+import { stripHtmlToPlainText } from "@/lib/project-description-plain";
 import type { Task, WorkflowStatus } from "@/types/api";
 import type { BoardPermissions } from "@/hooks/use-board-permissions";
 import type { AssigneeMap, SubtaskInfo, TaskCardQuickActions } from "@/components/kanban/kanban-board";
@@ -25,14 +26,17 @@ import {
 import {
   AlertCircle,
   ArrowRight,
+  Ban,
   BookOpen,
   Bug,
   Calendar,
   CheckCircle2,
-  CircleDot,
   Clock3,
+  Code2,
+  Link2,
   ListChecks,
   MessageSquare,
+  Monitor,
   MoreHorizontal,
   Paperclip,
   Repeat,
@@ -55,7 +59,25 @@ import {
   recurrenceRibbonLabel,
 } from "@/lib/recurrence-display";
 
-export type TaskType = "bug" | "feature" | "story" | "improvement";
+export type TaskType =
+  | "bug"
+  | "feature"
+  | "story"
+  | "improvement"
+  | "ui"
+  | "backend"
+  | "recurring";
+
+const TYPE_TAG_NAMES = new Set([
+  "bug",
+  "feature",
+  "story",
+  "improvement",
+  "ui",
+  "backend",
+]);
+
+const BLOCKED_TAG_NAMES = new Set(["blocked", "blocker"]);
 
 interface TaskLabel {
   id?: string;
@@ -225,26 +247,194 @@ const QUICK_ACTIONS_BAR = cn(
   "group-focus-within/card:pointer-events-auto group-focus-within/card:opacity-100",
 );
 
-function getDueDateTone(dueDate?: string) {
+function getDueDateTone(dueDate?: string, isCompleted = false) {
   if (!dueDate) return null;
   const due = new Date(dueDate);
   const now = new Date();
   const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime();
   const nowDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  if (dueDay < nowDay)
-    return { tone: "overdue", className: "text-rose-700 bg-rose-500/[0.06] dark:text-rose-300", icon: AlertCircle };
-  if (dueDay === nowDay)
-    return { tone: "today", className: "text-amber-800 bg-amber-500/[0.08] dark:text-amber-200", icon: Clock3 };
-  return { tone: "future", className: "text-neutral-500 bg-neutral-500/[0.06] dark:text-neutral-400 dark:bg-white/5", icon: Calendar };
+  if (isCompleted) {
+    return {
+      tone: "completed",
+      label: due.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+      className:
+        "text-emerald-800 bg-emerald-500/[0.1] ring-1 ring-emerald-500/15 dark:text-emerald-200 dark:bg-emerald-500/15",
+      icon: CheckCircle2,
+    };
+  }
+  if (dueDay < nowDay) {
+    return {
+      tone: "overdue",
+      label: due.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+      className: "text-rose-700 bg-rose-500/[0.1] ring-1 ring-rose-500/15 dark:text-rose-300",
+      icon: AlertCircle,
+    };
+  }
+  if (dueDay === nowDay) {
+    return {
+      tone: "today",
+      label: "Today",
+      className: "text-amber-900 bg-amber-500/[0.12] ring-1 ring-amber-500/15 dark:text-amber-100",
+      icon: Clock3,
+    };
+  }
+  return {
+    tone: "future",
+    label: due.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+    className: "text-neutral-600 bg-neutral-500/[0.08] dark:text-neutral-300 dark:bg-white/5",
+    icon: Calendar,
+  };
 }
 
-function TypeIcon({ type }: { type?: TaskType }) {
-  const common = "h-3.5 w-3.5 shrink-0 opacity-80";
-  if (type === "bug") return <Bug className={cn(common, "text-rose-600 dark:text-rose-400")} aria-label="Bug" />;
-  if (type === "feature") return <Rocket className={cn(common, "text-sky-600 dark:text-sky-400")} aria-label="Feature" />;
-  if (type === "story") return <BookOpen className={cn(common, "text-violet-600 dark:text-violet-400")} aria-label="Story" />;
-  if (type === "improvement") return <Wrench className={cn(common, "text-emerald-600 dark:text-emerald-400")} aria-label="Improvement" />;
-  return <CircleDot className={cn(common, "text-neutral-400 dark:text-neutral-500")} aria-label="Task" />;
+const TASK_TYPE_META: Record<
+  TaskType,
+  { label: string; icon: React.ComponentType<{ className?: string }>; className: string }
+> = {
+  bug: {
+    label: "Bug",
+    icon: Bug,
+    className:
+      "border-rose-200/80 bg-rose-500/[0.08] text-rose-800 dark:border-rose-500/30 dark:text-rose-200",
+  },
+  feature: {
+    label: "Feature",
+    icon: Rocket,
+    className:
+      "border-sky-200/80 bg-sky-500/[0.08] text-sky-800 dark:border-sky-500/30 dark:text-sky-200",
+  },
+  story: {
+    label: "Story",
+    icon: BookOpen,
+    className:
+      "border-violet-200/80 bg-violet-500/[0.08] text-violet-800 dark:border-violet-500/30 dark:text-violet-200",
+  },
+  improvement: {
+    label: "Improvement",
+    icon: Wrench,
+    className:
+      "border-emerald-200/80 bg-emerald-500/[0.08] text-emerald-800 dark:border-emerald-500/30 dark:text-emerald-200",
+  },
+  ui: {
+    label: "UI",
+    icon: Monitor,
+    className:
+      "border-fuchsia-200/80 bg-fuchsia-500/[0.08] text-fuchsia-800 dark:border-fuchsia-500/30 dark:text-fuchsia-200",
+  },
+  backend: {
+    label: "Backend",
+    icon: Code2,
+    className:
+      "border-slate-200/80 bg-slate-500/[0.08] text-slate-800 dark:border-slate-500/30 dark:text-slate-200",
+  },
+  recurring: {
+    label: "Recurring",
+    icon: Repeat,
+    className:
+      "border-indigo-200/80 bg-indigo-500/[0.08] text-indigo-800 dark:border-indigo-500/30 dark:text-indigo-200",
+  },
+};
+
+function inferTaskType(task: TaskCardTask): TaskType | null {
+  if (task.type) return task.type;
+  for (const tag of task.tags ?? task.labels ?? []) {
+    const key = tag.name.trim().toLowerCase();
+    if (key === "recurring") return "recurring";
+    if (TYPE_TAG_NAMES.has(key)) return key as TaskType;
+  }
+  return null;
+}
+
+function partitionTaskTags(tags: TaskLabel[]) {
+  let typeTag: TaskType | null = null;
+  let blocked = false;
+  const labels: TaskLabel[] = [];
+
+  for (const tag of tags) {
+    const key = tag.name.trim().toLowerCase();
+    if (!typeTag && (TYPE_TAG_NAMES.has(key) || key === "recurring")) {
+      typeTag = key as TaskType;
+      continue;
+    }
+    if (BLOCKED_TAG_NAMES.has(key)) {
+      blocked = true;
+      continue;
+    }
+    labels.push(tag);
+  }
+
+  return { typeTag, blocked, labels };
+}
+
+function getActivityLine(task: TaskCardTask): string | null {
+  if (!task.updatedAt) return null;
+  const updated = new Date(task.updatedAt);
+  const created = new Date(task.createdAt);
+  if (Number.isNaN(updated.getTime())) return null;
+
+  const now = new Date();
+  const isToday =
+    updated.getFullYear() === now.getFullYear() &&
+    updated.getMonth() === now.getMonth() &&
+    updated.getDate() === now.getDate();
+  const wasUpdatedAfterCreate = updated.getTime() - created.getTime() > 60_000;
+
+  if (isToday && wasUpdatedAfterCreate) return "Moved today";
+
+  const relative = formatRelativeTime(task.updatedAt);
+  return relative ? `Updated ${relative}` : null;
+}
+
+function TaskTypeBadge({ type }: { type: TaskType }) {
+  const meta = TASK_TYPE_META[type];
+  const Icon = meta.icon;
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide backdrop-blur-sm",
+        meta.className
+      )}
+    >
+      <Icon className="h-3 w-3 shrink-0 opacity-90" aria-hidden />
+      {meta.label}
+    </span>
+  );
+}
+
+function SubtaskProgressInline({
+  completed,
+  total,
+}: {
+  completed: number;
+  total: number;
+}) {
+  if (total <= 0) return null;
+  const pct = Math.round((completed / total) * 100);
+  return (
+    <div className="mt-3 space-y-1.5">
+      <div className="flex items-center justify-between gap-2 text-[10px] font-medium tabular-nums text-neutral-500 dark:text-neutral-400">
+        <span className="inline-flex items-center gap-1">
+          <ListChecks className="h-3 w-3 opacity-80" aria-hidden />
+          Subtasks
+        </span>
+        <span>
+          {completed}/{total}
+        </span>
+      </div>
+      <div
+        className="h-1 w-full overflow-hidden rounded-full bg-neutral-100/90 dark:bg-white/10"
+        role="progressbar"
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={`${completed} of ${total} subtasks complete`}
+      >
+        <div
+          className="h-full rounded-full bg-primary/75 transition-[width] duration-300 ease-out"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
 }
 
 export function TaskPriorityBadge({ priority }: { priority: string }) {
@@ -295,14 +485,10 @@ export function TaskLabelGroup({ labels }: { labels: TaskLabel[] }) {
 export function TaskMetaRow({
   commentsCount,
   attachmentsCount,
-  checklistCompleted,
-  checklistTotal,
   className,
 }: {
   commentsCount: number;
   attachmentsCount: number;
-  checklistCompleted?: number;
-  checklistTotal?: number;
   className?: string;
 }) {
   const iconClass = "h-3.5 w-3.5 text-neutral-400 dark:text-neutral-500";
@@ -315,15 +501,6 @@ export function TaskMetaRow({
       <span className="inline-flex items-center gap-1.5" aria-label={`${attachmentsCount} attachments`}>
         <Paperclip className={iconClass} strokeWidth={2} />
         {attachmentsCount}
-      </span>
-      <span
-        className="inline-flex items-center gap-1.5"
-        aria-label={`${checklistCompleted ?? 0} of ${checklistTotal ?? 0} subtasks`}
-      >
-        <ListChecks className={iconClass} strokeWidth={2} />
-        {(checklistTotal ?? 0) > 0
-          ? `${checklistCompleted ?? 0}/${checklistTotal}`
-          : 0}
       </span>
     </div>
   );
@@ -348,9 +525,11 @@ export function TaskProgressBar({ value }: { value: number }) {
 export function TaskAvatarStack({
   assignees,
   fallbackLabel = "Unassigned",
+  reporterName,
 }: {
   assignees: TaskAssignee[];
   fallbackLabel?: string;
+  reporterName?: string | null;
 }) {
   if (assignees.length === 0) {
     return (
@@ -363,7 +542,10 @@ export function TaskAvatarStack({
               </AvatarFallback>
             </Avatar>
           </TooltipTrigger>
-          <TooltipContent className="text-xs">{fallbackLabel}</TooltipContent>
+          <TooltipContent className="max-w-[220px] text-xs">
+            <p>{fallbackLabel}</p>
+            {reporterName ? <p className="mt-1 text-muted-foreground">Created by {reporterName}</p> : null}
+          </TooltipContent>
         </Tooltip>
       </TooltipProvider>
     );
@@ -389,8 +571,14 @@ export function TaskAvatarStack({
                 fallbackClassName="text-[10px] font-medium tracking-tight bg-violet-100 text-violet-700 dark:bg-primary/15 dark:text-primary"
               />
             </TooltipTrigger>
-            <TooltipContent className="text-xs">
-              {assignee.name}{assignee.email ? ` (${assignee.email})` : ""}
+            <TooltipContent className="max-w-[220px] text-xs">
+              <p>Assigned to {assignee.name}</p>
+              {assignee.email ? <p className="text-muted-foreground">{assignee.email}</p> : null}
+              {index === 0 && reporterName ? (
+                <p className="mt-1 border-t border-border/60 pt-1 text-muted-foreground">
+                  Created by {reporterName}
+                </p>
+              ) : null}
             </TooltipContent>
           </Tooltip>
         ))}
@@ -459,9 +647,43 @@ export function TaskCard({
   const isRecurring = isRecurringTask(task);
   const ribbonLabel = recurrenceRibbonLabel(task);
   const cadenceLine = recurrenceCadenceShort(task.recurrenceType);
-  const dueTone = getDueDateTone(task.dueDate);
-  const showDueChip = !isRecurring || (dueTone && (dueTone.tone === "overdue" || dueTone.tone === "today"));
-  const labels = task.labels ?? (task.sprintId ? [{ id: "sprint", name: "Sprint", color: "#6366f1" }] : []);
+  const statusForLane =
+    boardColumnStatus ?? statuses?.find((s) => s.id === task.statusId);
+  const statusCategory = getWorkflowStatusCategory(statusForLane);
+  const isCompleted = statusCategory === "done";
+  const dueTone = getDueDateTone(task.dueDate, isCompleted);
+  const tagSource: TaskLabel[] = useMemo(
+    () =>
+      (task.tags ?? task.labels ?? []).map((tag) => ({
+        id: "id" in tag && tag.id ? tag.id : tag.name,
+        name: tag.name,
+        color: tag.color,
+      })),
+    [task.labels, task.tags]
+  );
+  const { typeTag, blocked: blockedByTag, labels: partitionedLabels } = useMemo(
+    () => partitionTaskTags(tagSource),
+    [tagSource]
+  );
+  const taskType = typeTag ?? inferTaskType(task);
+  const hasDependency = !!task.parentTaskId;
+  const showBlockedBadge = blockedByTag;
+  const showDependencyBadge = hasDependency && !showBlockedBadge;
+  const labels =
+    partitionedLabels.length > 0
+      ? partitionedLabels
+      : task.sprintId
+        ? [{ id: "sprint", name: "Sprint", color: "#6366f1" }]
+        : [];
+  const descriptionPreview = useMemo(
+    () => stripHtmlToPlainText(task.description),
+    [task.description]
+  );
+  const activityLine = useMemo(() => getActivityLine(task), [task]);
+  const reporterName = useMemo(() => {
+    if (!task.reporterId) return null;
+    return assigneeMap?.[task.reporterId]?.name ?? "User";
+  }, [assigneeMap, task.reporterId]);
   const activityComments = task.commentsCount ?? commentCount;
   const activityAttachments = task.attachmentsCount ?? attachmentCount;
 
@@ -498,17 +720,6 @@ export function TaskCard({
     (Array.isArray(task.subtasks) ? task.subtasks.filter((s) => s.completed).length : 0);
 
   const prioCfg = PRIORITY[normalizePriority(task.priority)] ?? PRIORITY.medium;
-  const statusForLane =
-    boardColumnStatus ?? statuses?.find((s) => s.id === task.statusId);
-  const statusCategory = getWorkflowStatusCategory(statusForLane);
-  const leftAccentClass =
-    statusCategory === "todo"
-      ? STATUS_LANE_ACCENT.todo
-      : statusCategory === "done"
-        ? STATUS_LANE_ACCENT.done
-        : statusCategory === "in_progress"
-          ? STATUS_LANE_ACCENT.in_progress
-          : prioCfg.accentBar;
   const statusBulbClass =
     statusCategory === "todo"
       ? STATUS_BULB.todo
@@ -517,6 +728,14 @@ export function TaskCard({
         : statusCategory === "in_progress"
           ? STATUS_BULB.in_progress
           : "bg-neutral-300 ring-2 ring-neutral-200/80 dark:bg-neutral-600 dark:ring-neutral-500/40";
+  const leftAccentClass =
+    statusCategory === "todo"
+      ? STATUS_LANE_ACCENT.todo
+      : statusCategory === "done"
+        ? STATUS_LANE_ACCENT.done
+        : statusCategory === "in_progress"
+          ? STATUS_LANE_ACCENT.in_progress
+          : prioCfg.accentBar;
   const statusSurfaceClass =
     statusCategory === "todo"
       ? STATUS_CARD_SURFACE.todo
@@ -800,8 +1019,8 @@ export function TaskCard({
           isSelectionMode && "pl-9"
         )}
       >
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
+        <div className="mb-3 flex items-start justify-between gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <span
               role="img"
               aria-label={
@@ -818,15 +1037,42 @@ export function TaskCard({
             <span className="rounded-md border border-white/60 bg-white/50 px-1.5 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-widest text-neutral-500 backdrop-blur-sm dark:border-white/10 dark:bg-white/5 dark:text-neutral-400">
               #{task.id.slice(0, 4).toUpperCase()}
             </span>
+            {taskType ? (
+              <span
+                className={cn(
+                  showQuickActions && "group-hover/card:opacity-0 group-focus-within/card:opacity-0"
+                )}
+              >
+                <TaskTypeBadge type={taskType} />
+              </span>
+            ) : null}
           </div>
-          <span
+          <div
             className={cn(
-              "flex h-6 w-6 items-center justify-center rounded-md border border-white/50 bg-white/40 backdrop-blur-sm transition-opacity duration-200 dark:border-white/10 dark:bg-white/5",
+              "flex shrink-0 flex-wrap items-center justify-end gap-1.5",
               showQuickActions && "group-hover/card:opacity-0 group-focus-within/card:opacity-0"
             )}
           >
-            <TypeIcon type={task.type} />
-          </span>
+            {showBlockedBadge ? (
+              <span className="inline-flex items-center gap-1 rounded-md border border-rose-300/70 bg-rose-500/[0.1] px-1.5 py-0.5 text-[10px] font-semibold text-rose-800 dark:border-rose-500/30 dark:text-rose-200">
+                <Ban className="h-3 w-3" aria-hidden />
+                Blocked
+              </span>
+            ) : null}
+            {showDependencyBadge ? (
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex items-center gap-1 rounded-md border border-amber-300/70 bg-amber-500/[0.1] px-1.5 py-0.5 text-[10px] font-semibold text-amber-900 dark:border-amber-500/30 dark:text-amber-100">
+                      <Link2 className="h-3 w-3" aria-hidden />
+                      Dependency
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent className="text-xs">Depends on another task</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : null}
+          </div>
         </div>
 
         <h3 className="line-clamp-2 min-h-[2.5rem] text-[15px] font-semibold leading-[1.35] tracking-[-0.02em] text-neutral-900 dark:text-neutral-50">
@@ -834,9 +1080,9 @@ export function TaskCard({
         </h3>
 
         <div className="mt-1.5 min-h-[1.125rem]">
-          {task.description ? (
-            <p className="line-clamp-1 text-[12px] leading-[1.55] text-neutral-600/90 dark:text-neutral-400">
-              {task.description}
+          {descriptionPreview ? (
+            <p className="line-clamp-2 text-[12px] leading-[1.55] text-neutral-600/90 dark:text-neutral-400">
+              {descriptionPreview}
             </p>
           ) : null}
         </div>
@@ -852,7 +1098,7 @@ export function TaskCard({
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <TaskPriorityBadge priority={task.priority} />
-          {showDueChip && dueTone && (
+          {dueTone && task.dueDate ? (
             <TooltipProvider delayDuration={200}>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -863,15 +1109,15 @@ export function TaskCard({
                     )}
                   >
                     <dueTone.icon className="h-3 w-3 shrink-0 opacity-80" strokeWidth={2} />
-                    {new Date(task.dueDate!).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                    {dueTone.label}
                   </span>
                 </TooltipTrigger>
                 <TooltipContent className="text-xs">
-                  {new Date(task.dueDate!).toLocaleString()}
+                  Due {new Date(task.dueDate).toLocaleString()}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-          )}
+          ) : null}
         </div>
 
         {labels.length > 0 ? (
@@ -880,12 +1126,18 @@ export function TaskCard({
           </div>
         ) : null}
 
+        <SubtaskProgressInline completed={checklistCompleted} total={checklistTotal} />
+
+        {activityLine ? (
+          <p className="mt-2 text-[10px] font-medium text-neutral-400 opacity-80 transition-opacity group-hover/card:text-neutral-500 dark:text-neutral-500">
+            {activityLine}
+          </p>
+        ) : null}
+
         <div className="mt-auto flex items-end justify-between gap-3 rounded-xl border border-white/50 bg-white/40 px-2.5 py-2.5 backdrop-blur-sm dark:border-white/[0.08] dark:bg-black/10">
           <TaskMetaRow
             commentsCount={activityComments}
             attachmentsCount={activityAttachments}
-            checklistCompleted={checklistCompleted}
-            checklistTotal={checklistTotal}
             className="min-w-0 flex-1"
           />
           <TaskAssigneePopover
@@ -906,7 +1158,7 @@ export function TaskCard({
                 aria-label="Change assignee"
                 onClick={(e) => e.stopPropagation()}
               >
-                <TaskAvatarStack assignees={localAssignees} />
+                <TaskAvatarStack assignees={localAssignees} reporterName={reporterName} />
               </button>
             }
           />

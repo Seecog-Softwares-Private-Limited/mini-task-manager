@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { stripHtmlToPlainText } from "@/lib/project-description-plain";
 import type { Task, WorkflowStatus } from "@/types/api";
 import type { AssigneeMap, SubtaskInfo } from "./kanban-board";
 import type { BoardPermissions } from "@/hooks/use-board-permissions";
@@ -156,7 +157,9 @@ export function BoardTableView({
                             {task.title}
                           </p>
                           {task.description && (
-                            <p className="text-xs text-muted-foreground truncate mt-0.5 max-w-xs">{task.description}</p>
+                            <p className="text-xs text-muted-foreground truncate mt-0.5 max-w-xs">
+                              {stripHtmlToPlainText(task.description)}
+                            </p>
                           )}
                         </div>
                       </div>
