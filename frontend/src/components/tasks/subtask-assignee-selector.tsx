@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchOrgMembers, fetchProjectMembers } from "@/services/api/members.api";
 import { useTenant } from "@/context/tenant-context";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -139,12 +139,13 @@ export function SubtaskAssigneeSelector({
           aria-label={selected ? `Assignee ${selected.name}` : value ? "Assigned member" : "Assign subtask"}
         >
           {selected ? (
-            <Avatar className="h-7 w-7 ring-1 ring-border/60">
-              <AvatarImage src={selected.avatarUrl} />
-              <AvatarFallback className="bg-muted text-[10px] font-semibold text-foreground">
-                {selected.name.slice(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
+            <UserAvatar
+              userId={selected.id}
+              name={selected.name}
+              avatarUrl={selected.avatarUrl}
+              className="h-7 w-7 ring-1 ring-border/60"
+              fallbackClassName="bg-muted text-[10px] font-semibold text-foreground"
+            />
           ) : value ? (
             <span className="flex h-7 w-7 items-center justify-center rounded-full border border-border/40 bg-muted/40">
               <UserRound className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
@@ -211,12 +212,13 @@ export function SubtaskAssigneeSelector({
                 className="rounded-md py-2"
               >
                 <div className="flex w-full items-center gap-2.5">
-                  <Avatar className="h-7 w-7">
-                    <AvatarImage src={member.avatarUrl} />
-                    <AvatarFallback className="text-[10px]">
-                      {member.name.slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    userId={member.id}
+                    name={member.name}
+                    avatarUrl={member.avatarUrl}
+                    className="h-7 w-7"
+                    fallbackClassName="text-[10px]"
+                  />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-medium">{member.name}</p>
                     <p className="truncate text-[11px] text-muted-foreground">{member.email}</p>

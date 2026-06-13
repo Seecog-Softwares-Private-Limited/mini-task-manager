@@ -6,12 +6,15 @@ import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/rea
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
+  SheetTitle,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1054,6 +1057,9 @@ export function TaskDetailModal({
         aria-describedby="task-detail-desc"
         data-cy="task-detail-modal"
       >
+        <SheetTitle className="sr-only">
+          {task?.title ? `Task: ${task.title}` : "Task details"}
+        </SheetTitle>
         {taskLoading || !task ? (
           <div className="flex items-center justify-center min-h-[200px] p-8">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -2392,10 +2398,10 @@ export function TaskDetailModal({
     <Dialog open={completePromptOpen} onOpenChange={setCompletePromptOpen}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <h3 className="text-base font-semibold">Complete recurring task</h3>
-          <p className="text-sm text-muted-foreground">
+          <DialogTitle>Complete recurring task</DialogTitle>
+          <DialogDescription>
             Choose how this recurring occurrence should be completed.
-          </p>
+          </DialogDescription>
         </DialogHeader>
         <div className="grid gap-2">
           <Button

@@ -20,7 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { parseApiError } from "@/services/api/client";
 import { CalendarClock, PauseCircle, PlayCircle, Repeat, SkipForward, Trash2 } from "lucide-react";
 import type { RecurringTemplateSummary, TaskRecurrenceConfig } from "@/types/api";
-import { Dialog, DialogContent, DialogHeader } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { RecurrenceEditor } from "@/components/tasks/recurrence/recurrence-editor";
 import { recurrenceSummary } from "@/lib/recurrence-display";
 
@@ -267,7 +267,7 @@ export default function RecurringTasksPage() {
       <Dialog open={Boolean(editTemplate)} onOpenChange={(open) => !open && setEditTemplate(null)}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <h3 className="text-base font-semibold">Edit recurrence</h3>
+            <DialogTitle>Edit recurrence</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <RecurrenceEditor
