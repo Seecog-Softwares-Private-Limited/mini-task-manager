@@ -9,6 +9,13 @@ export function getAvatarInitials(name?: string): string {
   return value.slice(0, 2).toUpperCase();
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function avatarApiPath(userId: string): string {
+  return `/api/v1/users/avatar/${userId}`;
+}
+
 /** Stable portrait when no upload exists or the API file is missing locally. */
 export function generatedAvatarUrl(userId?: string, name?: string): string {
   const seed = encodeURIComponent((userId ?? name ?? "user").trim());
@@ -31,13 +38,17 @@ export function resolveAvatarSrc(
     return trimmed;
   }
 
+  if (trimmed && UUID_RE.test(trimmed)) {
+    return avatarApiPath(trimmed);
+  }
+
   const apiMatch = trimmed?.match(/\/api\/v1\/users\/avatar\/([0-9a-f-]+)/i);
   if (apiMatch) {
-    return `/api/v1/users/avatar/${apiMatch[1]}`;
+    return avatarApiPath(apiMatch[1]);
   }
 
   if (userId) {
-    return `/api/v1/users/avatar/${userId}`;
+    return avatarApiPath(userId);
   }
 
   if (trimmed?.startsWith("/")) {
