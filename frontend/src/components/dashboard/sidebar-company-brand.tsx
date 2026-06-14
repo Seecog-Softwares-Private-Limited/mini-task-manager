@@ -25,17 +25,24 @@ export function SidebarCompanyBrand({ collapsed }: SidebarCompanyBrandProps) {
     queryFn: fetchOrganizations,
   });
 
-  // Auto-select first workspace as soon as organizations load and none is selected
+  // Auto-select best workspace as soon as organizations load and none is selected.
+  // Priority: org with a logo → owner org → first org
   useEffect(() => {
     if (!orgId && organizations.length > 0) {
-      setOrgId(organizations[0].id);
+      const branded = organizations.find((o) => o.logoUrl);
+      const owned = organizations.find((o) => o.myRole?.toLowerCase() === "owner");
+      const best = branded ?? owned ?? organizations[0];
+      setOrgId(best.id);
     }
   }, [orgId, organizations, setOrgId]);
 
-  const currentOrg = useMemo(
-    () => organizations.find((o) => o.id === orgId) ?? (organizations.length > 0 ? organizations[0] : undefined),
-    [organizations, orgId]
-  );
+  const currentOrg = useMemo(() => {
+    if (orgId) return organizations.find((o) => o.id === orgId);
+    // Fallback before context update propagates: same priority as above
+    const branded = organizations.find((o) => o.logoUrl);
+    const owned = organizations.find((o) => o.myRole?.toLowerCase() === "owner");
+    return branded ?? owned ?? organizations[0];
+  }, [organizations, orgId]);
 
   const isOwner = currentOrg?.myRole?.toLowerCase() === "owner";
   const { option: fontOption } = useCompanyFontSize(currentOrg?.id);
