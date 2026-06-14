@@ -180,20 +180,26 @@ function startFrontend(mode) {
     );
     process.exit(1);
   }
-  const nextArgs = isProd
-    ? [nextBin, 'start', '-p', frontendPort]
-    : [nextBin, 'dev', '-p', frontendPort];
+  const standaloneServer = path.join(FRONTEND_DIR, '.next', 'standalone', 'server.js');
+  const useStandalone = isProd && fs.existsSync(standaloneServer);
+  const nextArgs = useStandalone
+    ? [standaloneServer]
+    : isProd
+      ? [nextBin, 'start', '-p', frontendPort]
+      : [nextBin, 'dev', '-p', frontendPort];
+  const frontendMode = useStandalone ? 'standalone' : isProd ? 'production' : 'dev';
   console.log(
-    '[app.js] Starting frontend (Next.js ' + (isProd ? 'production' : 'dev') + ') on http://localhost:' +
-      frontendPort,
+    '[app.js] Starting frontend (Next.js ' + frontendMode + ') on http://localhost:' + frontendPort,
   );
   console.log('[app.js] Next proxy → Nest at ' + miniTmBackendUrl);
   frontendChild = spawn(process.execPath, nextArgs, {
-    cwd: FRONTEND_DIR,
+    cwd: useStandalone ? path.join(FRONTEND_DIR, '.next', 'standalone') : FRONTEND_DIR,
     stdio: 'inherit',
     env: {
       ...process.env,
       FORCE_COLOR: '1',
+      PORT: frontendPort,
+      HOSTNAME: '0.0.0.0',
       MINI_TM_BACKEND_URL: miniTmBackendUrl,
     },
   });
