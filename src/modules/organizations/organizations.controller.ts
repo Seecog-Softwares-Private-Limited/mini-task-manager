@@ -171,10 +171,13 @@ export class OrganizationsController {
     if (!canAccess) {
       throw new ForbiddenException('You do not have access to this organization');
     }
-    if (dto.isArchived !== undefined) {
+    if (dto.isArchived !== undefined || dto.logoUrl !== undefined) {
       const membership = await this.organizationsService.getMembership(id, userId);
-      if (membership?.role?.toLowerCase() !== 'owner') {
+      if (dto.isArchived !== undefined && membership?.role?.toLowerCase() !== 'owner') {
         throw new ForbiddenException('Only the organization owner can archive or restore the organization');
+      }
+      if (dto.logoUrl !== undefined && membership?.role?.toLowerCase() !== 'owner') {
+        throw new ForbiddenException('Only the organization owner can change the workspace logo');
       }
     }
     const org = await this.organizationsService.update(id, dto);

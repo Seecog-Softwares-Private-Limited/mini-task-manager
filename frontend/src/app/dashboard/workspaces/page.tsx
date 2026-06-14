@@ -49,6 +49,7 @@ import {
   Eye,
   Pencil,
   Trash2,
+  Shield,
 } from "lucide-react";
 import { OrganizationPreviewDrawer } from "@/components/organizations/organization-preview-drawer";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -301,14 +302,17 @@ export default function WorkspacesPage() {
 
   const watchedName = watch("name");
   const watchedSlug = watch("slug");
+
+  const isEditingOrgOwner = editingOrg?.myRole?.toLowerCase() === "owner";
+
   const hasEditChanges = useMemo(() => {
     if (!editingOrg) return true;
     return (
       watchedName.trim() !== editingOrg.name ||
       watchedSlug.trim().toLowerCase() !== editingOrg.slug ||
-      (logoPreview ?? "") !== (editingOrg.logoUrl ?? "")
+      (isEditingOrgOwner && (logoPreview ?? "") !== (editingOrg.logoUrl ?? ""))
     );
-  }, [editingOrg, watchedName, watchedSlug, logoPreview]);
+  }, [editingOrg, watchedName, watchedSlug, logoPreview, isEditingOrgOwner]);
 
   function onSubmit(values: FormData) {
     if (editingOrg) {
@@ -316,10 +320,12 @@ export default function WorkspacesPage() {
       if (values.name.trim() !== editingOrg.name) payload.name = values.name.trim();
       const newSlug = values.slug.trim().toLowerCase();
       if (newSlug !== editingOrg.slug) payload.slug = newSlug;
-      const before = editingOrg.logoUrl ?? "";
-      const after = logoPreview ?? "";
-      if (before !== after) {
-        payload.logoUrl = after === "" ? "" : after;
+      if (isEditingOrgOwner) {
+        const before = editingOrg.logoUrl ?? "";
+        const after = logoPreview ?? "";
+        if (before !== after) {
+          payload.logoUrl = after === "" ? "" : after;
+        }
       }
       if (Object.keys(payload).length === 0) return;
       updateOrgMutation.mutate({ id: editingOrg.id, payload });
@@ -872,45 +878,63 @@ export default function WorkspacesPage() {
           </DialogHeader>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             {/* Logo: upload + preset avatars */}
-            <div className="space-y-3">
-              <Label>Workspace icon</Label>
-              <div className="flex items-center gap-4">
-                <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-muted bg-muted/50">
-                  {logoPreview ? (
-                    <>
-                      <img src={logoPreview} alt="Logo preview" className="h-full w-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={clearLogo}
-                        className="absolute inset-0 flex items-center justify-center bg-black/50 text-white opacity-0 transition-opacity hover:opacity-100"
-                        aria-label="Remove logo"
-                      >
-                        <span className="text-xs font-medium">Remove</span>
-                      </button>
-                    </>
-                  ) : (
-                    <span className="text-lg font-semibold text-muted-foreground">
-                      {getInitials(watch("name")) || "—"}
-                    </span>
+            {(() => {
+              const canChangeLogo = !editingOrg || isEditingOrgOwner;
+              return (
+                <div className="space-y-3">
+                  <Label>Workspace icon</Label>
+                  <div className="flex items-center gap-4">
+                    <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-muted bg-muted/50">
+                      {logoPreview ? (
+                        <>
+                          <img src={logoPreview} alt="Logo preview" className="h-full w-full object-cover" />
+                          {canChangeLogo && (
+                            <button
+                              type="button"
+                              onClick={clearLogo}
+                              className="absolute inset-0 flex items-center justify-center bg-black/50 text-white opacity-0 transition-opacity hover:opacity-100"
+                              aria-label="Remove logo"
+                            >
+                              <span className="text-xs font-medium">Remove</span>
+                            </button>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-lg font-semibold text-muted-foreground">
+                          {getInitials(watch("name")) || "—"}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      {canChangeLogo ? (
+                        <>
+                          <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+                            <input
+                              ref={logoFileInputRef}
+                              type="file"
+                              accept="image/*"
+                              className="sr-only"
+                              onChange={handleLogoChange}
+                            />
+                            <ImagePlus className="h-4 w-4" />
+                            <span>{logoPreview ? "Change" : "Upload"} image</span>
+                          </label>
+                          <p className="text-xs text-muted-foreground/80">PNG, JPG up to 100KB. Optional.</p>
+                        </>
+                      ) : (
+                        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Shield className="h-3.5 w-3.5 shrink-0" />
+                          Only the workspace owner can change the icon.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {canChangeLogo && (
+                    <WorkspaceAvatarPresetsPicker value={logoPreview} onSelectPreset={selectPresetAvatar} />
                   )}
                 </div>
-                <div className="flex-1 space-y-1">
-                  <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-                    <input
-                      ref={logoFileInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="sr-only"
-                      onChange={handleLogoChange}
-                    />
-                    <ImagePlus className="h-4 w-4" />
-                    <span>{logoPreview ? "Change" : "Upload"} image</span>
-                  </label>
-                  <p className="text-xs text-muted-foreground/80">PNG, JPG up to 100KB. Optional.</p>
-                </div>
-              </div>
-              <WorkspaceAvatarPresetsPicker value={logoPreview} onSelectPreset={selectPresetAvatar} />
-            </div>
+              );
+            })()}
             <div className="space-y-2">
               <Label htmlFor="modal-name">Name</Label>
               <Input id="modal-name" {...register("name")} placeholder="Acme Inc" />

@@ -131,7 +131,7 @@ export default function WorkspaceSettingsPage() {
     !!org &&
     (name.trim() !== org.name ||
       slug.trim().toLowerCase() !== org.slug ||
-      (logoPreview ?? "") !== (org.logoUrl ?? ""));
+      (isOwner && (logoPreview ?? "") !== (org.logoUrl ?? "")));
 
   function handleLogoFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -160,10 +160,12 @@ export default function WorkspaceSettingsPage() {
     const payload: { name?: string; slug?: string; logoUrl?: string } = {};
     if (name.trim() !== org.name) payload.name = name.trim();
     if (slug.trim().toLowerCase() !== org.slug) payload.slug = slug.trim().toLowerCase();
-    const before = org.logoUrl ?? "";
-    const after = logoPreview ?? "";
-    if (before !== after) {
-      payload.logoUrl = after === "" ? "" : after;
+    if (isOwner) {
+      const before = org.logoUrl ?? "";
+      const after = logoPreview ?? "";
+      if (before !== after) {
+        payload.logoUrl = after === "" ? "" : after;
+      }
     }
     if (Object.keys(payload).length === 0) return;
     updateDetailsMutation.mutate(payload);
@@ -257,14 +259,16 @@ export default function WorkspaceSettingsPage() {
                     {logoPreview ? (
                       <>
                         <img src={logoPreview} alt="" className="h-full w-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={clearLogo}
-                          className="absolute inset-0 flex items-center justify-center bg-black/50 text-xs font-medium text-white opacity-0 transition-opacity hover:opacity-100"
-                          aria-label="Remove icon"
-                        >
-                          Remove
-                        </button>
+                        {isOwner && (
+                          <button
+                            type="button"
+                            onClick={clearLogo}
+                            className="absolute inset-0 flex items-center justify-center bg-black/50 text-xs font-medium text-white opacity-0 transition-opacity hover:opacity-100"
+                            aria-label="Remove icon"
+                          >
+                            Remove
+                          </button>
+                        )}
                       </>
                     ) : (
                       <span className="text-lg font-semibold text-muted-foreground">
@@ -273,21 +277,32 @@ export default function WorkspaceSettingsPage() {
                     )}
                   </div>
                   <div className="flex-1 space-y-1">
-                    <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-                      <input
-                        ref={logoFileInputRef}
-                        type="file"
-                        accept="image/*"
-                        className="sr-only"
-                        onChange={handleLogoFile}
-                      />
-                      <ImagePlus className="h-4 w-4" />
-                      <span>{logoPreview ? "Change" : "Upload"} image</span>
-                    </label>
-                    <p className="text-xs text-muted-foreground/80">PNG, JPG up to 100KB. Optional.</p>
+                    {isOwner ? (
+                      <>
+                        <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+                          <input
+                            ref={logoFileInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="sr-only"
+                            onChange={handleLogoFile}
+                          />
+                          <ImagePlus className="h-4 w-4" />
+                          <span>{logoPreview ? "Change" : "Upload"} image</span>
+                        </label>
+                        <p className="text-xs text-muted-foreground/80">PNG, JPG up to 100KB. Optional.</p>
+                      </>
+                    ) : (
+                      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Shield className="h-3.5 w-3.5 shrink-0" />
+                        Only the workspace owner can change the icon.
+                      </p>
+                    )}
                   </div>
                 </div>
-                <WorkspaceAvatarPresetsPicker value={logoPreview} onSelectPreset={selectPresetAvatar} />
+                {isOwner && (
+                  <WorkspaceAvatarPresetsPicker value={logoPreview} onSelectPreset={selectPresetAvatar} />
+                )}
               </div>
 
               <div className="space-y-2">
