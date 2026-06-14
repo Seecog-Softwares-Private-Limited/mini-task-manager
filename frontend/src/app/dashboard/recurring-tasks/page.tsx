@@ -1,302 +1,820 @@
 "use client";
 
-import * as React from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { fetchProjects } from "@/services/api/projects.api";
 import {
-  deleteRecurringSeries,
+  fetchWorkflowsByProject,
+  fetchWorkflowStatuses,
+  createDefaultWorkflow,
+} from "@/services/api/workflows.api";
+import {
+  fetchTasksByProject,
+  createTask,
+  updateTaskStatus,
+  deleteTask,
+} from "@/services/api/tasks.api";
+import { fetchOrgMembers, fetchProjectMembers } from "@/services/api/members.api";
+import { fetchCommentCounts } from "@/services/api/comments.api";
+import {
+  completeRecurringTaskWithAction,
   fetchRecurringSummary,
-  fetchRecurringTemplateHistory,
-  fetchRecurringTemplates,
-  pauseRecurringTemplate,
-  resumeRecurringTemplate,
   skipNextRecurringOccurrence,
-  updateRecurringTemplate,
 } from "@/services/api/recurring-tasks.api";
+import { parseApiError, isRateLimited, getStoredToken } from "@/services/api/client";
+import { createTaskWithDescriptionImages } from "@/lib/upload-task-description-images";
 import { useTenant } from "@/context/tenant-context";
-import { useToast } from "@/components/ui/use-toast";
+import { useProjectSelection } from "@/context/project-selection-context";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { parseApiError } from "@/services/api/client";
-import { CalendarClock, PauseCircle, PlayCircle, Repeat, SkipForward, Trash2 } from "lucide-react";
-import type { RecurringTemplateSummary, TaskRecurrenceConfig } from "@/types/api";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { RecurrenceEditor } from "@/components/tasks/recurrence/recurrence-editor";
-import { recurrenceSummary } from "@/lib/recurrence-display";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/components/ui/use-toast";
+import { RecurringSummaryStats } from "@/components/recurring/recurring-summary-stats";
+import {
+  KanbanBoard,
+  computeBoardStats,
+  computeSubtaskMap,
+  DEFAULT_FILTERS,
+  type AssigneeMap,
+  type BoardFilters,
+} from "@/components/kanban/kanban-board";
+import { BoardToolbar, type ViewMode } from "@/components/kanban/board-toolbar";
+import { BoardTableView } from "@/components/kanban/board-table-view";
+import { BoardSkeleton } from "@/components/kanban/board-skeleton";
+import {
+  CreateTaskModal,
+  type CreateTaskFormData,
+} from "@/components/tasks/create-task-modal";
+import { TaskDetailModal } from "@/components/tasks/task-detail-modal";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { useTaskCreatedCelebration } from "@/components/tasks/task-create-celebration";
+import { ProjectSwitcher } from "@/components/tasks/project-switcher";
+import { OrgSwitcher } from "@/components/dashboard/org-switcher";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import { useBoardPermissions } from "@/hooks/use-board-permissions";
+import { useRetentionTracking } from "@/hooks/use-retention-tracking";
+import type { Task } from "@/types/api";
+import { isRecurringTask } from "@/lib/recurrence-display";
+import { Building2, Plus, Sparkles, Columns3, Shield } from "lucide-react";
 
-const TABS = [
-  { id: "UPCOMING", label: "Upcoming" },
-  { id: "OVERDUE", label: "Overdue" },
-  { id: "TEMPLATES", label: "Templates" },
-  { id: "COMPLETED_HISTORY", label: "Completed History" },
-] as const;
-
-type TabId = (typeof TABS)[number]["id"];
-
-function isOverdue(nextDueDate: string): boolean {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const due = new Date(nextDueDate);
-  due.setHours(0, 0, 0, 0);
-  return due < today;
+function getCurrentUserId(): string | null {
+  const token = getStoredToken();
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload.sub ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export default function RecurringTasksPage() {
   const { orgId } = useTenant();
+  const { selectedProjectId: storedProjectId, setSelectedProjectId, ready: projectSelectionReady } =
+    useProjectSelection();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [tab, setTab] = React.useState<TabId>("UPCOMING");
-  const [expandedTemplateId, setExpandedTemplateId] = React.useState<string | null>(null);
-  const [editTemplate, setEditTemplate] = React.useState<RecurringTemplateSummary | null>(null);
-  const [editRecurrence, setEditRecurrence] = React.useState<TaskRecurrenceConfig>({
-    repeat: "NONE",
+  const { trackFirstTaskCreated } = useRetentionTracking();
+  const { triggerTaskCreatedCelebration, celebrationLayer } = useTaskCreatedCelebration();
+  const currentUserId = useMemo(() => getCurrentUserId(), []);
+
+  const selectedProjectIdFromUrl = searchParams.get("projectId");
+
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [defaultStatusId, setDefaultStatusId] = useState<string | undefined>();
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("kanban");
+  const [filters, setFilters] = useState<BoardFilters>(DEFAULT_FILTERS);
+
+  const { data: projects = [], isLoading: projectsLoading } = useQuery({
+    queryKey: ["projects", orgId ?? ""],
+    queryFn: fetchProjects,
+    enabled: !!orgId,
+  });
+
+  const selectableProjects = useMemo(
+    () => projects.filter((p) => !p.id.startsWith("temp-")),
+    [projects]
+  );
+
+  const isProjectInList = useCallback(
+    (projectId: string | null | undefined) =>
+      !!projectId && selectableProjects.some((p) => p.id === projectId),
+    [selectableProjects]
+  );
+
+  const selectedProjectId = useMemo(() => {
+    if (isProjectInList(selectedProjectIdFromUrl)) return selectedProjectIdFromUrl;
+    if (isProjectInList(storedProjectId)) return storedProjectId;
+    return null;
+  }, [selectedProjectIdFromUrl, storedProjectId, isProjectInList]);
+
+  const selectedProject = useMemo(
+    () => selectableProjects.find((p) => p.id === selectedProjectId) ?? null,
+    [selectableProjects, selectedProjectId]
+  );
+
+  const setProjectInUrl = useCallback(
+    (projectId: string, replace = false) => {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("projectId", projectId);
+      const url = `${pathname}?${params.toString()}`;
+      if (replace) router.replace(url);
+      else router.push(url);
+    },
+    [pathname, router, searchParams]
+  );
+
+  const handleProjectChange = useCallback(
+    (projectId: string) => {
+      setSelectedProjectId(projectId);
+      setProjectInUrl(projectId);
+    },
+    [setSelectedProjectId, setProjectInUrl]
+  );
+
+  useEffect(() => {
+    if (!projectSelectionReady || projectsLoading || selectableProjects.length === 0) return;
+
+    if (isProjectInList(selectedProjectIdFromUrl)) {
+      if (selectedProjectIdFromUrl !== storedProjectId) {
+        setSelectedProjectId(selectedProjectIdFromUrl!);
+      }
+      return;
+    }
+
+    if (isProjectInList(storedProjectId)) {
+      if (selectedProjectIdFromUrl !== storedProjectId) {
+        setProjectInUrl(storedProjectId!, true);
+      }
+      return;
+    }
+
+    const defaultId = selectableProjects[0].id;
+    setSelectedProjectId(defaultId);
+    setProjectInUrl(defaultId, true);
+  }, [
+    projectSelectionReady,
+    selectableProjects,
+    projectsLoading,
+    selectedProjectIdFromUrl,
+    storedProjectId,
+    isProjectInList,
+    setSelectedProjectId,
+    setProjectInUrl,
+  ]);
+
+  useEffect(() => {
+    setFilters(DEFAULT_FILTERS);
+    setSelectedTaskId(null);
+    setCreateModalOpen(false);
+  }, [selectedProjectId]);
+
+  const { data: workflows = [], isLoading: workflowsLoading, isFetched: workflowsFetched } = useQuery({
+    queryKey: ["workflows", selectedProjectId],
+    queryFn: () => fetchWorkflowsByProject(selectedProjectId!),
+    enabled: !!selectedProjectId && !!orgId,
+  });
+
+  const defaultWorkflow = useMemo(
+    () => workflows.find((w) => w.isDefault) ?? workflows[0],
+    [workflows]
+  );
+
+  const { data: statuses = [], isLoading: statusesLoading } = useQuery({
+    queryKey: ["workflow-statuses", defaultWorkflow?.id],
+    queryFn: () => fetchWorkflowStatuses(defaultWorkflow!.id),
+    enabled: !!defaultWorkflow?.id,
+  });
+
+  const { data: tasksData, isLoading: tasksLoading } = useQuery({
+    queryKey: ["tasks", selectedProjectId],
+    queryFn: () => fetchTasksByProject(selectedProjectId!, 1, 200),
+    enabled: !!selectedProjectId && !!orgId,
   });
 
   const summaryQuery = useQuery({
-    queryKey: ["recurring-summary", orgId ?? ""],
-    queryFn: () => fetchRecurringSummary(),
+    queryKey: ["recurring-summary", orgId ?? "", selectedProjectId ?? ""],
+    queryFn: () => fetchRecurringSummary(selectedProjectId ?? undefined),
     enabled: Boolean(orgId),
   });
 
-  const templatesQuery = useQuery({
-    queryKey: ["recurring-templates", orgId ?? "", tab],
-    queryFn: () => fetchRecurringTemplates({ tab }),
-    enabled: Boolean(orgId),
+  const { data: projectMembers = [] } = useQuery({
+    queryKey: ["project-members", selectedProjectId ?? ""],
+    queryFn: () => fetchProjectMembers(selectedProjectId!),
+    enabled: !!selectedProjectId && !!orgId,
+    staleTime: 60_000,
   });
 
-  const historyQuery = useQuery({
-    queryKey: ["recurring-template-history", expandedTemplateId ?? ""],
-    queryFn: () => fetchRecurringTemplateHistory(expandedTemplateId!),
-    enabled: Boolean(expandedTemplateId),
+  const { data: orgMembers = [] } = useQuery({
+    queryKey: ["org-members", orgId ?? ""],
+    queryFn: () => fetchOrgMembers(orgId!),
+    enabled: !!orgId,
   });
 
-  const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ["recurring-summary", orgId ?? ""] });
-    queryClient.invalidateQueries({ queryKey: ["recurring-templates", orgId ?? ""] });
-  };
+  const tasks = tasksData?.data ?? [];
+  const recurringTasks = useMemo(
+    () => tasks.filter((task) => task.projectId === selectedProjectId && isRecurringTask(task)),
+    [tasks, selectedProjectId]
+  );
 
-  const makeActionMutation = (
-    mutationFn: (id: string) => Promise<void>,
-    successMessage: string
-  ) =>
-    useMutation({
-      mutationFn,
-      onSuccess: () => {
-        invalidate();
-        toast({ title: successMessage, variant: "success" });
-      },
-      onError: (err) =>
-        toast({ title: "Action failed", description: parseApiError(err), variant: "error" }),
-    });
+  const taskIds = useMemo(() => recurringTasks.map((t) => t.id), [recurringTasks]);
+  const { data: commentCountMap = {} } = useQuery({
+    queryKey: ["comment-counts", selectedProjectId, taskIds.join(",")],
+    queryFn: () => fetchCommentCounts(taskIds),
+    enabled: !!selectedProjectId && taskIds.length > 0 && taskIds.length <= 50,
+    staleTime: 60_000,
+  });
 
-  const pauseMutation = makeActionMutation(pauseRecurringTemplate, "Recurring task paused");
-  const resumeMutation = makeActionMutation(resumeRecurringTemplate, "Recurring task resumed");
-  const skipMutation = makeActionMutation(skipNextRecurringOccurrence, "Next occurrence skipped");
-  const deleteMutation = makeActionMutation(deleteRecurringSeries, "Recurring series deleted");
+  const permissions = useBoardPermissions(orgMembers, currentUserId);
+
+  const assigneeMap: AssigneeMap = useMemo(() => {
+    const map: AssigneeMap = {};
+    const members =
+      projectMembers.length > 0
+        ? projectMembers
+        : orgMembers.filter((m) => m.status?.toLowerCase() === "active");
+    for (const m of members) {
+      map[m.userId] = {
+        name: m.user?.fullName ?? m.user?.email ?? m.userId,
+        avatarUrl: m.user?.avatarUrl,
+      };
+    }
+    for (const t of recurringTasks) {
+      if (t.assigneeId && t.assignee && !map[t.assigneeId]) {
+        map[t.assigneeId] = {
+          name: t.assignee.fullName ?? t.assignee.email ?? t.assigneeId,
+          avatarUrl: t.assignee.avatarUrl,
+        };
+      }
+    }
+    return map;
+  }, [projectMembers, orgMembers, recurringTasks]);
+
+  const boardStats = useMemo(() => computeBoardStats(recurringTasks, statuses), [recurringTasks, statuses]);
+  const doneStatusId = useMemo(
+    () => statuses.find((s) => s.type === "DONE" || s.name.toLowerCase() === "done")?.id,
+    [statuses]
+  );
+  const subtaskMap = useMemo(() => computeSubtaskMap(recurringTasks, doneStatusId), [recurringTasks, doneStatusId]);
+
+  const tasksByStatus = useMemo(() => {
+    const map: Record<string, Task[]> = {};
+    for (const s of statuses) map[s.id] = [];
+    for (const t of recurringTasks) {
+      const key = t.statusId ?? statuses[0]?.id ?? "none";
+      if (!map[key]) map[key] = [];
+      map[key].push(t);
+    }
+    if (statuses.length && !map[statuses[0].id]) map[statuses[0].id] = [];
+    return map;
+  }, [recurringTasks, statuses]);
+
+  const allTasksFlat = useMemo(() => {
+    const all: Task[] = [];
+    for (const s of statuses) all.push(...(tasksByStatus[s.id] ?? []));
+    return all;
+  }, [statuses, tasksByStatus]);
+
+  const filteredTaskCount = useMemo(() => {
+    const hasFilter =
+      filters.search ||
+      filters.priority.length > 0 ||
+      filters.assignee.length > 0;
+    if (!hasFilter) return undefined;
+    let count = 0;
+    for (const statusTasks of Object.values(tasksByStatus)) {
+      count += statusTasks.filter((t) => {
+        if (filters.search) {
+          const q = filters.search.toLowerCase();
+          if (!t.title.toLowerCase().includes(q) && !t.description?.toLowerCase().includes(q)) return false;
+        }
+        if (filters.priority.length > 0 && !filters.priority.includes(t.priority)) return false;
+        if (filters.assignee.length > 0) {
+          const taskAssignees = t.assigneeIds?.length ? t.assigneeIds : (t.assigneeId ? [t.assigneeId] : []);
+          if (!taskAssignees.some((id) => filters.assignee.includes(id))) return false;
+        }
+        return true;
+      }).length;
+    }
+    return count;
+  }, [tasksByStatus, filters]);
+
   const updateMutation = useMutation({
-    mutationFn: (payload: { id: string; recurrence: TaskRecurrenceConfig }) =>
-      updateRecurringTemplate(payload.id, { recurrence: payload.recurrence }),
-    onSuccess: () => {
-      invalidate();
-      setEditTemplate(null);
-      toast({ title: "Recurrence updated", variant: "success" });
+    mutationFn: ({ taskId, statusId }: { taskId: string; statusId: string | null }) =>
+      updateTaskStatus(taskId, statusId),
+    onMutate: async ({ taskId, statusId: toStatusId }) => {
+      const qk = ["tasks", selectedProjectId];
+      await queryClient.cancelQueries({ queryKey: qk });
+      const prev = queryClient.getQueryData<{ data: Task[] }>(qk);
+      queryClient.setQueryData<{ data: Task[] }>(qk, (old) => {
+        if (!old) return old;
+        return { ...old, data: old.data.map((t) => (t.id === taskId ? { ...t, statusId: toStatusId ?? undefined } : t)) };
+      });
+      return { previous: prev };
     },
-    onError: (err) =>
-      toast({ title: "Update failed", description: parseApiError(err), variant: "error" }),
+    onSuccess: (updated, { taskId }) => {
+      if (!updated?.id) return;
+      queryClient.setQueryData<{ data: Task[] }>(["tasks", selectedProjectId], (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          data: old.data.map((t) => (t.id === taskId ? { ...t, ...updated } : t)),
+        };
+      });
+      queryClient.setQueryData(["task", taskId], updated);
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previous) queryClient.setQueryData(["tasks", selectedProjectId], ctx.previous);
+      toast({ title: "Failed to move task", description: "Returned to original column.", variant: "error" });
+    },
   });
 
-  const templates = templatesQuery.data ?? [];
+  const deleteMutation = useMutation({
+    mutationFn: (taskId: string) => deleteTask(taskId),
+    onSuccess: (_data, taskId) => {
+      queryClient.invalidateQueries({ queryKey: ["tasks", selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-templates"] });
+      if (selectedTaskId === taskId) setSelectedTaskId(null);
+      setDeleteTarget(null);
+      toast({ title: "Task deleted" });
+    },
+    onError: (err) => {
+      toast({
+        title: "Failed to delete task",
+        description: isRateLimited(err) ? "Too many requests. Try again later." : parseApiError(err),
+        variant: "error",
+      });
+    },
+  });
 
-  const filtered: RecurringTemplateSummary[] = React.useMemo(() => {
-    if (tab === "TEMPLATES") return templates;
-    if (tab === "OVERDUE") return templates.filter((t) => isOverdue(String(t.nextDueDate)));
-    if (tab === "COMPLETED_HISTORY") return templates.filter((t) => t.completed > 0);
-    return templates.filter((t) => !isOverdue(String(t.nextDueDate)));
-  }, [tab, templates]);
+  const recurringActionMutation = useMutation({
+    mutationFn: async ({ type, task }: { type: "complete" | "skip"; task: Task }) => {
+      const recurringTemplateId = task.recurringTemplateId;
+      if (!recurringTemplateId) {
+        throw new Error("Recurring template was not found for this task.");
+      }
+      if (type === "skip") {
+        await skipNextRecurringOccurrence(recurringTemplateId);
+        return;
+      }
+      const doneStatus = statuses.find((s) => s.type === "DONE")?.id;
+      await completeRecurringTaskWithAction(task.id, {
+        action: "ONLY_THIS",
+        doneStatusId: doneStatus,
+      });
+    },
+    onSuccess: (_data, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["tasks", selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ["task", vars.task.id] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-templates"] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-summary"] });
+      toast({
+        title: vars.type === "skip" ? "Next occurrence skipped" : "Occurrence completed",
+        variant: "success",
+      });
+    },
+    onError: (err) => {
+      toast({
+        title: "Recurring action failed",
+        description: parseApiError(err),
+        variant: "error",
+      });
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: ({
+      payload,
+      imageFiles,
+      subtaskPendingAttachments,
+      taskAttachmentFiles,
+    }: {
+      payload: Parameters<typeof createTask>[0];
+      imageFiles?: File[];
+      subtaskPendingAttachments?: import("@/lib/upload-subtask-attachments").SubtaskPendingUploadMap;
+      taskAttachmentFiles?: File[];
+    }) =>
+      createTaskWithDescriptionImages(
+        payload,
+        imageFiles,
+        subtaskPendingAttachments,
+        taskAttachmentFiles
+      ),
+    onSettled: () => {
+      if (!selectedProjectId) return;
+      queryClient.invalidateQueries({ queryKey: ["tasks", selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-templates"] });
+    },
+    onSuccess: (result) => {
+      setCreateModalOpen(false);
+      const uploadWarning =
+        result.subtaskUploadWarning ??
+        result.taskAttachmentWarning ??
+        result.imageUploadWarning;
+      if (uploadWarning) {
+        toast({
+          title: "Recurring task created",
+          description: uploadWarning,
+          variant: "error",
+        });
+      } else {
+        toast({ title: "Recurring task created", variant: "success" });
+      }
+      trackFirstTaskCreated();
+      triggerTaskCreatedCelebration();
+    },
+    onError: (err) => {
+      toast({
+        title: "Failed to create recurring task",
+        description: isRateLimited(err) ? "Too many requests. Try again later." : parseApiError(err),
+        variant: "error",
+      });
+    },
+  });
+
+  const autoSetupAttemptedRef = useRef<string | null>(null);
+
+  const setupWorkflowMutation = useMutation({
+    mutationFn: (projectId: string) => createDefaultWorkflow(projectId),
+    onSuccess: () => {
+      if (selectedProjectId) {
+        queryClient.invalidateQueries({ queryKey: ["workflows", selectedProjectId] });
+        queryClient.invalidateQueries({ queryKey: ["workflow-statuses"] });
+        queryClient.invalidateQueries({ queryKey: ["tasks", selectedProjectId] });
+      }
+    },
+    onError: (err) => {
+      autoSetupAttemptedRef.current = null;
+      toast({
+        title: "Could not set up task board",
+        description: parseApiError(err),
+        variant: "error",
+      });
+    },
+  });
+
+  useEffect(() => {
+    if (!selectedProjectId || !orgId || workflowsLoading || !workflowsFetched) return;
+    if (workflows.length > 0) {
+      autoSetupAttemptedRef.current = null;
+      return;
+    }
+    if (autoSetupAttemptedRef.current === selectedProjectId) return;
+    if (setupWorkflowMutation.isPending) return;
+    autoSetupAttemptedRef.current = selectedProjectId;
+    setupWorkflowMutation.mutate(selectedProjectId);
+  }, [
+    selectedProjectId,
+    orgId,
+    workflowsLoading,
+    workflowsFetched,
+    workflows.length,
+    setupWorkflowMutation.isPending,
+  ]);
+
+  const handleMoveTask = useCallback(
+    (taskId: string, _from: string | null, toStatusId: string) => {
+      updateMutation.mutate({ taskId, statusId: toStatusId });
+    },
+    [updateMutation]
+  );
+
+  const handleQuickAdd = useCallback((title: string, statusId: string) => {
+    if (!orgId || !selectedProjectId) return;
+    createMutation.mutate({
+      payload: {
+        projectId: selectedProjectId,
+        organizationId: orgId,
+        title,
+        statusId,
+        priority: "MEDIUM",
+        recurrence: { repeat: "WEEKLY" },
+      },
+    });
+  }, [orgId, selectedProjectId, createMutation]);
+
+  const handleCreateFromModal = useCallback((
+    data: CreateTaskFormData,
+    descriptionImageFiles?: File[],
+    subtaskPendingAttachments?: import("@/lib/upload-subtask-attachments").SubtaskPendingUploadMap,
+    taskPendingAttachments?: import("@/components/tasks/subtasks/subtask-attachments-section").PendingSubtaskAttachment[]
+  ) => {
+    if (!orgId || !selectedProjectId) return;
+    createMutation.mutate({
+      payload: {
+        projectId: selectedProjectId,
+        organizationId: orgId,
+        title: data.title,
+        description: data.description || undefined,
+        statusId: data.statusId || statuses[0]?.id || undefined,
+        priority: data.priority,
+        assigneeIds: data.assigneeIds?.length ? data.assigneeIds : undefined,
+        assigneeId: data.assigneeIds?.[0] || undefined,
+        storyPoints: data.storyPoints,
+        dueDate: data.dueDate || undefined,
+        tags: data.labels?.length ? data.labels.map((l) => ({ name: l.name, color: l.color })) : undefined,
+        subtasks: data.subtasks
+          .map((s) => ({
+            id: s.id,
+            title: s.title.trim(),
+            description: s.description?.trim() || undefined,
+            completed: s.completed,
+            assigneeId: s.assigneeId || undefined,
+            dueDate: s.dueDate || undefined,
+            status: s.status ?? (s.completed ? "DONE" : "TODO"),
+          }))
+          .filter((s) => s.title.length > 0),
+        recurrence:
+          data.recurrence?.repeat && data.recurrence.repeat !== "NONE"
+            ? data.recurrence
+            : undefined,
+      },
+      imageFiles: descriptionImageFiles,
+      subtaskPendingAttachments,
+      taskAttachmentFiles: taskPendingAttachments?.map((item) => item.file),
+    });
+  }, [orgId, selectedProjectId, createMutation, statuses]);
+
+  const quickActions = useMemo(() => ({
+    onEdit: (task: Task) => setSelectedTaskId(task.id),
+    onChangeStatus: (task: Task, statusId: string) => updateMutation.mutate({ taskId: task.id, statusId }),
+    onCompleteOccurrence: (task: Task) =>
+      recurringActionMutation.mutate({ type: "complete", task }),
+    onSkipNextOccurrence: (task: Task) =>
+      recurringActionMutation.mutate({ type: "skip", task }),
+    onDelete: (task: Task) => setDeleteTarget(task),
+  }), [updateMutation, recurringActionMutation]);
+
+  useKeyboardShortcuts(useMemo(() => [
+    { key: "n", ctrl: true, handler: () => { if (permissions.canCreateTask && selectedProjectId) setCreateModalOpen(true); }, description: "Create recurring task" },
+    { key: "b", handler: () => setViewMode((m) => (m === "kanban" ? "table" : "kanban")), description: "Cycle view (Kanban/Table)" },
+  ], [permissions.canCreateTask, selectedProjectId]));
+
+  if (!orgId) {
+    return (
+      <div className="space-y-8 animate-slide-up">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Recurring Tasks</h1>
+          <p className="mt-1 text-muted-foreground">Manage recurring task occurrences across your projects.</p>
+        </div>
+        <Card className="max-w-md border-dashed border-2">
+          <CardContent className="flex items-center gap-4 py-8 px-6">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 shrink-0">
+              <Building2 className="h-6 w-6 text-primary" />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold">No workspace selected</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">Select a workspace first to see recurring tasks.</p>
+              <Button asChild size="sm" className="mt-3">
+                <Link href="/dashboard/workspaces">Select workspace</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (projectsLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-8 w-56" />
+          <Skeleton className="h-9 w-56" />
+        </div>
+        <BoardSkeleton />
+      </div>
+    );
+  }
+
+  if (selectableProjects.length === 0) {
+    return (
+      <Card className="max-w-lg border-dashed border-2">
+        <CardContent className="py-10 text-center">
+          <p className="font-semibold">Create your first project</p>
+          <p className="mt-1 text-sm text-muted-foreground">Projects are required before you can manage recurring tasks.</p>
+          <Button asChild className="mt-4">
+            <Link href="/dashboard/projects">Create Project</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!selectedProject) return <BoardSkeleton />;
+
+  const isBoardLoading = workflowsLoading || statusesLoading || tasksLoading || setupWorkflowMutation.isPending;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Recurring Tasks</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Manage recurring templates and generated task history across weekly, monthly, and yearly cycles.
-        </p>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Total recurring tasks</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">{summaryQuery.data?.totalRecurringTasks ?? 0}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Due this week</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">{summaryQuery.data?.dueThisWeek ?? 0}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Overdue</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold text-destructive">{summaryQuery.data?.overdue ?? 0}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Completed this month</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">{summaryQuery.data?.completedThisMonth ?? 0}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Paused</CardTitle>
-          </CardHeader>
-          <CardContent className="text-2xl font-semibold">{summaryQuery.data?.paused ?? 0}</CardContent>
-        </Card>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {TABS.map((item) => (
-          <Button
-            key={item.id}
-            size="sm"
-            variant={tab === item.id ? "default" : "outline"}
-            onClick={() => setTab(item.id)}
-          >
-            {item.label}
-          </Button>
-        ))}
-      </div>
-
-      <div className="space-y-3">
-        {templatesQuery.isLoading ? (
-          <Card>
-            <CardContent className="py-8 text-sm text-muted-foreground">Loading recurring tasks…</CardContent>
-          </Card>
-        ) : filtered.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-sm text-muted-foreground">
-              No recurring tasks in this tab yet.
-            </CardContent>
-          </Card>
-        ) : (
-          filtered.map((item) => (
-            <Card key={item.id} className="border-primary/10">
-              <CardContent className="space-y-3 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold">{item.title}</h3>
-                      <Badge variant="secondary" className="gap-1">
-                        <Repeat className="h-3 w-3" />
-                        {item.repeatType}
-                      </Badge>
-                      {item.isPaused ? <Badge variant="outline">Paused</Badge> : null}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Next due: {String(item.nextDueDate).slice(0, 10)} • Completed: {item.completed} • Upcoming: {item.upcoming}
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() =>
-                        setExpandedTemplateId((prev) => (prev === item.id ? null : item.id))
-                      }
-                    >
-                      <CalendarClock className="mr-1 h-3.5 w-3.5" />
-                      View history
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setEditTemplate(item);
-                        setEditRecurrence({ repeat: item.repeatType, createDaysBeforeDue: item.createDaysBeforeDue });
-                      }}
-                    >
-                      Edit recurrence
-                    </Button>
-                    {item.isPaused ? (
-                      <Button size="sm" variant="outline" onClick={() => resumeMutation.mutate(item.id)}>
-                        <PlayCircle className="mr-1 h-3.5 w-3.5" />
-                        Resume
-                      </Button>
-                    ) : (
-                      <Button size="sm" variant="outline" onClick={() => pauseMutation.mutate(item.id)}>
-                        <PauseCircle className="mr-1 h-3.5 w-3.5" />
-                        Pause
-                      </Button>
-                    )}
-                    <Button size="sm" variant="outline" onClick={() => skipMutation.mutate(item.id)}>
-                      <SkipForward className="mr-1 h-3.5 w-3.5" />
-                      Skip next occurrence
-                    </Button>
-                    <Button size="sm" variant="destructive" onClick={() => deleteMutation.mutate(item.id)}>
-                      <Trash2 className="mr-1 h-3.5 w-3.5" />
-                      Delete series
-                    </Button>
-                  </div>
-                </div>
-
-                {expandedTemplateId === item.id ? (
-                  <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
-                    {historyQuery.isLoading ? (
-                      <p className="text-xs text-muted-foreground">Loading history…</p>
-                    ) : (
-                      <div className="space-y-1.5 text-xs">
-                        {(historyQuery.data ?? []).slice(0, 8).map((h) => (
-                          <div key={h.id} className="flex items-center justify-between rounded-md bg-background px-2 py-1.5">
-                            <span>#{h.sequenceNumber}</span>
-                            <span>{String(h.dueDate).slice(0, 10)}</span>
-                            <Badge variant={h.state === "COMPLETED" ? "default" : "secondary"}>{h.state}</Badge>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ) : null}
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
-
-      <Dialog open={Boolean(editTemplate)} onOpenChange={(open) => !open && setEditTemplate(null)}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Edit recurrence</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <RecurrenceEditor
-              value={editRecurrence}
-              onChange={(next) => setEditRecurrence(next ?? { repeat: "NONE" })}
-              disabled={updateMutation.isPending}
-            />
-            {editRecurrence?.repeat && editRecurrence.repeat !== "NONE" ? (
-              <p className="rounded-lg border border-primary/15 bg-primary/5 px-3 py-2 text-xs text-primary">
-                {recurrenceSummary(editRecurrence) ?? "Series rule updated"}
-              </p>
-            ) : null}
-            <Button
-              className="w-full"
-              disabled={!editTemplate || updateMutation.isPending}
-              onClick={() =>
-                editTemplate &&
-                updateMutation.mutate({
-                  id: editTemplate.id,
-                  recurrence: editRecurrence,
-                })
-              }
-            >
-              Save recurrence
-            </Button>
+    <div className="flex h-0 min-h-0 flex-1 flex-col gap-4 overflow-hidden animate-slide-up">
+      {celebrationLayer}
+      <div className="flex shrink-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 flex-1 flex-col gap-3">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Recurring Tasks</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              All recurring task occurrences for the selected project.
+            </p>
           </div>
-        </DialogContent>
-      </Dialog>
+          <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="w-full sm:max-w-[280px]">
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                Select workspace
+              </p>
+              <OrgSwitcher
+                variant="navbar"
+                contentAlign="start"
+                className="h-10 w-full justify-between rounded-xl border border-slate-200 bg-white px-3 text-slate-900 shadow-sm hover:bg-white"
+              />
+            </div>
+            <div className="min-w-0 flex-1">
+              <ProjectSwitcher
+                projects={selectableProjects}
+                selectedProjectId={selectedProjectId}
+                selectedTaskCount={recurringTasks.length}
+                onProjectChange={handleProjectChange}
+                disabled={projectsLoading}
+              />
+            </div>
+          </div>
+          {!permissions.canEditTask && (
+            <span className="inline-flex w-fit items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+              <Shield className="h-3 w-3" /> View only — workspace owner can edit tasks
+            </span>
+          )}
+        </div>
+        <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
+          {permissions.canCreateTask && (
+            <Button
+              onClick={() => {
+                setDefaultStatusId(statuses[0]?.id);
+                setCreateModalOpen(true);
+              }}
+              data-cy="create-recurring-task-button"
+              className="shadow-lg shadow-primary/20"
+            >
+              <Plus className="mr-1.5 h-4 w-4" /> New Task
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <RecurringSummaryStats
+        summary={summaryQuery.data}
+        boardStats={boardStats}
+        isLoading={summaryQuery.isLoading || isBoardLoading}
+        className="shrink-0"
+      />
+
+      {isBoardLoading ? (
+        <BoardSkeleton />
+      ) : statuses.length > 0 ? (
+        <>
+          <div className="shrink-0">
+            <BoardToolbar
+              filters={filters}
+              onFiltersChange={setFilters}
+              assigneeMap={assigneeMap}
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+              taskCount={recurringTasks.length}
+              filteredCount={filteredTaskCount}
+              showRecurrenceFilter={false}
+            />
+          </div>
+
+          <div className="flex h-0 min-h-0 flex-1 flex-col overflow-hidden">
+            {(viewMode === "kanban" || viewMode === "scrum") ? (
+              <KanbanBoard
+                className="min-h-0 flex-1"
+                statuses={statuses}
+                tasksByStatus={tasksByStatus}
+                onMoveTask={handleMoveTask}
+                onQuickAdd={permissions.canCreateTask ? handleQuickAdd : undefined}
+                onTaskClick={(task) => setSelectedTaskId(task.id)}
+                assigneeMap={assigneeMap}
+                commentCountMap={commentCountMap}
+                subtaskMap={subtaskMap}
+                filters={filters}
+                quickActions={quickActions}
+                permissions={permissions}
+                currentUserId={currentUserId}
+                aria-label={`Recurring tasks for ${selectedProject.name}`}
+              />
+            ) : (
+              <div className="min-h-0 flex-1 basis-0 overflow-y-auto">
+                <BoardTableView
+                  tasks={allTasksFlat}
+                  statuses={statuses}
+                  assigneeMap={assigneeMap}
+                  subtaskMap={subtaskMap}
+                  onTaskClick={(task) => setSelectedTaskId(task.id)}
+                  permissions={permissions}
+                />
+              </div>
+            )}
+          </div>
+
+          {recurringTasks.length === 0 && (
+            <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed bg-muted/10 py-14 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+                <Sparkles className="h-7 w-7 text-primary" />
+              </div>
+              <p className="mt-4 text-lg font-semibold">No recurring tasks yet</p>
+              <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                Create a recurring task to schedule repeating work for this project.
+              </p>
+              {permissions.canCreateTask && (
+                <Button
+                  className="mt-5 shadow-lg shadow-primary/20"
+                  onClick={() => {
+                    setDefaultStatusId(statuses[0]?.id);
+                    setCreateModalOpen(true);
+                  }}
+                >
+                  <Sparkles className="mr-1.5 h-4 w-4" /> Create First Recurring Task
+                </Button>
+              )}
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed bg-muted/10 py-16 text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
+            <Columns3 className="h-8 w-8 text-primary" />
+          </div>
+          <p className="mt-5 text-lg font-semibold">Board not set up yet</p>
+          <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
+            {setupWorkflowMutation.isPending
+              ? "Setting up your task board…"
+              : "This project needs a task board before recurring tasks can appear."}
+          </p>
+          <Button
+            className="mt-6 shadow-lg shadow-primary/20"
+            onClick={() => setupWorkflowMutation.mutate(selectedProject.id)}
+            disabled={setupWorkflowMutation.isPending}
+          >
+            {setupWorkflowMutation.isPending ? "Setting up..." : (
+              <>
+                <Columns3 className="mr-1.5 h-4 w-4" /> Setup Task Board
+              </>
+            )}
+          </Button>
+          {setupWorkflowMutation.error && (
+            <p className="mt-3 text-sm text-destructive">{parseApiError(setupWorkflowMutation.error)}</p>
+          )}
+        </div>
+      )}
+
+      <CreateTaskModal
+        open={createModalOpen}
+        onClose={() => setCreateModalOpen(false)}
+        onSubmit={handleCreateFromModal}
+        isSubmitting={createMutation.isPending}
+        error={createMutation.error ? (isRateLimited(createMutation.error) ? "Too many requests. Try again later." : parseApiError(createMutation.error)) : null}
+        projectId={selectedProjectId ?? ""}
+        statuses={statuses}
+        defaultStatusId={defaultStatusId}
+        showRecurrence
+      />
+
+      {orgId && selectedProjectId && (
+        <TaskDetailModal
+          taskId={selectedTaskId}
+          projectId={selectedProjectId}
+          organizationId={orgId}
+          statuses={statuses}
+          open={selectedTaskId !== null}
+          onOpenChange={(open) => !open && setSelectedTaskId(null)}
+          readOnly={!permissions.canEditTask}
+        />
+      )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
+        title="Delete task"
+        description={
+          deleteTarget
+            ? `Permanently delete "${deleteTarget.title}"? This cannot be undone.`
+            : undefined
+        }
+        confirmLabel="Delete"
+        variant="destructive"
+        loading={deleteMutation.isPending}
+        onConfirm={() => {
+          if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
+        }}
+      />
     </div>
   );
 }
-

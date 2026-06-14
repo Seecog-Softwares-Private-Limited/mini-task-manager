@@ -59,6 +59,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const isInternalScrollView =
     pathname === "/dashboard/tasks" ||
+    pathname === "/dashboard/recurring-tasks" ||
     pathname === "/dashboard/activity" ||
     pathname === "/dashboard/audit" ||
     pathname === "/dashboard/notifications" ||
