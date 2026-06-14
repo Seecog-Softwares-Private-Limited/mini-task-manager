@@ -68,7 +68,6 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile, visibleNav }: Si
 
   const content = (
     <div className="flex h-full flex-col">
-      {/* Company / workspace branding */}
       <SidebarCompanyBrand collapsed={collapsed} />
 
       {/* Employee profile */}
@@ -79,7 +78,7 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile, visibleNav }: Si
               "flex items-center gap-2.5 rounded-xl border border-[#E7EAF0] bg-[#FCFCFD] p-2 shadow-sm dark:border-border dark:bg-muted/25",
               collapsed && "justify-center px-1"
             )}
-            title={collapsed ? user.email : undefined}
+            title={collapsed ? user.fullName || user.email : undefined}
           >
             <DashboardProfileAvatar user={user} mergeUser={mergeUser} size="lg" />
             {!collapsed && (
@@ -87,11 +86,16 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile, visibleNav }: Si
                 <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
                   Your profile
                 </p>
-                <p className="truncate text-xs font-medium leading-tight text-muted-foreground">
+                <p className="truncate text-sm font-semibold leading-tight text-foreground">
                   {user.fullName?.trim() && user.fullName !== user.email
                     ? user.fullName
                     : user.email}
                 </p>
+                {user.fullName?.trim() && user.fullName !== user.email ? (
+                  <p className="truncate text-[11px] leading-tight text-muted-foreground">
+                    {user.email}
+                  </p>
+                ) : null}
               </div>
             )}
           </div>

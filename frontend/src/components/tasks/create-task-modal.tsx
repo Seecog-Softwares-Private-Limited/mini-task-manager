@@ -460,6 +460,7 @@ export function CreateTaskModal({
               remove={remove}
               errors={errors}
               disabled={isSubmitting}
+              hideQuickAdd={showRecurrence}
               pendingAttachmentsBySubtask={pendingSubtaskAttachments}
               onPendingAttachmentsChange={(subtaskKey, items) =>
                 setPendingSubtaskAttachments((prev) => ({ ...prev, [subtaskKey]: items }))

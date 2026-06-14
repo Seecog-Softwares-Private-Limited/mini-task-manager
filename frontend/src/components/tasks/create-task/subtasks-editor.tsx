@@ -51,6 +51,7 @@ interface SubtasksEditorProps {
     subtaskKey: string,
     items: PendingSubtaskAttachment[]
   ) => void;
+  hideQuickAdd?: boolean;
 }
 
 export function SubtasksEditor({
@@ -65,6 +66,7 @@ export function SubtasksEditor({
   disabled,
   pendingAttachmentsBySubtask = {},
   onPendingAttachmentsChange,
+  hideQuickAdd = false,
 }: SubtasksEditorProps) {
   const inputRefs = useRef<Record<number, HTMLInputElement | null>>({});
   const pendingFocusIndexRef = useRef<number | null>(null);
@@ -256,7 +258,7 @@ export function SubtasksEditor({
         )}
       </div>
 
-      {fields.length > 0 ? (
+      {fields.length > 0 && !hideQuickAdd ? (
         <div className="flex gap-2 pt-1">
           <div className="td-input-shell flex min-h-10 flex-1 items-center gap-2 rounded-xl px-3">
             <Plus className="h-4 w-4 shrink-0 text-muted-foreground/50" aria-hidden />
