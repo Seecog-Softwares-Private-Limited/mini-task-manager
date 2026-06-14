@@ -72,9 +72,9 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile, visibleNav }: Si
         <DashboardCompanyBrand collapsed={collapsed} />
       </div>
 
-      {/* Account */}
+      {/* Employee profile */}
       {user?.email && (
-        <div className={cn("border-b border-border/50", collapsed ? "px-2 py-3" : "px-3 py-3")}>
+        <div className={cn("border-b border-border/50", collapsed ? "px-2 py-2.5" : "px-3 py-2.5")}>
           <div
             className={cn(
               "flex items-center gap-2.5 rounded-xl border border-[#E7EAF0] bg-[#FCFCFD] p-2 shadow-sm dark:border-border dark:bg-muted/25",
@@ -85,10 +85,15 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile, visibleNav }: Si
             <DashboardProfileAvatar user={user} mergeUser={mergeUser} size="lg" />
             {!collapsed && (
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold leading-tight text-foreground">
-                  {user.fullName || user.email}
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
+                  Your profile
                 </p>
-                {user.fullName && user.email ? (
+                <p className="truncate text-sm font-semibold leading-tight text-foreground">
+                  {user.fullName?.trim() && user.fullName !== user.email
+                    ? user.fullName
+                    : user.email}
+                </p>
+                {user.fullName?.trim() && user.fullName !== user.email ? (
                   <p className="truncate text-[11px] leading-tight text-muted-foreground">
                     {user.email}
                   </p>
