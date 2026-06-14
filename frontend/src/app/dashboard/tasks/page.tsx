@@ -80,6 +80,7 @@ import { useBoardPermissions } from "@/hooks/use-board-permissions";
 import { useRetentionTracking } from "@/hooks/use-retention-tracking";
 import type { Task } from "@/types/api";
 import { exportTasksToZipFile } from "@/lib/export-tasks-zip";
+import { isRecurringTask } from "@/lib/recurrence-display";
 import { ImportTasksZipModal } from "@/components/tasks/import-tasks-zip-modal";
 import { Building2, Plus, Sparkles, Columns3, Keyboard, Shield, Rocket, Download, Upload } from "lucide-react";
 
@@ -293,7 +294,7 @@ export default function TasksPage() {
   }, [projectMembers, orgMembers, tasks]);
 
   const projectTasks = useMemo(
-    () => tasks.filter((task) => task.projectId === selectedProjectId),
+    () => tasks.filter((task) => task.projectId === selectedProjectId && !isRecurringTask(task)),
     [tasks, selectedProjectId]
   );
   const boardStats = useMemo(() => computeBoardStats(projectTasks, statuses), [projectTasks, statuses]);
@@ -880,9 +881,7 @@ export default function TasksPage() {
             {projectTasks.length > 0 && (
               <BoardStatsBar
                 stats={boardStats}
-                onRecurringFilterClick={() =>
-                  setFilters((prev) => ({ ...prev, recurrence: "recurring" }))
-                }
+                hideRecurringStat
               />
             )}
             <BoardToolbar
@@ -901,6 +900,7 @@ export default function TasksPage() {
               isSelectionMode={bulk.state.isSelectionMode}
               onToggleSelectionMode={handleToggleSelectionMode}
               canBulkSelect={permissions.canBulkSelect}
+              showRecurrenceFilter={false}
             />
           </div>
 

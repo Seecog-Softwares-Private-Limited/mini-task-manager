@@ -28,11 +28,17 @@ interface RecurrenceEditorProps {
   embedded?: boolean;
   /** Suppress inline summary (parent shows it once). */
   hideSummary?: boolean;
+  /** Hide "Does not repeat" and require an explicit frequency selection. */
+  requireRecurrence?: boolean;
+  error?: string | null;
 }
 
-function normalize(value?: TaskRecurrenceConfig): TaskRecurrenceConfig {
+function normalize(
+  value?: TaskRecurrenceConfig,
+  requireRecurrence = false
+): TaskRecurrenceConfig {
   return {
-    repeat: value?.repeat ?? "NONE",
+    repeat: value?.repeat ?? (requireRecurrence ? undefined : "NONE"),
     interval: value?.interval ?? 1,
     weeklyDays: value?.weeklyDays ?? [],
     monthlyMode: value?.monthlyMode ?? "DAY_OF_MONTH",
@@ -58,16 +64,21 @@ export function RecurrenceEditor({
   compact,
   embedded,
   hideSummary,
+  requireRecurrence = false,
+  error,
 }: RecurrenceEditorProps) {
-  const state = normalize(value);
-  const repeatEnabled = state.repeat && state.repeat !== "NONE";
+  const state = normalize(value, requireRecurrence);
+  const repeatEnabled = !!state.repeat && state.repeat !== "NONE";
   const summaryText = recurrenceSummary(state);
   const fieldGrid = embedded ? "grid gap-3 grid-cols-1" : "grid gap-3 sm:grid-cols-2";
+  const repeatOptions = requireRecurrence
+    ? REPEAT_OPTIONS.filter((opt) => opt !== "NONE")
+    : REPEAT_OPTIONS;
 
   const patch = (next: Partial<TaskRecurrenceConfig>) => {
     const merged = { ...state, ...next };
-    if ((merged.repeat ?? "NONE") === "NONE") {
-      onChange({ repeat: "NONE" });
+    if ((merged.repeat ?? (requireRecurrence ? undefined : "NONE")) === "NONE" || !merged.repeat) {
+      onChange(requireRecurrence ? { repeat: undefined } : { repeat: "NONE" });
       return;
     }
     onChange(merged);
@@ -92,20 +103,34 @@ export function RecurrenceEditor({
           Frequency
         </Label>
         <select
-          value={state.repeat ?? "NONE"}
+          value={requireRecurrence ? (state.repeat ?? "") : (state.repeat ?? "NONE")}
           disabled={disabled}
-          onChange={(e) => patch({ repeat: e.target.value as TaskRecurrenceConfig["repeat"] })}
+          onChange={(e) => {
+            const nextRepeat = e.target.value as TaskRecurrenceConfig["repeat"] | "";
+            if (!nextRepeat) {
+              onChange(requireRecurrence ? { repeat: undefined } : { repeat: "NONE" });
+              return;
+            }
+            patch({ repeat: nextRepeat });
+          }}
           className={cn(
             "h-9 w-full rounded-lg border bg-background px-3 text-sm",
-            embedded && "h-10 rounded-xl shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08)] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]"
+            embedded && "h-10 rounded-xl shadow-[inset_0_0_0_1px_rgba(15,23,42,0.08)] dark:shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]",
+            error && "border-destructive"
           )}
         >
-          {REPEAT_OPTIONS.map((opt) => (
+          {requireRecurrence ? (
+            <option value="">Select frequency</option>
+          ) : null}
+          {repeatOptions.map((opt) => (
             <option key={opt} value={opt}>
               {opt === "NONE" ? "Does not repeat" : opt[0] + opt.slice(1).toLowerCase()}
             </option>
           ))}
         </select>
+        {error ? (
+          <p className="text-xs text-destructive">{error}</p>
+        ) : null}
       </div>
 
       {repeatEnabled ? (

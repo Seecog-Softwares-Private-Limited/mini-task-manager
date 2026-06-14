@@ -74,6 +74,7 @@ interface BoardToolbarProps {
   isSelectionMode?: boolean;
   onToggleSelectionMode?: () => void;
   canBulkSelect?: boolean;
+  showRecurrenceFilter?: boolean;
 }
 
 // ─── Component ────────────────────────────────────────────────
@@ -94,6 +95,7 @@ export function BoardToolbar({
   isSelectionMode,
   onToggleSelectionMode,
   canBulkSelect,
+  showRecurrenceFilter = true,
 }: BoardToolbarProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [saveViewName, setSaveViewName] = useState("");
@@ -303,6 +305,7 @@ export function BoardToolbar({
           </DropdownMenuContent>
         </DropdownMenu>
 
+        {showRecurrenceFilter ? (
         <div className="inline-flex items-center gap-1 rounded-lg border bg-background p-1">
           <Button
             type="button"
@@ -338,6 +341,7 @@ export function BoardToolbar({
             ) : null}
           </Button>
         </div>
+        ) : null}
 
         {/* Saved views dropdown */}
         {(savedViews.length > 0 || onSaveView) && (

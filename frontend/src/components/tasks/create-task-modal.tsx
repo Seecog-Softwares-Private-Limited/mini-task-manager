@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -106,6 +106,10 @@ interface CreateTaskModalProps {
   projectId: string;
   statuses: WorkflowStatus[];
   defaultStatusId?: string;
+  /** Default recurrence repeat value when opening the create drawer. */
+  defaultRecurrenceRepeat?: TaskRecurrenceConfig["repeat"];
+  /** Show the frequency / recurrence editor (recurring tasks page only). */
+  showRecurrence?: boolean;
   /** Export current project tasks as a shareable CSV file. */
   onExportCsv?: () => void;
   exportCsvDisabled?: boolean;
@@ -120,6 +124,8 @@ export function CreateTaskModal({
   projectId,
   statuses,
   defaultStatusId,
+  defaultRecurrenceRepeat = "NONE",
+  showRecurrence = false,
   onExportCsv,
   exportCsvDisabled = false,
 }: CreateTaskModalProps) {
@@ -130,6 +136,15 @@ export function CreateTaskModal({
     Record<string, PendingSubtaskAttachment[]>
   >({});
   const [pendingTaskAttachments, setPendingTaskAttachments] = useState<PendingSubtaskAttachment[]>([]);
+  const [recurrenceError, setRecurrenceError] = useState<string | null>(null);
+
+  const initialRecurrence = useMemo(
+    () =>
+      showRecurrence && !defaultRecurrenceRepeat
+        ? { repeat: undefined as TaskRecurrenceConfig["repeat"] | undefined }
+        : { repeat: defaultRecurrenceRepeat },
+    [showRecurrence, defaultRecurrenceRepeat]
+  );
 
   const {
     register,
@@ -151,7 +166,7 @@ export function CreateTaskModal({
       dueDate: "",
       labels: [],
       subtasks: [],
-      recurrence: { repeat: "NONE" },
+      recurrence: initialRecurrence,
     },
   });
 
@@ -182,16 +197,29 @@ export function CreateTaskModal({
         dueDate: "",
         labels: [],
         subtasks: [],
-        recurrence: { repeat: "NONE" },
+        recurrence: initialRecurrence,
       });
       descriptionFieldRef.current?.resetPendingImages();
       setPendingSubtaskAttachments({});
       setPendingTaskAttachments([]);
+      setRecurrenceError(null);
     }
-  }, [open, defaultStatusId, statuses, reset]);
+  }, [open, defaultStatusId, defaultRecurrenceRepeat, showRecurrence, statuses, reset, initialRecurrence]);
 
   function handleFormSubmit(data: CreateTaskFormData) {
-    if (data.recurrence?.repeat && data.recurrence.repeat !== "NONE" && !data.dueDate) {
+    if (showRecurrence) {
+      if (!data.recurrence?.repeat || data.recurrence.repeat === "NONE") {
+        setRecurrenceError("please select frequency for the recurring task");
+        return;
+      }
+      setRecurrenceError(null);
+    }
+    if (
+      showRecurrence &&
+      data.recurrence?.repeat &&
+      data.recurrence.repeat !== "NONE" &&
+      !data.dueDate
+    ) {
       toast({
         title: "Due date required for recurring task",
         description: "Set a due date so the recurring series can generate occurrences accurately.",
@@ -392,7 +420,9 @@ export function CreateTaskModal({
                     onChange={field.onChange}
                     disabled={isSubmitting}
                     hint={
-                      watchedRecurrence?.repeat && watchedRecurrence.repeat !== "NONE"
+                      showRecurrence &&
+                      watchedRecurrence?.repeat &&
+                      watchedRecurrence.repeat !== "NONE"
                         ? "First occurrence due date — the series repeats from this anchor."
                         : undefined
                     }
@@ -436,21 +466,32 @@ export function CreateTaskModal({
               }
             />
 
-            <Controller
-              control={control}
-              name="recurrence"
-              render={({ field }) => (
-                <RecurrenceEditor
-                  value={field.value}
-                  onChange={field.onChange}
-                  disabled={isSubmitting}
+            {showRecurrence ? (
+              <>
+                <Controller
+                  control={control}
+                  name="recurrence"
+                  render={({ field }) => (
+                    <RecurrenceEditor
+                      value={field.value}
+                      onChange={(next) => {
+                        field.onChange(next);
+                        if (next?.repeat && next.repeat !== "NONE") {
+                          setRecurrenceError(null);
+                        }
+                      }}
+                      disabled={isSubmitting}
+                      requireRecurrence
+                      error={recurrenceError}
+                    />
+                  )}
                 />
-              )}
-            />
-            {watchedRecurrence?.repeat && watchedRecurrence.repeat !== "NONE" ? (
-              <p className="rounded-xl bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                {recurrenceSummary(watchedRecurrence) ?? "Recurring schedule enabled"}
-              </p>
+                {watchedRecurrence?.repeat && watchedRecurrence.repeat !== "NONE" ? (
+                  <p className="rounded-xl bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                    {recurrenceSummary(watchedRecurrence) ?? "Recurring schedule enabled"}
+                  </p>
+                ) : null}
+              </>
             ) : null}
 
             {errors.dueDate && (
