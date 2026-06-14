@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { Sparkles } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { DashboardProfileAvatar } from "@/components/dashboard/dashboard-profile-avatar";
+import { DashboardCompanyBrand } from "@/components/dashboard/dashboard-company-brand";
 
 interface SidebarProps {
   collapsed: boolean;
@@ -67,7 +68,11 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile, visibleNav }: Si
 
   const content = (
     <div className="flex h-full flex-col">
-      {/* Account — top of sidebar (workspace switch lives on Tasks + Workspaces nav) */}
+      <div className={cn("border-b border-border/50", collapsed ? "px-2 py-3" : "px-3 py-3")}>
+        <DashboardCompanyBrand collapsed={collapsed} />
+      </div>
+
+      {/* Account */}
       {user?.email && (
         <div className={cn("border-b border-border/50", collapsed ? "px-2 py-3" : "px-3 py-3")}>
           <div
@@ -75,13 +80,20 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile, visibleNav }: Si
               "flex items-center gap-2.5 rounded-xl border border-[#E7EAF0] bg-[#FCFCFD] p-2 shadow-sm dark:border-border dark:bg-muted/25",
               collapsed && "justify-center px-1"
             )}
-            title={collapsed ? user.email : undefined}
+            title={collapsed ? user.fullName || user.email : undefined}
           >
             <DashboardProfileAvatar user={user} mergeUser={mergeUser} size="lg" />
             {!collapsed && (
-              <span className="min-w-0 flex-1 truncate text-xs font-medium leading-tight text-muted-foreground">
-                {user.email}
-              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold leading-tight text-foreground">
+                  {user.fullName || user.email}
+                </p>
+                {user.fullName && user.email ? (
+                  <p className="truncate text-[11px] leading-tight text-muted-foreground">
+                    {user.email}
+                  </p>
+                ) : null}
+              </div>
             )}
           </div>
         </div>
