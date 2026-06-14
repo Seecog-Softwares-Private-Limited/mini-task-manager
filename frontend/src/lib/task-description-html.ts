@@ -1,3 +1,5 @@
+import { stripHtmlToPlainText } from "@/lib/project-description-plain";
+
 const ALLOWED_TAGS = [
   "p",
   "br",
@@ -67,20 +69,7 @@ export function sanitizeTaskDescriptionHtml(html: string): string {
 
 /** Rough plain-text length for “show more” / previews (works without DOM). */
 export function taskDescriptionPlainLength(htmlOrText: string): number {
-  if (!htmlOrText) return 0;
-  const text = htmlOrText
-    .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/p>/gi, "\n")
-    .replace(/<\/div>/gi, "\n")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/\s+/g, " ")
-    .trim();
-  return text.length;
+  return stripHtmlToPlainText(htmlOrText).length;
 }
 
 /** Detect stored rich text vs legacy plain description. */

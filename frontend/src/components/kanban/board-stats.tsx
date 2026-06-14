@@ -14,6 +14,7 @@ interface BoardStatsBarProps {
   stats: BoardStats;
   className?: string;
   onRecurringFilterClick?: () => void;
+  hideRecurringStat?: boolean;
 }
 
 type StatItem = {
@@ -26,7 +27,12 @@ type StatItem = {
   onClick?: () => void;
 };
 
-export function BoardStatsBar({ stats, className, onRecurringFilterClick }: BoardStatsBarProps) {
+export function BoardStatsBar({
+  stats,
+  className,
+  onRecurringFilterClick,
+  hideRecurringStat = false,
+}: BoardStatsBarProps) {
   const items: StatItem[] = [
     {
       label: "Total",
@@ -44,7 +50,7 @@ export function BoardStatsBar({ stats, className, onRecurringFilterClick }: Boar
       bgColor: "bg-blue-500/10",
       tooltip: `${stats.inProgress} task${stats.inProgress !== 1 ? "s" : ""} currently in progress`,
     },
-    ...(stats.recurring > 0
+    ...(stats.recurring > 0 && !hideRecurringStat
       ? [
           {
             label: "Recurring",

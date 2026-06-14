@@ -4,7 +4,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchProjectMembers } from "@/services/api/members.api";
 import { updateTaskAssignee, updateTaskAssignees } from "@/services/api/tasks.api";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
@@ -189,12 +189,13 @@ export function TaskAssigneePopover({
                 className="rounded-md py-2"
               >
                 <div className="flex w-full items-center gap-2.5">
-                  <Avatar className="h-7 w-7">
-                    <AvatarImage src={member.avatarUrl} />
-                    <AvatarFallback className="text-[10px]">
-                      {member.name.slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
+                  <UserAvatar
+                    userId={member.id}
+                    name={member.name}
+                    avatarUrl={member.avatarUrl}
+                    className="h-7 w-7"
+                    fallbackClassName="text-[10px]"
+                  />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-medium">{member.name}</p>
                     <p className="truncate text-[11px] text-muted-foreground">{member.email ?? "No email"}</p>
