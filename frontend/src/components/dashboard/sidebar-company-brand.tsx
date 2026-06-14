@@ -46,7 +46,7 @@ export function SidebarCompanyBrand({ collapsed }: SidebarCompanyBrandProps) {
             <Skeleton className="h-9 w-9 shrink-0 rounded-lg" />
           ) : (
             <>
-              <Skeleton className="h-16 w-full rounded-lg" />
+              <Skeleton className="w-full rounded-lg" style={{ aspectRatio: "4/3" }} />
               <div className="mt-2 space-y-1.5 text-center">
                 <Skeleton className="mx-auto h-2 w-16 rounded" />
                 <Skeleton className="mx-auto h-3.5 w-full max-w-[140px] rounded" />
@@ -80,12 +80,12 @@ export function SidebarCompanyBrand({ collapsed }: SidebarCompanyBrandProps) {
     /* Expanded: logo full-width on top, name below */
     <div className="w-full">
       {/* Logo — full width */}
-      <div className="relative w-full overflow-hidden rounded-lg bg-muted shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06]" style={{ aspectRatio: "16/7" }}>
+      <div className="relative w-full overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-black/[0.04] dark:bg-muted dark:ring-white/[0.06]" style={{ aspectRatio: "4/3" }}>
         {currentOrg?.logoUrl ? (
           <img
             src={currentOrg.logoUrl}
             alt={currentOrg.name}
-            className="h-full w-full object-contain p-2"
+            className="h-full w-full object-contain"
           />
         ) : currentOrg ? (
           <span
