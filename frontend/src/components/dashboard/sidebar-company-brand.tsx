@@ -38,25 +38,29 @@ export function SidebarCompanyBrand({ collapsed }: SidebarCompanyBrandProps) {
       <div className={cn("border-b border-border/50", collapsed ? "px-2 py-3" : "px-3 py-3")}>
         <div
           className={cn(
-            "flex items-center gap-2.5 rounded-xl border border-[#E7EAF0] bg-[#FCFCFD] p-2.5 dark:border-border dark:bg-muted/25",
-            collapsed && "justify-center px-1.5 py-2"
+            "rounded-xl border border-[#E7EAF0] bg-[#FCFCFD] p-2.5 dark:border-border dark:bg-muted/25",
+            collapsed ? "flex justify-center px-1.5 py-2" : "block"
           )}
         >
-          <Skeleton className="h-9 w-9 shrink-0 rounded-lg" />
-          {!collapsed && (
-            <div className="min-w-0 flex-1 space-y-1.5">
-              <Skeleton className="h-2 w-16 rounded" />
-              <Skeleton className="h-3.5 w-full max-w-[140px] rounded" />
-            </div>
+          {collapsed ? (
+            <Skeleton className="h-9 w-9 shrink-0 rounded-lg" />
+          ) : (
+            <>
+              <Skeleton className="h-16 w-full rounded-lg" />
+              <div className="mt-2 space-y-1.5 text-center">
+                <Skeleton className="mx-auto h-2 w-16 rounded" />
+                <Skeleton className="mx-auto h-3.5 w-full max-w-[140px] rounded" />
+              </div>
+            </>
           )}
         </div>
       </div>
     );
   }
 
-  const inner = (
+  const inner = collapsed ? (
+    /* Collapsed: small icon centered */
     <>
-      {/* Logo / icon */}
       {currentOrg ? (
         <WorkspaceThumb
           workspace={currentOrg}
@@ -71,41 +75,60 @@ export function SidebarCompanyBrand({ collapsed }: SidebarCompanyBrandProps) {
           <Building2 className="h-4 w-4" />
         </span>
       )}
-
-      {/* Text */}
-      {!collapsed && (
-        <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
-            Company
-          </p>
-          <p
-            className={cn(
-              "truncate font-semibold leading-tight tracking-tight",
-              currentOrg ? "text-foreground" : "text-muted-foreground"
-            )}
-            style={{ fontSize: currentOrg ? fontOption.px : undefined }}
-          >
-            {currentOrg?.name ?? "Select workspace"}
-          </p>
-          {isOwner && currentOrg && (
-            <p className="mt-0.5 text-[10px] text-primary/70 opacity-0 transition-opacity group-hover/brand:opacity-100">
-              Click to edit logo &amp; name
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Right icon */}
-      {!collapsed && (
-        <span className="shrink-0 text-muted-foreground/40 transition-colors group-hover/brand:text-primary/60">
-          {isOwner && currentOrg ? (
-            <Pencil className="h-3.5 w-3.5 opacity-0 transition-opacity group-hover/brand:opacity-100" />
-          ) : (
-            <ChevronRight className="h-4 w-4" />
-          )}
-        </span>
-      )}
     </>
+  ) : (
+    /* Expanded: logo full-width on top, name below */
+    <div className="w-full">
+      {/* Logo — full width */}
+      <div className="relative w-full overflow-hidden rounded-lg bg-muted shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06]" style={{ aspectRatio: "16/7" }}>
+        {currentOrg?.logoUrl ? (
+          <img
+            src={currentOrg.logoUrl}
+            alt={currentOrg.name}
+            className="h-full w-full object-contain p-2"
+          />
+        ) : currentOrg ? (
+          <span
+            className={cn(
+              "flex h-full w-full items-center justify-center text-lg font-bold text-white gradient-bg"
+            )}
+          >
+            {currentOrg.name.slice(0, 2).toUpperCase()}
+          </span>
+        ) : (
+          <span className="flex h-full w-full items-center justify-center text-muted-foreground">
+            <Building2 className="h-6 w-6" />
+          </span>
+        )}
+        {/* Edit hint overlay */}
+        {isOwner && currentOrg && (
+          <span className="absolute right-1.5 top-1.5 opacity-0 transition-opacity group-hover/brand:opacity-100">
+            <Pencil className="h-3 w-3 text-primary/70" />
+          </span>
+        )}
+      </div>
+
+      {/* Company label + name */}
+      <div className="mt-2 text-center">
+        <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
+          Company
+        </p>
+        <p
+          className={cn(
+            "truncate font-semibold leading-tight tracking-tight",
+            currentOrg ? "text-foreground" : "text-muted-foreground"
+          )}
+          style={{ fontSize: currentOrg ? fontOption.px : undefined }}
+        >
+          {currentOrg?.name ?? "Select workspace"}
+        </p>
+        {isOwner && currentOrg && (
+          <p className="mt-0.5 text-[10px] text-primary/70 opacity-0 transition-opacity group-hover/brand:opacity-100">
+            Click to edit logo &amp; name
+          </p>
+        )}
+      </div>
+    </div>
   );
 
   const sharedClass = cn(
