@@ -18,6 +18,9 @@ export function SessionExpiredModal() {
       const isPublicRoute =
         pathname === "/login" ||
         pathname === "/signup" ||
+        pathname === "/verify-email" ||
+        pathname === "/forgot-password" ||
+        pathname === "/reset-password" ||
         pathname.startsWith("/invite");
       if (!isPublicRoute) {
         setOpen(true);
