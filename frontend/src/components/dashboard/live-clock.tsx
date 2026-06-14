@@ -34,58 +34,38 @@ export function LiveClock() {
 
   const sep = (
     <span
-      className="mx-0.5 text-2xl font-black leading-none"
-      style={{
-        opacity: tick ? 1 : 0.2,
-        transition: "opacity 0.15s",
-        background: "linear-gradient(135deg, #a855f7, #6366f1)",
-        WebkitBackgroundClip: "text",
-        WebkitTextFillColor: "transparent",
-      }}
+      className="mx-0.5 text-2xl font-black leading-none text-slate-800 dark:text-slate-100"
+      style={{ opacity: tick ? 1 : 0.2, transition: "opacity 0.15s" }}
     >
       :
     </span>
   );
 
   const digitClass =
-    "text-2xl font-black tabular-nums leading-none tracking-tighter";
-  const gradientText = {
-    background: "linear-gradient(135deg, #a855f7 0%, #6366f1 60%, #3b82f6 100%)",
-    WebkitBackgroundClip: "text" as const,
-    WebkitTextFillColor: "transparent" as const,
-    filter: "drop-shadow(0 0 6px rgba(139,92,246,0.5))",
-  };
+    "text-2xl font-black tabular-nums leading-none tracking-tighter text-slate-900 dark:text-slate-50";
 
   return (
     <div className="flex flex-1 min-w-0 items-center justify-center select-none">
       <div
-        className="hidden sm:flex flex-col items-center gap-0.5 rounded-2xl px-5 py-2 border border-violet-500/20"
+        className="hidden sm:flex flex-col items-center gap-0.5 rounded-2xl px-5 py-2 border border-sky-200 dark:border-sky-800"
         style={{
-          background:
-            "linear-gradient(135deg, rgba(139,92,246,0.06) 0%, rgba(99,102,241,0.04) 100%)",
-          boxShadow: "0 0 18px rgba(139,92,246,0.12), inset 0 1px 0 rgba(255,255,255,0.06)",
+          background: "linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)",
+          boxShadow: "0 2px 12px rgba(14,165,233,0.15), inset 0 1px 0 rgba(255,255,255,0.7)",
         }}
       >
         {/* Date row */}
-        <span className="text-[10px] font-semibold tracking-[0.18em] text-muted-foreground/60">
+        <span className="text-[10px] font-semibold tracking-[0.18em] text-sky-700">
           {day}&nbsp;&nbsp;{dateStr}
         </span>
 
         {/* Time row */}
         <div className="flex items-center">
-          <span className={digitClass} style={gradientText}>{h}</span>
+          <span className={digitClass}>{h}</span>
           {sep}
-          <span className={digitClass} style={gradientText}>{m}</span>
+          <span className={digitClass}>{m}</span>
           {sep}
-          <span className={digitClass} style={gradientText}>{s}</span>
-          <span
-            className="ml-1.5 self-end mb-0.5 text-[11px] font-bold tracking-wide"
-            style={{
-              background: "linear-gradient(135deg, #a855f7, #6366f1)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-            }}
-          >
+          <span className={digitClass}>{s}</span>
+          <span className="ml-1.5 self-end mb-0.5 text-[11px] font-bold tracking-wide text-sky-700">
             {ampm}
           </span>
         </div>
