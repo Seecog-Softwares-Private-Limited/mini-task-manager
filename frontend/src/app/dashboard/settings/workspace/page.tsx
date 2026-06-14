@@ -36,6 +36,7 @@ import {
 import { cn, getInitials } from "@/lib/utils";
 import { OrgSettingsTabs } from "@/components/settings/org-settings-tabs";
 import { WorkspaceAvatarPresetsPicker } from "@/components/workspaces/workspace-avatar-presets-picker";
+import { LogoCropModal } from "@/components/workspaces/logo-crop-modal";
 import { parseApiError, isRateLimited } from "@/services/api/client";
 
 const SLUG_REGEX = /^[a-z0-9-]+$/;
@@ -49,6 +50,7 @@ export default function WorkspaceSettingsPage() {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [debouncedSlug, setDebouncedSlug] = useState("");
   const logoFileInputRef = useRef<HTMLInputElement>(null);
@@ -131,18 +133,18 @@ export default function WorkspaceSettingsPage() {
     !!org &&
     (name.trim() !== org.name ||
       slug.trim().toLowerCase() !== org.slug ||
-      (logoPreview ?? "") !== (org.logoUrl ?? ""));
+      (isOwner && (logoPreview ?? "") !== (org.logoUrl ?? "")));
 
   function handleLogoFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file?.type.startsWith("image/")) return;
-    const maxSize = 100 * 1024;
-    if (file.size > maxSize) return;
     const reader = new FileReader();
     reader.onload = () => {
-      if (typeof reader.result === "string") setLogoPreview(reader.result);
+      if (typeof reader.result === "string") setCropSrc(reader.result);
     };
     reader.readAsDataURL(file);
+    // Reset input so the same file can be re-selected
+    e.target.value = "";
   }
 
   function clearLogo() {
@@ -151,8 +153,7 @@ export default function WorkspaceSettingsPage() {
   }
 
   function selectPresetAvatar(dataUrl: string) {
-    setLogoPreview(dataUrl);
-    if (logoFileInputRef.current) logoFileInputRef.current.value = "";
+    setCropSrc(dataUrl);
   }
 
   function handleSaveDetails() {
@@ -160,10 +161,12 @@ export default function WorkspaceSettingsPage() {
     const payload: { name?: string; slug?: string; logoUrl?: string } = {};
     if (name.trim() !== org.name) payload.name = name.trim();
     if (slug.trim().toLowerCase() !== org.slug) payload.slug = slug.trim().toLowerCase();
-    const before = org.logoUrl ?? "";
-    const after = logoPreview ?? "";
-    if (before !== after) {
-      payload.logoUrl = after === "" ? "" : after;
+    if (isOwner) {
+      const before = org.logoUrl ?? "";
+      const after = logoPreview ?? "";
+      if (before !== after) {
+        payload.logoUrl = after === "" ? "" : after;
+      }
     }
     if (Object.keys(payload).length === 0) return;
     updateDetailsMutation.mutate(payload);
@@ -257,14 +260,16 @@ export default function WorkspaceSettingsPage() {
                     {logoPreview ? (
                       <>
                         <img src={logoPreview} alt="" className="h-full w-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={clearLogo}
-                          className="absolute inset-0 flex items-center justify-center bg-black/50 text-xs font-medium text-white opacity-0 transition-opacity hover:opacity-100"
-                          aria-label="Remove icon"
-                        >
-                          Remove
-                        </button>
+                        {isOwner && (
+                          <button
+                            type="button"
+                            onClick={clearLogo}
+                            className="absolute inset-0 flex items-center justify-center bg-black/50 text-xs font-medium text-white opacity-0 transition-opacity hover:opacity-100"
+                            aria-label="Remove icon"
+                          >
+                            Remove
+                          </button>
+                        )}
                       </>
                     ) : (
                       <span className="text-lg font-semibold text-muted-foreground">
@@ -273,21 +278,32 @@ export default function WorkspaceSettingsPage() {
                     )}
                   </div>
                   <div className="flex-1 space-y-1">
-                    <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-                      <input
-                        ref={logoFileInputRef}
-                        type="file"
-                        accept="image/*"
-                        className="sr-only"
-                        onChange={handleLogoFile}
-                      />
-                      <ImagePlus className="h-4 w-4" />
-                      <span>{logoPreview ? "Change" : "Upload"} image</span>
-                    </label>
-                    <p className="text-xs text-muted-foreground/80">PNG, JPG up to 100KB. Optional.</p>
+                    {isOwner ? (
+                      <>
+                        <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+                          <input
+                            ref={logoFileInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="sr-only"
+                            onChange={handleLogoFile}
+                          />
+                          <ImagePlus className="h-4 w-4" />
+                          <span>{logoPreview ? "Change" : "Upload"} image</span>
+                        </label>
+                        <p className="text-xs text-muted-foreground/80">PNG, JPG up to 100KB. Optional.</p>
+                      </>
+                    ) : (
+                      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Shield className="h-3.5 w-3.5 shrink-0" />
+                        Only the workspace owner can change the icon.
+                      </p>
+                    )}
                   </div>
                 </div>
-                <WorkspaceAvatarPresetsPicker value={logoPreview} onSelectPreset={selectPresetAvatar} />
+                {isOwner && (
+                  <WorkspaceAvatarPresetsPicker value={logoPreview} onSelectPreset={selectPresetAvatar} />
+                )}
               </div>
 
               <div className="space-y-2">
@@ -485,6 +501,16 @@ export default function WorkspaceSettingsPage() {
           <ArrowLeft className="mr-1 h-4 w-4" /> Settings
         </Link>
       </Button>
+
+      <LogoCropModal
+        open={!!cropSrc}
+        imageSrc={cropSrc ?? ""}
+        onConfirm={(cropped) => {
+          setLogoPreview(cropped);
+          setCropSrc(null);
+        }}
+        onCancel={() => setCropSrc(null)}
+      />
     </div>
   );
 }

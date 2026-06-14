@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { Sparkles } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { DashboardProfileAvatar } from "@/components/dashboard/dashboard-profile-avatar";
-import { DashboardCompanyBrand } from "@/components/dashboard/dashboard-company-brand";
+import { SidebarCompanyBrand } from "@/components/dashboard/sidebar-company-brand";
 
 interface SidebarProps {
   collapsed: boolean;
@@ -68,9 +68,7 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile, visibleNav }: Si
 
   const content = (
     <div className="flex h-full flex-col">
-      <div className={cn("border-b border-border/50", collapsed ? "px-2 py-3" : "px-3 py-3")}>
-        <DashboardCompanyBrand collapsed={collapsed} />
-      </div>
+      <SidebarCompanyBrand collapsed={collapsed} />
 
       {/* Employee profile */}
       {user?.email && (
