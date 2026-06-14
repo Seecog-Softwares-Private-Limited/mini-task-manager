@@ -45,7 +45,7 @@ export function LiveClock() {
     "text-2xl font-black tabular-nums leading-none tracking-tighter text-slate-900 dark:text-slate-50";
 
   return (
-    <div className="flex flex-1 min-w-0 items-center justify-center select-none">
+    <div className="select-none">
       <div
         className="hidden sm:flex flex-col items-center gap-0.5 rounded-2xl px-5 py-2 border border-sky-200 dark:border-sky-800"
         style={{

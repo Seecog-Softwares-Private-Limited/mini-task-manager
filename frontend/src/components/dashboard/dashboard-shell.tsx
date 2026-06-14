@@ -21,6 +21,7 @@ import { StreakBadge } from "@/components/streak-badge";
 import { TrialBanner } from "@/components/trial-banner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { LiveClock } from "@/components/dashboard/live-clock";
 import type { AppRole } from "@/hooks/use-auth";
 import {
   LayoutDashboard, Building2, FolderKanban, ListTodo, Bell,
@@ -146,6 +147,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2">
             <WorkspaceProgressBadge className="hidden sm:inline-flex" />
             <StreakBadge className="hidden sm:inline-flex" />
+            <LiveClock />
             <CommandPalette />
             <NotificationCenter />
             {(planContext?.plan || planContext?.subscription?.planName) && (
