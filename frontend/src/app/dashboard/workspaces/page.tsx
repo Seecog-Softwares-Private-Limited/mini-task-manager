@@ -54,6 +54,7 @@ import {
 import { OrganizationPreviewDrawer } from "@/components/organizations/organization-preview-drawer";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { WorkspaceAvatarPresetsPicker } from "@/components/workspaces/workspace-avatar-presets-picker";
+import { LogoCropModal } from "@/components/workspaces/logo-crop-modal";
 import type { Organization } from "@/types/api";
 import { cn, formatRelativeTime, isWithinLast24h, getInitials, nameToSlug } from "@/lib/utils";
 import { PendingWorkspaceInvitations } from "@/components/members/pending-workspace-invitations";
@@ -123,6 +124,7 @@ export default function WorkspacesPage() {
   const [editingOrg, setEditingOrg] = useState<Organization | null>(null);
   const workspaceModalOpen = createModalOpen || !!editingOrg;
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
   const logoFileInputRef = useRef<HTMLInputElement>(null);
   const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [debouncedSlug, setDebouncedSlug] = useState("");
@@ -363,25 +365,13 @@ export default function WorkspacesPage() {
 
   function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file) {
-      setLogoPreview(null);
-      return;
-    }
-    if (!file.type.startsWith("image/")) {
-      return;
-    }
-    const maxSize = 100 * 1024; // 100KB
-    if (file.size > maxSize) {
-      return;
-    }
+    if (!file?.type.startsWith("image/")) return;
     const reader = new FileReader();
     reader.onload = () => {
-      const result = reader.result;
-      if (typeof result === "string") {
-        setLogoPreview(result);
-      }
+      if (typeof reader.result === "string") setCropSrc(reader.result);
     };
     reader.readAsDataURL(file);
+    e.target.value = "";
   }
 
   function clearLogo() {
@@ -390,8 +380,7 @@ export default function WorkspacesPage() {
   }
 
   function selectPresetAvatar(dataUrl: string) {
-    setLogoPreview(dataUrl);
-    if (logoFileInputRef.current) logoFileInputRef.current.value = "";
+    setCropSrc(dataUrl);
   }
 
   return (
@@ -851,6 +840,7 @@ export default function WorkspacesPage() {
             setEditingOrg(null);
             reset();
             setLogoPreview(null);
+            setCropSrc(null);
             if (logoFileInputRef.current) logoFileInputRef.current.value = "";
             setSlugManuallyEdited(false);
             setDebouncedSlug("");
@@ -1003,6 +993,7 @@ export default function WorkspacesPage() {
                   setEditingOrg(null);
                   reset();
                   setLogoPreview(null);
+                  setCropSrc(null);
                   if (logoFileInputRef.current) logoFileInputRef.current.value = "";
                   setSlugManuallyEdited(false);
                   setDebouncedSlug("");
@@ -1033,6 +1024,16 @@ export default function WorkspacesPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <LogoCropModal
+        open={!!cropSrc}
+        imageSrc={cropSrc ?? ""}
+        onConfirm={(cropped) => {
+          setLogoPreview(cropped);
+          setCropSrc(null);
+        }}
+        onCancel={() => setCropSrc(null)}
+      />
     </div>
   );
 }

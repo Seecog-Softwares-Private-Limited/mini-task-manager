@@ -36,6 +36,7 @@ import {
 import { cn, getInitials } from "@/lib/utils";
 import { OrgSettingsTabs } from "@/components/settings/org-settings-tabs";
 import { WorkspaceAvatarPresetsPicker } from "@/components/workspaces/workspace-avatar-presets-picker";
+import { LogoCropModal } from "@/components/workspaces/logo-crop-modal";
 import { parseApiError, isRateLimited } from "@/services/api/client";
 
 const SLUG_REGEX = /^[a-z0-9-]+$/;
@@ -49,6 +50,7 @@ export default function WorkspaceSettingsPage() {
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [debouncedSlug, setDebouncedSlug] = useState("");
   const logoFileInputRef = useRef<HTMLInputElement>(null);
@@ -136,13 +138,13 @@ export default function WorkspaceSettingsPage() {
   function handleLogoFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file?.type.startsWith("image/")) return;
-    const maxSize = 100 * 1024;
-    if (file.size > maxSize) return;
     const reader = new FileReader();
     reader.onload = () => {
-      if (typeof reader.result === "string") setLogoPreview(reader.result);
+      if (typeof reader.result === "string") setCropSrc(reader.result);
     };
     reader.readAsDataURL(file);
+    // Reset input so the same file can be re-selected
+    e.target.value = "";
   }
 
   function clearLogo() {
@@ -151,8 +153,7 @@ export default function WorkspaceSettingsPage() {
   }
 
   function selectPresetAvatar(dataUrl: string) {
-    setLogoPreview(dataUrl);
-    if (logoFileInputRef.current) logoFileInputRef.current.value = "";
+    setCropSrc(dataUrl);
   }
 
   function handleSaveDetails() {
@@ -500,6 +501,16 @@ export default function WorkspaceSettingsPage() {
           <ArrowLeft className="mr-1 h-4 w-4" /> Settings
         </Link>
       </Button>
+
+      <LogoCropModal
+        open={!!cropSrc}
+        imageSrc={cropSrc ?? ""}
+        onConfirm={(cropped) => {
+          setLogoPreview(cropped);
+          setCropSrc(null);
+        }}
+        onCancel={() => setCropSrc(null)}
+      />
     </div>
   );
 }
