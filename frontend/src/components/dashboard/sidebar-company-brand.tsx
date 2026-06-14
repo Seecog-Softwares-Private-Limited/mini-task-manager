@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { Building2, Pencil, ChevronRight } from "lucide-react";
@@ -17,7 +17,7 @@ interface SidebarCompanyBrandProps {
 }
 
 export function SidebarCompanyBrand({ collapsed }: SidebarCompanyBrandProps) {
-  const { orgId } = useTenant();
+  const { orgId, setOrgId } = useTenant();
   const [modalOpen, setModalOpen] = useState(false);
 
   const { data: organizations = [], isLoading } = useQuery({
@@ -25,8 +25,15 @@ export function SidebarCompanyBrand({ collapsed }: SidebarCompanyBrandProps) {
     queryFn: fetchOrganizations,
   });
 
+  // Auto-select first workspace as soon as organizations load and none is selected
+  useEffect(() => {
+    if (!orgId && organizations.length > 0) {
+      setOrgId(organizations[0].id);
+    }
+  }, [orgId, organizations, setOrgId]);
+
   const currentOrg = useMemo(
-    () => organizations.find((o) => o.id === orgId),
+    () => organizations.find((o) => o.id === orgId) ?? (organizations.length > 0 ? organizations[0] : undefined),
     [organizations, orgId]
   );
 

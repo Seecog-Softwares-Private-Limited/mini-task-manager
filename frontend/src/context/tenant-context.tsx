@@ -9,7 +9,6 @@ import {
   type ReactNode,
 } from "react";
 import { getStoredOrgId, setStoredOrgId } from "@/services/api/client";
-import { fetchOrganizations } from "@/services/api/organizations.api";
 
 type TenantContextValue = {
   orgId: string | null;
@@ -24,22 +23,8 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const stored = getStoredOrgId();
-    if (stored) {
-      setOrgIdState(stored);
-      setReady(true);
-    } else {
-      // No workspace stored — auto-select the first one on login
-      fetchOrganizations()
-        .then((orgs) => {
-          if (orgs.length > 0) {
-            setStoredOrgId(orgs[0].id);
-            setOrgIdState(orgs[0].id);
-          }
-        })
-        .catch(() => {/* not logged in yet, ignore */})
-        .finally(() => setReady(true));
-    }
+    setOrgIdState(getStoredOrgId());
+    setReady(true);
   }, []);
 
   useEffect(() => {
