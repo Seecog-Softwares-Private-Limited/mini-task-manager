@@ -65,8 +65,7 @@ export function SidebarCompanyBrand({ collapsed }: SidebarCompanyBrandProps) {
           ) : (
             <>
               <Skeleton className="w-full rounded-lg" style={{ aspectRatio: "16/9" }} />
-              <div className="mt-2 space-y-1.5 text-center">
-                <Skeleton className="mx-auto h-2 w-16 rounded" />
+              <div className="mt-2 pb-[2px] text-center">
                 <Skeleton className="mx-auto h-3.5 w-full max-w-[140px] rounded" />
               </div>
             </>
@@ -126,11 +125,8 @@ export function SidebarCompanyBrand({ collapsed }: SidebarCompanyBrandProps) {
         )}
       </div>
 
-      {/* Company label + name */}
-      <div className="mt-2 text-center">
-        <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
-          Company
-        </p>
+      {/* Company name */}
+      <div className="mt-2 pb-[2px] text-center">
         <p
           className={cn(
             "truncate font-semibold leading-tight tracking-tight",
