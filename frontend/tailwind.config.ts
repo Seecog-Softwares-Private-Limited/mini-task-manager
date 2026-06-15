@@ -17,7 +17,19 @@ const config: Config = {
       },
       minHeight: { header: "var(--header-height)" },
       fontFamily: {
-        sans: ["Inter", "system-ui", "-apple-system", "sans-serif"],
+        sans: [
+          "var(--font-geist-sans)",
+          "var(--font-inter)",
+          "ui-sans-serif",
+          "system-ui",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Segoe UI",
+          "sans-serif",
+        ],
+      },
+      fontWeight: {
+        heading: "650",
       },
       colors: {
         border: "hsl(var(--border))",

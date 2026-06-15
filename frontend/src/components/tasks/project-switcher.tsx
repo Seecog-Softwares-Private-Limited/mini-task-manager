@@ -3,7 +3,6 @@
 import { useId, useState } from "react";
 import type { Project } from "@/types/api";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -21,6 +20,12 @@ const PROJECT_SWATCHES = [
   "bg-sky-500/15 text-sky-900 dark:bg-sky-500/25 dark:text-sky-100",
   "bg-violet-500/15 text-violet-900 dark:bg-violet-500/25 dark:text-violet-100",
 ] as const;
+
+const TRIGGER_BASE = cn(
+  "w-full min-w-0 rounded-lg border border-border/55 bg-background shadow-sm",
+  "transition-colors duration-200 hover:bg-muted/20",
+  "focus-visible:ring-2 focus-visible:ring-violet-500/20"
+);
 
 function hashPick<T extends readonly string[]>(id: string, palette: T): T[number] {
   let h = 0;
@@ -53,12 +58,12 @@ function ProjectThumb({
   const [imgFailed, setImgFailed] = useState(false);
   const url = project.iconUrl?.trim();
   const showImage = Boolean(url) && !imgFailed;
-  const dim = size === "sm" ? "h-6 w-6 text-[9px] rounded-md" : "h-7 w-7 text-[10px] rounded-md";
+  const dim = size === "sm" ? "h-5 w-5 text-[8px] rounded-md" : "h-6 w-6 text-[9px] rounded-md";
 
   return (
     <span
       className={cn(
-        "relative flex shrink-0 items-center justify-center overflow-hidden border border-border/70 bg-muted/80 shadow-sm",
+        "relative flex shrink-0 items-center justify-center overflow-hidden border border-border/60 bg-muted/60",
         dim,
         className
       )}
@@ -75,7 +80,7 @@ function ProjectThumb({
       ) : (
         <span
           className={cn(
-            "flex h-full w-full items-center justify-center font-bold leading-none",
+            "flex h-full w-full items-center justify-center font-semibold leading-none",
             hashPick(project.id, PROJECT_SWATCHES)
           )}
         >
@@ -92,8 +97,14 @@ interface ProjectSwitcherProps {
   selectedTaskCount?: number;
   onProjectChange: (projectId: string) => void;
   disabled?: boolean;
-  /** Visible label above the dropdown (default: "Select project") */
+  /** When true, omits built-in label (use BoardSelectorField wrapper) */
+  hideLabel?: boolean;
+  /** Visible label above the dropdown */
   label?: string;
+  /** Compact trigger aligned with workspace selector on command bar */
+  compact?: boolean;
+  className?: string;
+  triggerClassName?: string;
 }
 
 export function ProjectSwitcher({
@@ -102,7 +113,11 @@ export function ProjectSwitcher({
   selectedTaskCount,
   onProjectChange,
   disabled,
-  label = "Select project",
+  hideLabel = false,
+  label = "Project",
+  compact = false,
+  className,
+  triggerClassName,
 }: ProjectSwitcherProps) {
   const triggerId = useId();
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
@@ -110,58 +125,69 @@ export function ProjectSwitcher({
   return (
     <div
       className={cn(
-        "w-full min-w-[260px] max-w-[380px]"
+        "min-w-0",
+        compact ? "w-full min-w-[140px] max-w-[240px] sm:max-w-[280px]" : "w-full min-w-[260px] max-w-[380px]",
+        className
       )}
     >
-      <div className="relative flex flex-col gap-2">
-        <Label
+      {!hideLabel && !compact ? (
+        <label
           htmlFor={triggerId}
-          className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+          className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
         >
           {label}
-        </Label>
-        <Select
-          value={selectedProjectId ?? ""}
-          onValueChange={onProjectChange}
-          disabled={disabled || projects.length === 0}
+        </label>
+      ) : null}
+      <Select
+        value={selectedProjectId ?? ""}
+        onValueChange={onProjectChange}
+        disabled={disabled || projects.length === 0}
+      >
+        <SelectTrigger
+          id={triggerId}
+          className={cn(
+            TRIGGER_BASE,
+            compact ? "h-8 px-2 text-[13px]" : "h-10 px-2.5 text-sm",
+            triggerClassName
+          )}
         >
-          <SelectTrigger
-            id={triggerId}
-            className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white text-slate-900 shadow-sm transition-colors hover:bg-white focus-visible:ring-2 focus-visible:ring-primary/20"
-          >
-            <div className="flex min-w-0 items-center gap-2">
-              {selectedProject ? (
-                <ProjectThumb project={selectedProject} size="sm" />
-              ) : (
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-dashed border-muted-foreground/30 bg-muted/50 text-muted-foreground">
-                  <FolderKanban className="h-3.5 w-3.5" />
-                </span>
-              )}
-              <span className="truncate text-sm font-medium">
-                {selectedProject?.name ?? "Select a project"}
+          <div className="flex min-w-0 flex-1 items-center gap-1.5">
+            {selectedProject ? (
+              <ProjectThumb project={selectedProject} size="sm" />
+            ) : (
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-dashed border-muted-foreground/30 bg-muted/40 text-muted-foreground">
+                <FolderKanban className="h-3 w-3" />
               </span>
-              {selectedProjectId && selectedTaskCount != null && (
-                <Badge
-                  variant="secondary"
-                  className="ml-auto shrink-0 text-[10px] px-1.5 py-0.5"
-                >
-                  {selectedTaskCount}
-                </Badge>
-              )}
-            </div>
-          </SelectTrigger>
-          <SelectContent>
-            {projects.map((project) => (
-              <SelectItem key={project.id} value={project.id} textValue={project.name}>
-                <span className="flex min-w-0 items-center gap-2.5">
-                  <ProjectThumb project={project} size="md" />
-                  <span className="truncate">{project.name}</span>
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+            )}
+            <span className="min-w-0 truncate font-medium">
+              {selectedProject?.name ?? "Select project"}
+            </span>
+            {selectedProjectId && selectedTaskCount != null && compact && (
+              <Badge
+                variant="secondary"
+                className="ml-auto shrink-0 border-0 bg-muted/70 px-1 py-0 text-[10px] font-medium tabular-nums"
+              >
+                {selectedTaskCount}
+              </Badge>
+            )}
+            {selectedProjectId && selectedTaskCount != null && !compact && (
+              <Badge variant="secondary" className="ml-auto shrink-0 text-[10px] px-1.5 py-0.5">
+                {selectedTaskCount}
+              </Badge>
+            )}
+          </div>
+        </SelectTrigger>
+        <SelectContent>
+          {projects.map((project) => (
+            <SelectItem key={project.id} value={project.id} textValue={project.name}>
+              <span className="flex min-w-0 items-center gap-2">
+                <ProjectThumb project={project} size="md" />
+                <span className="truncate">{project.name}</span>
+              </span>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }

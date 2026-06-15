@@ -21,6 +21,8 @@ import { fetchCommentCounts } from "@/services/api/comments.api";
 import {
   completeRecurringTaskWithAction,
   fetchRecurringSummary,
+  fetchRecurringTemplates,
+  pauseRecurringTemplate,
   skipNextRecurringOccurrence,
 } from "@/services/api/recurring-tasks.api";
 import { parseApiError, isRateLimited, getStoredToken } from "@/services/api/client";
@@ -32,6 +34,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
 import { RecurringSummaryStats } from "@/components/recurring/recurring-summary-stats";
+import { RecurringHealthSection } from "@/components/recurring/recurring-health-section";
+import {
+  BoardCommandBar,
+  BoardSelectorField,
+  BOARD_COMMAND_ACTION_BTN,
+} from "@/components/kanban/board-command-bar";
+import { computeRecurringHealth } from "@/lib/recurring-board-utils";
 import {
   KanbanBoard,
   computeBoardStats,
@@ -57,7 +66,14 @@ import { useBoardPermissions } from "@/hooks/use-board-permissions";
 import { useRetentionTracking } from "@/hooks/use-retention-tracking";
 import type { Task } from "@/types/api";
 import { isRecurringTask } from "@/lib/recurrence-display";
-import { Building2, Plus, Sparkles, Columns3, Shield } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Building2, Plus, Sparkles, Columns3, Shield, Keyboard } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 function getCurrentUserId(): string | null {
   const token = getStoredToken();
@@ -205,6 +221,18 @@ export default function RecurringTasksPage() {
     enabled: Boolean(orgId),
   });
 
+  const { data: recurringTemplates = [] } = useQuery({
+    queryKey: ["recurring-templates", selectedProjectId ?? ""],
+    queryFn: () => fetchRecurringTemplates({ projectId: selectedProjectId ?? undefined }),
+    enabled: Boolean(orgId),
+  });
+
+  const recurringTemplateMap = useMemo(() => {
+    const map: Record<string, (typeof recurringTemplates)[number]> = {};
+    for (const t of recurringTemplates) map[t.id] = t;
+    return map;
+  }, [recurringTemplates]);
+
   const { data: projectMembers = [] } = useQuery({
     queryKey: ["project-members", selectedProjectId ?? ""],
     queryFn: () => fetchProjectMembers(selectedProjectId!),
@@ -350,6 +378,23 @@ export default function RecurringTasksPage() {
       toast({
         title: "Failed to delete task",
         description: isRateLimited(err) ? "Too many requests. Try again later." : parseApiError(err),
+        variant: "error",
+      });
+    },
+  });
+
+  const pauseSeriesMutation = useMutation({
+    mutationFn: (templateId: string) => pauseRecurringTemplate(templateId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks", selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-templates"] });
+      toast({ title: "Series paused", variant: "success" });
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not pause series",
+        description: parseApiError(err),
         variant: "error",
       });
     },
@@ -551,8 +596,23 @@ export default function RecurringTasksPage() {
       recurringActionMutation.mutate({ type: "complete", task }),
     onSkipNextOccurrence: (task: Task) =>
       recurringActionMutation.mutate({ type: "skip", task }),
+    onPauseSeries: (task: Task) => {
+      if (!task.recurringTemplateId) return;
+      pauseSeriesMutation.mutate(task.recurringTemplateId);
+    },
     onDelete: (task: Task) => setDeleteTarget(task),
-  }), [updateMutation, recurringActionMutation]);
+  }), [updateMutation, recurringActionMutation, pauseSeriesMutation]);
+
+  const healthMetrics = useMemo(
+    () =>
+      computeRecurringHealth(
+        summaryQuery.data,
+        recurringTasks,
+        recurringTemplates,
+        boardStats.completedPercent
+      ),
+    [summaryQuery.data, recurringTasks, recurringTemplates, boardStats.completedPercent]
+  );
 
   useKeyboardShortcuts(useMemo(() => [
     { key: "n", ctrl: true, handler: () => { if (permissions.canCreateTask && selectedProjectId) setCreateModalOpen(true); }, description: "Create recurring task" },
@@ -615,71 +675,79 @@ export default function RecurringTasksPage() {
   const isBoardLoading = workflowsLoading || statusesLoading || tasksLoading || setupWorkflowMutation.isPending;
 
   return (
-    <div className="flex h-0 min-h-0 flex-1 flex-col gap-4 overflow-hidden animate-slide-up">
+    <div className="flex h-0 min-h-0 flex-1 flex-col gap-2 overflow-hidden animate-slide-up">
       {celebrationLayer}
-      <div className="flex shrink-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 flex-1 flex-col gap-3">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Recurring Tasks</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              All recurring task occurrences for the selected project.
-            </p>
-          </div>
-          <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="w-full sm:max-w-[280px]">
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                Select workspace
-              </p>
+      <BoardCommandBar
+        selectors={
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
+            <BoardSelectorField label="Workspace" className="w-full sm:w-[min(100%,200px)] sm:shrink-0">
               <OrgSwitcher
                 variant="navbar"
+                compact
                 contentAlign="start"
-                className="h-10 w-full justify-between rounded-xl border border-slate-200 bg-white px-3 text-slate-900 shadow-sm hover:bg-white"
+                className="h-8 w-full justify-between rounded-lg border border-border/55 bg-background px-2 shadow-sm transition-colors duration-200 hover:bg-muted/20"
               />
-            </div>
-            <div className="min-w-0 flex-1">
+            </BoardSelectorField>
+            <BoardSelectorField label="Project" className="min-w-0 flex-1 sm:max-w-[280px]">
               <ProjectSwitcher
                 projects={selectableProjects}
                 selectedProjectId={selectedProjectId}
                 selectedTaskCount={recurringTasks.length}
                 onProjectChange={handleProjectChange}
                 disabled={projectsLoading}
+                compact
+                hideLabel
               />
-            </div>
+            </BoardSelectorField>
           </div>
-          {!permissions.canEditTask && (
-            <span className="inline-flex w-fit items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-              <Shield className="h-3 w-3" /> View only — workspace owner can edit tasks
-            </span>
-          )}
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
-          {permissions.canCreateTask && (
-            <Button
-              onClick={() => {
-                setDefaultStatusId(statuses[0]?.id);
-                setCreateModalOpen(true);
-              }}
-              data-cy="create-recurring-task-button"
-              className="shadow-lg shadow-primary/20"
-            >
-              <Plus className="mr-1.5 h-4 w-4" /> New Task
-            </Button>
-          )}
-        </div>
-      </div>
-
-      <RecurringSummaryStats
-        summary={summaryQuery.data}
-        boardStats={boardStats}
-        isLoading={summaryQuery.isLoading || isBoardLoading}
-        className="shrink-0"
-      />
-
-      {isBoardLoading ? (
-        <BoardSkeleton />
-      ) : statuses.length > 0 ? (
-        <>
-          <div className="shrink-0">
+        }
+        actions={
+          <>
+            {!permissions.canEditTask && (
+              <span className="inline-flex items-center gap-1 rounded-md border border-border/45 bg-muted/30 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                <Shield className="h-3 w-3" /> View only
+              </span>
+            )}
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground transition-colors duration-200">
+                    <Keyboard className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">
+                  Ctrl+N create · B cycle Kanban/Table
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            {permissions.canCreateTask && (
+              <Button
+                onClick={() => {
+                  setDefaultStatusId(statuses[0]?.id);
+                  setCreateModalOpen(true);
+                }}
+                data-cy="create-recurring-task-button"
+                className={cn(BOARD_COMMAND_ACTION_BTN, "px-2.5 shadow-sm")}
+              >
+                <Plus className="h-3 w-3" /> New recurring task
+              </Button>
+            )}
+          </>
+        }
+        stats={
+          recurringTasks.length > 0 || summaryQuery.data ? (
+            <RecurringSummaryStats
+              summary={summaryQuery.data}
+              tasks={recurringTasks}
+              templates={recurringTemplates}
+              completedPercent={boardStats.completedPercent}
+              doneStatusId={doneStatusId}
+              isLoading={summaryQuery.isLoading || isBoardLoading}
+            />
+          ) : undefined
+        }
+        toolbar={
+          !isBoardLoading && statuses.length > 0 ? (
             <BoardToolbar
               filters={filters}
               onFiltersChange={setFilters}
@@ -690,9 +758,15 @@ export default function RecurringTasksPage() {
               filteredCount={filteredTaskCount}
               showRecurrenceFilter={false}
             />
-          </div>
+          ) : undefined
+        }
+      />
 
-          <div className="flex h-0 min-h-0 flex-1 flex-col overflow-hidden">
+      {isBoardLoading ? (
+        <BoardSkeleton />
+      ) : statuses.length > 0 ? (
+        <>
+          <div className="flex h-0 min-h-0 flex-1 flex-col gap-2 overflow-hidden">
             {(viewMode === "kanban" || viewMode === "scrum") ? (
               <KanbanBoard
                 className="min-h-0 flex-1"
@@ -708,6 +782,8 @@ export default function RecurringTasksPage() {
                 quickActions={quickActions}
                 permissions={permissions}
                 currentUserId={currentUserId}
+                boardVariant="recurring"
+                recurringTemplateMap={recurringTemplateMap}
                 aria-label={`Recurring tasks for ${selectedProject.name}`}
               />
             ) : (
@@ -723,6 +799,10 @@ export default function RecurringTasksPage() {
               </div>
             )}
           </div>
+
+          {recurringTasks.length > 0 ? (
+            <RecurringHealthSection metrics={healthMetrics} />
+          ) : null}
 
           {recurringTasks.length === 0 && (
             <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed bg-muted/10 py-14 text-center">
@@ -782,6 +862,7 @@ export default function RecurringTasksPage() {
         isSubmitting={createMutation.isPending}
         error={createMutation.error ? (isRateLimited(createMutation.error) ? "Too many requests. Try again later." : parseApiError(createMutation.error)) : null}
         projectId={selectedProjectId ?? ""}
+        projectName={selectedProject?.name}
         statuses={statuses}
         defaultStatusId={defaultStatusId}
         showRecurrence

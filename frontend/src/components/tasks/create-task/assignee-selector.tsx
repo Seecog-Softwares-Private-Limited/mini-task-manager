@@ -16,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DropdownScrollList } from "@/components/ui/dropdown-scroll-list";
-import { Check, Loader2, Search, UserRoundX, Users } from "lucide-react";
+import { Check, Loader2, Search, UserRoundX, Users, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** Above create-task modal overlay (z-[100]). */
@@ -106,37 +106,69 @@ export function AssigneeSelector({
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={disabled || !projectId}
-          className="h-10 w-full justify-start gap-2"
-        >
-          {selected.length > 0 ? (
-            <>
-              <div className="flex -space-x-2">
-                {selected.slice(0, 3).map((member) => (
-                  <UserAvatar
-                    key={member.id}
-                    userId={member.id}
-                    name={member.name}
-                    avatarUrl={member.avatarUrl}
-                    className="h-6 w-6 border-2 border-background"
-                    fallbackClassName="text-[10px]"
-                  />
-                ))}
-              </div>
-              <span className="truncate text-sm">{selected.length} assigned</span>
-            </>
-          ) : (
-            <>
-              <Users className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">Assign member</span>
-            </>
-          )}
-        </Button>
-      </DropdownMenuTrigger>
+      <div
+        className={cn(
+          "flex h-9 w-full items-stretch overflow-hidden rounded-lg border border-border/55 bg-background shadow-sm",
+          "transition-all duration-200 hover:bg-muted/20",
+          (disabled || !projectId) && "opacity-50"
+        )}
+      >
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={disabled || !projectId}
+            className="h-full min-w-0 flex-1 justify-start gap-2 rounded-none border-0 px-2.5 shadow-none hover:bg-transparent"
+          >
+            {selected.length === 1 ? (
+              <>
+                <UserAvatar
+                  userId={selected[0].id}
+                  name={selected[0].name}
+                  avatarUrl={selected[0].avatarUrl}
+                  className="h-6 w-6 shrink-0"
+                  fallbackClassName="text-[10px]"
+                />
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">{selected[0].name}</span>
+              </>
+            ) : selected.length > 1 ? (
+              <>
+                <div className="flex -space-x-1.5">
+                  {selected.slice(0, 3).map((member) => (
+                    <UserAvatar
+                      key={member.id}
+                      userId={member.id}
+                      name={member.name}
+                      avatarUrl={member.avatarUrl}
+                      className="h-6 w-6 border-2 border-background"
+                      fallbackClassName="text-[10px]"
+                    />
+                  ))}
+                </div>
+                <span className="truncate text-sm font-medium">{selected.length} assignees</span>
+              </>
+            ) : (
+              <>
+                <Users className="h-4 w-4 shrink-0 text-muted-foreground/70" />
+                <span className="text-sm text-muted-foreground">Assign member</span>
+              </>
+            )}
+          </Button>
+        </DropdownMenuTrigger>
+        {selected.length === 1 ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            disabled={disabled}
+            className="h-full w-9 shrink-0 rounded-none border-l border-border/50 text-muted-foreground hover:bg-muted/40 hover:text-foreground"
+            onClick={() => onChange([])}
+            aria-label={`Remove ${selected[0].name}`}
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        ) : null}
+      </div>
       <DropdownMenuContent
         align="start"
         className={cn("w-80 p-0", DROPDOWN_Z)}
@@ -204,7 +236,7 @@ export function AssigneeSelector({
                       </div>
                       <span
                         className={cn(
-                          "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
+                          "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors duration-200",
                           checked
                             ? "border-primary bg-primary text-white"
                             : "border-border bg-background text-transparent"

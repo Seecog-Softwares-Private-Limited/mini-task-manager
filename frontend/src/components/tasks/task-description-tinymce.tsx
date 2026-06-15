@@ -129,7 +129,7 @@ export function TaskDescriptionEditor({
       ],
       content_style: `
         body {
-          font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+          font-family: var(--font-geist-sans), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
           font-size: 15px;
           line-height: 1.65;
           margin: 12px 14px;

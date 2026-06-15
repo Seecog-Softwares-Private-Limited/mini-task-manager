@@ -56,6 +56,11 @@ import {
   type SavedView,
 } from "@/components/kanban/board-toolbar";
 import { BoardStatsBar } from "@/components/kanban/board-stats";
+import {
+  BoardCommandBar,
+  BoardSelectorField,
+  BOARD_COMMAND_ACTION_BTN,
+} from "@/components/kanban/board-command-bar";
 import { BoardTableView } from "@/components/kanban/board-table-view";
 import { BoardSkeleton } from "@/components/kanban/board-skeleton";
 import {
@@ -81,6 +86,7 @@ import { useRetentionTracking } from "@/hooks/use-retention-tracking";
 import type { Task } from "@/types/api";
 import { exportTasksToZipFile } from "@/lib/export-tasks-zip";
 import { isRecurringTask } from "@/lib/recurrence-display";
+import { cn } from "@/lib/utils";
 import { ImportTasksZipModal } from "@/components/tasks/import-tasks-zip-modal";
 import { Building2, Plus, Sparkles, Columns3, Keyboard, Shield, Rocket, Download, Upload } from "lucide-react";
 
@@ -792,98 +798,96 @@ export default function TasksPage() {
   const isBoardLoading = workflowsLoading || statusesLoading || tasksLoading || setupWorkflowMutation.isPending;
 
   return (
-    <div className="flex h-0 min-h-0 flex-1 flex-col gap-4 overflow-hidden animate-slide-up">
+    <div className="flex h-0 min-h-0 flex-1 flex-col gap-2 overflow-hidden animate-slide-up">
       {celebrationLayer}
-      <div className="flex shrink-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 flex-1 flex-col gap-3">
-          <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="w-full sm:max-w-[280px]">
-              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                Select workspace
-              </p>
+      <BoardCommandBar
+        selectors={
+          <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end sm:gap-3">
+            <BoardSelectorField label="Workspace" className="w-full sm:w-[min(100%,200px)] sm:shrink-0">
               <OrgSwitcher
                 variant="navbar"
+                compact
                 contentAlign="start"
-                className="h-10 w-full justify-between rounded-xl border border-slate-200 bg-white px-3 text-slate-900 shadow-sm hover:bg-white"
+                className="h-[26px] w-full justify-between rounded-lg border border-border/55 bg-background px-2 text-[13px] shadow-sm transition-colors duration-200 hover:bg-muted/20"
               />
-            </div>
-            <div className="min-w-0 flex-1">
+            </BoardSelectorField>
+            <BoardSelectorField label="Project" className="min-w-0 flex-1 sm:max-w-[280px]">
               <ProjectSwitcher
                 projects={selectableProjects}
                 selectedProjectId={selectedProjectId}
                 selectedTaskCount={projectTasks.length}
                 onProjectChange={handleProjectChange}
                 disabled={projectsLoading}
+                compact
+                hideLabel
               />
-            </div>
+            </BoardSelectorField>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+        }
+        actions={
+          <>
             {!permissions.canEditTask && (
-              <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                <Shield className="h-3 w-3" /> View only — workspace owner can edit tasks
+              <span className="inline-flex items-center gap-1 rounded-md border border-border/45 bg-muted/30 px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                <Shield className="h-3 w-3" /> View only
               </span>
             )}
-          </div>
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2 sm:justify-end">
-          <TooltipProvider delayDuration={300}>
-            <Tooltip>
-              <TooltipTrigger asChild><Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-muted-foreground"><Keyboard className="h-4 w-4" /></Button></TooltipTrigger>
-              <TooltipContent side="bottom" className="text-xs">Ctrl+N create, B cycle Kanban/Scrum/Table</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          {permissions.canManageBoard && (
-            <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)} className="h-9 gap-1.5">
-              Settings
-            </Button>
-          )}
-          {viewMode === "scrum" && permissions.canManageBoard && (
-            <Button variant="outline" size="sm" onClick={() => setCreateSprintModalOpen(true)} className="h-9 gap-1.5">
-              <Rocket className="h-4 w-4" /> New Sprint
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 gap-1.5"
-            disabled={!selectedProjectId || projectTasks.length === 0 || exportingZip}
-            onClick={() => void handleExportZip()}
-            data-cy="export-tasks-zip"
-          >
-            <Download className="h-4 w-4" />
-            {exportingZip ? "Exporting…" : "Export ZIP"}
-          </Button>
-          {permissions.canCreateTask && selectedProjectId && (
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground transition-colors duration-200">
+                    <Keyboard className="h-3.5 w-3.5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="text-xs">Ctrl+N create, B cycle Kanban/Scrum/Table</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            {permissions.canManageBoard && (
+              <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)} className={BOARD_COMMAND_ACTION_BTN}>
+                Settings
+              </Button>
+            )}
+            {viewMode === "scrum" && permissions.canManageBoard && (
+              <Button variant="outline" size="sm" onClick={() => setCreateSprintModalOpen(true)} className={BOARD_COMMAND_ACTION_BTN}>
+                <Rocket className="h-3 w-3" /> Sprint
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
-              className="h-9 gap-1.5"
-              onClick={() => setImportZipOpen(true)}
-              data-cy="import-tasks-zip"
+              className={BOARD_COMMAND_ACTION_BTN}
+              disabled={!selectedProjectId || projectTasks.length === 0 || exportingZip}
+              onClick={() => void handleExportZip()}
+              data-cy="export-tasks-zip"
             >
-              <Upload className="h-4 w-4" />
-              Import ZIP
+              <Download className="h-3 w-3" />
+              {exportingZip ? "Exporting…" : "Export ZIP"}
             </Button>
-          )}
-          {permissions.canCreateTask && (
-            <Button onClick={() => { setDefaultStatusId(statuses[0]?.id); setCreateModalOpen(true); }} data-cy="create-task-button" className="shadow-lg shadow-primary/20">
-              <Plus className="mr-1.5 h-4 w-4" /> New Task
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {isBoardLoading ? (
-        <BoardSkeleton />
-      ) : statuses.length > 0 ? (
-        <>
-          <div className="shrink-0 space-y-4">
-            {projectTasks.length > 0 && (
-              <BoardStatsBar
-                stats={boardStats}
-                hideRecurringStat
-              />
+            {permissions.canCreateTask && selectedProjectId && (
+              <Button
+                variant="outline"
+                size="sm"
+                className={BOARD_COMMAND_ACTION_BTN}
+                onClick={() => setImportZipOpen(true)}
+                data-cy="import-tasks-zip"
+              >
+                <Upload className="h-3 w-3" />
+                Import ZIP
+              </Button>
             )}
+            {permissions.canCreateTask && (
+              <Button
+                onClick={() => { setDefaultStatusId(statuses[0]?.id); setCreateModalOpen(true); }}
+                data-cy="create-task-button"
+                className={cn(BOARD_COMMAND_ACTION_BTN, "px-2.5 shadow-sm")}
+              >
+                <Plus className="h-3 w-3" /> New Task
+              </Button>
+            )}
+          </>
+        }
+        stats={projectTasks.length > 0 ? <BoardStatsBar stats={boardStats} hideRecurringStat /> : undefined}
+        toolbar={
+          !isBoardLoading && statuses.length > 0 ? (
             <BoardToolbar
               filters={filters}
               onFiltersChange={setFilters}
@@ -900,10 +904,15 @@ export default function TasksPage() {
               isSelectionMode={bulk.state.isSelectionMode}
               onToggleSelectionMode={handleToggleSelectionMode}
               canBulkSelect={permissions.canBulkSelect}
-              showRecurrenceFilter={false}
             />
-          </div>
+          ) : undefined
+        }
+      />
 
+      {isBoardLoading ? (
+        <BoardSkeleton />
+      ) : statuses.length > 0 ? (
+        <>
           <div className="flex h-0 min-h-0 flex-1 flex-col overflow-hidden">
             {viewMode === "kanban" ? (
               <KanbanBoard
@@ -1040,10 +1049,9 @@ export default function TasksPage() {
         isSubmitting={createMutation.isPending}
         error={createMutation.error ? (isRateLimited(createMutation.error) ? "Too many requests. Try again later." : parseApiError(createMutation.error)) : null}
         projectId={selectedProjectId ?? ""}
+        projectName={selectedProject?.name}
         statuses={statuses}
         defaultStatusId={defaultStatusId}
-        onExportCsv={() => void handleExportZip()}
-        exportCsvDisabled={!selectedProjectId || projectTasks.length === 0 || exportingZip}
       />
 
       {orgId && selectedProjectId && (

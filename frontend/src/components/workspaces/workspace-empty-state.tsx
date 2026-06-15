@@ -65,7 +65,7 @@ export function WorkspaceEmptyState({
       {config.action === "create" && onCreate ? (
         <Button onClick={onCreate} size="sm" className="mt-5 rounded-xl">
           <Plus className="mr-2 h-4 w-4" />
-          New Workspace
+          Create Workspace
         </Button>
       ) : onShowAll ? (
         <Button variant="outline" size="sm" className="mt-5 rounded-xl" onClick={onShowAll}>

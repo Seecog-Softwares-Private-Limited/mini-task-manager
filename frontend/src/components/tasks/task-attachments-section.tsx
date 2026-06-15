@@ -26,6 +26,7 @@ import {
   type AttachmentPreviewTarget,
 } from "@/components/tasks/subtasks/attachment-preview-modal";
 import { generateClientId } from "@/lib/generate-client-id";
+import { cn } from "@/lib/utils";
 import type { PendingSubtaskAttachment } from "@/components/tasks/subtasks/subtask-attachments-section";
 
 function pendingToCard(item: PendingSubtaskAttachment): AttachmentCardItem {
@@ -46,6 +47,8 @@ interface TaskAttachmentsSectionProps {
   pendingAttachments?: PendingSubtaskAttachment[];
   onPendingChange?: (items: PendingSubtaskAttachment[]) => void;
   disabled?: boolean;
+  /** Premium empty/drop styling for the create-task drawer */
+  createDrawer?: boolean;
 }
 
 export function TaskAttachmentsSection({
@@ -54,6 +57,7 @@ export function TaskAttachmentsSection({
   pendingAttachments = [],
   onPendingChange,
   disabled,
+  createDrawer = false,
 }: TaskAttachmentsSectionProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -61,6 +65,7 @@ export function TaskAttachmentsSection({
   const sectionRef = React.useRef<HTMLDivElement>(null);
   const [previewTarget, setPreviewTarget] = React.useState<AttachmentPreviewTarget | null>(null);
   const [focused, setFocused] = React.useState(false);
+  const [dragOver, setDragOver] = React.useState(false);
   const [thumbById, setThumbById] = React.useState<Record<string, string>>({});
   const [uploadingFiles, setUploadingFiles] = React.useState<
     Array<{ tempId: string; file: File }>
@@ -230,12 +235,32 @@ export function TaskAttachmentsSection({
         }
       }}
       onPaste={handlePaste}
-      className="space-y-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-primary/20"
+      onDragOver={(e) => {
+        if (disabled) return;
+        e.preventDefault();
+        setDragOver(true);
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragOver(false);
+        if (disabled || !e.dataTransfer.files?.length) return;
+        void handleFiles(e.dataTransfer.files);
+      }}
+      className={cn(
+        "space-y-2.5 rounded-lg outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-violet-500/15",
+        createDrawer && cards.length === 0 && "border border-dashed border-border/45 bg-muted/10 px-2.5 py-2 transition-all duration-200 hover:border-violet-500/30 hover:bg-violet-500/[0.04]",
+        createDrawer && dragOver && "border-violet-500/35 bg-violet-500/[0.05]",
+        createDrawer && focused && cards.length === 0 && "ring-2 ring-violet-500/10"
+      )}
     >
       <div className="flex items-center justify-between gap-2">
-        <Label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <Label className={cn(
+          "flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground",
+          !createDrawer && "text-xs font-semibold uppercase tracking-wider"
+        )}>
           <Paperclip className="h-3.5 w-3.5" />
-          Task attachments
+          {createDrawer ? "Attachments" : "Task attachments"}
         </Label>
         <div>
           <input
@@ -252,7 +277,10 @@ export function TaskAttachmentsSection({
             type="button"
             variant="outline"
             size="sm"
-            className="h-8 text-xs"
+            className={cn(
+              "h-7 text-[11px] transition-all duration-200",
+              createDrawer && "rounded-md border-border/55"
+            )}
             disabled={disabled}
             onClick={() => fileInputRef.current?.click()}
           >
@@ -261,11 +289,17 @@ export function TaskAttachmentsSection({
           </Button>
         </div>
       </div>
-      <p className="text-[11px] text-muted-foreground">
-        {persist
-          ? "Paste screenshots with Ctrl+V / Cmd+V while this section is focused."
-          : "Files are queued locally and upload automatically when you create the task. Paste screenshots with Ctrl+V / Cmd+V while this section is focused."}
-      </p>
+      {!createDrawer ? (
+        <p className="text-[11px] text-muted-foreground">
+          {persist
+            ? "Paste screenshots with Ctrl+V / Cmd+V while this section is focused."
+            : "Files are queued locally and upload automatically when you create the task. Paste screenshots with Ctrl+V / Cmd+V while this section is focused."}
+        </p>
+      ) : cards.length === 0 ? (
+        <p className="text-[11px] leading-snug text-muted-foreground/90">
+          Drop files, paste screenshots, or upload.
+        </p>
+      ) : null}
 
       {isLoading && persist ? (
         <p className="text-xs text-muted-foreground">Loading attachments…</p>
@@ -285,9 +319,11 @@ export function TaskAttachmentsSection({
           </Button>
         </div>
       ) : cards.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-border/50 bg-muted/10 px-3 py-4 text-center text-xs text-muted-foreground">
-          No task attachments yet
-        </p>
+        !createDrawer ? (
+          <p className="rounded-lg border border-dashed border-border/50 bg-muted/10 px-3 py-4 text-center text-xs text-muted-foreground">
+            No task attachments yet
+          </p>
+        ) : null
       ) : (
         <div className="space-y-2">
           {cards.map((card) => (

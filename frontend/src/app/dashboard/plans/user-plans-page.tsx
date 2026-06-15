@@ -9,6 +9,13 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { PlanUsageWidget } from "@/components/PlanUsageWidget";
 import { PlanBadge } from "@/components/PlanBadge";
+import { PlanFeatureComparison } from "@/components/plans/plan-feature-comparison";
+import {
+  canUpgradeTo,
+  getPlanCta,
+  PLAN_DESCRIPTIONS,
+  toLimitLabel,
+} from "@/lib/plan-display";
 import {
   createUserPlanOrder,
   fetchCurrentUserPlan,
@@ -20,7 +27,7 @@ import {
   type UserPlanSlug,
 } from "@/services/api/user-plans.api";
 import { parseApiError } from "@/services/api/client";
-import { Check, Crown, HardDrive, Users, Building2, Sparkles, Ticket } from "lucide-react";
+import { Check, Crown, HardDrive, Users, Building2, Sparkles, Ticket, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 declare global {
@@ -41,38 +48,24 @@ type PlanAccent = {
 
 const ACCENTS: Record<UserPlanSlug, PlanAccent> = {
   free: {
-    gradient: "from-slate-500 to-slate-700",
+    gradient: "from-slate-400/80 to-slate-600/80",
     border: "border-slate-200/70 dark:border-slate-700/70",
     badge: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
     button: "bg-slate-100 hover:bg-slate-200 text-slate-900 dark:bg-slate-800 dark:hover:bg-slate-700",
   },
   silver: {
-    gradient: "from-slate-300 via-slate-200 to-slate-300",
-    border: "border-slate-300/70 dark:border-slate-500/70",
-    badge: "bg-gradient-to-r from-slate-200 to-slate-300 text-slate-900 dark:text-white",
-    button: "bg-gradient-to-r from-slate-500 to-slate-300 text-slate-950 hover:brightness-110",
+    gradient: "from-slate-300/90 via-blue-100/80 to-slate-300/90",
+    border: "border-blue-200/60 dark:border-blue-800/40",
+    badge: "bg-gradient-to-r from-slate-100 to-blue-100 text-slate-800 dark:text-white",
+    button: "bg-gradient-to-r from-slate-500 to-slate-400 text-white hover:brightness-110",
   },
   gold: {
-    gradient: "from-amber-400 via-amber-300 to-yellow-400",
-    border: "border-amber-400/60 dark:border-amber-600/60",
+    gradient: "from-amber-400/90 via-amber-300/80 to-yellow-400/90",
+    border: "border-amber-400/50 dark:border-amber-600/40",
     badge: "bg-amber-100 text-amber-950 dark:bg-amber-950/30 dark:text-amber-200",
     button: "bg-gradient-to-r from-amber-500 to-yellow-400 text-amber-950 hover:brightness-110",
   },
 };
-
-function toMaxText(n: number | null): string {
-  if (n === null) return "Unlimited";
-  return String(n);
-}
-
-function canUpgradeTo(current: UserPlanSlug | null | undefined, target: UserPlanSlug) {
-  if (!current) return target !== "free";
-  if (current === "gold") return false;
-  if (target === "free") return false;
-  if (current === "silver") return target === "gold";
-  if (current === "free") return target === "silver" || target === "gold";
-  return false;
-}
 
 function planIcon(plan: UserPlanSlug) {
   switch (plan) {
@@ -81,7 +74,7 @@ function planIcon(plan: UserPlanSlug) {
     case "silver":
       return <Crown className="h-6 w-6" />;
     case "gold":
-      return <Crown className="h-6 w-6" />;
+      return <Star className="h-6 w-6" />;
   }
 }
 
@@ -96,7 +89,7 @@ export default function UserPlansPage() {
     staleTime: 30_000,
   });
 
-  const { data: current, isLoading: currentLoading } = useQuery({
+  const { data: current } = useQuery({
     queryKey: ["user-plans", "current"],
     queryFn: fetchCurrentUserPlan,
     staleTime: 30_000,
@@ -134,11 +127,6 @@ export default function UserPlansPage() {
       document.body.appendChild(script);
     });
   }, []);
-
-  const upgradeButtonText = (target: UserPlanSlug) => {
-    if (currentPlan === target) return "Current plan";
-    return `Upgrade to ${target.charAt(0).toUpperCase() + target.slice(1)}`;
-  };
 
   const applyCoupon = async (target: UserPlanSlug) => {
     const code = couponInputs[target]?.trim();
@@ -281,199 +269,204 @@ export default function UserPlansPage() {
 
   return (
     <>
-    <div className="mx-auto max-w-7xl space-y-8 pb-10 pt-6">
-      <div className="text-center space-y-3">
-        <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-foreground via-foreground/90 to-foreground/70 bg-clip-text">
-          Plans that scale with you
-        </h1>
-        <p className="mx-auto max-w-2xl text-muted-foreground">
-          Transparent pricing for your account limits: Free, Silver, and Gold.
-        </p>
-      </div>
+      <div className="mx-auto max-w-7xl space-y-8 pb-10 pt-6">
+        <div className="space-y-3 text-center">
+          <h1 className="bg-gradient-to-r from-foreground via-foreground/90 to-foreground/70 bg-clip-text text-4xl font-extrabold tracking-tight">
+            Plans that scale with you
+          </h1>
+          <p className="mx-auto max-w-2xl text-muted-foreground">
+            Transparent pricing for your account limits: Free, Silver, and Gold.
+          </p>
+        </div>
 
-      <div className="grid gap-8 lg:grid-cols-[1fr_320px] items-start">
-        <div className="space-y-6">
-          <div className="grid gap-6 md:grid-cols-3 items-start">
-            {plansLoading ? (
-              <div className="md:col-span-3 text-center text-muted-foreground">Loading plans…</div>
-            ) : (
-              plansList.map((plan) => {
-                const accent = ACCENTS[plan.slug as UserPlanSlug] ?? ACCENTS.free;
-                const currentBadge =
-                  currentPlan && plan.slug === currentPlan ? (
-                    <span className={cn("text-xs font-bold uppercase", accent.badge)}>Current</span>
-                  ) : null;
-                const canUpgrade = canUpgradeTo(currentPlan, plan.slug as UserPlanSlug);
-                const isUpgrading = upgrading === plan.slug;
-                const slug = plan.slug as UserPlanSlug;
-                const applied = appliedCoupons[slug];
-                const showCoupon =
-                  plan.allowCoupon && slug !== "free" && canUpgrade;
+        <div className="grid items-start gap-8 lg:grid-cols-[1fr_320px]">
+          <div className="space-y-8">
+            <div className="grid items-start gap-6 md:grid-cols-3">
+              {plansLoading ? (
+                <div className="text-center text-muted-foreground md:col-span-3">Loading plans…</div>
+              ) : (
+                plansList.map((plan) => {
+                  const slug = plan.slug as UserPlanSlug;
+                  const accent = ACCENTS[slug] ?? ACCENTS.free;
+                  const isCurrent = currentPlan === slug;
+                  const canUpgrade = canUpgradeTo(currentPlan, slug);
+                  const isUpgrading = upgrading === slug;
+                  const applied = appliedCoupons[slug];
+                  const showCoupon = plan.allowCoupon && slug !== "free" && canUpgrade;
+                  const cta = getPlanCta(slug, currentPlan ?? "free");
+                  const isGoldCurrent = isCurrent && slug === "gold";
 
-                return (
-                  <Card
-                    key={plan.slug}
-                    className={cn(
-                      "relative overflow-hidden transition-shadow hover:shadow-lg",
-                      accent.border,
-                      plan.slug === "silver" && "shadow-md"
-                    )}
-                  >
-                    <div className={cn("h-1.5 w-full bg-gradient-to-r", accent.gradient)} />
+                  return (
+                    <Card
+                      key={plan.slug}
+                      className={cn(
+                        "relative overflow-hidden transition-all duration-200",
+                        accent.border,
+                        "hover:-translate-y-px hover:shadow-md",
+                        slug === "silver" && !isCurrent && "shadow-sm",
+                        isGoldCurrent &&
+                          "border-amber-400/50 shadow-[0_0_20px_-8px_rgba(245,158,11,0.35)] ring-1 ring-amber-400/25"
+                      )}
+                    >
+                      <div className={cn("h-1 w-full bg-gradient-to-r", accent.gradient)} />
 
-                    <CardHeader className="pb-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted/50">
-                            {planIcon(plan.slug as UserPlanSlug)}
+                      <CardHeader className="pb-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className={cn(
+                                "flex h-10 w-10 items-center justify-center rounded-xl transition-colors duration-200",
+                                isGoldCurrent ? "bg-amber-100/70 dark:bg-amber-950/25" : "bg-muted/50"
+                              )}
+                            >
+                              {planIcon(slug)}
+                            </div>
+                            <div>
+                              <CardTitle className="text-xl">{plan.name}</CardTitle>
+                              <p className="mt-0.5 text-xs text-muted-foreground">
+                                {PLAN_DESCRIPTIONS[slug]}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <CardTitle className="text-xl">{plan.name}</CardTitle>
-                            {currentBadge ? <div className="mt-1">{currentBadge}</div> : null}
-                          </div>
+                          {isCurrent && <PlanBadge plan={slug} showIcon />}
                         </div>
-                        {plan.slug !== "free" ? (
-                          <PlanBadge plan={plan.slug as UserPlanSlug} className="hidden" />
-                        ) : null}
-                      </div>
-                    </CardHeader>
+                      </CardHeader>
 
-                    <CardContent className="space-y-4">
-                      <div>
-                        {plan.price === 0 ? (
-                          <div className="flex items-baseline gap-1">
-                            <span className="text-4xl font-extrabold">₹0</span>
-                            <span className="text-muted-foreground">/forever</span>
-                          </div>
-                        ) : applied?.valid ? (
-                          <div>
-                            <div className="flex items-baseline gap-2">
-                              <span className="text-4xl font-extrabold text-emerald-600">
-                                ₹{applied.finalAmountInr}
-                              </span>
-                              <span className="text-lg text-muted-foreground line-through">
-                                ₹{applied.originalAmountInr}
-                              </span>
+                      <CardContent className="space-y-4">
+                        <div>
+                          {plan.price === 0 ? (
+                            <div className="flex items-baseline gap-1">
+                              <span className="text-4xl font-extrabold">₹0</span>
+                              <span className="text-muted-foreground">/forever</span>
+                            </div>
+                          ) : applied?.valid ? (
+                            <div>
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-4xl font-extrabold text-emerald-600">
+                                  ₹{applied.finalAmountInr}
+                                </span>
+                                <span className="text-lg text-muted-foreground line-through">
+                                  ₹{applied.originalAmountInr}
+                                </span>
+                                <span className="text-muted-foreground">/mo</span>
+                              </div>
+                              <p className="mt-1 text-xs font-medium text-emerald-600">
+                                {applied.discountPercent}% off with {applied.code}
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="flex items-baseline gap-1">
+                              <span className="text-4xl font-extrabold">₹{plan.price}</span>
                               <span className="text-muted-foreground">/mo</span>
                             </div>
-                            <p className="mt-1 text-xs font-medium text-emerald-600">
-                              {applied.discountPercent}% off with {applied.code}
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="flex items-baseline gap-1">
-                            <span className="text-4xl font-extrabold">₹{plan.price}</span>
-                            <span className="text-muted-foreground">/mo</span>
+                          )}
+                        </div>
+
+                        {showCoupon && (
+                          <div className="space-y-2 rounded-xl border border-dashed border-primary/30 bg-primary/5 p-3">
+                            <Label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                              <Ticket className="h-3.5 w-3.5" />
+                              Coupon code
+                            </Label>
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="Enter code"
+                                value={couponInputs[slug] ?? ""}
+                                onChange={(e) =>
+                                  setCouponInputs((prev) => ({
+                                    ...prev,
+                                    [slug]: e.target.value.toUpperCase(),
+                                  }))
+                                }
+                                className="h-9 text-sm"
+                              />
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                disabled={validatingCoupon === slug}
+                                onClick={() => void applyCoupon(slug)}
+                              >
+                                {validatingCoupon === slug ? "…" : "Apply"}
+                              </Button>
+                            </div>
                           </div>
                         )}
-                      </div>
 
-                      {showCoupon && (
-                        <div className="space-y-2 rounded-xl border border-dashed border-primary/30 bg-primary/5 p-3">
-                          <Label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                            <Ticket className="h-3.5 w-3.5" />
-                            Coupon code
-                          </Label>
-                          <div className="flex gap-2">
-                            <Input
-                              placeholder="Enter code"
-                              value={couponInputs[slug] ?? ""}
-                              onChange={(e) =>
-                                setCouponInputs((prev) => ({
-                                  ...prev,
-                                  [slug]: e.target.value.toUpperCase(),
-                                }))
-                              }
-                              className="h-9 text-sm"
-                            />
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="secondary"
-                              disabled={validatingCoupon === slug}
-                              onClick={() => void applyCoupon(slug)}
-                            >
-                              {validatingCoupon === slug ? "…" : "Apply"}
-                            </Button>
+                        <div className="space-y-2 rounded-xl border bg-muted/30 p-3">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="flex items-center gap-2 text-muted-foreground">
+                              <Building2 className="h-4 w-4" />
+                              Workspaces
+                            </span>
+                            <span className="font-semibold">{toLimitLabel(plan.limits.maxWorkspaces)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="flex items-center gap-2 text-muted-foreground">
+                              <Users className="h-4 w-4" />
+                              Members / workspace
+                            </span>
+                            <span className="font-semibold">
+                              {toLimitLabel(plan.limits.maxMembersPerWorkspace)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="flex items-center gap-2 text-muted-foreground">
+                              <HardDrive className="h-4 w-4" />
+                              Storage
+                            </span>
+                            <span className="font-semibold">{formatBytes(plan.limits.storageBytes)}</span>
                           </div>
                         </div>
-                      )}
 
-                      <div className="space-y-2 rounded-xl border bg-muted/30 p-3">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="flex items-center gap-2 text-muted-foreground">
-                            <Building2 className="h-4 w-4" />
-                            Workspaces
-                          </span>
-                          <span className="font-semibold">{plan.limits.maxWorkspaces}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="flex items-center gap-2 text-muted-foreground">
-                            <Users className="h-4 w-4" />
-                            Members / workspace
-                          </span>
-                          <span className="font-semibold">{toMaxText(plan.limits.maxMembersPerWorkspace)}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="flex items-center gap-2 text-muted-foreground">
-                            <HardDrive className="h-4 w-4" />
-                            Storage
-                          </span>
-                          <span className="font-semibold">{formatBytes(plan.limits.storageBytes)}</span>
-                        </div>
-                      </div>
+                        <ul className="space-y-1.5 text-sm">
+                          {plan.benefits.slice(0, 5).map((b) => (
+                            <li key={b} className="flex items-start gap-2">
+                              <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                              <span>{b}</span>
+                            </li>
+                          ))}
+                        </ul>
 
-                      <ul className="space-y-1.5 text-sm">
-                        {plan.benefits.slice(0, 5).map((b) => (
-                          <li key={b} className="flex items-start gap-2">
-                            <Check className="mt-0.5 h-4 w-4 text-emerald-600" />
-                            <span>{b}</span>
-                          </li>
-                        ))}
-                      </ul>
+                        <Button
+                          className={cn(
+                            "w-full transition-all duration-200",
+                            cta.action === "upgrade" && canUpgrade ? accent.button : undefined,
+                            isGoldCurrent && "border-amber-300/40 bg-amber-50/50 text-amber-900 dark:bg-amber-950/20 dark:text-amber-200"
+                          )}
+                          variant={cta.action === "upgrade" && canUpgrade ? "default" : "secondary"}
+                          disabled={cta.disabled || isUpgrading || (cta.action === "upgrade" && !canUpgrade)}
+                          onClick={() => {
+                            if (cta.action === "upgrade" && canUpgrade) void onUpgrade(slug);
+                          }}
+                        >
+                          {isUpgrading ? "Processing…" : cta.label}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              )}
+            </div>
 
-                      <Button
-                        className={cn(
-                          "w-full",
-                          plan.slug === "free"
-                            ? "cursor-not-allowed"
-                            : canUpgrade
-                              ? accent.button
-                              : "cursor-not-allowed bg-muted"
-                        )}
-                        disabled={plan.slug === "free" || !canUpgrade || isUpgrading}
-                        onClick={() => void onUpgrade(plan.slug as UserPlanSlug)}
-                      >
-                        {plan.slug === currentPlan
-                          ? "Current plan"
-                          : canUpgrade
-                            ? isUpgrading
-                              ? "Upgrading…"
-                              : upgradeButtonText(plan.slug as UserPlanSlug)
-                            : "Not available"}
-                      </Button>
-                    </CardContent>
-                  </Card>
-                );
-              })
+            {!plansLoading && plansList.length > 0 && (
+              <PlanFeatureComparison plans={plansList} currentPlan={currentPlan} />
             )}
           </div>
-        </div>
 
-        <div className="sticky top-6">
-          <PlanUsageWidget />
+          <div className="sticky top-6">
+            <PlanUsageWidget />
+          </div>
         </div>
       </div>
-    </div>
 
-    {checkoutOverlay && (
-      <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/50 backdrop-blur-sm">
-        <p className="rounded-lg bg-background px-6 py-4 text-sm font-medium shadow-lg">
-          Complete your payment in the Razorpay popup…
-        </p>
-      </div>
-    )}
+      {checkoutOverlay && (
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <p className="rounded-lg bg-background px-6 py-4 text-sm font-medium shadow-lg">
+            Complete your payment in the Razorpay popup…
+          </p>
+        </div>
+      )}
     </>
   );
 }
-

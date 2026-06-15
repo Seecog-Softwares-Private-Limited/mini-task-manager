@@ -2,7 +2,13 @@
 
 import { cn } from "@/lib/utils";
 import type { RecurringTaskSummary } from "@/types/api";
-import type { BoardStats } from "@/components/kanban/kanban-board";
+import type { Task } from "@/types/api";
+import {
+  activeSeriesCount,
+  countCompletedThisWeek,
+  countDueToday,
+} from "@/lib/recurring-board-utils";
+import type { RecurringTemplateSummary } from "@/types/api";
 import {
   AlertCircle,
   CalendarClock,
@@ -10,7 +16,6 @@ import {
   Clock,
   ListTodo,
   PauseCircle,
-  Zap,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -20,162 +25,99 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-type BadgeStat = {
-  id: string;
+const STAT_CHIP = cn(
+  "inline-flex h-6 items-center gap-1 rounded-md border px-2 text-[11px] transition-all duration-200",
+  "border-border/45 bg-background/80 shadow-sm"
+);
+
+type StatItem = {
+  key: string;
   label: string;
   value: string | number;
   icon: LucideIcon;
-  color: string;
-  bgColor: string;
+  tone: "neutral" | "violet" | "amber" | "warning" | "success" | "muted";
   tooltip: string;
 };
 
+const TONE_STYLES = {
+  neutral: { chip: "hover:bg-muted/40", icon: "text-muted-foreground", value: "text-foreground", label: "text-muted-foreground" },
+  violet: { chip: "border-violet-200/40 bg-violet-50/45 hover:bg-violet-50/65 dark:border-violet-500/15 dark:bg-violet-500/8", icon: "text-violet-600 dark:text-violet-400", value: "text-violet-800 dark:text-violet-300", label: "text-violet-700/80 dark:text-violet-400/80" },
+  amber: { chip: "border-amber-200/40 bg-amber-50/45 hover:bg-amber-50/65 dark:border-amber-500/15 dark:bg-amber-500/8", icon: "text-amber-600 dark:text-amber-400", value: "text-amber-800 dark:text-amber-300", label: "text-amber-700/80 dark:text-amber-400/80" },
+  warning: { chip: "border-orange-200/45 bg-orange-50/45 hover:bg-orange-50/65 dark:border-orange-500/15 dark:bg-orange-500/8", icon: "text-orange-600 dark:text-orange-400", value: "text-orange-800 dark:text-orange-300", label: "text-orange-700/80 dark:text-orange-400/80" },
+  success: { chip: "border-emerald-200/40 bg-emerald-50/45 hover:bg-emerald-50/65 dark:border-emerald-500/15 dark:bg-emerald-500/8", icon: "text-emerald-600 dark:text-emerald-400", value: "text-emerald-800 dark:text-emerald-300", label: "text-emerald-700/80 dark:text-emerald-400/80" },
+  muted: { chip: "hover:bg-muted/40", icon: "text-muted-foreground", value: "text-muted-foreground", label: "text-muted-foreground" },
+} as const;
+
 interface RecurringSummaryStatsProps {
   summary?: RecurringTaskSummary;
-  boardStats?: BoardStats;
+  tasks?: Task[];
+  templates?: RecurringTemplateSummary[];
+  completedPercent?: number;
+  doneStatusId?: string;
   isLoading?: boolean;
   className?: string;
 }
 
 export function RecurringSummaryStats({
   summary,
-  boardStats,
+  tasks = [],
+  templates = [],
+  completedPercent = 0,
+  doneStatusId,
   isLoading,
   className,
 }: RecurringSummaryStatsProps) {
-  const completedPercent = boardStats?.completedPercent ?? 0;
-  const boardTotal = boardStats?.total ?? 0;
+  const dueToday = countDueToday(tasks);
+  const completedWeek = countCompletedThisWeek(tasks, doneStatusId);
+  const activeSeries = activeSeriesCount(summary, templates);
+  const missed = summary?.overdue ?? 0;
+  const paused = summary?.paused ?? 0;
+  const dueWeek = summary?.dueThisWeek ?? 0;
 
-  const badges: BadgeStat[] = [
-    {
-      id: "on-board",
-      label: "On board",
-      value: boardTotal,
-      icon: ListTodo,
-      color: "text-slate-700 dark:text-slate-200",
-      bgColor: "bg-slate-500/10",
-      tooltip: `${boardTotal} recurring occurrence${boardTotal !== 1 ? "s" : ""} on this project board`,
-    },
-    {
-      id: "due-week",
-      label: "Due this week",
-      value: summary?.dueThisWeek ?? 0,
-      icon: CalendarClock,
-      color: "text-violet-600 dark:text-violet-400",
-      bgColor: "bg-violet-500/10",
-      tooltip: `${summary?.dueThisWeek ?? 0} occurrence${(summary?.dueThisWeek ?? 0) !== 1 ? "s" : ""} due within the next 7 days`,
-    },
-    {
-      id: "in-progress",
-      label: "In progress",
-      value: boardStats?.inProgress ?? 0,
-      icon: Clock,
-      color: "text-blue-600 dark:text-blue-400",
-      bgColor: "bg-blue-500/10",
-      tooltip: `${boardStats?.inProgress ?? 0} occurrence${(boardStats?.inProgress ?? 0) !== 1 ? "s" : ""} currently in progress`,
-    },
-    {
-      id: "overdue",
-      label: "Overdue",
-      value: summary?.overdue ?? 0,
-      icon: AlertCircle,
-      color:
-        (summary?.overdue ?? 0) > 0
-          ? "text-red-600 dark:text-red-400"
-          : "text-muted-foreground",
-      bgColor: (summary?.overdue ?? 0) > 0 ? "bg-red-500/10" : "bg-muted",
-      tooltip:
-        (summary?.overdue ?? 0) > 0
-          ? `${summary?.overdue} overdue occurrence${(summary?.overdue ?? 0) !== 1 ? "s" : ""} need attention`
-          : "No overdue recurring tasks",
-    },
-    {
-      id: "done",
-      label: "Done",
-      value: `${completedPercent}%`,
-      icon: CheckCircle2,
-      color:
-        completedPercent >= 75
-          ? "text-emerald-600 dark:text-emerald-400"
-          : completedPercent > 0
-            ? "text-amber-600 dark:text-amber-400"
-            : "text-muted-foreground",
-      bgColor:
-        completedPercent >= 75
-          ? "bg-emerald-500/10"
-          : completedPercent > 0
-            ? "bg-amber-500/10"
-            : "bg-muted",
-      tooltip:
-        completedPercent === 100
-          ? "All board occurrences completed!"
-          : `${completedPercent}% of board occurrences completed`,
-    },
-    {
-      id: "paused",
-      label: "Paused",
-      value: summary?.paused ?? 0,
-      icon: PauseCircle,
-      color: "text-amber-600 dark:text-amber-400",
-      bgColor: "bg-amber-500/10",
-      tooltip:
-        (summary?.paused ?? 0) > 0
-          ? `${summary?.paused} recurring series paused`
-          : "No paused recurring series",
-    },
+  const items: StatItem[] = [
+    { key: "active", label: "Active series", value: activeSeries, icon: ListTodo, tone: "violet", tooltip: `${activeSeries} active recurring series` },
+    { key: "today", label: "Due today", value: dueToday, icon: Clock, tone: dueToday > 0 ? "amber" : "neutral", tooltip: `${dueToday} occurrence${dueToday !== 1 ? "s" : ""} due today` },
+    { key: "week", label: "Due this week", value: dueWeek, icon: CalendarClock, tone: dueWeek > 0 ? "violet" : "neutral", tooltip: `${dueWeek} due within the next 7 days` },
+    { key: "missed", label: "Missed", value: missed, icon: AlertCircle, tone: missed >= 3 ? "warning" : missed > 0 ? "amber" : "neutral", tooltip: missed > 0 ? `${missed} missed or overdue occurrence${missed !== 1 ? "s" : ""}` : "No missed occurrences" },
+    { key: "paused", label: "Paused", value: paused, icon: PauseCircle, tone: paused > 0 ? "amber" : "muted", tooltip: paused > 0 ? `${paused} series paused` : "No paused series" },
+    { key: "completed", label: "Done this week", value: completedWeek, icon: CheckCircle2, tone: completedWeek > 0 ? "success" : "neutral", tooltip: `${completedWeek} completed this week` },
   ];
+
+  const progressLabel = `${completedPercent}% completed this week`;
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div
-        className={cn("flex flex-wrap items-center gap-2", className)}
-        role="list"
-        aria-label="Recurring task statistics"
-      >
-        {badges.map((badge) => {
-          const Icon = badge.icon;
-          return (
-            <Tooltip key={badge.id}>
-              <TooltipTrigger asChild>
-                <div
-                  role="listitem"
-                  className={cn(
-                    "flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm transition-colors",
-                    badge.bgColor
-                  )}
-                >
-                  <Icon className={cn("h-3.5 w-3.5 shrink-0", badge.color)} aria-hidden />
-                  {isLoading ? (
-                    <span className="h-4 w-5 animate-pulse rounded bg-muted-foreground/20" />
-                  ) : (
-                    <span className={cn("font-semibold tabular-nums", badge.color)}>
-                      {badge.value}
-                    </span>
-                  )}
-                  <span className="hidden text-xs text-muted-foreground sm:inline">
-                    {badge.label}
+      <div className={cn("flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5", className)}>
+        <div className="flex min-w-0 flex-wrap items-center gap-1">
+          {items.map((item) => {
+            const tone = TONE_STYLES[item.tone];
+            const Icon = item.icon;
+            return (
+              <Tooltip key={item.key}>
+                <TooltipTrigger asChild>
+                  <span className="inline-flex">
+                    <div className={cn(STAT_CHIP, tone.chip)}>
+                      <Icon className={cn("h-3 w-3 shrink-0", tone.icon)} />
+                      {isLoading ? (
+                        <span className="h-3 w-4 animate-pulse rounded bg-muted-foreground/20" />
+                      ) : (
+                        <span className={cn("font-semibold tabular-nums leading-none", tone.value)}>
+                          {item.value}
+                        </span>
+                      )}
+                      <span className={cn("hidden leading-none sm:inline", tone.label)}>{item.label}</span>
+                    </div>
                   </span>
-                </div>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-[220px] text-xs">
-                {badge.tooltip}
-              </TooltipContent>
-            </Tooltip>
-          );
-        })}
-
-        {!isLoading && completedPercent === 100 && boardTotal > 0 ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="flex items-center gap-1.5 rounded-xl bg-emerald-500/10 px-3 py-1.5 animate-in fade-in duration-500">
-                <Zap className="h-3.5 w-3.5 text-emerald-500" />
-                <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-                  All done
-                </span>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent className="text-xs">Every board occurrence is completed!</TooltipContent>
-          </Tooltip>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-[220px] text-xs">{item.tooltip}</TooltipContent>
+              </Tooltip>
+            );
+          })}
+        </div>
+        {!isLoading && tasks.length > 0 ? (
+          <span className="ml-auto truncate text-[11px] font-medium tabular-nums text-muted-foreground">
+            {progressLabel}
+          </span>
         ) : null}
       </div>
     </TooltipProvider>

@@ -199,6 +199,7 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
         isSubmitting={createMutation.isPending}
         error={createMutation.error ? (isRateLimited(createMutation.error) ? "Too many requests." : parseApiError(createMutation.error)) : null}
         projectId={id}
+        projectName={project?.name}
         statuses={statuses}
         defaultStatusId={statuses[0]?.id}
       />

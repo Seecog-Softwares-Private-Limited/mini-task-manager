@@ -15,6 +15,8 @@ export interface ProjectFormDescriptionEditorProps {
   disabled?: boolean;
   placeholder?: string;
   className?: string;
+  /** Shorter editor for compact modals */
+  compact?: boolean;
 }
 
 export function ProjectFormDescriptionEditor({
@@ -23,14 +25,15 @@ export function ProjectFormDescriptionEditor({
   disabled,
   placeholder = "Describe the project",
   className,
+  compact = false,
 }: ProjectFormDescriptionEditorProps) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === "dark";
 
   const init = React.useMemo(
     () => ({
-      height: 220,
-      min_height: 180,
+      height: compact ? 140 : 220,
+      min_height: compact ? 100 : 180,
       menubar: false,
       statusbar: false,
       branding: false,
@@ -49,16 +52,16 @@ export function ProjectFormDescriptionEditor({
         { title: "No follow", value: "nofollow" },
       ],
       content_style:
-        "body { font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.6; margin: 10px 12px; }",
+        "body { font-family: var(--font-geist-sans), var(--font-inter), ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.5; margin: 6px 10px; }",
       setup(_editor: TinyMceEditorType) {},
     }),
-    [isDark, placeholder]
+    [isDark, placeholder, compact]
   );
 
   return (
     <div
       className={cn(
-        "rounded-xl overflow-hidden ring-1 ring-black/[0.06] dark:ring-white/10",
+        "overflow-hidden rounded-lg ring-1 ring-border/50 transition-shadow duration-150 focus-within:ring-violet-500/25 dark:ring-white/10",
         className
       )}
     >

@@ -23,6 +23,7 @@ type AuthUser = LoginResponse["user"];
 const sizeClasses = {
   sm: { avatar: "h-7 w-7", fallback: "text-[10px]", cam: "h-5 w-5", camIcon: "h-3 w-3" },
   md: { avatar: "h-9 w-9", fallback: "text-xs", cam: "h-5 w-5", camIcon: "h-3 w-3" },
+  sidebar: { avatar: "h-10 w-10", fallback: "text-xs", cam: "h-6 w-6", camIcon: "h-3 w-3" },
   /** Sidebar / hero profile — large with premium frame */
   lg: { avatar: "h-[4.75rem] w-[4.75rem]", fallback: "text-xl", cam: "h-8 w-8", camIcon: "h-4 w-4" },
 } as const;
@@ -168,7 +169,9 @@ export function DashboardProfileAvatar({
                       "group-hover/avatar:shadow-[0_6px_22px_-4px_rgba(99,102,241,0.5),0_0_0_1px_rgba(255,255,255,0.18)_inset]",
                       "group-hover/avatar:brightness-[1.02]"
                     )
-                  : "ring-2 ring-transparent group-hover/avatar:ring-primary/30"
+                  : size === "sidebar"
+                    ? "ring-2 ring-violet-500/15 group-hover/avatar:ring-violet-500/25"
+                    : "ring-2 ring-transparent group-hover/avatar:ring-primary/30"
               )}
             >
               <Avatar
@@ -189,7 +192,7 @@ export function DashboardProfileAvatar({
             <span
               className={cn(
                 "absolute flex items-center justify-center rounded-full border-2 border-white bg-primary text-white shadow-md dark:border-background",
-                size === "lg" ? "-bottom-0 -right-0" : "-bottom-0.5 -right-0.5",
+                size === "lg" ? "-bottom-0 -right-0" : size === "sidebar" ? "-bottom-0.5 -right-0.5" : "-bottom-0.5 -right-0.5",
                 sz.cam
               )}
             >

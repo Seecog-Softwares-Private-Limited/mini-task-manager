@@ -15,7 +15,7 @@ import {
   fetchOrgHealthData,
 } from "@/services/api/organizations.api";
 import { fetchProjectsCountByOrg } from "@/services/api/projects.api";
-import { fetchOrgMemberCount } from "@/services/api/members.api";
+import { fetchOrgMemberCount, fetchOrgMembers } from "@/services/api/members.api";
 import { fetchSubscriptionByOrg, fetchPlans } from "@/services/api/billing.api";
 import { fetchLastActivityByOrg } from "@/services/api/activity-logs.api";
 import { useTenant } from "@/context/tenant-context";
@@ -89,6 +89,14 @@ export default function WorkspacesPage() {
       queryKey: ["org-member-count", org.id],
       queryFn: () => fetchOrgMemberCount(org.id),
       enabled: organizations.length > 0,
+    })),
+  });
+  const memberPreviewQueries = useQueries({
+    queries: organizations.map((org) => ({
+      queryKey: ["org-members-preview", org.id],
+      queryFn: () => fetchOrgMembers(org.id),
+      enabled: organizations.length > 0,
+      staleTime: 120_000,
     })),
   });
   const projectsCountQueries = useQueries({
@@ -328,7 +336,7 @@ export default function WorkspacesPage() {
   }
 
   return (
-    <div className="space-y-10 animate-slide-up">
+    <div className="w-full space-y-8 animate-slide-up">
       {/* Page header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -343,10 +351,10 @@ export default function WorkspacesPage() {
             setCreateModalOpen(true);
           }}
           size="sm"
-          className="h-10 w-full rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-fuchsia-600 text-white shadow-[0_10px_24px_-14px_rgba(109,40,217,0.65)] transition-all duration-300 hover:-translate-y-0.5 hover:brightness-105 sm:h-9 sm:w-auto sm:shrink-0"
+          className="h-9 w-full rounded-lg bg-gradient-to-r from-violet-600 via-indigo-600 to-fuchsia-600 px-4 text-sm font-medium text-white shadow-[0_4px_14px_-4px_rgba(109,40,217,0.55)] transition-all duration-200 hover:-translate-y-px hover:shadow-[0_6px_18px_-4px_rgba(109,40,217,0.6)] sm:w-auto sm:shrink-0"
         >
           <Plus className="mr-2 h-4 w-4" />
-          New Workspace
+          Create Workspace
         </Button>
       </div>
 
@@ -363,10 +371,10 @@ export default function WorkspacesPage() {
             archivedCount={archivedCount}
           />
         )}
-        <h2 className="mb-4 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        <h2 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/60">
           {organizations.length > 0 ? "Your workspaces" : "Get started"}
         </h2>
-        <div className="grid auto-rows-fr gap-4 sm:grid-cols-1 sm:gap-4 md:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3">
+        <div className="grid auto-rows-fr gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           {organizations.length === 0 && !isLoading ? (
             <WorkspaceEmptyState
               variant="none"
@@ -377,8 +385,8 @@ export default function WorkspacesPage() {
             />
           ) : isLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
-                <Card key={i} className="min-h-[172px] overflow-hidden rounded-xl border-[#E7EAF0] bg-[#FCFCFD] dark:border-border dark:bg-card/50">
-                  <CardContent className="p-4">
+                <Card key={i} className="min-h-[180px] overflow-hidden rounded-xl border-[#E7EAF0] bg-[#FCFCFD] dark:border-border dark:bg-card/50">
+                  <CardContent className="p-5">
                     <div className="flex items-start gap-3">
                       <Skeleton className="h-14 w-14 shrink-0 rounded-xl" />
                       <div className="flex-1 space-y-2">
@@ -427,6 +435,8 @@ export default function WorkspacesPage() {
                     isCurrent={isCurrent}
                     memberCount={memberCount}
                     memberCountLoading={memberCountQueries[idx]?.isLoading ?? false}
+                    memberPreview={memberPreviewQueries[idx]?.data ?? []}
+                    memberPreviewLoading={memberPreviewQueries[idx]?.isLoading ?? false}
                     projectCount={projectCount}
                     projectCountLoading={projectsCountQueries[idx]?.isLoading ?? false}
                     planLabel={planLabel}
@@ -527,7 +537,7 @@ export default function WorkspacesPage() {
               >
                 {editingOrg ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
               </div>
-              {editingOrg ? "Edit workspace" : "New Workspace"}
+              {editingOrg ? "Edit workspace" : "Create workspace"}
             </DialogTitle>
             <DialogDescription>
               {editingOrg

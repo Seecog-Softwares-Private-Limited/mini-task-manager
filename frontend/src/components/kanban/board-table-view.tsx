@@ -153,11 +153,11 @@ export function BoardTableView({
                       <div className="flex items-center gap-2.5">
                         <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", priority.bg)} />
                         <div className="min-w-0">
-                          <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">
-                            {task.title}
+                          <p className="line-clamp-2 text-[14px] font-semibold leading-[1.35] tracking-[-0.01em] group-hover:text-primary transition-colors duration-200">
+                            {stripHtmlToPlainText(task.title) || "Untitled"}
                           </p>
                           {task.description && (
-                            <p className="text-xs text-muted-foreground truncate mt-0.5 max-w-xs">
+                            <p className="mt-0.5 line-clamp-2 max-w-xs text-[13px] font-normal leading-[1.45] text-muted-foreground">
                               {stripHtmlToPlainText(task.description)}
                             </p>
                           )}
