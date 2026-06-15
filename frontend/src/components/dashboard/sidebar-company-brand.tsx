@@ -36,16 +36,20 @@ export function SidebarCompanyBrand({ collapsed }: SidebarCompanyBrandProps) {
     }
   }, [orgId, organizations, setOrgId]);
 
-  const currentOrg = useMemo(() => {
-    if (orgId) return organizations.find((o) => o.id === orgId);
-    // Fallback before context update propagates: same priority as above
-    const branded = organizations.find((o) => o.logoUrl);
+  // companyOrg: the fixed company identity shown in the brand section.
+  // Always the owner org with a logo, then first owner org, then first org.
+  // It does NOT change when the active workspace switches.
+  const companyOrg = useMemo(() => {
+    const ownedWithLogo = organizations.find(
+      (o) => o.myRole?.toLowerCase() === "owner" && o.logoUrl
+    );
     const owned = organizations.find((o) => o.myRole?.toLowerCase() === "owner");
-    return branded ?? owned ?? organizations[0];
-  }, [organizations, orgId]);
+    const branded = organizations.find((o) => o.logoUrl);
+    return ownedWithLogo ?? owned ?? branded ?? organizations[0];
+  }, [organizations]);
 
-  const isOwner = currentOrg?.myRole?.toLowerCase() === "owner";
-  const { option: fontOption } = useCompanyFontSize(currentOrg?.id);
+  const isOwner = companyOrg?.myRole?.toLowerCase() === "owner";
+  const { option: fontOption } = useCompanyFontSize(companyOrg?.id);
 
   if (isLoading) {
     return (
@@ -75,13 +79,13 @@ export function SidebarCompanyBrand({ collapsed }: SidebarCompanyBrandProps) {
   const inner = collapsed ? (
     /* Collapsed: small icon centered */
     <>
-      {currentOrg ? (
+      {companyOrg ? (
         <WorkspaceThumb
-          workspace={currentOrg}
+          workspace={companyOrg}
           size="md"
           className={cn(
             "h-9 w-9 shrink-0 rounded-lg text-xs shadow-sm ring-1 ring-black/[0.04] dark:ring-white/[0.06]",
-            !currentOrg.logoUrl && "gradient-bg text-white"
+            !companyOrg.logoUrl && "gradient-bg text-white"
           )}
         />
       ) : (
@@ -95,19 +99,19 @@ export function SidebarCompanyBrand({ collapsed }: SidebarCompanyBrandProps) {
     <div className="w-full">
       {/* Logo — full width */}
       <div className="relative w-full overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-black/[0.04] dark:bg-muted dark:ring-white/[0.06]" style={{ aspectRatio: "16/9" }}>
-        {currentOrg?.logoUrl ? (
+        {companyOrg?.logoUrl ? (
           <img
-            src={currentOrg.logoUrl}
-            alt={currentOrg.name}
+            src={companyOrg.logoUrl}
+            alt={companyOrg.name}
             className="h-full w-full object-contain"
           />
-        ) : currentOrg ? (
+        ) : companyOrg ? (
           <span
             className={cn(
               "flex h-full w-full items-center justify-center text-lg font-bold text-white gradient-bg"
             )}
           >
-            {currentOrg.name.slice(0, 2).toUpperCase()}
+            {companyOrg.name.slice(0, 2).toUpperCase()}
           </span>
         ) : (
           <span className="flex h-full w-full items-center justify-center text-muted-foreground">
@@ -115,7 +119,7 @@ export function SidebarCompanyBrand({ collapsed }: SidebarCompanyBrandProps) {
           </span>
         )}
         {/* Edit hint overlay */}
-        {isOwner && currentOrg && (
+        {isOwner && companyOrg && (
           <span className="absolute right-1.5 top-1.5 opacity-0 transition-opacity group-hover/brand:opacity-100">
             <Pencil className="h-3 w-3 text-primary/70" />
           </span>
@@ -130,13 +134,13 @@ export function SidebarCompanyBrand({ collapsed }: SidebarCompanyBrandProps) {
         <p
           className={cn(
             "truncate font-semibold leading-tight tracking-tight",
-            currentOrg ? "text-foreground" : "text-muted-foreground"
+            companyOrg ? "text-foreground" : "text-muted-foreground"
           )}
-          style={{ fontSize: currentOrg ? fontOption.px : undefined }}
+          style={{ fontSize: companyOrg ? fontOption.px : undefined }}
         >
-          {currentOrg?.name ?? "Select workspace"}
+          {companyOrg?.name ?? "Select workspace"}
         </p>
-        {isOwner && currentOrg && (
+        {isOwner && companyOrg && (
           <p className="mt-0.5 text-[10px] text-primary/70 opacity-0 transition-opacity group-hover/brand:opacity-100">
             Click to edit logo &amp; name
           </p>
@@ -155,7 +159,7 @@ export function SidebarCompanyBrand({ collapsed }: SidebarCompanyBrandProps) {
   return (
     <div className={cn("border-b border-border/50", collapsed ? "px-2 py-3" : "px-3 py-3")}>
       {/* Owner with workspace → open modal */}
-      {isOwner && currentOrg ? (
+      {isOwner && companyOrg ? (
         <>
           <button
             type="button"
@@ -169,15 +173,15 @@ export function SidebarCompanyBrand({ collapsed }: SidebarCompanyBrandProps) {
           <CompanyBrandModal
             open={modalOpen}
             onOpenChange={setModalOpen}
-            org={currentOrg}
+            org={companyOrg}
           />
         </>
       ) : (
         /* Non-owner / no workspace → navigate to workspace list */
         <Link
           href="/dashboard/workspaces"
-          title={currentOrg ? `Workspace: ${currentOrg.name}` : "Select a workspace"}
-          aria-label={currentOrg ? `Workspace: ${currentOrg.name}` : "Select a workspace"}
+          title={companyOrg ? `Company: ${companyOrg.name}` : "Select a workspace"}
+          aria-label={companyOrg ? `Company: ${companyOrg.name}` : "Select a workspace"}
           className={sharedClass}
         >
           {inner}
