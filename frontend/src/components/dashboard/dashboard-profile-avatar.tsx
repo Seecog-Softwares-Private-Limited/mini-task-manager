@@ -24,7 +24,7 @@ const sizeClasses = {
   sm: { avatar: "h-7 w-7", fallback: "text-[10px]", cam: "h-5 w-5", camIcon: "h-3 w-3" },
   md: { avatar: "h-9 w-9", fallback: "text-xs", cam: "h-5 w-5", camIcon: "h-3 w-3" },
   /** Sidebar / hero profile — large with premium frame */
-  lg: { avatar: "h-16 w-16", fallback: "text-lg", cam: "h-8 w-8", camIcon: "h-4 w-4" },
+  lg: { avatar: "h-[4.75rem] w-[4.75rem]", fallback: "text-xl", cam: "h-8 w-8", camIcon: "h-4 w-4" },
 } as const;
 
 export function DashboardProfileAvatar({

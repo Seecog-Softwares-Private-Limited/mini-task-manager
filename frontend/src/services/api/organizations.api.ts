@@ -69,6 +69,8 @@ export async function deleteOrganization(orgId: string): Promise<{ success: bool
 export interface OrgHealthData {
   overdueCount: number;
   totalTasks: number;
+  dueTodayCount: number;
+  completedCount: number;
 }
 
 /** Fetch health metrics for an org (overdue tasks across all projects). Used for health indicator on org cards. */
@@ -77,7 +79,13 @@ export async function fetchOrgHealthData(orgId: string): Promise<OrgHealthData> 
   const activeProjects = projects.filter((p) => !p.isArchived);
   let overdueCount = 0;
   let totalTasks = 0;
+  let dueTodayCount = 0;
+  let completedCount = 0;
   const now = Date.now();
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
   for (const project of activeProjects) {
     const result = await fetchTasksByProject(project.id, 1, 100, { organizationId: orgId });
     const tasks = result.data ?? [];
@@ -85,8 +93,16 @@ export async function fetchOrgHealthData(orgId: string): Promise<OrgHealthData> 
     overdueCount += tasks.filter(
       (t) => t.dueDate && new Date(t.dueDate).getTime() < now
     ).length;
+    dueTodayCount += tasks.filter((t) => {
+      if (!t.dueDate) return false;
+      const due = new Date(t.dueDate).getTime();
+      return due >= startOfToday.getTime() && due <= endOfToday.getTime();
+    }).length;
+    completedCount += tasks.filter(
+      (t) => (t.subtasks?.length ?? 0) === 0 || (t.subtasks ?? []).every((s) => s.completed)
+    ).length;
   }
-  return { overdueCount, totalTasks };
+  return { overdueCount, totalTasks, dueTodayCount, completedCount };
 }
 
 /** Transfer organization ownership to another member. Stub: backend may expose PATCH /organizations/:id/owner or similar. */

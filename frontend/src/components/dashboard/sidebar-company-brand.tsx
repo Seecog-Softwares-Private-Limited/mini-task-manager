@@ -53,11 +53,11 @@ export function SidebarCompanyBrand({ collapsed }: SidebarCompanyBrandProps) {
 
   if (isLoading) {
     return (
-      <div className={cn("border-b border-border/50", collapsed ? "px-2 py-3" : "px-3 py-3")}>
+      <div className={cn("border-b border-border/50", collapsed ? "px-2 py-3" : "px-3 pt-3 pb-0")}>
         <div
           className={cn(
-            "rounded-xl border border-[#E7EAF0] bg-[#FCFCFD] p-2.5 dark:border-border dark:bg-muted/25",
-            collapsed ? "flex justify-center px-1.5 py-2" : "block"
+            "rounded-xl border border-[#E7EAF0] bg-[#FCFCFD] dark:border-border dark:bg-muted/25",
+            collapsed ? "flex justify-center px-1.5 py-2" : "block px-2.5 pt-2.5 pb-1"
           )}
         >
           {collapsed ? (
@@ -65,7 +65,7 @@ export function SidebarCompanyBrand({ collapsed }: SidebarCompanyBrandProps) {
           ) : (
             <>
               <Skeleton className="w-full rounded-lg" style={{ aspectRatio: "16/9" }} />
-              <div className="mt-2 pb-[2px] text-center">
+              <div className="mt-1.5 pb-[2px] text-center">
                 <Skeleton className="mx-auto h-3.5 w-full max-w-[140px] rounded" />
               </div>
             </>
@@ -126,10 +126,10 @@ export function SidebarCompanyBrand({ collapsed }: SidebarCompanyBrandProps) {
       </div>
 
       {/* Company name */}
-      <div className="mt-2 pb-[2px] text-center">
+      <div className="mt-1.5 pb-[2px] text-center">
         <p
           className={cn(
-            "truncate font-semibold leading-tight tracking-tight",
+            "truncate font-semibold leading-none tracking-tight",
             companyOrg ? "text-foreground" : "text-muted-foreground"
           )}
           style={{ fontSize: companyOrg ? fontOption.px : undefined }}
@@ -137,7 +137,7 @@ export function SidebarCompanyBrand({ collapsed }: SidebarCompanyBrandProps) {
           {companyOrg?.name ?? "Select workspace"}
         </p>
         {isOwner && companyOrg && (
-          <p className="mt-0.5 text-[10px] text-primary/70 opacity-0 transition-opacity group-hover/brand:opacity-100">
+          <p className="mt-0.5 hidden text-[10px] text-primary/70 group-hover/brand:block">
             Click to edit logo &amp; name
           </p>
         )}
@@ -146,14 +146,14 @@ export function SidebarCompanyBrand({ collapsed }: SidebarCompanyBrandProps) {
   );
 
   const sharedClass = cn(
-    "group/brand flex items-center gap-2.5 rounded-xl border border-[#E7EAF0] bg-gradient-to-br from-[#FCFCFD] via-white to-primary/[0.03] p-2.5 shadow-sm transition-all duration-200",
+    "group/brand flex items-center gap-2.5 rounded-xl border border-[#E7EAF0] bg-gradient-to-br from-[#FCFCFD] via-white to-primary/[0.03] shadow-sm transition-all duration-200",
     "hover:border-primary/30 hover:shadow-md",
     "dark:border-border dark:from-muted/30 dark:via-muted/20 dark:to-primary/[0.06] dark:hover:border-primary/30",
-    collapsed && "justify-center px-1.5 py-2"
+    collapsed ? "justify-center px-1.5 py-2" : "px-2.5 pt-2.5 pb-1"
   );
 
   return (
-    <div className={cn("border-b border-border/50", collapsed ? "px-2 py-3" : "px-3 py-3")}>
+    <div className={cn("border-b border-border/50", collapsed ? "px-2 py-3" : "px-3 pt-3 pb-0")}>
       {/* Owner with workspace → open modal */}
       {isOwner && companyOrg ? (
         <>

@@ -349,6 +349,9 @@
   .badge-role-member {
     @apply bg-muted text-muted-foreground;
   }
+  .badge-role-guest {
+    @apply bg-slate-500/10 text-slate-600 dark:bg-slate-400/15 dark:text-slate-300;
+  }
 }
 
 @keyframes fadeIn {
