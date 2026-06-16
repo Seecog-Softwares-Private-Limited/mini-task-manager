@@ -74,7 +74,6 @@ import {
 import { filterTaskImageAttachments } from "@/lib/task-image-attachments";
 import { isTinyMceUiTarget } from "@/lib/tinymce-dialog";
 import { TaskAttachmentsSection } from "@/components/tasks/task-attachments-section";
-import { RecurrenceEditor } from "@/components/tasks/recurrence/recurrence-editor";
 import {
   completeRecurringTaskWithAction,
   fetchRecurringTemplateHistory,
@@ -884,12 +883,6 @@ export function TaskDetailModal({
   const recurrenceTypeLabel = toRecurrenceLabel(task?.recurrenceType);
   const recurrenceMetaSummary = recurrenceSummary(recurrenceDraft);
   const recurringHistory = recurringHistoryQuery.data ?? [];
-  const recurringCompletedCount = recurringHistory.filter((item) => item.state === "COMPLETED").length;
-  const recurringOverduePendingCount = recurringHistory.filter((item) => {
-    if (item.state !== "PENDING") return false;
-    return isTaskDueDateOverdue(item.dueDate);
-  }).length;
-  const recurringUpcomingCount = recurringHistory.filter((item) => item.state === "PENDING").length;
   const statusColorById = React.useMemo(() => {
     const map = new Map<string, string>();
     statuses.forEach((s, index) => {
@@ -1372,6 +1365,13 @@ export function TaskDetailModal({
                                 updateSubtasksMutation.mutate(
                                   checklist.map((i) =>
                                     i.id === item.id ? subtaskWithStatus(i, nextStatus) : i
+                                  )
+                                );
+                              }}
+                              onAssigneeChange={(nextAssigneeId?: string) => {
+                                updateSubtasksMutation.mutate(
+                                  checklist.map((i) =>
+                                    i.id === item.id ? { ...i, assigneeId: nextAssigneeId } : i
                                   )
                                 );
                               }}
@@ -2097,78 +2097,6 @@ export function TaskDetailModal({
                         </DropdownMenu>
                       </div>
                     </div>
-                  </div>
-
-                  <div className={tdSidebarSurface}>
-                    <span className={tdSidebarHeading}>Repeat series</span>
-
-                    {task.recurrenceType && task.recurrenceType !== "NONE" ? (
-                      <div className="mb-4 grid grid-cols-3 gap-2">
-                        {[
-                          { label: "Done", value: recurringCompletedCount },
-                          { label: "Upcoming", value: recurringUpcomingCount },
-                          { label: "Overdue", value: recurringOverduePendingCount, warn: true },
-                        ].map((stat) => (
-                          <div
-                            key={stat.label}
-                            className="rounded-xl bg-muted/35 px-2 py-2.5 text-center ring-1 ring-black/[0.04] dark:ring-white/[0.06]"
-                          >
-                            <p
-                              className={cn(
-                                "text-base font-semibold tabular-nums leading-none",
-                                stat.warn && stat.value > 0 ? "text-destructive" : "text-foreground"
-                              )}
-                            >
-                              {stat.value}
-                            </p>
-                            <p className="mt-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                              {stat.label}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-
-                    {recurrenceMetaSummary ? (
-                      <p className="mb-3 rounded-xl bg-muted/40 px-3 py-2 text-xs leading-relaxed text-muted-foreground">
-                        {recurrenceMetaSummary}
-                      </p>
-                    ) : null}
-
-                    <RecurrenceEditor
-                      value={recurrenceDraft}
-                      onChange={(next) => setRecurrenceDraft((next as any) ?? { repeat: "NONE" })}
-                      disabled={!canEditAll || updateMutation.isPending}
-                      embedded
-                      hideSummary
-                    />
-
-                    {canEditAll ? (
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="mt-4 w-full"
-                        disabled={updateMutation.isPending}
-                        onClick={() => {
-                          if (
-                            recurrenceDraft?.repeat &&
-                            recurrenceDraft.repeat !== "NONE" &&
-                            !task.dueDate
-                          ) {
-                            toast({
-                              title: "Due date required",
-                              description:
-                                "Set an occurrence due date before enabling a repeating series.",
-                              variant: "error",
-                            });
-                            return;
-                          }
-                          updateMutation.mutate({ recurrence: recurrenceDraft });
-                        }}
-                      >
-                        Save series
-                      </Button>
-                    ) : null}
                   </div>
 
                   <div className={tdSidebarSurface}>
