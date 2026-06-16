@@ -233,6 +233,22 @@ export class TasksService {
     }
     const nextStatusId = dto.statusId !== undefined ? dto.statusId ?? null : task.statusId;
     const statusChanged = dto.statusId !== undefined && nextStatusId !== task.statusId;
+    if (statusChanged) {
+      const movingToDone = await this.isDoneStatus(task.projectId, organizationId, nextStatusId);
+      if (movingToDone) {
+        const effectiveSubtasks = patch.subtasks ?? task.subtasks ?? [];
+        const hasIncompleteSubtask = effectiveSubtasks.some((subtask) => {
+          const status = String(subtask?.status ?? '').toUpperCase();
+          if (status) return status !== 'DONE';
+          return !Boolean(subtask?.completed);
+        });
+        if (hasIncompleteSubtask) {
+          throw new BadRequestException(
+            'Complete all subtasks before moving this task to Done',
+          );
+        }
+      }
+    }
     if (Object.keys(patch).length > 0) {
       await this.tasksRepository.update(taskId, patch);
       const action = dto.statusId !== undefined ? 'move' : 'update';

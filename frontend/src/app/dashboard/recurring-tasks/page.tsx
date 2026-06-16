@@ -358,9 +358,13 @@ export default function RecurringTasksPage() {
       });
       queryClient.setQueryData(["task", taskId], updated);
     },
-    onError: (_err, _vars, ctx) => {
+    onError: (err, _vars, ctx) => {
       if (ctx?.previous) queryClient.setQueryData(["tasks", selectedProjectId], ctx.previous);
-      toast({ title: "Failed to move task", description: "Returned to original column.", variant: "error" });
+      toast({
+        title: "Failed to move task",
+        description: parseApiError(err),
+        variant: "error",
+      });
     },
   });
 
