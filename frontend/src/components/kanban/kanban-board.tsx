@@ -15,8 +15,8 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
-import type { Task } from "@/types/api";
-import type { WorkflowStatus } from "@/types/api";
+import { APP_LABEL_UPPER } from "@/lib/ui/design-tokens";
+import type { Task, WorkflowStatus, RecurringTemplateSummary } from "@/types/api";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,8 +39,12 @@ import {
 } from "lucide-react";
 import type { BoardPermissions } from "@/hooks/use-board-permissions";
 import { canUserMoveTask } from "@/lib/task-assignees";
-import { TaskCard as EnterpriseTaskCard } from "@/components/kanban/task-card";
+import { TaskCard as EnterpriseTaskCard, getWorkflowStatusCategory } from "@/components/kanban/task-card";
 import { partitionBoardTasks } from "@/lib/recurrence-display";
+import {
+  getRecurringColumnHint,
+  getRecurringEmptyColumnMessage,
+} from "@/lib/recurring-board-utils";
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -71,6 +75,7 @@ export interface TaskCardQuickActions {
   onDelete?: (task: Task) => void;
   onCompleteOccurrence?: (task: Task) => void;
   onSkipNextOccurrence?: (task: Task) => void;
+  onPauseSeries?: (task: Task) => void;
 }
 
 /** Subtask info computed from all tasks on the board */
@@ -101,6 +106,16 @@ function getStatusColor(index: number) {
   return STATUS_COLORS[index % STATUS_COLORS.length];
 }
 
+function getColumnColor(status: WorkflowStatus, index: number) {
+  const cat = getWorkflowStatusCategory(status);
+  if (cat === "todo") return { dot: "bg-rose-500", ring: "ring-rose-500/20" };
+  if (cat === "in_progress") return { dot: "bg-amber-500", ring: "ring-amber-500/20" };
+  if (cat === "done") return { dot: "bg-emerald-500", ring: "ring-emerald-500/20" };
+  return getStatusColor(index);
+}
+
+const COLUMN_SCROLL = "kanban-col-scroll";
+
 // ─── Task Card ────────────────────────────────────────────────
 
 function TaskCard({
@@ -120,6 +135,8 @@ function TaskCard({
   onToggleSelect,
   permissions,
   currentUserId,
+  recurringBoardMode,
+  recurringTemplate,
 }: {
   task: Task;
   isOverlay?: boolean;
@@ -137,6 +154,8 @@ function TaskCard({
   onToggleSelect?: (taskId: string) => void;
   permissions?: BoardPermissions;
   currentUserId?: string | null;
+  recurringBoardMode?: boolean;
+  recurringTemplate?: RecurringTemplateSummary;
 }) {
   return (
     <EnterpriseTaskCard
@@ -156,6 +175,8 @@ function TaskCard({
       onToggleSelect={onToggleSelect}
       permissions={permissions}
       currentUserId={currentUserId}
+      recurringBoardMode={recurringBoardMode}
+      recurringTemplate={recurringTemplate}
     />
   );
 }
@@ -179,6 +200,8 @@ function DraggableCard(props: {
   onToggleSelect?: (taskId: string) => void;
   permissions?: BoardPermissions;
   currentUserId?: string | null;
+  recurringBoardMode?: boolean;
+  recurringTemplateMap?: Record<string, RecurringTemplateSummary>;
 }) {
   const canDrag =
     !props.isSelectionMode &&
@@ -205,7 +228,14 @@ function DraggableCard(props: {
       )}
       style={{ touchAction: "none" }}
     >
-      <TaskCard {...props} />
+      <TaskCard
+        {...props}
+        recurringTemplate={
+          props.recurringTemplateMap && props.task.recurringTemplateId
+            ? props.recurringTemplateMap[props.task.recurringTemplateId]
+            : undefined
+        }
+      />
     </div>
   );
 }
@@ -233,20 +263,20 @@ function QuickAddInline({ onAdd }: { onAdd: (title: string) => void }) {
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="flex w-full items-center gap-2 rounded-xl border border-dashed border-muted-foreground/15 px-3 py-2.5 text-xs text-muted-foreground/60 transition-all hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
+        className="flex w-full items-center gap-1.5 rounded-md border border-dashed border-border/55 bg-background/50 px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground transition-all duration-200 hover:border-violet-300/45 hover:bg-violet-50/25 hover:text-violet-700 dark:hover:border-violet-500/25 dark:hover:bg-violet-500/5 dark:hover:text-violet-300"
       >
-        <Plus className="h-3.5 w-3.5" />
+        <Plus className="h-3 w-3 shrink-0" />
         Add task
       </button>
     );
   }
 
   return (
-    <div className="rounded-xl border bg-card p-3 shadow-sm animate-in fade-in slide-in-from-top-1 duration-200">
+    <div className="rounded-md border border-border/55 bg-card p-2 shadow-sm animate-in fade-in slide-in-from-top-1 duration-200">
       <input
         ref={inputRef}
         type="text"
-        placeholder="Task title... (Enter to add, Esc to cancel)"
+        placeholder="Task title…"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         onKeyDown={(e) => {
@@ -254,19 +284,25 @@ function QuickAddInline({ onAdd }: { onAdd: (title: string) => void }) {
           if (e.key === "Escape") { setEditing(false); setTitle(""); }
         }}
         onBlur={() => { if (!title.trim()) { setEditing(false); setTitle(""); } }}
-        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary/30"
+        className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-[13px] placeholder:text-muted-foreground/50 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
       />
-      <div className="mt-2 flex items-center gap-2">
-        <button type="button" onClick={handleSubmit}
-          className="rounded-lg gradient-bg px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:brightness-110 transition-all">
-          Add
+      <div className="mt-1.5 flex items-center gap-1">
+        <button
+          type="button"
+          onClick={handleSubmit}
+          className="rounded-md bg-primary px-2 py-0.5 text-[11px] font-semibold text-primary-foreground shadow-sm transition-all duration-200 hover:brightness-105"
+        >
+          Add task
         </button>
-        <button type="button" onClick={() => { setEditing(false); setTitle(""); }}
-          className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors">
+        <button
+          type="button"
+          onClick={() => { setEditing(false); setTitle(""); }}
+          className="rounded-md px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors duration-200 hover:bg-muted/60"
+        >
           Cancel
         </button>
-        <span className="ml-auto text-[10px] text-muted-foreground/50">
-          <kbd className="rounded border bg-muted px-1 py-0.5 text-[9px] font-mono">Enter</kbd>
+        <span className="ml-auto text-[10px] text-muted-foreground/55">
+          Enter to add
         </span>
       </div>
     </div>
@@ -340,9 +376,7 @@ function ColumnSettingsDropdown({
 function ColumnSectionHeader({ label, count }: { label: string; count: number }) {
   return (
     <div className="flex items-center gap-2 px-0.5 pb-0.5 pt-1">
-      <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/55">
-        {label}
-      </span>
+      <span className={APP_LABEL_UPPER}>{label}</span>
       <span className="text-[10px] font-medium tabular-nums text-muted-foreground/40">({count})</span>
       <div className="h-px flex-1 bg-border/40" />
     </div>
@@ -375,6 +409,8 @@ function DroppableColumn({
   onSetWipLimit,
   permissions,
   currentUserId,
+  boardVariant = "default",
+  recurringTemplateMap,
 }: {
   status: WorkflowStatus;
   statusIndex: number;
@@ -399,18 +435,39 @@ function DroppableColumn({
   onSetWipLimit?: (statusId: string, limit: number | undefined) => void;
   permissions?: BoardPermissions;
   currentUserId?: string | null;
+  boardVariant?: "default" | "recurring";
+  recurringTemplateMap?: Record<string, RecurringTemplateSummary>;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: status.id,
     data: { statusId: status.id },
   });
 
-  const colorSet = getStatusColor(statusIndex);
+  const colorSet = getColumnColor(status, statusIndex);
+  const statusCategory = getWorkflowStatusCategory(status);
   const isActiveTarget = isOver || activeOverColumnId === status.id;
   const isOverWipLimit = wipLimit ? tasks.length > wipLimit : false;
   const isAtWipLimit = wipLimit ? tasks.length === wipLimit : false;
   const { recurring, oneTime } = partitionBoardTasks(tasks);
-  const showSections = recurring.length > 0 && oneTime.length > 0;
+  const showSections =
+    boardVariant !== "recurring" && recurring.length > 0 && oneTime.length > 0;
+  const isRecurringBoard = boardVariant === "recurring";
+
+  const columnHint = useMemo(() => {
+    if (isRecurringBoard) return getRecurringColumnHint(status, tasks);
+    const now = Date.now();
+    if (statusCategory === "done") {
+      return tasks.length > 0 ? `${tasks.length} completed` : null;
+    }
+    const overdue = tasks.filter(
+      (t) => t.dueDate && new Date(t.dueDate).getTime() < now
+    ).length;
+    if (overdue > 0) return `${overdue} overdue`;
+    if (statusCategory === "in_progress" && tasks.length > 0) {
+      return `${tasks.length} active`;
+    }
+    return null;
+  }, [tasks, statusCategory, status, isRecurringBoard]);
 
   const renderTaskCard = (task: Task) => (
     <DraggableCard
@@ -431,6 +488,8 @@ function DroppableColumn({
       onToggleSelect={onToggleSelect}
       permissions={permissions}
       currentUserId={currentUserId}
+      recurringBoardMode={isRecurringBoard}
+      recurringTemplateMap={recurringTemplateMap}
     />
   );
 
@@ -468,50 +527,63 @@ function DroppableColumn({
       ref={setNodeRef}
       data-cy={`kanban-column-${status.id}`}
       className={cn(
-        "group/col flex h-full min-h-0 min-w-[310px] flex-1 flex-col self-stretch rounded-2xl border transition-all duration-300",
+        "group/col flex h-full min-h-0 min-w-[292px] flex-1 flex-col self-stretch rounded-lg border transition-all duration-200",
+        "border-slate-200/65 bg-slate-50/30 shadow-[0_1px_3px_rgba(15,23,42,0.04)] dark:border-border/50 dark:bg-muted/8",
         isActiveTarget
-          ? "ring-2 ring-primary/40 border-primary/30 bg-primary/[0.03] shadow-lg shadow-primary/10 scale-[1.01]"
-          : "bg-muted/15 hover:bg-muted/20",
-        isOverWipLimit && !isActiveTarget && "border-red-500/30 bg-red-500/[0.02]"
+          ? "border-violet-300/45 bg-violet-50/15 shadow-md shadow-violet-500/8 ring-1 ring-violet-400/20 dark:border-violet-500/25 dark:bg-violet-500/5"
+          : "hover:border-slate-300/75 dark:hover:border-border/65",
+        isOverWipLimit && !isActiveTarget && "border-red-500/25 bg-red-500/[0.02]"
       )}
       aria-label={`Column: ${status.name}`}
     >
-      {/* Header — fixed at top of column; only task list below scrolls */}
-      <div className="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b bg-muted/15 px-4 py-3 backdrop-blur-sm dark:bg-muted/20">
-        <button
-          onClick={() => onToggleCollapse?.(status.id)}
-          className="flex items-center gap-2 hover:opacity-70 transition-opacity"
-          aria-label={`Collapse ${status.name}`}
-        >
-          <ChevronDown className="h-3.5 w-3.5 text-muted-foreground/50" />
-          <span className={cn("h-2.5 w-2.5 rounded-full ring-2", colorSet.dot, colorSet.ring)} />
-          <h3 className="text-sm font-semibold text-foreground">{status.name}</h3>
-        </button>
+      {/* Header — sticky inside column */}
+      <div className="sticky top-0 z-10 shrink-0 border-b border-slate-200/50 bg-white/95 px-3 py-1.5 backdrop-blur-sm dark:border-border/40 dark:bg-card/95">
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => onToggleCollapse?.(status.id)}
+            className="flex min-w-0 flex-1 items-center gap-1.5 transition-opacity duration-200 hover:opacity-75"
+            aria-label={`Collapse ${status.name}`}
+          >
+            <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground/45" />
+            <span className={cn("h-2 w-2 shrink-0 rounded-full", colorSet.dot)} />
+            <div className="min-w-0 flex-1 text-left">
+              <div className="flex items-center gap-1.5">
+                <h3 className="truncate text-[13px] font-semibold leading-tight tracking-[-0.01em] text-foreground">
+                  {status.name}
+                </h3>
+                <span
+                  className={cn(
+                    "app-chip shrink-0 border-transparent px-1.5 py-px text-[10px] font-semibold tabular-nums",
+                    isOverWipLimit
+                      ? "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                      : isAtWipLimit
+                        ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                        : "bg-muted/50 text-muted-foreground ring-1 ring-border/35"
+                  )}
+                >
+                  {tasks.length}
+                  {wipLimit ? `/${wipLimit}` : ""}
+                </span>
+              </div>
+              {columnHint ? (
+                <p className="mt-0.5 truncate text-[10px] font-medium text-muted-foreground/70">
+                  {columnHint}
+                </p>
+              ) : null}
+            </div>
+          </button>
 
-        <div className="flex-1" />
-
-        <span className={cn(
-          "rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums transition-colors",
-          isOverWipLimit
-            ? "bg-red-500/15 text-red-600 dark:text-red-400 animate-pulse"
-            : isAtWipLimit
-              ? "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-              : "bg-muted text-muted-foreground"
-        )}>
-          {tasks.length}
-          {wipLimit ? `/${wipLimit}` : ""}
-        </span>
-
-        <ColumnSettingsDropdown
-          status={status}
-          taskCount={tasks.length}
-          wipLimit={wipLimit}
-          collapsed={collapsed}
-          onToggleCollapse={() => onToggleCollapse?.(status.id)}
-          onSetWipLimit={onSetWipLimit ? (limit) => onSetWipLimit(status.id, limit) : undefined}
-          onSelectAll={onSelectColumnTasks ? () => onSelectColumnTasks(status.id) : undefined}
-          permissions={permissions}
-        />
+          <ColumnSettingsDropdown
+            status={status}
+            taskCount={tasks.length}
+            wipLimit={wipLimit}
+            collapsed={collapsed}
+            onToggleCollapse={() => onToggleCollapse?.(status.id)}
+            onSetWipLimit={onSetWipLimit ? (limit) => onSetWipLimit(status.id, limit) : undefined}
+            onSelectAll={onSelectColumnTasks ? () => onSelectColumnTasks(status.id) : undefined}
+            permissions={permissions}
+          />
+        </div>
       </div>
 
       {/* WIP warning */}
@@ -524,8 +596,13 @@ function DroppableColumn({
         </div>
       )}
 
-      {/* Cards — only this area scrolls vertically */}
-      <div className="flex min-h-0 flex-1 basis-0 flex-col gap-2.5 overflow-y-auto overscroll-y-contain px-3 pb-2 pt-3">
+      {/* Cards — scrollable task list */}
+      <div
+        className={cn(
+          "flex min-h-0 flex-1 basis-0 flex-col gap-1.5 overflow-y-auto overscroll-y-contain px-2 pb-1.5 pt-2",
+          COLUMN_SCROLL
+        )}
+      >
         {recurring.length > 0 ? (
           <div className="flex flex-col gap-2.5">
             {showSections ? <ColumnSectionHeader label="Recurring" count={recurring.length} /> : null}
@@ -541,10 +618,14 @@ function DroppableColumn({
 
         {/* Empty */}
         {tasks.length === 0 && !isActiveTarget && (
-          <div className="flex flex-1 items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/10 p-6">
+          <div className="flex flex-1 items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/10 p-5">
             <div className="text-center">
-              <Zap className="h-5 w-5 mx-auto text-muted-foreground/20 mb-1" />
-              <p className="text-xs text-muted-foreground/40">No tasks</p>
+              <Zap className="mx-auto mb-1 h-5 w-5 text-muted-foreground/20" />
+              <p className="text-xs text-muted-foreground/50">
+                {isRecurringBoard
+                  ? getRecurringEmptyColumnMessage(status)
+                  : "No tasks"}
+              </p>
             </div>
           </div>
         )}
@@ -559,7 +640,7 @@ function DroppableColumn({
 
       {/* Quick add */}
       {onQuickAdd && !permissions?.isViewer && (
-        <div className="shrink-0 border-t border-border/40 px-3 pb-4 pt-3">
+        <div className="shrink-0 border-t border-slate-200/50 px-2 pb-2.5 pt-2 dark:border-border/40">
           <QuickAddInline onAdd={(title) => onQuickAdd(title, status.id)} />
         </div>
       )}
@@ -625,6 +706,7 @@ function applySorting(tasks: Task[], sortBy: string, sortDir: string): Task[] {
 
 export interface BoardStats {
   total: number;
+  completed: number;
   overdue: number;
   completedPercent: number;
   inProgress: number;
@@ -643,7 +725,7 @@ export function computeBoardStats(tasks: Task[], statuses: WorkflowStatus[]): Bo
   const inProgress = inProgressStatus ? tasks.filter((t) => t.statusId === inProgressStatus.id).length : 0;
   const recurring = tasks.filter((t) => !!t.recurrenceType && t.recurrenceType !== "NONE").length;
   const oneTime = total - recurring;
-  return { total, overdue, completedPercent, inProgress, recurring, oneTime };
+  return { total, completed, overdue, completedPercent, inProgress, recurring, oneTime };
 }
 
 // ─── Compute subtask map ──────────────────────────────────────
@@ -689,6 +771,8 @@ export interface KanbanBoardProps {
   currentUserId?: string | null;
   "aria-label"?: string;
   className?: string;
+  boardVariant?: "default" | "recurring";
+  recurringTemplateMap?: Record<string, RecurringTemplateSummary>;
 }
 
 export function KanbanBoard({
@@ -716,6 +800,8 @@ export function KanbanBoard({
   currentUserId,
   "aria-label": ariaLabel = "Kanban board",
   className,
+  boardVariant = "default",
+  recurringTemplateMap,
 }: KanbanBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overColumnId, setOverColumnId] = useState<string | null>(null);
@@ -831,6 +917,8 @@ export function KanbanBoard({
             onSetWipLimit={onSetWipLimit}
             permissions={permissions}
             currentUserId={currentUserId}
+            boardVariant={boardVariant}
+            recurringTemplateMap={recurringTemplateMap}
           />
         ))}
         </div>

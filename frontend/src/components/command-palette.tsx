@@ -65,17 +65,17 @@ export function CommandPalette() {
       <button
         type="button"
         onClick={toggle}
-        className="inline-flex items-center gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-sm text-muted-foreground transition-all hover:bg-muted hover:text-foreground hover:border-primary/20 hover:shadow-sm"
+        className="inline-flex h-9 w-[260px] max-w-[280px] items-center gap-2 rounded-lg border bg-muted/30 px-3 text-sm text-muted-foreground transition-all duration-200 hover:border-primary/20 hover:bg-muted hover:text-foreground hover:shadow-sm max-lg:w-auto max-lg:min-w-0"
         aria-label="Open command palette (⌘K)"
       >
         <Search className="h-4 w-4" aria-hidden />
-        <span className="hidden sm:inline">Search...</span>
+        <span className="hidden sm:inline">Quick search…</span>
         <kbd className="pointer-events-none hidden h-5 select-none items-center gap-0.5 rounded-md border bg-background px-1.5 font-mono text-[10px] font-medium sm:inline-flex">
           ⌘K
         </kbd>
       </button>
       <CommandDialog open={open} onOpenChange={setOpen} label="Command palette">
-        <CommandInput placeholder="Search pages or projects..." aria-label="Search" />
+        <CommandInput placeholder="Search tasks, projects…" aria-label="Search" />
         <CommandList>
           <CommandEmpty>No results found.</CommandEmpty>
           <CommandGroup heading="Pages">

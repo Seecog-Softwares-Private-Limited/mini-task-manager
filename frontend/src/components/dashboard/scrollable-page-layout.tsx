@@ -25,7 +25,7 @@ export function ScrollablePageLayout({
     >
       <div
         className={cn(
-          "shrink-0 border-b border-border bg-background pb-4 md:pb-6",
+          "relative z-10 shrink-0 border-b border-border/60 bg-background/95 pb-4 backdrop-blur-md md:pb-5",
           headerClassName
         )}
       >
@@ -33,7 +33,7 @@ export function ScrollablePageLayout({
       </div>
       <div
         className={cn(
-          "min-h-0 flex-1 overflow-y-auto overscroll-y-contain pt-6",
+          "relative z-0 min-h-0 flex-1 overflow-y-auto overscroll-y-contain pt-4 md:pt-5",
           bodyClassName
         )}
       >

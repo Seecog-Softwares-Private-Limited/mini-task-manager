@@ -57,3 +57,22 @@ export function getInitials(name: string | undefined): string {
   }
   return name.slice(0, 2).toUpperCase();
 }
+
+const WORKSPACE_GRADIENTS = [
+  "from-violet-500 via-indigo-500 to-purple-600",
+  "from-fuchsia-500 via-violet-500 to-indigo-600",
+  "from-sky-500 via-blue-500 to-indigo-600",
+  "from-emerald-500 via-teal-500 to-cyan-600",
+  "from-amber-500 via-orange-500 to-rose-500",
+  "from-rose-500 via-pink-500 to-fuchsia-600",
+] as const;
+
+/** Stable gradient class for workspace initials avatars. */
+export function getWorkspaceAvatarGradient(name: string | undefined): string {
+  const source = (name ?? "?").trim().toLowerCase();
+  let hash = 0;
+  for (let i = 0; i < source.length; i += 1) {
+    hash = source.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return WORKSPACE_GRADIENTS[Math.abs(hash) % WORKSPACE_GRADIENTS.length];
+}

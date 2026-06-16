@@ -3,15 +3,20 @@
  * Avoid relying on `frontend/.env` / `.env.local` for app configuration.
  */
 import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
 
+const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const frontendRoot = path.join(__dirname, "..");
 const repoRoot = path.join(frontendRoot, "..");
 const nextBin = path.join(frontendRoot, "node_modules", "next", "dist", "bin", "next");
+
+const { ensureDevNextCache } = require("./ensure-dev-next-cache.cjs");
+ensureDevNextCache(frontendRoot);
 
 dotenv.config({ path: path.join(repoRoot, "properties.env"), override: true });
 

@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/use-auth";
 import { usePlatformAdmin } from "@/hooks/use-platform-admin";
 import { usePermissions } from "@/hooks/use-permissions";
-import { usePlanOptional } from "@/context/plan-context";
 import { useProjectSelectionOptional } from "@/context/project-selection-context";
 import { buildTasksPageHref } from "@/lib/tasks-page-href";
 import { logout } from "@/services/api/auth.api";
@@ -17,11 +15,10 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { CommandPalette } from "@/components/command-palette";
 import { NotificationCenter } from "@/components/notifications/notification-center";
 import { WorkspaceProgressBadge } from "@/components/workspace-progress-badge";
-import { StreakBadge } from "@/components/streak-badge";
 import { TrialBanner } from "@/components/trial-banner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { LiveClock } from "@/components/dashboard/live-clock";
+import { HeaderContextGreeting } from "@/components/dashboard/header-context-greeting";
 import type { AppRole } from "@/hooks/use-auth";
 import {
   LayoutDashboard, Building2, FolderKanban, ListTodo, Bell,
@@ -37,22 +34,21 @@ const nav: {
   billingOnly?: boolean;
   adminOnly?: boolean;
   platformAdminOnly?: boolean;
-  section?: string;
+  section?: "workspace" | "reporting" | "administration" | "billing";
 }[] = [
-  { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-  { href: "/dashboard/workspaces", label: "Workspaces", icon: Building2 },
-  { href: "/dashboard/projects", label: "Projects", icon: FolderKanban },
-  { href: "/dashboard/tasks", label: "Tasks", icon: ListTodo },
-  { href: "/dashboard/recurring-tasks", label: "Recurring Tasks", icon: Repeat },
-  { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
-  { href: "/dashboard/activity", label: "Activity", icon: Activity },
-  { href: "/dashboard/audit", label: "Audit log", icon: ClipboardList, adminOnly: true },
-  { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3, adminOnly: true },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
-  // Billing section
+  { href: "/dashboard", label: "Overview", icon: LayoutDashboard, section: "workspace" },
+  { href: "/dashboard/workspaces", label: "Workspaces", icon: Building2, section: "workspace" },
+  { href: "/dashboard/projects", label: "Projects", icon: FolderKanban, section: "workspace" },
+  { href: "/dashboard/tasks", label: "Tasks", icon: ListTodo, section: "workspace" },
+  { href: "/dashboard/recurring-tasks", label: "Recurring Tasks", icon: Repeat, section: "workspace" },
+  { href: "/dashboard/notifications", label: "Notifications", icon: Bell, section: "reporting" },
+  { href: "/dashboard/activity", label: "Activity", icon: Activity, section: "reporting" },
+  { href: "/dashboard/audit", label: "Audit Logs", icon: ClipboardList, adminOnly: true, section: "reporting" },
+  { href: "/dashboard/analytics", label: "Analytics", icon: BarChart3, adminOnly: true, section: "reporting" },
+  { href: "/dashboard/settings", label: "Settings", icon: Settings, section: "administration" },
   { href: "/dashboard/plans", label: "Plans & Pricing", icon: Sparkles, section: "billing" },
   { href: "/dashboard/billing", label: "Billing", icon: CreditCard, section: "billing", billingOnly: true },
-  { href: "/super-admin", label: "Platform Admin", icon: Shield, platformAdminOnly: true },
+  { href: "/super-admin", label: "Platform Admin", icon: Shield, platformAdminOnly: true, section: "administration" },
 ];
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
@@ -68,7 +64,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   const { hasRole } = useAuth();
   const { isPlatformAdmin } = usePlatformAdmin();
   const { canManageBilling, canViewAudit } = usePermissions();
-  const planContext = usePlanOptional();
   const projectSelection = useProjectSelectionOptional();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -116,59 +111,52 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         )}
       >
         {/* Premium header */}
-        <header className="sticky top-0 z-30 flex min-h-header items-center gap-3 border-b bg-background/80 backdrop-blur-xl px-4 md:px-6">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="md:hidden h-9 w-9 shrink-0"
-            onClick={() => setMobileOpen(true)}
-            aria-label="Open menu"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="hidden md:flex h-9 w-9 shrink-0"
-            onClick={() => setSidebarCollapsed((c) => !c)}
-            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          >
-            {sidebarCollapsed ? (
-              <PanelLeft className="h-5 w-5" />
-            ) : (
-              <PanelLeftClose className="h-5 w-5" />
-            )}
-          </Button>
+        <header className="sticky top-0 z-30 flex min-h-header items-center gap-2 border-b border-border/60 bg-background/85 px-4 backdrop-blur-xl md:gap-3 md:px-6">
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 shrink-0 md:hidden"
+              onClick={() => setMobileOpen(true)}
+              aria-label="Open menu"
+            >
+              <Menu className="h-[18px] w-[18px]" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="hidden h-9 w-9 shrink-0 md:inline-flex"
+              onClick={() => setSidebarCollapsed((c) => !c)}
+              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {sidebarCollapsed ? (
+                <PanelLeft className="h-[18px] w-[18px]" />
+              ) : (
+                <PanelLeftClose className="h-[18px] w-[18px]" />
+              )}
+            </Button>
+          </div>
 
-          <div className="flex-1 min-w-0" />
+          <div className="flex min-w-0 flex-1 items-center gap-3 pl-1">
+            <HeaderContextGreeting />
+          </div>
 
-          <div className="flex items-center gap-2">
-            <WorkspaceProgressBadge className="hidden sm:inline-flex" />
-            <StreakBadge className="hidden sm:inline-flex" />
-            <LiveClock />
+          <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+            <WorkspaceProgressBadge className="hidden lg:inline-flex" />
             <CommandPalette />
             <NotificationCenter />
-            {(planContext?.plan || planContext?.subscription?.planName) && (
-              <Link
-                href="/dashboard/billing"
-                className="rounded-full gradient-bg px-3 py-1 text-[11px] font-semibold text-white shadow-sm hover:shadow-md transition-shadow"
-                title="Current plan"
-              >
-                {planContext.plan?.name ?? planContext.subscription?.planName ?? "Free"}
-              </Link>
-            )}
             <ThemeToggle />
             <Button
               variant="ghost"
               size="icon"
               onClick={handleLogout}
               data-cy="logout-button"
-              className="h-9 w-9 text-muted-foreground hover:text-destructive"
+              className="h-9 w-9 text-muted-foreground transition-colors duration-200 hover:bg-destructive/10 hover:text-destructive"
               title="Log out"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-[18px] w-[18px]" />
             </Button>
           </div>
         </header>

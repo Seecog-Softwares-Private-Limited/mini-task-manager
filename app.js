@@ -157,6 +157,41 @@ function waitForApiPort(port, options) {
   });
 }
 
+/**
+ * Running `next build` while `next dev` is active leaves production artifacts in .next
+ * without dev chunks (main-app.js, css/app/layout.css) → blank pages.
+ */
+function prepareDevNextCache() {
+  const { ensureDevNextCache } = require(path.join(FRONTEND_DIR, 'scripts', 'ensure-dev-next-cache.cjs'));
+  ensureDevNextCache(FRONTEND_DIR);
+}
+
+/**
+ * Next.js standalone output omits .next/static and public/. Without them, pages load blank
+ * with 404s on layout.css and chunk JS (see Dockerfile runner stage for the same copy steps).
+ */
+function ensureStandaloneAssets() {
+  const standaloneDir = path.join(FRONTEND_DIR, '.next', 'standalone');
+  const staticSrc = path.join(FRONTEND_DIR, '.next', 'static');
+  const staticDest = path.join(standaloneDir, '.next', 'static');
+  const publicSrc = path.join(FRONTEND_DIR, 'public');
+  const publicDest = path.join(standaloneDir, 'public');
+
+  if (!fs.existsSync(standaloneDir) || !fs.existsSync(staticSrc)) {
+    return false;
+  }
+
+  fs.mkdirSync(path.dirname(staticDest), { recursive: true });
+  fs.cpSync(staticSrc, staticDest, { recursive: true, force: true });
+
+  if (fs.existsSync(publicSrc)) {
+    fs.cpSync(publicSrc, publicDest, { recursive: true, force: true });
+  }
+
+  console.log('[app.js] Standalone assets synced (.next/static + public)');
+  return true;
+}
+
 function startFrontend(mode) {
   if (!fs.existsSync(FRONTEND_DIR) || !fs.existsSync(path.join(FRONTEND_DIR, 'package.json'))) {
     console.error('[app.js] Frontend folder not found.');
@@ -180,8 +215,16 @@ function startFrontend(mode) {
     );
     process.exit(1);
   }
+  if (!isProd) {
+    prepareDevNextCache();
+  }
   const standaloneServer = path.join(FRONTEND_DIR, '.next', 'standalone', 'server.js');
   const useStandalone = isProd && fs.existsSync(standaloneServer);
+  if (useStandalone && !ensureStandaloneAssets()) {
+    console.warn(
+      '[app.js] Could not sync standalone static assets. Run: cd frontend && npm run build',
+    );
+  }
   const nextArgs = useStandalone
     ? [standaloneServer]
     : isProd

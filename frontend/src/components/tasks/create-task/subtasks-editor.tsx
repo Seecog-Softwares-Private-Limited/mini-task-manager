@@ -1,9 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { fetchOrgMembers, fetchProjectMembers } from "@/services/api/members.api";
+import { useTenant } from "@/context/tenant-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { UserAvatar } from "@/components/ui/user-avatar";
+import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-selector";
+import {
+  processSubtaskComposerPaste,
+  SubtaskComposerAttachments,
+  SubtaskRowAttachmentPreview,
+} from "@/components/tasks/create-task/subtask-composer-attachments";
 import type {
   FieldErrors,
   UseFieldArrayAppend,
@@ -11,20 +20,16 @@ import type {
   UseFormRegister,
   UseFormSetValue,
 } from "react-hook-form";
-import { CheckSquare2, Plus } from "lucide-react";
-import { SubtaskCompactRow } from "@/components/tasks/subtasks/subtask-compact-row";
-import {
-  SubtaskDetailPanel,
-  type SubtaskDraft,
-} from "@/components/tasks/subtasks/subtask-detail-panel";
-import type { PendingSubtaskAttachment } from "@/components/tasks/subtasks/subtask-attachments-section";
+import { CalendarDays, Check, Pencil, Plus, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { generateClientId } from "@/lib/generate-client-id";
 import {
   resolveSubtaskStatus,
   subtaskWithCompleted,
-  subtaskWithStatus,
   type SubtaskStatus,
 } from "@/lib/subtask-status";
-import { generateClientId } from "@/lib/generate-client-id";
+import type { PendingSubtaskAttachment } from "@/components/tasks/subtasks/subtask-attachments-section";
+import { useToast } from "@/components/ui/use-toast";
 
 export interface SubtaskItem {
   id?: string;
@@ -40,10 +45,10 @@ interface SubtasksEditorProps {
   projectId: string;
   fields: Array<{ id: string } & SubtaskItem>;
   values?: SubtaskItem[];
-  register: UseFormRegister<any>;
-  setValue: UseFormSetValue<any>;
+  register?: UseFormRegister<any>;
   append: UseFieldArrayAppend<any, any>;
   remove: UseFieldArrayRemove;
+  setValue: UseFormSetValue<any>;
   errors: FieldErrors<any>;
   disabled?: boolean;
   pendingAttachmentsBySubtask?: Record<string, PendingSubtaskAttachment[]>;
@@ -54,26 +59,75 @@ interface SubtasksEditorProps {
   hideQuickAdd?: boolean;
 }
 
+function formatCompactDueDate(value?: string): string {
+  if (!value) return "";
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return "";
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 export function SubtasksEditor({
   projectId,
   fields,
   values,
-  register,
-  setValue,
   append,
   remove,
+  setValue,
   errors,
   disabled,
   pendingAttachmentsBySubtask = {},
   onPendingAttachmentsChange,
-  hideQuickAdd = false,
+  hideQuickAdd,
 }: SubtasksEditorProps) {
-  const inputRefs = useRef<Record<number, HTMLInputElement | null>>({});
-  const pendingFocusIndexRef = useRef<number | null>(null);
-  const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const { orgId } = useTenant();
+  const { toast } = useToast();
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
+
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [draftKey, setDraftKey] = useState("");
+  const [draftTitle, setDraftTitle] = useState("");
+  const [draftAssigneeId, setDraftAssigneeId] = useState<string | undefined>();
+  const [draftDueDate, setDraftDueDate] = useState("");
+  const [pasteFlash, setPasteFlash] = useState(false);
 
   const subtaskErrors =
     (errors.subtasks as Array<{ title?: { message?: string } } | undefined> | undefined) ?? [];
+
+  const { data: projectMembers = [] } = useQuery({
+    queryKey: ["project-members", projectId],
+    queryFn: () => fetchProjectMembers(projectId),
+    enabled: !!projectId,
+    staleTime: 60_000,
+  });
+
+  const { data: orgMembers = [] } = useQuery({
+    queryKey: ["org-members", orgId ?? ""],
+    queryFn: () => fetchOrgMembers(orgId!),
+    enabled: !!orgId,
+    staleTime: 60_000,
+  });
+
+  const memberById = useMemo(() => {
+    const map = new Map<string, { name: string; avatarUrl?: string }>();
+    for (const m of projectMembers) {
+      map.set(m.userId, {
+        name: m.user?.fullName ?? m.user?.email ?? "User",
+        avatarUrl: m.user?.avatarUrl,
+      });
+    }
+    for (const om of orgMembers) {
+      if (om.status?.toLowerCase() !== "active" || map.has(om.userId)) continue;
+      map.set(om.userId, {
+        name: om.user?.fullName ?? om.user?.email ?? "User",
+        avatarUrl: om.user?.avatarUrl,
+      });
+    }
+    return map;
+  }, [projectMembers, orgMembers]);
 
   const progress = useMemo(() => {
     const list = values ?? [];
@@ -84,207 +138,335 @@ export function SubtasksEditor({
     return { completed, total };
   }, [values]);
 
-  useEffect(() => {
-    if (pendingFocusIndexRef.current === null) return;
-    const index = pendingFocusIndexRef.current;
-    pendingFocusIndexRef.current = null;
-    requestAnimationFrame(() => {
-      inputRefs.current[index]?.focus();
-    });
-  }, [fields.length]);
+  const savedEntries = useMemo(
+    () =>
+      fields
+        .map((field, index) => ({
+          field,
+          index,
+          value: values?.[index],
+          key: values?.[index]?.id ?? field.id,
+        }))
+        .filter(({ value }) => (value?.title ?? "").trim().length > 0),
+    [fields, values]
+  );
 
-  const syncDraftToForm = (index: number, draft: SubtaskDraft) => {
-    const status = resolveSubtaskStatus(draft);
-    setValue(`subtasks.${index}.title`, draft.title, { shouldDirty: true, shouldTouch: true });
-    setValue(`subtasks.${index}.description`, draft.description ?? "", {
-      shouldDirty: true,
-      shouldTouch: true,
-    });
-    setValue(`subtasks.${index}.status`, status, {
-      shouldDirty: true,
-      shouldTouch: true,
-    });
-    setValue(`subtasks.${index}.completed`, status === "DONE", {
-      shouldDirty: true,
-      shouldTouch: true,
-    });
-    setValue(`subtasks.${index}.dueDate`, draft.dueDate, {
-      shouldDirty: true,
-      shouldTouch: true,
-    });
-    setValue(`subtasks.${index}.assigneeId`, draft.assigneeId, {
-      shouldDirty: true,
-      shouldTouch: true,
-    });
-  };
+  const draftAttachments = draftKey
+    ? pendingAttachmentsBySubtask[draftKey] ?? []
+    : [];
 
-  const saveDraft = (index: number, draft: SubtaskDraft) => {
-    syncDraftToForm(index, draft);
-    setExpandedKey(null);
-  };
+  function clearDraftAttachments(key: string) {
+    const items = pendingAttachmentsBySubtask[key] ?? [];
+    for (const item of items) {
+      if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+    }
+    onPendingAttachmentsChange?.(key, []);
+  }
 
-  const applySubtaskPatch = (index: number, patch: Partial<SubtaskItem>) => {
+  function openCreateComposer() {
+    const key = generateClientId();
+    setDraftKey(key);
+    setEditingIndex(null);
+    setDraftTitle("");
+    setDraftAssigneeId(undefined);
+    setDraftDueDate("");
+    setComposerOpen(true);
+    requestAnimationFrame(() => titleInputRef.current?.focus());
+  }
+
+  function openEditComposer(index: number) {
+    const value = values?.[index];
+    const key = value?.id ?? fields[index]?.id ?? generateClientId();
+    setDraftKey(key);
+    setEditingIndex(index);
+    setDraftTitle(value?.title ?? "");
+    setDraftAssigneeId(value?.assigneeId);
+    setDraftDueDate(value?.dueDate ?? "");
+    setComposerOpen(true);
+    requestAnimationFrame(() => titleInputRef.current?.focus());
+  }
+
+  function closeComposer() {
+    if (editingIndex === null && draftKey) {
+      clearDraftAttachments(draftKey);
+    }
+    setComposerOpen(false);
+    setEditingIndex(null);
+    setDraftKey("");
+    setDraftTitle("");
+    setDraftAssigneeId(undefined);
+    setDraftDueDate("");
+    setPasteFlash(false);
+  }
+
+  function handleSaveSubtask() {
+    const title = draftTitle.trim();
+    if (!title || disabled) return;
+
+    if (editingIndex !== null) {
+      setValue(`subtasks.${editingIndex}.title`, title, { shouldDirty: true, shouldTouch: true });
+      setValue(`subtasks.${editingIndex}.assigneeId`, draftAssigneeId, {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+      setValue(`subtasks.${editingIndex}.dueDate`, draftDueDate || undefined, {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+      if (!values?.[editingIndex]?.id) {
+        setValue(`subtasks.${editingIndex}.id`, draftKey, { shouldDirty: true });
+      }
+    } else {
+      append({
+        id: draftKey,
+        title,
+        completed: false,
+        description: "",
+        assigneeId: draftAssigneeId,
+        dueDate: draftDueDate || undefined,
+        status: "TODO",
+      });
+    }
+
+    setComposerOpen(false);
+    setEditingIndex(null);
+    setDraftKey("");
+    setDraftTitle("");
+    setDraftAssigneeId(undefined);
+    setDraftDueDate("");
+  }
+
+  function handleRemoveSubtask(index: number, key: string) {
+    if (composerOpen && editingIndex === index) closeComposer();
+    clearDraftAttachments(key);
+    remove(index);
+  }
+
+  function toggleComplete(index: number) {
     const current = values?.[index];
     if (!current) return;
-    const next = { ...current, ...patch };
-    if (patch.status !== undefined || patch.completed !== undefined) {
-      const normalized = patch.status
-        ? subtaskWithStatus(next, patch.status)
-        : subtaskWithCompleted(next, Boolean(patch.completed));
-      setValue(`subtasks.${index}.status`, normalized.status, {
-        shouldDirty: true,
-        shouldTouch: true,
-      });
-      setValue(`subtasks.${index}.completed`, normalized.completed, {
-        shouldDirty: true,
-        shouldTouch: true,
-      });
-      return;
-    }
-    Object.entries(patch).forEach(([key, value]) => {
-      setValue(`subtasks.${index}.${key}` as const, value, {
-        shouldDirty: true,
-        shouldTouch: true,
-      });
+    const completed = resolveSubtaskStatus(current) === "DONE";
+    const next = subtaskWithCompleted(current, !completed);
+    setValue(`subtasks.${index}.status`, next.status, { shouldDirty: true, shouldTouch: true });
+    setValue(`subtasks.${index}.completed`, next.completed, {
+      shouldDirty: true,
+      shouldTouch: true,
     });
-  };
+  }
+
+  const canSaveDraft = draftTitle.trim().length > 0 && !disabled;
 
   return (
-    <div className="space-y-3 rounded-xl border border-border/70 bg-muted/10 p-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Label className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            <CheckSquare2 className="h-3.5 w-3.5" /> Subtasks
-          </Label>
-          <span className="inline-flex h-5 items-center rounded-full border border-border bg-background px-2 text-[11px] font-medium text-muted-foreground">
-            {progress.completed}/{progress.total} completed
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="min-w-0 truncate text-[11px] font-medium text-muted-foreground">
+          Subtasks{" "}
+          <span className="font-normal text-muted-foreground/75">
+            — {progress.completed} of {progress.total} completed
           </span>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="h-7 text-xs"
-          onClick={() => {
-            const clientId = generateClientId();
-            append({
-              id: clientId,
-              title: "",
-              completed: false,
-              description: "",
-              assigneeId: undefined,
-              dueDate: undefined,
-              status: "TODO",
+        </p>
+        {!composerOpen && !hideQuickAdd ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 shrink-0 rounded-md px-2 text-[11px] transition-all duration-200"
+            onClick={openCreateComposer}
+            disabled={disabled}
+          >
+            <Plus className="mr-1 h-3 w-3" /> Add subtask
+          </Button>
+        ) : null}
+      </div>
+
+      {composerOpen ? (
+        <div
+          ref={composerRef}
+          className="rounded-lg border border-violet-500/20 bg-muted/10 p-2.5 shadow-sm transition-all duration-200"
+          onPaste={(event) => {
+            if (!onPendingAttachmentsChange || !draftKey) return;
+            processSubtaskComposerPaste(event, draftAttachments, (items) =>
+              onPendingAttachmentsChange(draftKey, items), {
+              disabled,
+              onError: (message) =>
+                toast({ title: "Could not paste image", description: message, variant: "error" }),
+              onSuccess: () => {
+                setPasteFlash(true);
+                window.setTimeout(() => setPasteFlash(false), 2000);
+              },
             });
-            setExpandedKey(clientId);
           }}
-          disabled={disabled}
         >
-          <Plus className="mr-1 h-3.5 w-3.5" /> Add
-        </Button>
-      </div>
+          <Input
+            ref={titleInputRef}
+            value={draftTitle}
+            onChange={(e) => setDraftTitle(e.target.value)}
+            placeholder="Subtask title"
+            disabled={disabled}
+            className="h-8 rounded-md border-border/55 bg-background text-sm shadow-sm transition-all duration-200 focus-visible:ring-violet-500/15"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && canSaveDraft) {
+                e.preventDefault();
+                handleSaveSubtask();
+              }
+              if (e.key === "Escape") {
+                e.preventDefault();
+                closeComposer();
+              }
+            }}
+          />
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-muted-foreground">Assignee</span>
+              <SubtaskAssigneeSelector
+                projectId={projectId}
+                value={draftAssigneeId}
+                onChange={setDraftAssigneeId}
+                disabled={disabled}
+              />
+            </div>
+            <div className="flex min-w-[120px] flex-1 items-center gap-1.5">
+              <CalendarDays className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" aria-hidden />
+              <Input
+                type="date"
+                value={draftDueDate}
+                onChange={(e) => setDraftDueDate(e.target.value)}
+                disabled={disabled}
+                className="h-8 flex-1 rounded-md border-border/55 bg-background px-2 text-xs shadow-sm transition-all duration-200"
+                aria-label="Subtask due date"
+              />
+            </div>
+          </div>
 
-      <div className="space-y-2">
-        {fields.length === 0 ? (
-          <p className="text-xs text-muted-foreground">
-            Break larger work into actionable subtasks with notes and attachments.
-          </p>
-        ) : (
-          fields.map((field, index) => {
-            const message = subtaskErrors[index]?.title?.message ?? "";
-            const value = values?.[index];
-            const completed = resolveSubtaskStatus(value ?? { completed: false }) === "DONE";
-            const subtaskKey = value?.id ?? field.id;
-            const attachmentCount = (pendingAttachmentsBySubtask[subtaskKey] ?? []).length;
-            const expanded = expandedKey === subtaskKey;
-
-            return (
-              <div key={field.id} className="space-y-0">
-                <input type="hidden" {...register(`subtasks.${index}.id` as const)} />
-                <input type="hidden" {...register(`subtasks.${index}.description` as const)} />
-                <input type="hidden" {...register(`subtasks.${index}.status` as const)} />
-                <SubtaskCompactRow
-                  title={value?.title ?? ""}
-                  completed={completed}
-                  status={resolveSubtaskStatus(value ?? { status: "TODO" })}
-                  dueDate={value?.dueDate}
-                  assigneeId={value?.assigneeId}
-                  attachmentCount={attachmentCount}
-                  projectId={projectId}
-                  expanded={expanded}
-                  editDisabled={disabled}
-                  onToggleComplete={() =>
-                    applySubtaskPatch(index, { completed: !completed })
-                  }
-                  onStatusChange={(status) => applySubtaskPatch(index, { status })}
-                  onRowClick={() =>
-                    setExpandedKey((prev) => (prev === subtaskKey ? null : subtaskKey))
-                  }
-                  onDelete={() => {
-                    if (expandedKey === subtaskKey) setExpandedKey(null);
-                    remove(index);
-                  }}
-                  onAssigneeChange={(assigneeId) =>
-                    applySubtaskPatch(index, { assigneeId })
-                  }
-                />
-                {expanded ? (
-                  <SubtaskDetailPanel
-                    draft={{
-                      id: subtaskKey,
-                      title: value?.title ?? "",
-                      description: value?.description,
-                      completed,
-                      assigneeId: value?.assigneeId,
-                      dueDate: value?.dueDate,
-                      status: resolveSubtaskStatus(value ?? { status: "TODO" }),
-                    }}
-                    projectId={projectId}
-                    persistAttachments={false}
-                    pendingAttachments={pendingAttachmentsBySubtask[subtaskKey] ?? []}
-                    onPendingAttachmentsChange={(items) =>
-                      onPendingAttachmentsChange?.(subtaskKey, items)
-                    }
-                    disabled={disabled}
-                    onDraftChange={(draft) => syncDraftToForm(index, draft)}
-                    onSave={(draft) => saveDraft(index, draft)}
-                    onCancel={() => setExpandedKey(null)}
-                  />
-                ) : null}
-                {message ? <p className="text-xs text-destructive">{message}</p> : null}
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      {fields.length > 0 && !hideQuickAdd ? (
-        <div className="flex gap-2 pt-1">
-          <div className="td-input-shell flex min-h-10 flex-1 items-center gap-2 rounded-xl px-3">
-            <Plus className="h-4 w-4 shrink-0 text-muted-foreground/50" aria-hidden />
-            <Input
-              placeholder="Quick add subtask…"
-              className="h-9 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0"
+          {onPendingAttachmentsChange && draftKey ? (
+            <SubtaskComposerAttachments
+              attachments={draftAttachments}
+              onChange={(items) => onPendingAttachmentsChange(draftKey, items)}
               disabled={disabled}
-              onKeyDown={(event) => {
-                if (event.key !== "Enter" || disabled) return;
-                event.preventDefault();
-                const clientId = generateClientId();
-                append({
-                  id: clientId,
-                  title: "",
-                  completed: false,
-                  description: "",
-                  assigneeId: undefined,
-                  dueDate: undefined,
-                  status: "TODO",
-                });
-                pendingFocusIndexRef.current = fields.length;
-                setExpandedKey(clientId);
-              }}
+              pasteFlash={pasteFlash}
             />
+          ) : null}
+
+          <div className="mt-2 flex justify-end gap-1.5">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-[11px] transition-colors duration-200"
+              onClick={closeComposer}
+              disabled={disabled}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="h-7 gap-1 px-2.5 text-[11px] transition-all duration-200"
+              onClick={handleSaveSubtask}
+              disabled={!canSaveDraft}
+            >
+              {editingIndex !== null ? (
+                <>
+                  <Check className="h-3 w-3" /> Save
+                </>
+              ) : (
+                "Add"
+              )}
+            </Button>
           </div>
         </div>
+      ) : null}
+
+      {savedEntries.length > 0 ? (
+        <ul className="space-y-1">
+          {savedEntries.map(({ field, index, value, key }) => {
+            const message = subtaskErrors[index]?.title?.message ?? "";
+            const assignee = value?.assigneeId ? memberById.get(value.assigneeId) : undefined;
+            const dueLabel = formatCompactDueDate(value?.dueDate);
+            const completed = resolveSubtaskStatus(value ?? { completed: false }) === "DONE";
+            const rowAttachments = pendingAttachmentsBySubtask[key] ?? [];
+            const isEditingThis = composerOpen && editingIndex === index;
+
+            return (
+              <li key={field.id}>
+                <div
+                  className={cn(
+                    "group flex items-center gap-1.5 rounded-md border border-border/45 bg-background/80 px-1.5 py-1 transition-all duration-200 hover:border-border/70 hover:bg-muted/20",
+                    isEditingThis && "border-violet-500/25 bg-violet-500/[0.04]",
+                    completed && "opacity-75"
+                  )}
+                >
+                  <button
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => toggleComplete(index)}
+                    className={cn(
+                      "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-all duration-200",
+                      completed
+                        ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-600"
+                        : "border-border/60 bg-background hover:border-violet-500/40"
+                    )}
+                    aria-label={completed ? "Mark subtask incomplete" : "Mark subtask complete"}
+                  >
+                    {completed ? <Check className="h-2.5 w-2.5" /> : null}
+                  </button>
+
+                  <span
+                    className={cn(
+                      "min-w-0 flex-1 truncate text-[13px] text-foreground",
+                      completed && "text-muted-foreground line-through"
+                    )}
+                  >
+                    {value?.title}
+                  </span>
+
+                  {assignee ? (
+                    <UserAvatar
+                      userId={value!.assigneeId!}
+                      name={assignee.name}
+                      avatarUrl={assignee.avatarUrl}
+                      className="h-5 w-5 shrink-0"
+                      fallbackClassName="text-[8px]"
+                    />
+                  ) : null}
+
+                  {dueLabel ? (
+                    <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+                      {dueLabel}
+                    </span>
+                  ) : null}
+
+                  <SubtaskRowAttachmentPreview attachments={rowAttachments} />
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 shrink-0 text-muted-foreground opacity-70 transition-all duration-200 hover:text-foreground group-hover:opacity-100"
+                    onClick={() => openEditComposer(index)}
+                    disabled={disabled || (composerOpen && editingIndex !== index)}
+                    aria-label={`Edit subtask ${value?.title}`}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 shrink-0 text-muted-foreground opacity-70 transition-all duration-200 hover:text-destructive group-hover:opacity-100"
+                    onClick={() => handleRemoveSubtask(index, key)}
+                    disabled={disabled}
+                    aria-label={`Remove subtask ${value?.title}`}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+                {message ? <p className="mt-0.5 text-[11px] text-destructive">{message}</p> : null}
+              </li>
+            );
+          })}
+        </ul>
       ) : null}
     </div>
   );

@@ -77,7 +77,19 @@ interface BoardToolbarProps {
   showRecurrenceFilter?: boolean;
 }
 
-// ─── Component ────────────────────────────────────────────────
+const FILTER_BTN = cn(
+  "h-[26px] gap-1.5 rounded-lg border-border/60 text-xs font-medium transition-all duration-200",
+  "hover:border-border hover:bg-muted/30"
+);
+
+const SEGMENTED_WRAP = "inline-flex items-center rounded-lg border border-border/60 bg-muted/20 p-0.5";
+const SEGMENTED_ITEM = (active: boolean) =>
+  cn(
+    "h-[26px] rounded-md px-2.5 text-xs font-medium transition-all duration-200",
+    active
+      ? "bg-background text-foreground shadow-sm"
+      : "text-muted-foreground hover:text-foreground"
+  );
 
 export function BoardToolbar({
   filters,
@@ -150,18 +162,16 @@ export function BoardToolbar({
   const assigneeEntries = Object.entries(assigneeMap ?? {});
 
   return (
-    <div className="min-w-0 space-y-2">
-      {/* Main toolbar row */}
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        {/* Search — always visible so tap/focus does not collapse the field */}
-        <div className="relative w-full min-w-[12rem] shrink-0 sm:w-56 md:w-64">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/50" />
+    <div className="min-w-0 space-y-1.5">
+      <div className="flex min-w-0 flex-wrap items-center gap-1">
+        <div className="relative w-full min-w-[11rem] shrink-0 sm:w-52 md:w-60">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/50" />
           <Input
             ref={searchInputRef}
             placeholder="Search tasks..."
             value={filters.search}
             onChange={(e) => updateFilter("search", e.target.value)}
-            className="h-9 pl-9 pr-8 text-sm"
+            className="h-8 rounded-lg pl-8 pr-8 text-sm transition-colors duration-200"
             data-cy="board-search"
             aria-label="Search tasks"
           />
@@ -188,8 +198,8 @@ export function BoardToolbar({
               variant="outline"
               size="sm"
               className={cn(
-                "h-9 gap-2",
-                filters.priority.length > 0 && "border-primary/30 bg-primary/5 text-primary"
+                FILTER_BTN,
+                filters.priority.length > 0 && "border-violet-400/40 bg-violet-50/50 text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300"
               )}
             >
               <Flag className="h-3.5 w-3.5" />
@@ -227,8 +237,8 @@ export function BoardToolbar({
                 variant="outline"
                 size="sm"
                 className={cn(
-                  "h-9 gap-2",
-                  filters.assignee.length > 0 && "border-primary/30 bg-primary/5 text-primary"
+                  FILTER_BTN,
+                  filters.assignee.length > 0 && "border-violet-400/40 bg-violet-50/50 text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300"
                 )}
               >
                 <User className="h-3.5 w-3.5" />
@@ -275,8 +285,8 @@ export function BoardToolbar({
               variant="outline"
               size="sm"
               className={cn(
-                "h-9 gap-2",
-                filters.sortBy !== "created" && "border-primary/30 bg-primary/5 text-primary"
+                FILTER_BTN,
+                filters.sortBy !== "created" && "border-violet-400/40 bg-violet-50/50 text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300"
               )}
             >
               <ArrowUpDown className="h-3.5 w-3.5" />
@@ -306,40 +316,34 @@ export function BoardToolbar({
         </DropdownMenu>
 
         {showRecurrenceFilter ? (
-        <div className="inline-flex items-center gap-1 rounded-lg border bg-background p-1">
-          <Button
+        <div className={SEGMENTED_WRAP}>
+          <button
             type="button"
-            variant={filters.recurrence === "all" ? "default" : "ghost"}
-            size="sm"
-            className="h-7 px-2 text-xs"
+            className={SEGMENTED_ITEM(filters.recurrence === "all")}
             onClick={() => updateFilter("recurrence", "all")}
           >
             All
-          </Button>
-          <Button
+          </button>
+          <button
             type="button"
-            variant={filters.recurrence === "normal" ? "default" : "ghost"}
-            size="sm"
-            className="h-7 px-2 text-xs"
+            className={SEGMENTED_ITEM(filters.recurrence === "normal")}
             onClick={() => updateFilter("recurrence", "normal")}
           >
             Normal
-          </Button>
-          <Button
+          </button>
+          <button
             type="button"
-            variant={filters.recurrence === "recurring" ? "default" : "ghost"}
-            size="sm"
-            className="h-7 gap-1 px-2 text-xs"
+            className={cn(SEGMENTED_ITEM(filters.recurrence === "recurring"), "gap-1")}
             onClick={() => updateFilter("recurrence", "recurring")}
           >
             <Repeat className="h-3 w-3" />
             Recurring
             {recurringCount > 0 ? (
-              <span className="rounded-full bg-indigo-500/15 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-indigo-700 dark:text-indigo-300">
+              <span className="rounded-full bg-indigo-500/12 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-indigo-700 dark:text-indigo-300">
                 {recurringCount}
               </span>
             ) : null}
-          </Button>
+          </button>
         </div>
         ) : null}
 
@@ -347,7 +351,7 @@ export function BoardToolbar({
         {(savedViews.length > 0 || onSaveView) && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-9 gap-2">
+              <Button variant="outline" size="sm" className={FILTER_BTN}>
                 <Bookmark className="h-3.5 w-3.5" />
                 Views
                 {savedViews.length > 0 && (
@@ -419,7 +423,7 @@ export function BoardToolbar({
           <Button
             variant="ghost"
             size="sm"
-            className="h-9 gap-1.5 text-muted-foreground hover:text-destructive"
+            className="h-8 gap-1.5 text-muted-foreground transition-colors duration-200 hover:text-destructive"
             onClick={clearFilters}
           >
             <X className="h-3.5 w-3.5" />
@@ -446,7 +450,7 @@ export function BoardToolbar({
           <Button
             variant={isSelectionMode ? "default" : "outline"}
             size="sm"
-            className="h-9 gap-1.5"
+            className={cn(FILTER_BTN, isSelectionMode && "border-primary bg-primary text-primary-foreground")}
             onClick={onToggleSelectionMode}
           >
             <CheckSquare2 className="h-3.5 w-3.5" />
@@ -455,15 +459,10 @@ export function BoardToolbar({
         )}
 
         {/* View toggle: Kanban | Scrum | Table */}
-        <div className="flex items-center rounded-lg border bg-muted/30 p-0.5">
+        <div className={SEGMENTED_WRAP}>
           <button
             onClick={() => onViewModeChange("kanban")}
-            className={cn(
-              "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all",
-              viewMode === "kanban"
-                ? "bg-background shadow-sm text-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            )}
+            className={cn(SEGMENTED_ITEM(viewMode === "kanban"), "flex items-center gap-1")}
             aria-label="Kanban view"
           >
             <LayoutGrid className="h-3.5 w-3.5" />
@@ -471,12 +470,7 @@ export function BoardToolbar({
           </button>
           <button
             onClick={() => onViewModeChange("scrum")}
-            className={cn(
-              "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all",
-              viewMode === "scrum"
-                ? "bg-background shadow-sm text-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            )}
+            className={cn(SEGMENTED_ITEM(viewMode === "scrum"), "flex items-center gap-1")}
             aria-label="Scrum view"
           >
             <Rocket className="h-3.5 w-3.5" />
@@ -484,12 +478,7 @@ export function BoardToolbar({
           </button>
           <button
             onClick={() => onViewModeChange("table")}
-            className={cn(
-              "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all",
-              viewMode === "table"
-                ? "bg-background shadow-sm text-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            )}
+            className={cn(SEGMENTED_ITEM(viewMode === "table"), "flex items-center gap-1")}
             aria-label="Table view"
           >
             <List className="h-3.5 w-3.5" />

@@ -5,20 +5,34 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Sparkles } from "lucide-react";
-import { useAuth } from "@/hooks/use-auth";
-import { DashboardProfileAvatar } from "@/components/dashboard/dashboard-profile-avatar";
-import { SidebarCompanyBrand } from "@/components/dashboard/sidebar-company-brand";
+import { SidebarIdentityPanel } from "@/components/dashboard/sidebar-identity-panel";
+import { SidebarHelpFooter } from "@/components/dashboard/sidebar-help-footer";
+
+export type NavSection = "workspace" | "reporting" | "administration" | "billing";
+
+export interface SidebarNavItem {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  section?: NavSection;
+}
 
 interface SidebarProps {
   collapsed: boolean;
   mobileOpen: boolean;
   onCloseMobile: () => void;
-  visibleNav: { href: string; label: string; icon: React.ComponentType<{ className?: string }>; section?: string }[];
+  visibleNav: SidebarNavItem[];
 }
+
+const NAV_GROUPS: { id: NavSection | "billing"; label: string }[] = [
+  { id: "workspace", label: "Workspace" },
+  { id: "reporting", label: "Reporting" },
+  { id: "administration", label: "Administration" },
+  { id: "billing", label: "Plans & Billing" },
+];
 
 export function Sidebar({ collapsed, mobileOpen, onCloseMobile, visibleNav }: SidebarProps) {
   const pathname = usePathname();
-  const { user, mergeUser } = useAuth();
 
   useEffect(() => {
     if (!mobileOpen) return;
@@ -29,10 +43,7 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile, visibleNav }: Si
     return () => window.removeEventListener("keydown", handler);
   }, [mobileOpen, onCloseMobile]);
 
-  const mainNav = visibleNav.filter((item) => !item.section);
-  const billingNav = visibleNav.filter((item) => item.section === "billing");
-
-  const renderNavItem = (item: typeof visibleNav[0]) => {
+  const renderNavItem = (item: SidebarNavItem) => {
     const itemPath = item.href.split("?")[0];
     const isActive =
       pathname === itemPath ||
@@ -45,19 +56,27 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile, visibleNav }: Si
         onClick={onCloseMobile}
         data-cy={item.href === "/dashboard/billing" ? "nav-billing" : item.href === "/dashboard/plans" ? "nav-plans" : undefined}
         className={cn(
-          "group flex items-center gap-2.5 rounded-lg py-2.5 text-sm font-medium transition-all duration-200",
-          collapsed ? "justify-center px-2" : "px-3",
+          "group relative flex items-center gap-2.5 rounded-lg py-2 text-[13px] transition-all duration-200 ease-out",
+          collapsed ? "justify-center px-2" : "pl-3 pr-3",
           isActive
-            ? "gradient-bg text-white shadow-md shadow-primary/20"
-            : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+            ? "bg-violet-500/[0.11] font-semibold text-violet-800 dark:bg-violet-500/15 dark:text-violet-200"
+            : "font-medium text-muted-foreground hover:bg-violet-500/[0.06] hover:text-foreground"
         )}
         aria-current={isActive ? "page" : undefined}
         title={collapsed ? item.label : undefined}
       >
+        {isActive && !collapsed && (
+          <span
+            className="absolute bottom-1.5 left-0 top-1.5 w-[3px] rounded-r-full bg-violet-500 shadow-[0_0_10px_rgba(139,92,246,0.55)]"
+            aria-hidden
+          />
+        )}
         <Icon
           className={cn(
-            "h-4 w-4 shrink-0 transition-transform duration-200",
-            !isActive && "group-hover:scale-110"
+            "h-[18px] w-[18px] shrink-0 transition-all duration-200",
+            isActive
+              ? "text-violet-600 dark:text-violet-400"
+              : "text-muted-foreground/75 group-hover:text-foreground/90"
           )}
           aria-hidden
         />
@@ -66,81 +85,47 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile, visibleNav }: Si
     );
   };
 
+  const sectionLabel = (label: string, isFirst: boolean, icon?: React.ReactNode) =>
+    !collapsed ? (
+      <p
+        className={cn(
+          "mb-1 flex items-center gap-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground/50",
+          isFirst ? "mt-0" : "mt-3.5"
+        )}
+      >
+        {icon}
+        {label}
+      </p>
+    ) : null;
+
+  const groups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: visibleNav.filter((item) => item.section === group.id),
+  })).filter((group) => group.items.length > 0);
+
   const content = (
     <div className="flex h-full flex-col">
-      <SidebarCompanyBrand collapsed={collapsed} />
+      <SidebarIdentityPanel collapsed={collapsed} />
 
-      {/* Employee profile */}
-      {user?.email && (
-        <div className={cn("border-b border-border/50", collapsed ? "px-2 py-2.5" : "px-3 py-2.5")}>
-          <div
-            className={cn(
-              "flex items-center gap-2.5 rounded-xl border border-[#E7EAF0] bg-[#FCFCFD] p-2 shadow-sm dark:border-border dark:bg-muted/25",
-              collapsed && "justify-center px-1"
+      <div className={cn("flex-1 overflow-y-auto py-1", collapsed ? "px-3" : "px-4")}>
+        {groups.map((group, index) => (
+          <div key={group.id}>
+            {sectionLabel(
+              group.label,
+              index === 0,
+              group.id === "billing" ? (
+                <Sparkles className="h-3 w-3 text-amber-500/70" aria-hidden />
+              ) : undefined
             )}
-            title={collapsed ? user.fullName || user.email : undefined}
-          >
-            <DashboardProfileAvatar user={user} mergeUser={mergeUser} size="lg" />
-            {!collapsed && (
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/70">
-                  Your profile
-                </p>
-                <p className="truncate text-sm font-semibold leading-tight text-foreground">
-                  {user.fullName?.trim() && user.fullName !== user.email
-                    ? user.fullName
-                    : user.email}
-                </p>
-                {user.fullName?.trim() && user.fullName !== user.email ? (
-                  <p className="truncate text-[11px] leading-tight text-muted-foreground">
-                    {user.email}
-                  </p>
-                ) : null}
-              </div>
-            )}
+            <nav className="space-y-0.5" aria-label={group.label}>
+              {group.items.map(renderNavItem)}
+            </nav>
           </div>
-        </div>
-      )}
-
-      {/* Main Navigation */}
-      <div className={cn("px-3 pt-3", collapsed && "px-2")}>
-        {!collapsed && (
-          <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/90">
-            Navigation
-          </p>
-        )}
+        ))}
       </div>
-      <nav className="flex-1 space-y-1 px-3 py-1" aria-label="Main navigation">
-        {mainNav.map(renderNavItem)}
-      </nav>
 
-      {/* Billing Section - Separated with premium styling */}
-      {billingNav.length > 0 && (
-        <div className={cn("border-t border-border/40", collapsed ? "px-2 py-2" : "px-3 py-3")}>
-          {!collapsed && (
-            <div className="mb-2 flex items-center gap-1.5 px-1">
-              <div className="flex h-4 w-4 items-center justify-center rounded-md bg-gradient-to-br from-amber-400 to-orange-500">
-                <Sparkles className="h-2.5 w-2.5 text-white" />
-              </div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
-                Plans & Billing
-              </p>
-            </div>
-          )}
-          <div className="space-y-1">
-            {billingNav.map(renderNavItem)}
-          </div>
-        </div>
-      )}
-
-      {/* Bottom help section */}
-      <div className={cn("border-t border-border/40 px-3 py-4", collapsed && "px-2")}>
-        {!collapsed && (
-          <div className="rounded-lg bg-gradient-to-br from-primary/10 to-purple-500/10 p-3">
-            <p className="text-xs font-bold text-foreground">Need help?</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">Check our documentation for guides and tips.</p>
-          </div>
-        )}
+      <div className="mt-auto border-t border-border/40">
+        <SidebarHelpFooter collapsed={collapsed} />
       </div>
     </div>
   );
@@ -156,7 +141,7 @@ export function Sidebar({ collapsed, mobileOpen, onCloseMobile, visibleNav }: Si
       )}
       <aside
         className={cn(
-          "fixed left-0 top-0 z-50 h-full border-r bg-card/95 backdrop-blur-xl transition-all duration-300 ease-in-out",
+          "fixed left-0 top-0 z-50 h-full border-r border-border/60 bg-card/95 backdrop-blur-xl transition-all duration-300 ease-in-out",
           "md:translate-x-0",
           collapsed ? "w-sidebar-collapsed" : "w-sidebar",
           mobileOpen ? "translate-x-0 w-sidebar" : "-translate-x-full md:translate-x-0"
