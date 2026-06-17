@@ -330,6 +330,27 @@
     backdrop-filter: blur(28px) saturate(1.1);
   }
 
+  .auth-brand-enter {
+    animation: authBrandEnter 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /** Login 50/50 split — minimal neutral brand pane */
+  .auth-split-brand {
+    background:
+      linear-gradient(180deg, hsl(var(--muted) / 0.35) 0%, hsl(var(--background)) 100%);
+  }
+  .auth-split-brand::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(
+      circle at 24% 38%,
+      hsl(var(--primary) / 0.06) 0%,
+      transparent 48%
+    );
+    pointer-events: none;
+  }
+
   /* Project status badges – distinct, standardized, accessible contrast */
   .badge-status-active {
     background: hsl(var(--status-active-bg));
@@ -470,6 +491,18 @@
   }
 }
 
+@keyframes authBrandEnter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+
 @media (prefers-reduced-motion: reduce) {
   .auth-ambient-blob,
   .auth-grid,
@@ -479,7 +512,8 @@
     animation: none !important;
   }
   .auth-card-enter,
-  .auth-icon-pop {
+  .auth-icon-pop,
+  .auth-brand-enter {
     animation: none !important;
   }
 }

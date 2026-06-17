@@ -32,7 +32,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
               const axiosErr = error as { response?: { status?: number }; code?: string };
               const status = axiosErr?.response?.status;
               if (status === 401 || status === 403 || status === 429) return false;
-              if (!axiosErr?.response && (axiosErr?.code === "ERR_NETWORK" || axiosErr?.code === "ECONNREFUSED")) return false;
+              if (
+                !axiosErr?.response &&
+                (axiosErr?.code === "ERR_NETWORK" ||
+                  axiosErr?.code === "ECONNREFUSED" ||
+                  axiosErr?.code === "ECONNRESET")
+              ) {
+                return false;
+              }
               return failureCount < 2;
             },
             retryDelay: (attemptIndex) =>
