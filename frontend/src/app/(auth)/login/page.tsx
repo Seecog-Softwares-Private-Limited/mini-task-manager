@@ -15,11 +15,9 @@ import { Label } from "@/components/ui/label";
 import { Lock, Mail, ArrowRight, Eye, EyeOff, Smartphone } from "lucide-react";
 import {
   AuthAlert,
-  AuthBrandPanel,
   AuthDivider,
   AuthMethodTabs,
   PremiumAuthCard,
-  PremiumAuthShell,
   authGoogleButtonClass,
   authInputClass,
   authLabelClass,
@@ -27,6 +25,7 @@ import {
   authSecondaryButtonClass,
 } from "@/components/auth/premium-auth-shell";
 import { PhoneInput } from "@/components/auth/phone-input";
+import { AuthTransitionLink } from "@/components/auth/auth-transition-link";
 import { DEFAULT_COUNTRY_ISO, formatFullPhone } from "@/lib/country-codes";
 
 const schema = z.object({
@@ -123,12 +122,12 @@ function LoginForm() {
       footer={
         <p className="text-sm text-muted-foreground">
           Don&apos;t have an account?{" "}
-          <Link
+          <AuthTransitionLink
             href="/signup"
             className="font-semibold text-primary underline-offset-4 transition-colors hover:underline"
           >
             Sign up for free
-          </Link>
+          </AuthTransitionLink>
         </p>
       }
     >
@@ -411,20 +410,18 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <PremiumAuthShell dataCy="login-page" brandPanel={<AuthBrandPanel />}>
-      <Suspense
-        fallback={
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            Loading...
-          </div>
-        }
-      >
-        <LoginForm />
-      </Suspense>
-    </PremiumAuthShell>
+    <Suspense
+      fallback={
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          Loading...
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

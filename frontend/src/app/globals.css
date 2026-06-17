@@ -116,6 +116,12 @@
   ::selection {
     @apply bg-primary/20;
   }
+
+}
+
+[data-auth-sliding="true"] .auth-card-enter,
+[data-auth-sliding="true"] .auth-icon-pop {
+  animation: none !important;
 }
 
 /* Premium utility classes */

@@ -144,10 +144,12 @@ export function PremiumAuthShell({
   children,
   dataCy,
   brandPanel,
+  reverseSplit = false,
 }: {
   children: ReactNode;
   dataCy: string;
   brandPanel?: ReactNode;
+  reverseSplit?: boolean;
 }) {
   if (brandPanel) {
     return (
@@ -155,11 +157,21 @@ export function PremiumAuthShell({
         className="grid min-h-screen grid-cols-1 bg-background lg:grid-cols-2"
         data-cy={dataCy}
       >
-        <aside className="auth-split-brand relative hidden min-h-screen items-center justify-center border-r border-border/60 px-10 py-12 lg:flex lg:px-14 xl:px-20">
+        <aside
+          className={cn(
+            "auth-split-brand relative hidden min-h-screen items-center justify-center border-border/60 px-10 py-12 lg:flex lg:px-14 xl:px-20",
+            reverseSplit ? "border-l lg:order-2" : "border-r lg:order-1"
+          )}
+        >
           <div className="w-full max-w-[320px]">{brandPanel}</div>
         </aside>
 
-        <main className="flex min-h-screen items-center justify-center px-6 py-10 sm:px-10 lg:px-14 xl:px-20">
+        <main
+          className={cn(
+            "flex min-h-screen items-center justify-center px-6 py-10 sm:px-10 lg:px-14 xl:px-20",
+            reverseSplit ? "lg:order-1" : "lg:order-2"
+          )}
+        >
           <div className="w-full max-w-[400px]">{children}</div>
         </main>
       </div>
