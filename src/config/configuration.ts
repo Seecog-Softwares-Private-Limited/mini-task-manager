@@ -63,6 +63,9 @@ export const configuration = () => {
       queueLimit: parseInt(process.env.DB_QUEUE_LIMIT || '0', 10) || undefined,
       // Avoid hanging forever when MySQL is down (otherwise login waits indefinitely).
       connectTimeout: parseInt(process.env.DB_CONNECT_TIMEOUT_MS || '15000', 10),
+      // Keep RDS / remote MySQL connections alive to reduce ECONNRESET on idle pool sockets.
+      enableKeepAlive: true,
+      keepAliveInitialDelay: parseInt(process.env.DB_KEEPALIVE_MS || '10000', 10),
     },
   },
   };

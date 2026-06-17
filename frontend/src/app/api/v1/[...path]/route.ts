@@ -68,6 +68,39 @@ function buildTargetUrl(subpath: string, search: string): string {
   return `${base}${prefix}${pathPart}${search}`;
 }
 
+function isUpstreamConnectionError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const code = (err as NodeJS.ErrnoException).code;
+  if (code === "ECONNRESET" || code === "ECONNREFUSED" || code === "EPIPE" || code === "ETIMEDOUT") {
+    return true;
+  }
+  const msg = err.message.toLowerCase();
+  return (
+    msg.includes("econnreset") ||
+    msg.includes("econnrefused") ||
+    msg.includes("socket hang up") ||
+    msg.includes("fetch failed")
+  );
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function proxyUnavailableResponse(base: string, targetUrl: string, err: unknown, timedOut: boolean) {
+  const upstreamTimeoutMs = 12_000;
+  console.error("[mini-tm api proxy] fetch failed:", targetUrl, err);
+  return NextResponse.json(
+    {
+      statusCode: 503,
+      message: timedOut
+        ? `API proxy timed out (${upstreamTimeoutMs / 1000}s) calling ${targetUrl}. Is Nest running at ${base}?`
+        : `Cannot reach Nest API at ${base} (connection reset). From the repo root run: node app.js`,
+    },
+    { status: 503 }
+  );
+}
+
 async function proxy(request: NextRequest, pathSegments: string[] | undefined) {
   const subpath = (pathSegments ?? []).join("/");
   const targetUrl = buildTargetUrl(subpath, request.nextUrl.search);
@@ -94,34 +127,40 @@ async function proxy(request: NextRequest, pathSegments: string[] | undefined) {
   }
 
   const upstreamTimeoutMs = 12_000;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), upstreamTimeoutMs);
+  const maxAttempts = 2;
+  const base = upstreamBaseUrl();
+  let upstream: Response | undefined;
+  let lastErr: unknown;
 
-  let upstream: Response;
-  try {
-    upstream = await fetch(targetUrl, {
-      ...init,
-      cache: "no-store",
-      signal: controller.signal,
-    });
-  } catch (err) {
-    clearTimeout(timeoutId);
-    const base = upstreamBaseUrl();
-    const isAbort =
-      err instanceof Error &&
-      (err.name === "AbortError" || err.message?.includes("aborted"));
-    console.error("[mini-tm api proxy] fetch failed:", targetUrl, err);
-    return NextResponse.json(
-      {
-        statusCode: 503,
-        message: isAbort
-          ? `API proxy timed out (${upstreamTimeoutMs / 1000}s) calling ${targetUrl}. Is Nest running at ${base}?`
-          : `Cannot reach Nest API at ${base}. Start the backend (node app.js) or set MINI_TM_BACKEND_URL / BACKEND_INTERNAL_URL.`,
-      },
-      { status: 503 }
-    );
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), upstreamTimeoutMs);
+    try {
+      upstream = await fetch(targetUrl, {
+        ...init,
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      break;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      lastErr = err;
+      const timedOut =
+        err instanceof Error &&
+        (err.name === "AbortError" || err.message?.includes("aborted"));
+      const retryable = isUpstreamConnectionError(err) && attempt < maxAttempts && !timedOut;
+      if (retryable) {
+        await sleep(250);
+        continue;
+      }
+      return proxyUnavailableResponse(base, targetUrl, err, timedOut);
+    }
   }
-  clearTimeout(timeoutId);
+
+  if (!upstream) {
+    return proxyUnavailableResponse(base, targetUrl, lastErr, false);
+  }
 
   const outHeaders = new Headers();
   upstream.headers.forEach((value, key) => {
@@ -129,19 +168,28 @@ async function proxy(request: NextRequest, pathSegments: string[] | undefined) {
     outHeaders.set(key, value);
   });
 
-  if (upstream.body) {
-    return new NextResponse(upstream.body, {
+  // Buffer JSON API bodies so a mid-stream ECONNRESET does not break the browser.
+  if (request.method === "HEAD") {
+    return new NextResponse(null, {
       status: upstream.status,
       statusText: upstream.statusText,
       headers: outHeaders,
     });
   }
 
-  return new NextResponse(null, {
-    status: upstream.status,
-    statusText: upstream.statusText,
-    headers: outHeaders,
-  });
+  try {
+    const body = await upstream.arrayBuffer();
+    return new NextResponse(body, {
+      status: upstream.status,
+      statusText: upstream.statusText,
+      headers: outHeaders,
+    });
+  } catch (err) {
+    if (isUpstreamConnectionError(err)) {
+      return proxyUnavailableResponse(base, targetUrl, err, false);
+    }
+    throw err;
+  }
 }
 
 type RouteCtx = { params: { path?: string[] } };
