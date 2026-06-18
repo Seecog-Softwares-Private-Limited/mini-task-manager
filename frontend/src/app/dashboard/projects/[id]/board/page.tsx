@@ -40,6 +40,7 @@ import { useTaskCreatedCelebration } from "@/components/tasks/task-create-celebr
 import { CreateSprintModal, type CreateSprintFormData } from "@/components/sprints/create-sprint-modal";
 import { TaskDetailModal } from "@/components/tasks/task-detail-modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { NoticeDialog, useNoticeDialog } from "@/components/ui/notice-dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
@@ -78,6 +79,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
   const { orgId } = useTenant();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { showNotice, noticeDialogProps } = useNoticeDialog();
   const { trackFirstTaskCreated } = useRetentionTracking();
   const { triggerTaskCreatedCelebration, celebrationLayer } = useTaskCreatedCelebration();
   const currentUserId = useMemo(() => getCurrentUserId(), []);
@@ -320,11 +322,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
     },
     onError: (err, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(["tasks", id], context.previous);
-      toast({
-        title: "Failed to move task",
-        description: parseApiError(err),
-        variant: "error",
-      });
+      showNotice("Failed to update task status", parseApiError(err));
     },
   });
 
@@ -443,7 +441,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
     },
     onError: (_err, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(["tasks", id], context.previous);
-      toast({ title: "Failed to move task", description: "Returned to original position.", variant: "error" });
+      showNotice("Failed to update task status", "Returned to original position.");
     },
   });
 
@@ -1081,6 +1079,8 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
           }}
         />
       )}
+
+      <NoticeDialog {...noticeDialogProps} />
     </div>
   );
 }
