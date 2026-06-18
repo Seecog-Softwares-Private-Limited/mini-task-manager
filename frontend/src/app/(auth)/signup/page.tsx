@@ -16,10 +16,11 @@ import { Lock, Mail, User, ArrowRight, Eye, EyeOff } from "lucide-react";
 import {
   AuthDivider,
   PremiumAuthCard,
-  PremiumAuthShell,
   authInputClass,
+  authLabelClass,
   authPrimaryButtonClass,
 } from "@/components/auth/premium-auth-shell";
+import { AuthTransitionLink } from "@/components/auth/auth-transition-link";
 
 const inviteSchema = z.object({
   fullName: z.string().min(1, "Name is required"),
@@ -122,24 +123,24 @@ function SignupForm() {
           </svg>
         }
         footer={
-          <p className="text-xs text-slate-500">
+          <p className="text-sm text-muted-foreground">
             Already have an account?{" "}
-            <Link href="/login" className="font-semibold text-violet-700 transition-colors hover:text-violet-800 hover:underline">
+            <AuthTransitionLink href="/login" className="font-semibold text-primary underline-offset-4 transition-colors hover:underline">
               Sign in
-            </Link>
+            </AuthTransitionLink>
           </p>
         }
       >
           <form onSubmit={inviteForm.handleSubmit(handleInviteSubmit)} className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Email address</Label>
+              <Label htmlFor="email" className={authLabelClass}>Email address</Label>
               <div className="relative">
                 <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input id="email" type="email" value={emailFromInvite} readOnly className={`pl-10 bg-slate-100/75 ${authInputClass}`} />
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="fullName" className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Full name</Label>
+              <Label htmlFor="fullName" className={authLabelClass}>Full name</Label>
               <div className="relative">
                 <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input id="fullName" type="text" placeholder="Your name" data-cy="signup-fullName" {...inviteForm.register("fullName")} autoComplete="name" className={`pl-10 ${authInputClass}`} />
@@ -147,7 +148,7 @@ function SignupForm() {
               {inviteForm.formState.errors.fullName && <p className="text-xs text-destructive">{inviteForm.formState.errors.fullName.message}</p>}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Password</Label>
+              <Label htmlFor="password" className={authLabelClass}>Password</Label>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <Input id="password" type={showPassword ? "text" : "password"} placeholder="Your password" data-cy="signup-password" {...inviteForm.register("password")} autoComplete="new-password" className={`pl-10 pr-10 ${authInputClass}`} />
@@ -180,7 +181,7 @@ function SignupForm() {
         >
           <div className="mt-2">
             <Button asChild className={authPrimaryButtonClass}>
-              <Link href="/login">Go to Sign in</Link>
+              <AuthTransitionLink href="/login">Go to Sign in</AuthTransitionLink>
             </Button>
           </div>
         </PremiumAuthCard>
@@ -223,7 +224,7 @@ function SignupForm() {
               <Link href="/verify-email">Enter verification code</Link>
             </Button>
             <Button asChild variant="outline">
-              <Link href="/login">Go to Sign in</Link>
+              <AuthTransitionLink href="/login">Go to Sign in</AuthTransitionLink>
             </Button>
             <button
               type="button"
@@ -267,17 +268,17 @@ function SignupForm() {
         </svg>
       }
       footer={
-        <p className="text-xs text-slate-500">
+        <p className="text-sm text-muted-foreground">
           Already have an account?{" "}
-          <Link href="/login" className="font-semibold text-violet-700 transition-colors hover:text-violet-800 hover:underline">
+          <AuthTransitionLink href="/login" className="font-semibold text-primary underline-offset-4 transition-colors hover:underline">
             Sign in
-          </Link>
+          </AuthTransitionLink>
         </p>
       }
     >
       <form onSubmit={publicForm.handleSubmit(handlePublicSubmit)} className="space-y-5">
         <div className="space-y-2">
-          <Label htmlFor="email" className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Email address</Label>
+          <Label htmlFor="email" className={authLabelClass}>Email address</Label>
           <div className="relative">
             <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <Input id="email" type="email" placeholder="you@example.com" data-cy="signup-email" {...publicForm.register("email")} autoComplete="email" className={`pl-10 ${authInputClass}`} />
@@ -285,7 +286,7 @@ function SignupForm() {
           {publicForm.formState.errors.email && <p className="text-xs text-destructive">{publicForm.formState.errors.email.message}</p>}
         </div>
         <div className="space-y-2">
-          <Label htmlFor="fullName" className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Username</Label>
+          <Label htmlFor="fullName" className={authLabelClass}>Username</Label>
           <div className="relative">
             <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <Input id="fullName" type="text" placeholder="Your username" data-cy="signup-fullName" {...publicForm.register("fullName")} autoComplete="username" className={`pl-10 ${authInputClass}`} />
@@ -293,7 +294,7 @@ function SignupForm() {
           {publicForm.formState.errors.fullName && <p className="text-xs text-destructive">{publicForm.formState.errors.fullName.message}</p>}
         </div>
         <div className="space-y-2">
-          <Label htmlFor="password" className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Password</Label>
+          <Label htmlFor="password" className={authLabelClass}>Password</Label>
           <div className="relative">
             <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <Input id="password" type={showPassword ? "text" : "password"} placeholder="Your password" data-cy="signup-password" {...publicForm.register("password")} autoComplete="new-password" className={`pl-10 pr-10 ${authInputClass}`} />
@@ -335,10 +336,8 @@ function SignupForm() {
 
 export default function SignupPage() {
   return (
-    <PremiumAuthShell dataCy="signup-page">
-      <Suspense fallback={<div className="flex items-center gap-2 text-muted-foreground"><svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Loading...</div>}>
-        <SignupForm />
-      </Suspense>
-    </PremiumAuthShell>
+    <Suspense fallback={<div className="flex items-center gap-2 text-muted-foreground"><svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Loading...</div>}>
+      <SignupForm />
+    </Suspense>
   );
 }

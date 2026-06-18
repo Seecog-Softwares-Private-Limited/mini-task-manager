@@ -90,6 +90,7 @@ export function SubtasksEditor({
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [draftKey, setDraftKey] = useState("");
   const [draftTitle, setDraftTitle] = useState("");
+  const [draftDescription, setDraftDescription] = useState("");
   const [draftAssigneeId, setDraftAssigneeId] = useState<string | undefined>();
   const [draftDueDate, setDraftDueDate] = useState("");
   const [pasteFlash, setPasteFlash] = useState(false);
@@ -168,6 +169,7 @@ export function SubtasksEditor({
     setDraftKey(key);
     setEditingIndex(null);
     setDraftTitle("");
+    setDraftDescription("");
     setDraftAssigneeId(undefined);
     setDraftDueDate("");
     setComposerOpen(true);
@@ -180,6 +182,7 @@ export function SubtasksEditor({
     setDraftKey(key);
     setEditingIndex(index);
     setDraftTitle(value?.title ?? "");
+    setDraftDescription(value?.description ?? "");
     setDraftAssigneeId(value?.assigneeId);
     setDraftDueDate(value?.dueDate ?? "");
     setComposerOpen(true);
@@ -194,6 +197,7 @@ export function SubtasksEditor({
     setEditingIndex(null);
     setDraftKey("");
     setDraftTitle("");
+    setDraftDescription("");
     setDraftAssigneeId(undefined);
     setDraftDueDate("");
     setPasteFlash(false);
@@ -201,10 +205,15 @@ export function SubtasksEditor({
 
   function handleSaveSubtask() {
     const title = draftTitle.trim();
+    const description = draftDescription.trim();
     if (!title || disabled) return;
 
     if (editingIndex !== null) {
       setValue(`subtasks.${editingIndex}.title`, title, { shouldDirty: true, shouldTouch: true });
+      setValue(`subtasks.${editingIndex}.description`, description ? description : undefined, {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
       setValue(`subtasks.${editingIndex}.assigneeId`, draftAssigneeId, {
         shouldDirty: true,
         shouldTouch: true,
@@ -221,7 +230,7 @@ export function SubtasksEditor({
         id: draftKey,
         title,
         completed: false,
-        description: "",
+        description: description ? description : undefined,
         assigneeId: draftAssigneeId,
         dueDate: draftDueDate || undefined,
         status: "TODO",
@@ -232,6 +241,7 @@ export function SubtasksEditor({
     setEditingIndex(null);
     setDraftKey("");
     setDraftTitle("");
+    setDraftDescription("");
     setDraftAssigneeId(undefined);
     setDraftDueDate("");
   }
@@ -314,6 +324,14 @@ export function SubtasksEditor({
                 closeComposer();
               }
             }}
+          />
+          <Input
+            value={draftDescription}
+            onChange={(e) => setDraftDescription(e.target.value)}
+            placeholder="Subtask description (optional)"
+            disabled={disabled}
+            className="mt-2 h-8 rounded-md border-border/55 bg-background text-sm shadow-sm transition-all duration-200 focus-visible:ring-violet-500/15"
+            aria-label="Subtask description"
           />
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1.5">

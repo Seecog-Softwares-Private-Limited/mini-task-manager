@@ -318,9 +318,13 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
       const toName = statuses.find((s) => s.id === vars.statusId)?.name ?? "new column";
       toast({ title: "Task moved", description: `Moved to ${toName}`, variant: "success" });
     },
-    onError: (_err, _vars, context) => {
+    onError: (err, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(["tasks", id], context.previous);
-      toast({ title: "Failed to move task", description: "Returned to original column.", variant: "error" });
+      toast({
+        title: "Failed to move task",
+        description: parseApiError(err),
+        variant: "error",
+      });
     },
   });
 

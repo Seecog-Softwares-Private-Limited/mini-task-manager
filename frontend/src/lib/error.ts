@@ -36,10 +36,23 @@ export function normalizeApiError(err: unknown): NormalizedError {
     const data = err.response?.data as ApiErrorBody | undefined;
     const message = data?.message;
     const messageStr = Array.isArray(message) ? message.join(", ") : typeof message === "string" ? message : undefined;
+    const isNetwork = !err.response;
+    const code = err.code ?? "";
+    const raw = (err.message ?? "").toLowerCase();
+    const connectionLost =
+      isNetwork &&
+      (code === "ECONNRESET" ||
+        code === "ECONNREFUSED" ||
+        code === "ERR_NETWORK" ||
+        raw.includes("econnreset") ||
+        raw.includes("network error") ||
+        raw.includes("socket hang up"));
     return {
-      message: messageStr ?? err.message ?? "Request failed",
-      statusCode: status,
-      isNetwork: !err.response,
+      message: connectionLost
+        ? "Cannot reach the server. Start the backend from the repo root: node app.js"
+        : messageStr ?? err.message ?? "Request failed",
+      statusCode: status ?? (connectionLost ? 503 : undefined),
+      isNetwork: connectionLost || isNetwork,
       isRateLimited: status === 429,
     };
   }
