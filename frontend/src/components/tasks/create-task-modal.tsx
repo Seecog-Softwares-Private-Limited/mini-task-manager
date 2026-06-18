@@ -130,6 +130,7 @@ const schema = z.object({
         completed: z.boolean().default(false),
         assigneeId: z.string().uuid().optional(),
         status: z.enum(["TODO", "IN_PROGRESS", "DONE"]).default("TODO"),
+        priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional(),
         dueDate: z
           .string()
           .optional()
@@ -217,7 +218,7 @@ export function CreateTaskModal({
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, prepend, remove } = useFieldArray({
     control,
     name: "subtasks",
   });
@@ -542,7 +543,7 @@ export function CreateTaskModal({
                 values={watchedSubtasks}
                 register={register}
                 setValue={setValue}
-                append={append}
+                prepend={prepend}
                 remove={remove}
                 errors={errors}
                 disabled={isSubmitting}

@@ -112,6 +112,7 @@ function SignupForm() {
   if (isInviteFlow) {
     return (
       <PremiumAuthCard
+        variant="compact"
         title="Create your account"
         subtitle="You’ve been invited to join a team. Complete signup to get started."
         icon={
@@ -171,6 +172,7 @@ function SignupForm() {
     if (signupEmailVerified) {
       return (
         <PremiumAuthCard
+          variant="compact"
           title="You’re all set"
           subtitle={`Account created for ${signupEmail}. You can sign in with your password now.`}
           icon={
@@ -189,6 +191,7 @@ function SignupForm() {
     }
     return (
       <PremiumAuthCard
+        variant="compact"
         title="Check your email"
         subtitle={
           devVerificationCode
@@ -257,6 +260,7 @@ function SignupForm() {
 
   return (
     <PremiumAuthCard
+      variant="compact"
       title="Create your account"
       subtitle="Get started for free. No credit card required."
       icon={

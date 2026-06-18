@@ -40,6 +40,7 @@ import { useTaskCreatedCelebration } from "@/components/tasks/task-create-celebr
 import { CreateSprintModal, type CreateSprintFormData } from "@/components/sprints/create-sprint-modal";
 import { TaskDetailModal } from "@/components/tasks/task-detail-modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { NoticeDialog, useNoticeDialog } from "@/components/ui/notice-dialog";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
@@ -78,6 +79,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
   const { orgId } = useTenant();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { showNotice, noticeDialogProps } = useNoticeDialog();
   const { trackFirstTaskCreated } = useRetentionTracking();
   const { triggerTaskCreatedCelebration, celebrationLayer } = useTaskCreatedCelebration();
   const currentUserId = useMemo(() => getCurrentUserId(), []);
@@ -229,7 +231,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
       filters.search ||
       filters.priority.length > 0 ||
       filters.assignee.length > 0 ||
-      filters.recurrence !== "all";
+      filters.recurrence === "recurring";
     if (!hasFilter) return undefined;
     let count = 0;
     for (const statusTasks of Object.values(tasksByStatus)) {
@@ -320,11 +322,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
     },
     onError: (err, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(["tasks", id], context.previous);
-      toast({
-        title: "Failed to move task",
-        description: parseApiError(err),
-        variant: "error",
-      });
+      showNotice("Failed to update task status", parseApiError(err));
     },
   });
 
@@ -443,7 +441,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
     },
     onError: (_err, _vars, context) => {
       if (context?.previous) queryClient.setQueryData(["tasks", id], context.previous);
-      toast({ title: "Failed to move task", description: "Returned to original position.", variant: "error" });
+      showNotice("Failed to update task status", "Returned to original position.");
     },
   });
 
@@ -541,7 +539,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
       filters.search.length > 0 ||
       filters.priority.length > 0 ||
       filters.assignee.length > 0 ||
-      filters.recurrence !== "all";
+      filters.recurrence === "recurring";
     setExportingZip(true);
     try {
       const { count, filename, mediaFiles } = await exportTasksToZipFile(tasks, {
@@ -597,6 +595,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
               assigneeId: s.assigneeId || undefined,
               dueDate: s.dueDate || undefined,
               status: s.status ?? (s.completed ? "DONE" : "TODO"),
+              priority: s.priority || undefined,
             }))
             .filter((s) => s.title.length > 0),
           recurrence:
@@ -868,6 +867,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
             isSelectionMode={bulk.state.isSelectionMode}
             onToggleSelectionMode={handleToggleSelectionMode}
             canBulkSelect={permissions.canBulkSelect}
+            showRecurrenceFilter={false}
           />
         }
       />
@@ -1081,6 +1081,8 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
           }}
         />
       )}
+
+      <NoticeDialog {...noticeDialogProps} />
     </div>
   );
 }

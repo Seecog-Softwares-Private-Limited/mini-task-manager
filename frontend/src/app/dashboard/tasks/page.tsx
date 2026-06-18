@@ -75,6 +75,7 @@ import {
 import { CreateSprintModal, type CreateSprintFormData } from "@/components/sprints/create-sprint-modal";
 import { TaskDetailModal } from "@/components/tasks/task-detail-modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { NoticeDialog, useNoticeDialog } from "@/components/ui/notice-dialog";
 import { useTaskCreatedCelebration } from "@/components/tasks/task-create-celebration";
 import { ProjectSwitcher } from "@/components/tasks/project-switcher";
 import { OrgSwitcher } from "@/components/dashboard/org-switcher";
@@ -110,6 +111,7 @@ export default function TasksPage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { showNotice, noticeDialogProps } = useNoticeDialog();
   const { trackFirstTaskCreated } = useRetentionTracking();
   const { triggerTaskCreatedCelebration, celebrationLayer } = useTaskCreatedCelebration();
   const currentUserId = useMemo(() => getCurrentUserId(), []);
@@ -370,7 +372,7 @@ export default function TasksPage() {
       filters.search ||
       filters.priority.length > 0 ||
       filters.assignee.length > 0 ||
-      filters.recurrence !== "all";
+      filters.recurrence === "recurring";
     if (!hasFilter) return undefined;
     let count = 0;
     for (const statusTasks of Object.values(tasksByStatus)) {
@@ -418,11 +420,7 @@ export default function TasksPage() {
     },
     onError: (err, _vars, ctx) => {
       if (ctx?.previous) queryClient.setQueryData(["tasks", selectedProjectId], ctx.previous);
-      toast({
-        title: "Failed to move task",
-        description: parseApiError(err),
-        variant: "error",
-      });
+      showNotice("Failed to update task status", parseApiError(err));
     },
   });
 
@@ -474,11 +472,7 @@ export default function TasksPage() {
     },
     onError: (err, _vars, ctx) => {
       if (ctx?.previous) queryClient.setQueryData(["tasks", selectedProjectId], ctx.previous);
-      toast({
-        title: "Failed to move task",
-        description: parseApiError(err),
-        variant: "error",
-      });
+      showNotice("Failed to update task status", parseApiError(err));
     },
   });
 
@@ -674,7 +668,7 @@ export default function TasksPage() {
       filters.search.length > 0 ||
       filters.priority.length > 0 ||
       filters.assignee.length > 0 ||
-      filters.recurrence !== "all";
+      filters.recurrence === "recurring";
     setExportingZip(true);
     try {
       const { count, filename, mediaFiles } = await exportTasksToZipFile(projectTasks, {
@@ -729,6 +723,7 @@ export default function TasksPage() {
             assigneeId: s.assigneeId || undefined,
             dueDate: s.dueDate || undefined,
             status: s.status ?? (s.completed ? "DONE" : "TODO"),
+            priority: s.priority || undefined,
           }))
           .filter((s) => s.title.length > 0),
         recurrence:
@@ -912,6 +907,7 @@ export default function TasksPage() {
               isSelectionMode={bulk.state.isSelectionMode}
               onToggleSelectionMode={handleToggleSelectionMode}
               canBulkSelect={permissions.canBulkSelect}
+              showRecurrenceFilter={false}
             />
           ) : undefined
         }
@@ -1125,6 +1121,8 @@ export default function TasksPage() {
           }}
         />
       )}
+
+      <NoticeDialog {...noticeDialogProps} />
     </div>
   );
 }

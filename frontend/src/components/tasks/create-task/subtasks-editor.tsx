@@ -15,7 +15,7 @@ import {
 } from "@/components/tasks/create-task/subtask-composer-attachments";
 import type {
   FieldErrors,
-  UseFieldArrayAppend,
+  UseFieldArrayPrepend,
   UseFieldArrayRemove,
   UseFormRegister,
   UseFormSetValue,
@@ -28,8 +28,14 @@ import {
   subtaskWithCompleted,
   type SubtaskStatus,
 } from "@/lib/subtask-status";
+import {
+  SubtaskPrioritySelector,
+  resolveSubtaskPriority,
+  type SubtaskPriority,
+} from "@/components/tasks/subtask-priority-selector";
 import type { PendingSubtaskAttachment } from "@/components/tasks/subtasks/subtask-attachments-section";
 import { useToast } from "@/components/ui/use-toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export interface SubtaskItem {
   id?: string;
@@ -39,6 +45,7 @@ export interface SubtaskItem {
   assigneeId?: string;
   dueDate?: string;
   status?: SubtaskStatus;
+  priority?: SubtaskPriority;
 }
 
 interface SubtasksEditorProps {
@@ -46,7 +53,7 @@ interface SubtasksEditorProps {
   fields: Array<{ id: string } & SubtaskItem>;
   values?: SubtaskItem[];
   register?: UseFormRegister<any>;
-  append: UseFieldArrayAppend<any, any>;
+  prepend: UseFieldArrayPrepend<any, any>;
   remove: UseFieldArrayRemove;
   setValue: UseFormSetValue<any>;
   errors: FieldErrors<any>;
@@ -72,7 +79,7 @@ export function SubtasksEditor({
   projectId,
   fields,
   values,
-  append,
+  prepend,
   remove,
   setValue,
   errors,
@@ -93,7 +100,12 @@ export function SubtasksEditor({
   const [draftDescription, setDraftDescription] = useState("");
   const [draftAssigneeId, setDraftAssigneeId] = useState<string | undefined>();
   const [draftDueDate, setDraftDueDate] = useState("");
+  const [draftPriority, setDraftPriority] = useState<SubtaskPriority>("MEDIUM");
   const [pasteFlash, setPasteFlash] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<{
+    index: number;
+    key: string;
+  } | null>(null);
 
   const subtaskErrors =
     (errors.subtasks as Array<{ title?: { message?: string } } | undefined> | undefined) ?? [];
@@ -172,6 +184,7 @@ export function SubtasksEditor({
     setDraftDescription("");
     setDraftAssigneeId(undefined);
     setDraftDueDate("");
+    setDraftPriority("MEDIUM");
     setComposerOpen(true);
     requestAnimationFrame(() => titleInputRef.current?.focus());
   }
@@ -185,6 +198,7 @@ export function SubtasksEditor({
     setDraftDescription(value?.description ?? "");
     setDraftAssigneeId(value?.assigneeId);
     setDraftDueDate(value?.dueDate ?? "");
+    setDraftPriority(resolveSubtaskPriority(value?.priority));
     setComposerOpen(true);
     requestAnimationFrame(() => titleInputRef.current?.focus());
   }
@@ -200,6 +214,7 @@ export function SubtasksEditor({
     setDraftDescription("");
     setDraftAssigneeId(undefined);
     setDraftDueDate("");
+    setDraftPriority("MEDIUM");
     setPasteFlash(false);
   }
 
@@ -222,11 +237,15 @@ export function SubtasksEditor({
         shouldDirty: true,
         shouldTouch: true,
       });
+      setValue(`subtasks.${editingIndex}.priority`, draftPriority, {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
       if (!values?.[editingIndex]?.id) {
         setValue(`subtasks.${editingIndex}.id`, draftKey, { shouldDirty: true });
       }
     } else {
-      append({
+      prepend({
         id: draftKey,
         title,
         completed: false,
@@ -234,6 +253,7 @@ export function SubtasksEditor({
         assigneeId: draftAssigneeId,
         dueDate: draftDueDate || undefined,
         status: "TODO",
+        priority: draftPriority,
       });
     }
 
@@ -244,6 +264,7 @@ export function SubtasksEditor({
     setDraftDescription("");
     setDraftAssigneeId(undefined);
     setDraftDueDate("");
+    setDraftPriority("MEDIUM");
   }
 
   function handleRemoveSubtask(index: number, key: string) {
@@ -334,6 +355,14 @@ export function SubtasksEditor({
             aria-label="Subtask description"
           />
           <div className="mt-2 flex flex-wrap items-center gap-2">
+            <div className="min-w-[140px] flex-1">
+              <SubtaskPrioritySelector
+                value={draftPriority}
+                onChange={setDraftPriority}
+                disabled={disabled}
+                variant="field"
+              />
+            </div>
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] text-muted-foreground">Assignee</span>
               <SubtaskAssigneeSelector
@@ -473,7 +502,12 @@ export function SubtasksEditor({
                     variant="ghost"
                     size="icon"
                     className="h-6 w-6 shrink-0 text-muted-foreground opacity-70 transition-all duration-200 hover:text-destructive group-hover:opacity-100"
-                    onClick={() => handleRemoveSubtask(index, key)}
+                    onClick={() =>
+                      setRemoveTarget({
+                        index,
+                        key,
+                      })
+                    }
                     disabled={disabled}
                     aria-label={`Remove subtask ${value?.title}`}
                   >
@@ -486,6 +520,22 @@ export function SubtasksEditor({
           })}
         </ul>
       ) : null}
+
+      <ConfirmDialog
+        open={removeTarget !== null}
+        onOpenChange={(open) => !open && setRemoveTarget(null)}
+        title="Remove subtask"
+        description="This will remove the subtask from the checklist."
+        confirmLabel="Remove"
+        variant="destructive"
+        icon="delete"
+        elevated
+        onConfirm={() => {
+          if (removeTarget) {
+            handleRemoveSubtask(removeTarget.index, removeTarget.key);
+          }
+        }}
+      />
     </div>
   );
 }

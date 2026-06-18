@@ -43,6 +43,7 @@ import {
 } from "@/lib/task-assignees";
 import { fetchTask, updateTask, updateTaskAssignees, deleteTask } from "@/services/api/tasks.api";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { NoticeDialog, useNoticeDialog } from "@/components/ui/notice-dialog";
 import { fetchComments, addComment, deleteComment } from "@/services/api/comments.api";
 import { fetchOrgMembers, fetchProjectMembers } from "@/services/api/members.api";
 import { fetchActivityLogs } from "@/services/api/activity-logs.api";
@@ -63,6 +64,7 @@ import {
   SubtaskDetailPanel,
   type SubtaskDraft,
 } from "@/components/tasks/subtasks/subtask-detail-panel";
+import { resolveSubtaskPriority } from "@/components/tasks/subtask-priority-selector";
 import { fetchEntityAttachments } from "@/services/api/entity-attachments.api";
 import { CommentInputWithMentions } from "@/components/tasks/comment-input-with-mentions";
 import {
@@ -287,6 +289,7 @@ export function TaskDetailModal({
     [projectId, queryClient]
   );
   const { toast } = useToast();
+  const { showNotice, noticeDialogProps } = useNoticeDialog();
   const { user } = useAuth();
   const currentUserId = user?.id ?? "";
   const [commentText, setCommentText] = React.useState("");
@@ -661,11 +664,7 @@ export function TaskDetailModal({
       if (ctx?.previous) {
         queryClient.setQueryData(["task", taskId], ctx.previous);
       }
-      toast({
-        title: "Failed to update task",
-        description: parseApiError(err),
-        variant: "error",
-      });
+      showNotice("Failed to update task status", parseApiError(err));
     },
   });
 
@@ -835,14 +834,15 @@ export function TaskDetailModal({
       const trimmed = clampSubtaskTitle(title.trim());
       if (!trimmed) return;
       updateSubtasksMutation.mutate([
-        ...checklist,
         {
           id: generateClientId(),
           title: trimmed,
           completed: false,
           status: "TODO",
+          priority: "MEDIUM",
           dueDate: undefined,
         },
+        ...checklist,
       ]);
       setNewCheckItem("");
     },
@@ -899,6 +899,7 @@ export function TaskDetailModal({
         return;
       }
       const status = resolveSubtaskStatus(draft);
+      const priority = resolveSubtaskPriority(draft.priority);
       updateSubtasksMutation.mutate(
         checklist.map((item) =>
           item.id === draft.id
@@ -908,6 +909,7 @@ export function TaskDetailModal({
                 title: safeTitle,
                 status,
                 completed: status === "DONE",
+                priority,
               }
             : item
         ),
@@ -1408,6 +1410,7 @@ export function TaskDetailModal({
                                   assigneeId: item.assigneeId,
                                   dueDate: item.dueDate,
                                   status: resolveSubtaskStatus(item),
+                                  priority: item.priority,
                                 }}
                                 projectId={projectId}
                                 organizationId={organizationId}
@@ -2285,6 +2288,8 @@ export function TaskDetailModal({
       }
       confirmLabel="Delete"
       variant="destructive"
+      icon="delete"
+      elevated
       loading={deleteTaskMutation.isPending}
       onConfirm={() => deleteTaskMutation.mutate()}
     />
@@ -2294,14 +2299,12 @@ export function TaskDetailModal({
       onOpenChange={(next) => {
         if (!next) setSubtaskDeleteTarget(null);
       }}
-      title="Remove subtask?"
-      description={
-        subtaskDeleteTarget
-          ? `Remove "${subtaskDeleteTarget.title}" from this checklist? Subtask attachments remain stored unless deleted separately.`
-          : undefined
-      }
+      title="Remove subtask"
+      description="This will remove the subtask from the checklist."
       confirmLabel="Remove"
       variant="destructive"
+      icon="delete"
+      elevated
       loading={updateSubtasksMutation.isPending}
       onConfirm={confirmRemoveSubtask}
     />
@@ -2316,6 +2319,8 @@ export function TaskDetailModal({
       description="Title, description, and other field edits have not been saved. Attachments already uploaded will remain."
       confirmLabel="Discard"
       variant="destructive"
+      icon="warning"
+      elevated
       onConfirm={() => {
         setSubtaskDraftDirty(false);
         setExpandedSubtaskId(pendingSubtaskExpandId);
@@ -2382,6 +2387,8 @@ export function TaskDetailModal({
         </div>
       </DialogContent>
     </Dialog>
+
+    <NoticeDialog {...noticeDialogProps} />
     </>
   );
 }
