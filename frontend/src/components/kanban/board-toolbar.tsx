@@ -41,6 +41,7 @@ const PRIORITIES = [
 
 const SORT_OPTIONS = [
   { value: "created", label: "Date created" },
+  { value: "completed", label: "Date completed" },
   { value: "priority", label: "Priority" },
   { value: "dueDate", label: "Due date" },
   { value: "title", label: "Title" },
@@ -107,7 +108,7 @@ export function BoardToolbar({
   isSelectionMode,
   onToggleSelectionMode,
   canBulkSelect,
-  showRecurrenceFilter = true,
+  showRecurrenceFilter = false,
 }: BoardToolbarProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [saveViewName, setSaveViewName] = useState("");
@@ -117,8 +118,9 @@ export function BoardToolbar({
     filters.search.length > 0 ||
     filters.priority.length > 0 ||
     filters.assignee.length > 0 ||
-    filters.recurrence !== "all" ||
-    filters.sortBy !== "created";
+    (showRecurrenceFilter && filters.recurrence !== "all") ||
+    filters.sortBy !== "completed" ||
+    filters.sortDir !== "asc";
 
   const updateFilter = useCallback(<K extends keyof BoardFilters>(key: K, value: BoardFilters[K]) => {
     onFiltersChange({ ...filters, [key]: value });
@@ -137,9 +139,9 @@ export function BoardToolbar({
       search: "",
       priority: [],
       assignee: [],
-      recurrence: "all",
-      sortBy: "created",
-      sortDir: "desc",
+      recurrence: "normal",
+      sortBy: "completed",
+      sortDir: "asc",
     });
   }
 
@@ -286,7 +288,8 @@ export function BoardToolbar({
               size="sm"
               className={cn(
                 FILTER_BTN,
-                filters.sortBy !== "created" && "border-violet-400/40 bg-violet-50/50 text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300"
+                (filters.sortBy !== "completed" || filters.sortDir !== "asc") &&
+                  "border-violet-400/40 bg-violet-50/50 text-violet-700 dark:border-violet-500/30 dark:bg-violet-500/10 dark:text-violet-300"
               )}
             >
               <ArrowUpDown className="h-3.5 w-3.5" />
@@ -308,9 +311,15 @@ export function BoardToolbar({
             <DropdownMenuSeparator />
             <DropdownMenuCheckboxItem
               checked={filters.sortDir === "asc"}
-              onCheckedChange={() => updateFilter("sortDir", filters.sortDir === "asc" ? "desc" : "asc")}
+              onCheckedChange={() => updateFilter("sortDir", "asc")}
             >
               Ascending
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuCheckboxItem
+              checked={filters.sortDir === "desc"}
+              onCheckedChange={() => updateFilter("sortDir", "desc")}
+            >
+              Descending
             </DropdownMenuCheckboxItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -330,19 +339,6 @@ export function BoardToolbar({
             onClick={() => updateFilter("recurrence", "normal")}
           >
             Normal
-          </button>
-          <button
-            type="button"
-            className={cn(SEGMENTED_ITEM(filters.recurrence === "recurring"), "gap-1")}
-            onClick={() => updateFilter("recurrence", "recurring")}
-          >
-            <Repeat className="h-3 w-3" />
-            Recurring
-            {recurringCount > 0 ? (
-              <span className="rounded-full bg-indigo-500/12 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-indigo-700 dark:text-indigo-300">
-                {recurringCount}
-              </span>
-            ) : null}
           </button>
         </div>
         ) : null}
@@ -549,10 +545,10 @@ export function BoardToolbar({
           })}
 
           {/* Recurrence chip */}
-          {filters.recurrence !== "all" && (
+          {showRecurrenceFilter && filters.recurrence !== "all" && (
             <Badge variant="secondary" className="h-6 gap-1 pl-2 pr-1 text-[11px] font-medium">
               <Repeat className="h-2.5 w-2.5" />
-              {filters.recurrence === "recurring" ? "Recurring tasks" : "Normal tasks"}
+              Normal tasks
               <button
                 onClick={() => updateFilter("recurrence", "all")}
                 className="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5 transition-colors"
@@ -563,13 +559,13 @@ export function BoardToolbar({
           )}
 
           {/* Sort chip */}
-          {filters.sortBy !== "created" && (
+          {(filters.sortBy !== "completed" || filters.sortDir !== "asc") && (
             <Badge variant="secondary" className="h-6 gap-1 pl-2 pr-1 text-[11px] font-medium">
               <ArrowUpDown className="h-2.5 w-2.5" />
               {SORT_OPTIONS.find((o) => o.value === filters.sortBy)?.label}
               {filters.sortDir === "asc" ? " ↑" : " ↓"}
               <button
-                onClick={() => { updateFilter("sortBy", "created"); updateFilter("sortDir", "desc"); }}
+                onClick={() => { updateFilter("sortBy", "completed"); updateFilter("sortDir", "asc"); }}
                 className="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5 transition-colors"
               >
                 <X className="h-2.5 w-2.5" />

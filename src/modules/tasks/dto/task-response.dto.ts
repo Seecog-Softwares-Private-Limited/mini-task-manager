@@ -32,6 +32,7 @@ export class TaskResponseDto {
   parentTaskId?: string;
   storyPoints?: number;
   dueDate?: Date;
+  completedAt?: Date | null;
   estimatedMinutes?: number;
   loggedMinutes!: number;
   sprintId?: string;

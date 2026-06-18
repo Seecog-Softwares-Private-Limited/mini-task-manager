@@ -96,6 +96,7 @@ export interface Task {
   recurrenceSequence?: number;
   tags?: Array<{ name: string; color: string }>;
   subtasks?: TaskSubtask[];
+  completedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }

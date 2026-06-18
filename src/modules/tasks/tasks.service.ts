@@ -247,6 +247,12 @@ export class TasksService {
             'Complete all subtasks before moving this task to Done',
           );
         }
+        patch.completedAt = new Date();
+      } else {
+        const leavingDone = await this.isDoneStatus(task.projectId, organizationId, task.statusId);
+        if (leavingDone) {
+          patch.completedAt = null;
+        }
       }
     }
     if (Object.keys(patch).length > 0) {

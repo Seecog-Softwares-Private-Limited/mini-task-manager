@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState, useRef, useEffect } from "react";
+import { applyBoardSorting } from "@/lib/board-sort";
 import {
   DndContext,
   DragOverlay,
@@ -55,7 +56,7 @@ export interface BoardFilters {
   priority: string[];
   assignee: string[];
   recurrence: "all" | "normal" | "recurring";
-  sortBy: "created" | "priority" | "dueDate" | "title";
+  sortBy: "created" | "priority" | "dueDate" | "title" | "completed";
   sortDir: "asc" | "desc";
 }
 
@@ -63,9 +64,9 @@ export const DEFAULT_FILTERS: BoardFilters = {
   search: "",
   priority: [],
   assignee: [],
-  recurrence: "all",
-  sortBy: "created",
-  sortDir: "desc",
+  recurrence: "normal",
+  sortBy: "completed",
+  sortDir: "asc",
 };
 
 export interface TaskCardQuickActions {
@@ -679,29 +680,6 @@ function applyFilters(tasks: Task[], filters: BoardFilters): Task[] {
   return result;
 }
 
-function applySorting(tasks: Task[], sortBy: string, sortDir: string): Task[] {
-  const sorted = [...tasks];
-  sorted.sort((a, b) => {
-    let cmp = 0;
-    switch (sortBy) {
-      case "priority":
-        cmp = (PRIORITY_CONFIG[a.priority]?.order ?? 99) - (PRIORITY_CONFIG[b.priority]?.order ?? 99);
-        break;
-      case "dueDate":
-        cmp = (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999");
-        break;
-      case "title":
-        cmp = a.title.localeCompare(b.title);
-        break;
-      default:
-        cmp = a.createdAt.localeCompare(b.createdAt);
-        break;
-    }
-    return sortDir === "desc" ? -cmp : cmp;
-  });
-  return sorted;
-}
-
 // ─── Board Stats ──────────────────────────────────────────────
 
 export interface BoardStats {
@@ -832,7 +810,7 @@ export function KanbanBoard({
     const result: Record<string, Task[]> = {};
     for (const [statusId, tasks] of Object.entries(tasksByStatus)) {
       const filtered = applyFilters(tasks, filters);
-      result[statusId] = applySorting(filtered, filters.sortBy, filters.sortDir);
+      result[statusId] = applyBoardSorting(filtered, filters.sortBy, filters.sortDir);
     }
     return result;
   }, [tasksByStatus, filters]);

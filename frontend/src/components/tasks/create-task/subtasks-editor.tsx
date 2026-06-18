@@ -28,6 +28,11 @@ import {
   subtaskWithCompleted,
   type SubtaskStatus,
 } from "@/lib/subtask-status";
+import {
+  SubtaskPrioritySelector,
+  resolveSubtaskPriority,
+  type SubtaskPriority,
+} from "@/components/tasks/subtask-priority-selector";
 import type { PendingSubtaskAttachment } from "@/components/tasks/subtasks/subtask-attachments-section";
 import { useToast } from "@/components/ui/use-toast";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -40,6 +45,7 @@ export interface SubtaskItem {
   assigneeId?: string;
   dueDate?: string;
   status?: SubtaskStatus;
+  priority?: SubtaskPriority;
 }
 
 interface SubtasksEditorProps {
@@ -94,6 +100,7 @@ export function SubtasksEditor({
   const [draftDescription, setDraftDescription] = useState("");
   const [draftAssigneeId, setDraftAssigneeId] = useState<string | undefined>();
   const [draftDueDate, setDraftDueDate] = useState("");
+  const [draftPriority, setDraftPriority] = useState<SubtaskPriority>("MEDIUM");
   const [pasteFlash, setPasteFlash] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<{
     index: number;
@@ -177,6 +184,7 @@ export function SubtasksEditor({
     setDraftDescription("");
     setDraftAssigneeId(undefined);
     setDraftDueDate("");
+    setDraftPriority("MEDIUM");
     setComposerOpen(true);
     requestAnimationFrame(() => titleInputRef.current?.focus());
   }
@@ -190,6 +198,7 @@ export function SubtasksEditor({
     setDraftDescription(value?.description ?? "");
     setDraftAssigneeId(value?.assigneeId);
     setDraftDueDate(value?.dueDate ?? "");
+    setDraftPriority(resolveSubtaskPriority(value?.priority));
     setComposerOpen(true);
     requestAnimationFrame(() => titleInputRef.current?.focus());
   }
@@ -205,6 +214,7 @@ export function SubtasksEditor({
     setDraftDescription("");
     setDraftAssigneeId(undefined);
     setDraftDueDate("");
+    setDraftPriority("MEDIUM");
     setPasteFlash(false);
   }
 
@@ -227,6 +237,10 @@ export function SubtasksEditor({
         shouldDirty: true,
         shouldTouch: true,
       });
+      setValue(`subtasks.${editingIndex}.priority`, draftPriority, {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
       if (!values?.[editingIndex]?.id) {
         setValue(`subtasks.${editingIndex}.id`, draftKey, { shouldDirty: true });
       }
@@ -239,6 +253,7 @@ export function SubtasksEditor({
         assigneeId: draftAssigneeId,
         dueDate: draftDueDate || undefined,
         status: "TODO",
+        priority: draftPriority,
       });
     }
 
@@ -249,6 +264,7 @@ export function SubtasksEditor({
     setDraftDescription("");
     setDraftAssigneeId(undefined);
     setDraftDueDate("");
+    setDraftPriority("MEDIUM");
   }
 
   function handleRemoveSubtask(index: number, key: string) {
@@ -339,6 +355,14 @@ export function SubtasksEditor({
             aria-label="Subtask description"
           />
           <div className="mt-2 flex flex-wrap items-center gap-2">
+            <div className="min-w-[140px] flex-1">
+              <SubtaskPrioritySelector
+                value={draftPriority}
+                onChange={setDraftPriority}
+                disabled={disabled}
+                variant="field"
+              />
+            </div>
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] text-muted-foreground">Assignee</span>
               <SubtaskAssigneeSelector
