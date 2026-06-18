@@ -335,7 +335,8 @@ export class TasksService {
   ): Promise<void> {
     const membership = await this.organizationsService.getMembership(organizationId, userId);
     const role = membership?.role?.toLowerCase() ?? '';
-    if (role === 'owner') return;
+    // Workspace owner or admin can fully update any task fields.
+    if (role === 'owner' || role === 'admin') return;
 
     const assigneeIds = taskAssigneeUserIds(task);
     const normalizedUserId = normalizeAssigneeUserId(userId);
