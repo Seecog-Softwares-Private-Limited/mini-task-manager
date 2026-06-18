@@ -15,6 +15,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
+import { applyBoardSorting } from "@/lib/board-sort";
 import type { Task } from "@/types/api";
 import type { WorkflowStatus } from "@/types/api";
 import type { Sprint } from "@/types/api";
@@ -85,36 +86,6 @@ function applyFilters(tasks: Task[], filters: BoardFilters): Task[] {
     result = result.filter((t) => !!t.recurrenceType && t.recurrenceType !== "NONE");
   }
   return result;
-}
-
-const PRIORITY_CONFIG: Record<string, { order: number }> = {
-  CRITICAL: { order: 0 },
-  HIGH: { order: 1 },
-  MEDIUM: { order: 2 },
-  LOW: { order: 3 },
-};
-
-function applySorting(tasks: Task[], sortBy: string, sortDir: string): Task[] {
-  const sorted = [...tasks];
-  sorted.sort((a, b) => {
-    let cmp = 0;
-    switch (sortBy) {
-      case "priority":
-        cmp = (PRIORITY_CONFIG[a.priority]?.order ?? 99) - (PRIORITY_CONFIG[b.priority]?.order ?? 99);
-        break;
-      case "dueDate":
-        cmp = (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999");
-        break;
-      case "title":
-        cmp = a.title.localeCompare(b.title);
-        break;
-      default:
-        cmp = a.createdAt.localeCompare(b.createdAt);
-        break;
-    }
-    return sortDir === "desc" ? -cmp : cmp;
-  });
-  return sorted;
 }
 
 // ─── Swimlane type ─────────────────────────────────────────────
@@ -371,7 +342,7 @@ export function ScrumBoard({
   assigneeMap,
   commentCountMap,
   subtaskMap,
-  filters = { search: "", priority: [], assignee: [], recurrence: "all", sortBy: "created", sortDir: "desc" },
+  filters = { search: "", priority: [], assignee: [], recurrence: "normal", sortBy: "completed", sortDir: "asc" },
   quickActions,
   wipLimits,
   movingTaskId,
@@ -522,7 +493,7 @@ export function ScrumBoard({
                       const cellKey = cellId(swimlane.id, status.id);
                       const tasks = tasksByCell[cellKey] ?? [];
                       const filtered = applyFilters(tasks, filters);
-                      const sorted = applySorting(filtered, filters.sortBy, filters.sortDir);
+                      const sorted = applyBoardSorting(filtered, filters.sortBy, filters.sortDir);
                       return (
                         <td key={cellKey} className="align-top p-2">
                           <ScrumCell

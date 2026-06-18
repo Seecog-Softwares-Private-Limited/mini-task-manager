@@ -231,7 +231,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
       filters.search ||
       filters.priority.length > 0 ||
       filters.assignee.length > 0 ||
-      filters.recurrence !== "all";
+      filters.recurrence === "recurring";
     if (!hasFilter) return undefined;
     let count = 0;
     for (const statusTasks of Object.values(tasksByStatus)) {
@@ -539,7 +539,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
       filters.search.length > 0 ||
       filters.priority.length > 0 ||
       filters.assignee.length > 0 ||
-      filters.recurrence !== "all";
+      filters.recurrence === "recurring";
     setExportingZip(true);
     try {
       const { count, filename, mediaFiles } = await exportTasksToZipFile(tasks, {
@@ -595,6 +595,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
               assigneeId: s.assigneeId || undefined,
               dueDate: s.dueDate || undefined,
               status: s.status ?? (s.completed ? "DONE" : "TODO"),
+              priority: s.priority || undefined,
             }))
             .filter((s) => s.title.length > 0),
           recurrence:
@@ -866,6 +867,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
             isSelectionMode={bulk.state.isSelectionMode}
             onToggleSelectionMode={handleToggleSelectionMode}
             canBulkSelect={permissions.canBulkSelect}
+            showRecurrenceFilter={false}
           />
         }
       />

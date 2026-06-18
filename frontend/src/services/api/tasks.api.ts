@@ -50,6 +50,9 @@ export function serializeSubtasksForApi(subtasks: TaskSubtask[]): TaskSubtask[] 
       const match = String(s.dueDate).match(/^(\d{4}-\d{2}-\d{2})/);
       if (match) item.dueDate = match[1];
     }
+    if (s.priority) {
+      item.priority = s.priority;
+    }
     return item;
   });
 }

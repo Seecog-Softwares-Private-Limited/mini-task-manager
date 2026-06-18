@@ -134,6 +134,7 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
             assigneeId: s.assigneeId || undefined,
             dueDate: s.dueDate || undefined,
             status: s.status ?? (s.completed ? "DONE" : "TODO"),
+            priority: s.priority || undefined,
           }))
           .filter((s) => s.title.length > 0),
         recurrence:

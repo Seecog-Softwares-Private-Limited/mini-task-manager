@@ -9,6 +9,11 @@ import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-sel
 import { SubtaskDueDatePicker } from "@/components/tasks/subtask-due-date-picker";
 import { SubtaskStatusSelector } from "@/components/tasks/subtask-status-selector";
 import {
+  SubtaskPrioritySelector,
+  resolveSubtaskPriority,
+  type SubtaskPriority,
+} from "@/components/tasks/subtask-priority-selector";
+import {
   SubtaskAttachmentsSection,
   type PendingSubtaskAttachment,
 } from "@/components/tasks/subtasks/subtask-attachments-section";
@@ -29,7 +34,7 @@ type MemberHint = { id: string; name: string; email?: string; avatarUrl?: string
 
 export type SubtaskDraft = Pick<
   TaskSubtask,
-  "id" | "title" | "description" | "completed" | "assigneeId" | "dueDate" | "status"
+  "id" | "title" | "description" | "completed" | "assigneeId" | "dueDate" | "status" | "priority"
 >;
 
 interface SubtaskDetailPanelProps {
@@ -91,7 +96,8 @@ export function SubtaskDetailPanel({
       a.completed === b.completed &&
       a.assigneeId === b.assigneeId &&
       a.dueDate === b.dueDate &&
-      resolveSubtaskStatus(a) === resolveSubtaskStatus(b)
+      resolveSubtaskStatus(a) === resolveSubtaskStatus(b) &&
+      resolveSubtaskPriority(a.priority) === resolveSubtaskPriority(b.priority)
     );
   }, []);
 
@@ -101,6 +107,7 @@ export function SubtaskDetailPanel({
       title: clampSubtaskTitle(initialDraft.title),
       status: resolveSubtaskStatus(initialDraft),
       completed: resolveSubtaskStatus(initialDraft) === "DONE",
+      priority: resolveSubtaskPriority(initialDraft.priority),
     };
     setDraft(normalized);
     baselineRef.current = normalized;
@@ -112,6 +119,7 @@ export function SubtaskDetailPanel({
     initialDraft.assigneeId,
     initialDraft.dueDate,
     initialDraft.status,
+    initialDraft.priority,
   ]);
 
   React.useEffect(() => {
@@ -225,14 +233,24 @@ export function SubtaskDetailPanel({
       />
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="min-w-[220px] flex-1">
-          <SubtaskStatusSelector
-            value={resolveSubtaskStatus(draft)}
-            completed={draft.completed}
-            onChange={handleStatusChange}
-            disabled={fieldsDisabled}
-            variant="field"
-          />
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <div className="min-w-[160px] flex-1">
+            <SubtaskStatusSelector
+              value={resolveSubtaskStatus(draft)}
+              completed={draft.completed}
+              onChange={handleStatusChange}
+              disabled={fieldsDisabled}
+              variant="field"
+            />
+          </div>
+          <div className="min-w-[160px] flex-1">
+            <SubtaskPrioritySelector
+              value={resolveSubtaskPriority(draft.priority)}
+              onChange={(priority: SubtaskPriority) => update("priority", priority)}
+              disabled={fieldsDisabled}
+              variant="field"
+            />
+          </div>
         </div>
         <SubtaskDueDatePicker
           value={draft.dueDate}
@@ -293,6 +311,7 @@ export function SubtaskDetailPanel({
                   title: clampSubtaskTitle(draft.title.trim()),
                   status: resolveSubtaskStatus(draft),
                   completed: resolveSubtaskStatus(draft) === "DONE",
+                  priority: resolveSubtaskPriority(draft.priority),
                 })
               }
             >

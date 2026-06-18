@@ -62,6 +62,9 @@ export class TaskEntity extends BaseEntity {
   @Column({ name: 'due_date', type: 'date', nullable: true })
   dueDate!: Date | null;
 
+  @Column({ name: 'completed_at', type: 'timestamp', nullable: true })
+  completedAt!: Date | null;
+
   @Column({ name: 'estimated_minutes', type: 'int', nullable: true })
   estimatedMinutes!: number | null;
 

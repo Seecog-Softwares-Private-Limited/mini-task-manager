@@ -64,6 +64,7 @@ import {
   SubtaskDetailPanel,
   type SubtaskDraft,
 } from "@/components/tasks/subtasks/subtask-detail-panel";
+import { resolveSubtaskPriority } from "@/components/tasks/subtask-priority-selector";
 import { fetchEntityAttachments } from "@/services/api/entity-attachments.api";
 import { CommentInputWithMentions } from "@/components/tasks/comment-input-with-mentions";
 import {
@@ -838,6 +839,7 @@ export function TaskDetailModal({
           title: trimmed,
           completed: false,
           status: "TODO",
+          priority: "MEDIUM",
           dueDate: undefined,
         },
         ...checklist,
@@ -897,6 +899,7 @@ export function TaskDetailModal({
         return;
       }
       const status = resolveSubtaskStatus(draft);
+      const priority = resolveSubtaskPriority(draft.priority);
       updateSubtasksMutation.mutate(
         checklist.map((item) =>
           item.id === draft.id
@@ -906,6 +909,7 @@ export function TaskDetailModal({
                 title: safeTitle,
                 status,
                 completed: status === "DONE",
+                priority,
               }
             : item
         ),
@@ -1406,6 +1410,7 @@ export function TaskDetailModal({
                                   assigneeId: item.assigneeId,
                                   dueDate: item.dueDate,
                                   status: resolveSubtaskStatus(item),
+                                  priority: item.priority,
                                 }}
                                 projectId={projectId}
                                 organizationId={organizationId}
