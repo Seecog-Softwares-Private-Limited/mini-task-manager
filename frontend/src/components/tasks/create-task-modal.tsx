@@ -217,7 +217,7 @@ export function CreateTaskModal({
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, prepend, remove } = useFieldArray({
     control,
     name: "subtasks",
   });
@@ -542,7 +542,7 @@ export function CreateTaskModal({
                 values={watchedSubtasks}
                 register={register}
                 setValue={setValue}
-                append={append}
+                prepend={prepend}
                 remove={remove}
                 errors={errors}
                 disabled={isSubmitting}

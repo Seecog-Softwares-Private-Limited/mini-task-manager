@@ -309,6 +309,8 @@ export function SubtaskDetailPanel({
         description="Title, description, and other field edits have not been saved. Attachments already uploaded will remain."
         confirmLabel="Discard"
         variant="destructive"
+        icon="warning"
+        elevated
         onConfirm={() => {
           setDraft(baselineRef.current);
           onDirtyChange?.(false);

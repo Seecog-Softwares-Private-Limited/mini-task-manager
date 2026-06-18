@@ -75,6 +75,7 @@ import {
 import { CreateSprintModal, type CreateSprintFormData } from "@/components/sprints/create-sprint-modal";
 import { TaskDetailModal } from "@/components/tasks/task-detail-modal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { NoticeDialog, useNoticeDialog } from "@/components/ui/notice-dialog";
 import { useTaskCreatedCelebration } from "@/components/tasks/task-create-celebration";
 import { ProjectSwitcher } from "@/components/tasks/project-switcher";
 import { OrgSwitcher } from "@/components/dashboard/org-switcher";
@@ -110,6 +111,7 @@ export default function TasksPage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { showNotice, noticeDialogProps } = useNoticeDialog();
   const { trackFirstTaskCreated } = useRetentionTracking();
   const { triggerTaskCreatedCelebration, celebrationLayer } = useTaskCreatedCelebration();
   const currentUserId = useMemo(() => getCurrentUserId(), []);
@@ -418,11 +420,7 @@ export default function TasksPage() {
     },
     onError: (err, _vars, ctx) => {
       if (ctx?.previous) queryClient.setQueryData(["tasks", selectedProjectId], ctx.previous);
-      toast({
-        title: "Failed to move task",
-        description: parseApiError(err),
-        variant: "error",
-      });
+      showNotice("Failed to update task status", parseApiError(err));
     },
   });
 
@@ -474,11 +472,7 @@ export default function TasksPage() {
     },
     onError: (err, _vars, ctx) => {
       if (ctx?.previous) queryClient.setQueryData(["tasks", selectedProjectId], ctx.previous);
-      toast({
-        title: "Failed to move task",
-        description: parseApiError(err),
-        variant: "error",
-      });
+      showNotice("Failed to update task status", parseApiError(err));
     },
   });
 
@@ -1125,6 +1119,8 @@ export default function TasksPage() {
           }}
         />
       )}
+
+      <NoticeDialog {...noticeDialogProps} />
     </div>
   );
 }
