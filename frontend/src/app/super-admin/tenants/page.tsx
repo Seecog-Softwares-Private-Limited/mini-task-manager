@@ -1,18 +1,38 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { fetchSuperAdminTenants, setSuperAdminTenantStatus } from "@/services/api/super-admin.api";
 
+const SEARCH_DEBOUNCE_MS = 400;
+
 export default function SuperAdminTenantsPage() {
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState<"ALL" | "ACTIVE" | "SUSPENDED">("ALL");
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ["super-admin", "tenants", search, status],
-    queryFn: () => fetchSuperAdminTenants({ search: search || undefined, status }),
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    debounceRef.current = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [search]);
+
+  const { data, isLoading, isFetching, refetch } = useQuery({
+    queryKey: ["super-admin", "tenants", debouncedSearch, status],
+    queryFn: ({ signal }) =>
+      fetchSuperAdminTenants(
+        { search: debouncedSearch || undefined, status },
+        signal
+      ),
+    retry: false,
+    staleTime: 30_000,
   });
 
   async function toggleStatus(id: string, current: string) {
@@ -35,7 +55,7 @@ export default function SuperAdminTenantsPage() {
           <option value="SUSPENDED">Suspended</option>
         </select>
       </div>
-      {isLoading ? (
+      {isLoading || (isFetching && !data) ? (
         <p className="text-sm text-muted-foreground">Loading tenants...</p>
       ) : (
         <div className="overflow-x-auto rounded-lg border">
@@ -80,4 +100,3 @@ export default function SuperAdminTenantsPage() {
     </div>
   );
 }
-

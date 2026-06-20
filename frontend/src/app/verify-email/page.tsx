@@ -1,41 +1,58 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { verifyEmail } from "@/services/api/auth.api";
 import { parseApiError } from "@/services/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
+
+function completeLoginAndRedirect(router: ReturnType<typeof useRouter>) {
+  window.dispatchEvent(new CustomEvent("auth:login"));
+  router.replace("/dashboard/workspaces");
+}
 
 function VerifyEmailContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const tokenFromUrl = searchParams.get("token");
+  const errorFromUrl = searchParams.get("error");
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">(
     tokenFromUrl ? "loading" : "idle",
   );
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(errorFromUrl);
   const [code, setCode] = useState("");
 
-  const runVerification = useCallback(async (value: string) => {
-    const trimmed = value.trim();
-    if (!trimmed) {
+  const runVerification = useCallback(
+    async (value: string) => {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        setStatus("error");
+        setError("Enter your 6-digit verification code.");
+        return;
+      }
+      setStatus("loading");
+      setError(null);
+      try {
+        await verifyEmail(trimmed);
+        setStatus("success");
+        completeLoginAndRedirect(router);
+      } catch (err) {
+        setStatus("error");
+        setError(parseApiError(err));
+      }
+    },
+    [router],
+  );
+
+  useEffect(() => {
+    if (errorFromUrl) {
       setStatus("error");
-      setError("Enter your 6-digit verification code.");
-      return;
     }
-    setStatus("loading");
-    setError(null);
-    try {
-      await verifyEmail(trimmed);
-      setStatus("success");
-    } catch (err) {
-      setStatus("error");
-      setError(parseApiError(err));
-    }
-  }, []);
+  }, [errorFromUrl]);
 
   useEffect(() => {
     if (tokenFromUrl) {
@@ -54,7 +71,7 @@ function VerifyEmailContent() {
             </svg>
           </div>
           <h1 className="text-2xl font-bold tracking-tight">Verifying your email</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Please wait...</p>
+          <p className="mt-2 text-sm text-muted-foreground">Signing you in...</p>
         </div>
       </div>
     );
@@ -68,12 +85,7 @@ function VerifyEmailContent() {
             <CheckCircle2 className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight">Email verified</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Your email has been verified. You can now sign in to your account.
-          </p>
-          <Button asChild className="mt-6">
-            <Link href="/login">Sign in</Link>
-          </Button>
+          <p className="mt-2 text-sm text-muted-foreground">Redirecting to your workspace...</p>
         </div>
       </div>
     );
@@ -88,7 +100,7 @@ function VerifyEmailContent() {
           </div>
           <h1 className="text-2xl font-bold tracking-tight">Verify your email</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Gmail often blocks localhost links. Enter the <strong>6-digit code</strong> from your email instead.
+            Enter the <strong>6-digit code</strong> from your email if the verify button did not work.
           </p>
         </div>
 

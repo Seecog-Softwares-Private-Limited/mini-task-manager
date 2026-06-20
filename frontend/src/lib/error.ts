@@ -36,7 +36,8 @@ export function normalizeApiError(err: unknown): NormalizedError {
     const data = err.response?.data as ApiErrorBody | undefined;
     const message = data?.message;
     const messageStr = Array.isArray(message) ? message.join(", ") : typeof message === "string" ? message : undefined;
-    const isNetwork = !err.response;
+    const isCanceled = err.code === "ERR_CANCELED";
+    const isNetwork = !err.response && !isCanceled;
     const code = err.code ?? "";
     const raw = (err.message ?? "").toLowerCase();
     const connectionLost =

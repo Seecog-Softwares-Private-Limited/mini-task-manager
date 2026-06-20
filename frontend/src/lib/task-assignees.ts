@@ -107,6 +107,34 @@ export function getTaskAssigneeIdList(task: TaskAssigneeSource): string[] {
   return [];
 }
 
+/** True when every ID in `filteredIds` is already in `selectedIds`. */
+export function areAllFilteredAssigneesSelected(
+  selectedIds: Iterable<string>,
+  filteredIds: string[],
+): boolean {
+  if (filteredIds.length === 0) return false;
+  const selected = new Set(
+    Array.from(selectedIds).map((id) => normalizeAssigneeUserId(id)),
+  );
+  return filteredIds.every((id) => selected.has(normalizeAssigneeUserId(id)));
+}
+
+/** Select or deselect every member in `filteredIds` (search-aware). */
+export function toggleSelectAllFilteredAssignees(
+  currentIds: string[],
+  filteredIds: string[],
+): string[] {
+  if (filteredIds.length === 0) return currentIds;
+  if (areAllFilteredAssigneesSelected(currentIds, filteredIds)) {
+    const filteredNorm = new Set(filteredIds.map((id) => normalizeAssigneeUserId(id)));
+    return currentIds.filter((id) => !filteredNorm.has(normalizeAssigneeUserId(id)));
+  }
+  const merged = new Map<string, string>();
+  for (const id of currentIds) merged.set(normalizeAssigneeUserId(id), id);
+  for (const id of filteredIds) merged.set(normalizeAssigneeUserId(id), id);
+  return Array.from(merged.values());
+}
+
 export function canUserMoveTask(
   task: TaskAssigneeSource,
   userId: string | null | undefined,

@@ -23,7 +23,7 @@ export class PlanConfigurationsRepository {
     planName: UserPlanSlug,
     data: Pick<
       PlanConfigurationEntity,
-      'maxUsers' | 'maxStorage' | 'maxWorkspaces' | 'allowCoupon'
+      'maxUsers' | 'maxStorage' | 'maxWorkspaces' | 'allowCoupon' | 'priceMonthlyInr'
     >,
   ): Promise<PlanConfigurationEntity> {
     const existing = await this.findByPlanName(planName);

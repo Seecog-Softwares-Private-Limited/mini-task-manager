@@ -14,11 +14,10 @@ import {
 } from "@/services/api/super-admin.api";
 import { formatBytes, type UserPlanSlug } from "@/services/api/user-plans.api";
 import { cn } from "@/lib/utils";
-import { Building2, Crown, HardDrive, Loader2, Save, Sparkles, Users } from "lucide-react";
+import { Building2, Crown, HardDrive, IndianRupee, Loader2, Save, Sparkles, Users } from "lucide-react";
 
 type PlanMeta = {
   name: string;
-  priceLabel: string;
   description: string;
   accent: string;
   icon: React.ReactNode;
@@ -27,28 +26,33 @@ type PlanMeta = {
 const PLAN_META: Record<UserPlanSlug, PlanMeta> = {
   free: {
     name: "Free",
-    priceLabel: "₹0 / forever",
     description: "Default plan for new users on the landing page and dashboard.",
     accent: "border-slate-200 dark:border-slate-700",
     icon: <Sparkles className="h-5 w-5" />,
   },
   silver: {
     name: "Silver",
-    priceLabel: "₹500 / month",
     description: "Mid-tier plan shown to customers upgrading from Free.",
     accent: "border-slate-300 dark:border-slate-600",
     icon: <Crown className="h-5 w-5" />,
   },
   gold: {
     name: "Gold",
-    priceLabel: "₹1000 / month",
     description: "Top tier with the highest workspace and member limits.",
     accent: "border-amber-300/80 dark:border-amber-600/60",
     icon: <Crown className="h-5 w-5 text-amber-600" />,
   },
 };
 
+function formatPriceLabel(planName: UserPlanSlug, priceMonthlyInr: number): string {
+  if (planName === "free" || priceMonthlyInr <= 0) {
+    return "₹0 / forever";
+  }
+  return `₹${priceMonthlyInr} / month`;
+}
+
 type PlanFormState = {
+  priceMonthlyInr: string;
   maxUsers: string;
   unlimitedUsers: boolean;
   maxWorkspaces: string;
@@ -67,6 +71,7 @@ function configToFormFromConfig(
   planName: UserPlanSlug
 ): PlanFormState {
   return {
+    priceMonthlyInr: String(config.priceMonthlyInr ?? 0),
     maxUsers: config.maxUsers === null ? "" : String(config.maxUsers),
     unlimitedUsers: config.maxUsers === null,
     maxWorkspaces: config.maxWorkspaces === null ? "" : String(config.maxWorkspaces),
@@ -93,6 +98,11 @@ function PlanEditorCard({
   }, [config, planName]);
 
   const preview = useMemo(() => {
+    const priceMonthlyInr = parseInt(form.priceMonthlyInr, 10);
+    const priceLine =
+      planName === "free" || !Number.isFinite(priceMonthlyInr) || priceMonthlyInr <= 0
+        ? "₹0 / forever"
+        : `₹${priceMonthlyInr} / month`;
     const members = form.unlimitedUsers
       ? "Unlimited members per workspace"
       : `${form.maxUsers || "—"} members per workspace`;
@@ -102,8 +112,8 @@ function PlanEditorCard({
     const storageGb = parseFloat(form.maxStorageGb);
     const storageBytes = Number.isFinite(storageGb) ? storageGb * 1024 ** 3 : 0;
     const storage = storageBytes > 0 ? `${formatBytes(storageBytes)} storage` : "— storage";
-    return [workspaces, members, storage];
-  }, [form]);
+    return [priceLine, workspaces, members, storage];
+  }, [form, planName]);
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -113,6 +123,10 @@ function PlanEditorCard({
       }
       const maxUsers = form.unlimitedUsers ? null : parseInt(form.maxUsers, 10);
       const maxWorkspaces = form.unlimitedWorkspaces ? null : parseInt(form.maxWorkspaces, 10);
+      const priceMonthlyInr = planName === "free" ? 0 : parseInt(form.priceMonthlyInr, 10);
+      if (planName !== "free" && (!Number.isFinite(priceMonthlyInr) || priceMonthlyInr < 0)) {
+        throw new Error("Price must be zero or a positive whole number (INR)");
+      }
       if (!form.unlimitedUsers && (!maxUsers || maxUsers < 1)) {
         throw new Error("Members per workspace must be at least 1, or enable Unlimited");
       }
@@ -124,13 +138,14 @@ function PlanEditorCard({
         maxWorkspaces,
         maxStorage: Math.round(storageGb * 1024 ** 3),
         allowCoupon: planName === "free" ? false : form.allowCoupon,
+        priceMonthlyInr,
       });
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["super-admin", "plans"] });
       toast({
         title: `${meta.name} plan updated`,
-        description: "Customers will see the new limits on the website and in their dashboard.",
+        description: "Customers will see the new limits and pricing on the website and in their dashboard.",
         variant: "success",
       });
     },
@@ -153,13 +168,33 @@ function PlanEditorCard({
             </div>
             <div>
               <CardTitle className="text-lg">{meta.name}</CardTitle>
-              <p className="text-sm font-medium text-primary">{meta.priceLabel}</p>
+              <p className="text-sm font-medium text-primary">
+                {formatPriceLabel(planName, parseInt(form.priceMonthlyInr, 10) || 0)}
+              </p>
             </div>
           </div>
         </div>
         <CardDescription>{meta.description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
+        {planName !== "free" && (
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2 text-sm">
+              <IndianRupee className="h-4 w-4 text-muted-foreground" />
+              Price (INR / month)
+            </Label>
+            <Input
+              type="number"
+              min={0}
+              step={1}
+              value={form.priceMonthlyInr}
+              onChange={(e) => setForm((f) => ({ ...f, priceMonthlyInr: e.target.value }))}
+              className="max-w-[140px]"
+              placeholder="e.g. 500"
+            />
+          </div>
+        )}
+
         <div className="space-y-2">
           <Label className="flex items-center gap-2 text-sm">
             <Building2 className="h-4 w-4 text-muted-foreground" />

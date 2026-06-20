@@ -32,9 +32,16 @@ export interface SignupResponse {
   message: string;
   /** When true, user can sign in immediately (no inbox verification step). */
   emailVerified?: boolean;
+  accessToken?: string;
+  user?: LoginResponse["user"];
+  organizationId?: string;
   /** Local dev only — shown when Gmail drops verification emails. */
   devVerificationCode?: string;
   verifyPageUrl?: string;
+}
+
+export interface VerifyEmailResponse extends LoginResponse {
+  message: string;
 }
 
 export interface ResendVerificationResponse {
@@ -45,11 +52,19 @@ export interface ResendVerificationResponse {
 
 export async function signup(payload: PublicSignupPayload): Promise<SignupResponse> {
   const { data } = await apiClient.post<SignupResponse>("auth/signup", payload);
+  if (data.accessToken) {
+    setStoredToken(data.accessToken);
+    if (data.organizationId) setStoredOrgId(data.organizationId);
+  }
   return data;
 }
 
-export async function verifyEmail(token: string): Promise<{ message: string }> {
-  const { data } = await apiClient.post<{ message: string }>("auth/verify-email", { token });
+export async function verifyEmail(token: string): Promise<VerifyEmailResponse> {
+  const { data } = await apiClient.post<VerifyEmailResponse>("auth/verify-email", { token });
+  if (data.accessToken) {
+    setStoredToken(data.accessToken);
+    if (data.organizationId) setStoredOrgId(data.organizationId);
+  }
   return data;
 }
 

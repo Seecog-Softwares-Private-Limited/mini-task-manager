@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, UseGuards, Req, Res, Logger } from '@nestjs/common';
+import { Controller, Post, Body, Get, Query, UseGuards, Req, Res, Logger, BadRequestException } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { AuthGuard } from '@nestjs/passport';
 import { Response } from 'express';
@@ -41,15 +41,40 @@ export class AuthController {
   @Public()
   @SkipThrottle({ default: true })
   @Post('signup')
-  async signup(@Body() dto: PublicSignupDto): Promise<{ message: string; emailVerified?: boolean }> {
+  async signup(@Body() dto: PublicSignupDto) {
     this.logger.log(`Signup request: ${dto.email?.toLowerCase?.() ?? dto.email}`);
     return this.authService.signup(dto);
   }
 
   @Public()
   @SkipThrottle({ default: true })
+  @Get('verify-email')
+  async verifyEmailFromLink(
+    @Query('token') token: string | undefined,
+    @Res() res: Response,
+  ): Promise<void> {
+    const frontendUrl = getFrontendUrl();
+    if (!token?.trim()) {
+      res.redirect(`${frontendUrl}/verify-email?error=${encodeURIComponent('Missing verification token.')}`);
+      return;
+    }
+    try {
+      const result = await this.authService.verifyEmail(token);
+      res.redirect(`${frontendUrl}/auth/callback?token=${encodeURIComponent(result.accessToken)}`);
+    } catch (err) {
+      const message =
+        err instanceof BadRequestException
+          ? (err.getResponse() as { message?: string | string[] })?.message
+          : 'Verification failed.';
+      const text = Array.isArray(message) ? message.join(', ') : String(message ?? 'Verification failed.');
+      res.redirect(`${frontendUrl}/verify-email?error=${encodeURIComponent(text)}`);
+    }
+  }
+
+  @Public()
+  @SkipThrottle({ default: true })
   @Post('verify-email')
-  async verifyEmail(@Body() dto: VerifyEmailDto): Promise<{ message: string }> {
+  async verifyEmail(@Body() dto: VerifyEmailDto): Promise<LoginResponseDto & { message: string }> {
     return this.authService.verifyEmail(dto.token);
   }
 

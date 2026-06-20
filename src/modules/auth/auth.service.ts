@@ -23,7 +23,7 @@ import { PasswordResetTokenEntity } from './entities/password-reset-token.entity
 import { OtpCodeEntity } from './entities/otp-code.entity';
 import { SmsService } from './services/sms.service';
 import { generateUuid } from '../../common/utils/uuid.util';
-import { getFrontendUrl } from '../../common/utils/frontend-url.util';
+import { getFrontendUrl, buildEmailVerificationUrls } from '../../common/utils/frontend-url.util';
 import { OrganizationsService } from '../organizations/organizations.service';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
@@ -152,6 +152,9 @@ export class AuthService {
   ): Promise<{
     message: string;
     emailVerified?: boolean;
+    accessToken?: string;
+    user?: LoginResponseDto['user'];
+    organizationId?: string;
     devVerificationCode?: string;
     verifyPageUrl?: string;
   }> {
@@ -221,8 +224,13 @@ export class AuthService {
     }
 
     if (skipVerification) {
+      const user = await this.usersService.findById(userId);
+      if (!user) {
+        throw new BadRequestException('Account created but sign-in could not be completed. Please sign in.');
+      }
       return {
-        message: 'Account created. You can sign in now.',
+        ...(await this.buildLoginResponse(user)),
+        message: 'Account created. You are signed in.',
         emailVerified: true,
       };
     }
@@ -238,7 +246,7 @@ export class AuthService {
     );
   }
 
-  async verifyEmail(tokenOrCode: string): Promise<{ message: string }> {
+  async verifyEmail(tokenOrCode: string): Promise<LoginResponseDto & { message: string }> {
     const trimmed = tokenOrCode.trim();
     const isShortCode = /^\d{6}$/.test(trimmed);
 
@@ -260,7 +268,15 @@ export class AuthService {
     await this.usersService.updateEmailVerified(record.userId, true);
     await this.verificationTokenRepo.delete(record.id);
 
-    return { message: 'Email verified successfully. You can now sign in.' };
+    const refreshedUser = await this.usersService.findById(record.userId);
+    if (!refreshedUser) {
+      throw new BadRequestException('User not found after verification.');
+    }
+
+    return {
+      ...(await this.buildLoginResponse(refreshedUser)),
+      message: 'Email verified successfully.',
+    };
   }
 
   async resendVerificationEmail(email: string): Promise<{
@@ -547,8 +563,7 @@ export class AuthService {
       expiresAt,
     } as Partial<EmailVerificationTokenEntity>);
 
-    const verifyPageUrl = `${getFrontendUrl()}/verify-email`;
-    const verifyUrl = `${verifyPageUrl}?token=${encodeURIComponent(token)}`;
+    const { verifyPageUrl, verifyUrl } = buildEmailVerificationUrls(token);
     this.logger.log(`Sending signup verification email to ${email} (verifyUrl host=${new URL(verifyUrl).host})`);
     if (process.env.NODE_ENV !== 'production') {
       this.logger.log(`[dev] Verification code for ${email}: ${shortCode} — open ${verifyPageUrl}`);
@@ -576,6 +591,27 @@ export class AuthService {
       ...response,
       devVerificationCode: sent.shortCode,
       verifyPageUrl: sent.verifyPageUrl,
+    };
+  }
+
+  private async buildLoginResponse(user: UserEntity): Promise<LoginResponseDto> {
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      roles: user.isPlatformAdmin ? ['SUPER_ADMIN'] : [],
+    };
+    const accessToken = this.jwtService.sign(payload);
+    const orgs = await this.organizationsService.findOrganizationsForUser(user.id);
+
+    return {
+      accessToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        isPlatformAdmin: user.isPlatformAdmin,
+      },
+      organizationId: orgs[0]?.id,
     };
   }
 

@@ -16,8 +16,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DropdownScrollList } from "@/components/ui/dropdown-scroll-list";
-import { Check, Loader2, Search, UserRoundX, Users, X } from "lucide-react";
+import { AssigneeBulkActions } from "@/components/tasks/assignee-bulk-actions";
+import { Check, Loader2, Search, Users, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  areAllFilteredAssigneesSelected,
+  toggleSelectAllFilteredAssignees,
+} from "@/lib/task-assignees";
 
 /** Above create-task modal overlay (z-[100]). */
 const DROPDOWN_Z = "z-[110]";
@@ -94,6 +99,16 @@ export function AssigneeSelector({
   const selected = useMemo(
     () => list.filter((m) => value.includes(m.id)),
     [list, value]
+  );
+
+  const allFilteredSelected = useMemo(
+    () => areAllFilteredAssigneesSelected(value, filtered.map((m) => m.id)),
+    [value, filtered]
+  );
+
+  const selectedFilteredCount = useMemo(
+    () => filtered.filter((m) => value.includes(m.id)).length,
+    [filtered, value]
   );
 
   function toggle(memberId: string) {
@@ -192,18 +207,18 @@ export function AssigneeSelector({
           </div>
         </div>
         <DropdownMenuSeparator />
+        <AssigneeBulkActions
+          filteredCount={filtered.length}
+          allSelected={allFilteredSelected}
+          selectedCount={selectedFilteredCount}
+          isSearchActive={search.trim().length > 0}
+          onToggleSelectAll={() =>
+            onChange(toggleSelectAllFilteredAssignees(value, filtered.map((m) => m.id)))
+          }
+          onClear={() => onChange([])}
+          disabled={disabled || isLoading}
+        />
         <DropdownScrollList>
-          <DropdownMenuItem
-            onSelect={(event) => {
-              event.preventDefault();
-              onChange([]);
-            }}
-            className="rounded-md text-xs"
-          >
-            <UserRoundX className="mr-2 h-3.5 w-3.5" />
-            Clear assignment
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
           {isLoading ? (
             <div className="flex items-center justify-center gap-2 px-2 py-6 text-xs text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />

@@ -30,9 +30,11 @@ import { CreateCouponDto } from '../../plans/dto/create-coupon.dto';
 import { PlanConfigurationsService } from '../../plans/plan-configurations.service';
 import { CouponCodesService } from '../../plans/coupon-codes.service';
 import { normalizePlanSlug } from '../../config/plans.config';
+import { SkipThrottle } from '@nestjs/throttler';
 
 @Controller('super-admin')
 @UseGuards(JwtAuthGuard, PlatformAdminGuard)
+@SkipThrottle({ default: true, auth: true })
 export class SuperAdminController {
   constructor(
     private readonly superAdminService: SuperAdminService,
