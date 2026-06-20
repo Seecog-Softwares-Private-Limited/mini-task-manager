@@ -265,6 +265,253 @@ ${emailVerificationActions(verifyUrl)}
 ${emailExpiryNote('24 hours')}`.trim();
 }
 
+export interface TaskAssignmentSubtask {
+  title: string;
+  completed?: boolean;
+}
+
+export interface TaskAssignmentAttachment {
+  fileName: string;
+  fileSize?: string;
+}
+
+export interface TaskAssignmentTemplateParams {
+  assigneeName: string;
+  assigneeEmail: string;
+  assignerName: string;
+  assignerEmail: string;
+  taskTitle: string;
+  taskDescription?: string | null;
+  projectName?: string;
+  dueDateLabel: string;
+  subtasks: TaskAssignmentSubtask[];
+  attachments: TaskAssignmentAttachment[];
+  allAssigneesLabel: string;
+  taskUrl: string;
+  emailSubject?: string;
+  headline?: string;
+  introHtml?: string;
+  cardLabel?: string;
+  highlightTitle?: string;
+  parentTaskTitle?: string;
+  focusSubtasks?: TaskAssignmentSubtask[];
+}
+
+/** Strip rich-text HTML to plain text for safe email display. */
+export function stripHtmlForEmail(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+export function formatTaskDueDateLabel(dueDate: Date | string | null | undefined): string {
+  if (!dueDate) return 'Not set';
+  const parsed = dueDate instanceof Date ? dueDate : new Date(String(dueDate).slice(0, 10));
+  if (Number.isNaN(parsed.getTime())) return 'Not set';
+  return parsed.toLocaleDateString('en-US', {
+    weekday: 'short',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+export function formatAttachmentFileSize(bytes: number | null | undefined): string | undefined {
+  if (!bytes || bytes <= 0) return undefined;
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function emailDetailRow(label: string, value: string, options?: { preserveLineBreaks?: boolean }): string {
+  const safe = escapeHtml(value);
+  const content = options?.preserveLineBreaks ? safe.replace(/\n/g, '<br />') : safe;
+  return `
+<tr>
+  <td style="padding:12px 0;border-bottom:1px solid ${BRAND.cardBorder};vertical-align:top;width:132px;">
+    <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:${BRAND.textLight};">
+      ${escapeHtml(label)}
+    </span>
+  </td>
+  <td style="padding:12px 0;border-bottom:1px solid ${BRAND.cardBorder};font-size:14px;line-height:1.6;color:${BRAND.text};">
+    ${content}
+  </td>
+</tr>`.trim();
+}
+
+function emailSubtasksBlock(subtasks: TaskAssignmentSubtask[]): string {
+  if (!subtasks.length) {
+    return `<span style="color:${BRAND.textMuted};font-size:14px;">No subtasks</span>`;
+  }
+
+  const items = subtasks
+    .map((subtask) => {
+      const status = subtask.completed
+        ? `<span style="margin-left:8px;font-size:11px;font-weight:600;color:${BRAND.emeraldDark};text-transform:uppercase;">Done</span>`
+        : '';
+      return `
+<li style="margin:6px 0;color:${BRAND.text};font-size:14px;line-height:1.5;">
+  ${escapeHtml(subtask.title)}${status}
+</li>`.trim();
+    })
+    .join('');
+
+  return `<ul style="margin:0;padding-left:18px;">${items}</ul>`;
+}
+
+function emailAttachmentsBlock(attachments: TaskAssignmentAttachment[]): string {
+  if (!attachments.length) {
+    return `<span style="color:${BRAND.textMuted};font-size:14px;">No attachments</span>`;
+  }
+
+  return attachments
+    .map((attachment) => {
+      const size = attachment.fileSize
+        ? `<span style="margin-left:6px;color:${BRAND.textLight};font-size:12px;">(${escapeHtml(attachment.fileSize)})</span>`
+        : '';
+      return `
+<div style="margin:6px 0;padding:10px 12px;background:${BRAND.footerBg};border:1px solid ${BRAND.cardBorder};border-radius:10px;font-size:13px;color:${BRAND.text};">
+  <span style="font-weight:600;">File:</span> ${escapeHtml(attachment.fileName)}${size}
+</div>`.trim();
+    })
+    .join('');
+}
+
+/** Task assignment body — full task details for assignees. */
+export function emailTaskAssignmentBody(params: TaskAssignmentTemplateParams): string {
+  const {
+    assigneeName,
+    assigneeEmail,
+    assignerName,
+    assignerEmail,
+    taskTitle,
+    taskDescription,
+    projectName,
+    dueDateLabel,
+    subtasks,
+    attachments,
+    allAssigneesLabel,
+    taskUrl,
+    headline = 'Task Assigned to You',
+    introHtml,
+    cardLabel = 'Task',
+    highlightTitle,
+    parentTaskTitle,
+    focusSubtasks,
+  } = params;
+
+  const descriptionText = taskDescription?.trim()
+    ? stripHtmlForEmail(taskDescription)
+    : 'No description';
+  const projectLine = projectName
+    ? `<p style="margin:0 0 20px;font-size:13px;color:${BRAND.textMuted};text-align:center;">
+        Project: <strong style="color:${BRAND.text};">${escapeHtml(projectName)}</strong>
+      </p>`
+    : '';
+  const intro = introHtml
+    ?? `<p style="text-align:center;color:${BRAND.textMuted};font-size:15px;line-height:1.6;margin:0 0 20px;">
+  Hi <strong style="color:${BRAND.text};">${escapeHtml(assigneeName)}</strong>,
+  a new task needs your attention.
+</p>`;
+  const displayTitle = highlightTitle ?? taskTitle;
+  const subtasksToShow = focusSubtasks ?? subtasks;
+  const parentTaskRow = parentTaskTitle
+    ? emailDetailRow('Parent task', parentTaskTitle)
+    : '';
+
+  return `
+<h1 style="font-size:26px;font-weight:700;text-align:center;margin:0 0 8px;color:${BRAND.text};letter-spacing:-0.02em;">
+  ${escapeHtml(headline)}
+</h1>
+${intro}
+${projectLine}
+<div style="background:${BRAND.footerBg};border:1px solid ${BRAND.cardBorder};border-radius:16px;padding:8px 20px;margin:0 0 24px;">
+  <p style="margin:16px 0 8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:${BRAND.textLight};text-align:center;">
+    ${escapeHtml(cardLabel)}
+  </p>
+  <p style="margin:0 0 16px;font-size:22px;font-weight:700;color:${BRAND.text};text-align:center;letter-spacing:-0.01em;">
+    ${escapeHtml(displayTitle)}
+  </p>
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+    ${parentTaskRow}
+    ${emailDetailRow('Assigned by', `${assignerName} (${assignerEmail})`)}
+    ${emailDetailRow('Assigned to', allAssigneesLabel)}
+    ${emailDetailRow('Your email', assigneeEmail)}
+    ${emailDetailRow('Due date', dueDateLabel)}
+    ${emailDetailRow('Description', descriptionText, { preserveLineBreaks: true })}
+    <tr>
+      <td style="padding:12px 0;border-bottom:1px solid ${BRAND.cardBorder};vertical-align:top;width:132px;">
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:${BRAND.textLight};">
+          Subtasks
+        </span>
+      </td>
+      <td style="padding:12px 0;border-bottom:1px solid ${BRAND.cardBorder};">
+        ${emailSubtasksBlock(subtasksToShow)}
+      </td>
+    </tr>
+    <tr>
+      <td style="padding:12px 0;vertical-align:top;width:132px;">
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:${BRAND.textLight};">
+          Attachments
+        </span>
+      </td>
+      <td style="padding:12px 0;">
+        ${emailAttachmentsBlock(attachments)}
+      </td>
+    </tr>
+  </table>
+</div>
+${emailActionSection(taskUrl, 'View Task')}`.trim();
+}
+
+export function emailPlainTextTaskAssignment(params: TaskAssignmentTemplateParams): string {
+  const headline = params.headline ?? 'Task assigned';
+  const displayTitle = params.highlightTitle ?? params.taskTitle;
+  const subtasksToShow = params.focusSubtasks ?? params.subtasks;
+  const descriptionText = params.taskDescription?.trim()
+    ? stripHtmlForEmail(params.taskDescription)
+    : 'No description';
+  const subtasksText = subtasksToShow.length
+    ? subtasksToShow.map((s) => `- ${s.title}${s.completed ? ' (done)' : ''}`).join('\n')
+    : 'No subtasks';
+  const attachmentsText = params.attachments.length
+    ? params.attachments
+        .map((a) => `- ${a.fileName}${a.fileSize ? ` (${a.fileSize})` : ''}`)
+        .join('\n')
+    : 'No attachments';
+
+  return [
+    `Hi ${params.assigneeName},`,
+    '',
+    headline,
+    '',
+    params.parentTaskTitle ? `Parent task: ${params.parentTaskTitle}` : '',
+    `Task: ${displayTitle}`,
+    `Assigned by: ${params.assignerName} (${params.assignerEmail})`,
+    `Assigned to: ${params.allAssigneesLabel}`,
+    `Your email: ${params.assigneeEmail}`,
+    `Due date: ${params.dueDateLabel}`,
+    '',
+    'Description:',
+    descriptionText,
+    '',
+    'Subtasks:',
+    subtasksText,
+    '',
+    'Attachments:',
+    attachmentsText,
+    '',
+    `View task: ${params.taskUrl}`,
+  ].join('\n');
+}
+
 /** Password reset body. */
 export function emailPasswordResetBody(params: { fullName: string; resetUrl: string }): string {
   const { fullName, resetUrl } = params;

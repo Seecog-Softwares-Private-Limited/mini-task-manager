@@ -16,8 +16,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DropdownScrollList } from "@/components/ui/dropdown-scroll-list";
-import { Check, Loader2, Search, UserRoundX, Users, X } from "lucide-react";
+import { AssigneeBulkActions } from "@/components/tasks/assignee-bulk-actions";
+import { Check, Loader2, Search, Users, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  areAllFilteredAssigneesSelected,
+  toggleSelectAllFilteredAssignees,
+} from "@/lib/task-assignees";
 
 /** Above create-task modal overlay (z-[100]). */
 const DROPDOWN_Z = "z-[110]";
@@ -96,24 +101,22 @@ export function AssigneeSelector({
     [list, value]
   );
 
+  const allFilteredSelected = useMemo(
+    () => areAllFilteredAssigneesSelected(value, filtered.map((m) => m.id)),
+    [value, filtered]
+  );
+
+  const selectedFilteredCount = useMemo(
+    () => filtered.filter((m) => value.includes(m.id)).length,
+    [filtered, value]
+  );
+
   function toggle(memberId: string) {
     if (value.includes(memberId)) {
       onChange(value.filter((id) => id !== memberId));
       return;
     }
     onChange([...value, memberId]);
-  }
-
-  const filteredIds = filtered.map((m) => m.id);
-  const allFilteredSelected =
-    filteredIds.length > 0 && filteredIds.every((id) => value.includes(id));
-
-  function selectAllFiltered() {
-    if (allFilteredSelected) {
-      onChange(value.filter((id) => !filteredIds.includes(id)));
-      return;
-    }
-    onChange([...new Set([...value, ...filteredIds])]);
   }
 
   return (
@@ -204,47 +207,18 @@ export function AssigneeSelector({
           </div>
         </div>
         <DropdownMenuSeparator />
+        <AssigneeBulkActions
+          filteredCount={filtered.length}
+          allSelected={allFilteredSelected}
+          selectedCount={selectedFilteredCount}
+          isSearchActive={search.trim().length > 0}
+          onToggleSelectAll={() =>
+            onChange(toggleSelectAllFilteredAssignees(value, filtered.map((m) => m.id)))
+          }
+          onClear={() => onChange([])}
+          disabled={disabled || isLoading}
+        />
         <DropdownScrollList>
-          <DropdownMenuItem
-            onSelect={(event) => {
-              event.preventDefault();
-              onChange([]);
-            }}
-            className="rounded-md text-xs"
-          >
-            <UserRoundX className="mr-2 h-3.5 w-3.5" />
-            Clear assignment
-          </DropdownMenuItem>
-          {!isLoading && filtered.length > 0 ? (
-            <DropdownMenuItem
-              onSelect={(event) => {
-                event.preventDefault();
-                selectAllFiltered();
-              }}
-              className="rounded-md text-xs"
-            >
-              <Users className="mr-2 h-3.5 w-3.5" />
-              {allFilteredSelected
-                ? search.trim()
-                  ? "Deselect all matching"
-                  : "Deselect all members"
-                : search.trim()
-                  ? `Select all matching (${filtered.length})`
-                  : "Select all members"}
-              <span
-                className={cn(
-                  "ml-auto flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors duration-200",
-                  allFilteredSelected
-                    ? "border-primary bg-primary text-white"
-                    : "border-border bg-background text-transparent"
-                )}
-                aria-hidden
-              >
-                <Check className="h-3 w-3" />
-              </span>
-            </DropdownMenuItem>
-          ) : null}
-          <DropdownMenuSeparator />
           {isLoading ? (
             <div className="flex items-center justify-center gap-2 px-2 py-6 text-xs text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />

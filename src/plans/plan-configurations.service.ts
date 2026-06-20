@@ -19,6 +19,7 @@ export interface PlanConfigurationView {
   maxStorage: number;
   maxWorkspaces: number | null;
   allowCoupon: boolean;
+  priceMonthlyInr: number;
 }
 
 type CacheEntry = {
@@ -47,6 +48,7 @@ export class PlanConfigurationsService {
       maxStorage: limits.storageBytes,
       maxWorkspaces: limits.maxWorkspaces,
       allowCoupon: PlanConfigurationsService.defaultAllowCoupon(slug),
+      priceMonthlyInr: PLANS[slug].pricing.priceMonthlyInr,
     };
   }
 
@@ -71,6 +73,8 @@ export class PlanConfigurationsService {
         maxWorkspaces: row.maxWorkspaces,
         allowCoupon:
           row.allowCoupon ?? PlanConfigurationsService.defaultAllowCoupon(key),
+        priceMonthlyInr:
+          row.priceMonthlyInr ?? PLANS[key].pricing.priceMonthlyInr,
       };
     }
 
@@ -94,7 +98,8 @@ export class PlanConfigurationsService {
           : '';
       if (
         msg.includes('plan_configurations') ||
-        msg.includes('allow_coupon')
+        msg.includes('allow_coupon') ||
+        msg.includes('price_monthly_inr')
       ) {
         merged = this.mergeWithDefaults([]);
       } else {
@@ -149,9 +154,21 @@ export class PlanConfigurationsService {
       dto.maxWorkspaces === undefined ? current.maxWorkspaces : dto.maxWorkspaces;
     const nextAllowCoupon =
       dto.allowCoupon === undefined ? current.allowCoupon : dto.allowCoupon;
+    const nextPriceMonthlyInr =
+      dto.priceMonthlyInr === undefined
+        ? current.priceMonthlyInr
+        : dto.priceMonthlyInr;
 
     if (planName === 'free' && nextAllowCoupon) {
       throw new BadRequestException('Coupon codes cannot be enabled on the Free plan');
+    }
+
+    if (planName === 'free' && nextPriceMonthlyInr !== 0) {
+      throw new BadRequestException('Free plan price must be 0');
+    }
+
+    if (nextPriceMonthlyInr < 0) {
+      throw new BadRequestException('priceMonthlyInr must be zero or positive');
     }
 
     if (nextStorage <= 0) {
@@ -169,6 +186,7 @@ export class PlanConfigurationsService {
       maxStorage: String(nextStorage),
       maxWorkspaces: nextWorkspaces,
       allowCoupon: nextAllowCoupon,
+      priceMonthlyInr: nextPriceMonthlyInr,
     });
     this.invalidateCache();
 
@@ -178,6 +196,8 @@ export class PlanConfigurationsService {
       maxStorage: Number(saved.maxStorage),
       maxWorkspaces: saved.maxWorkspaces,
       allowCoupon: saved.allowCoupon ?? PlanConfigurationsService.defaultAllowCoupon(planName),
+      priceMonthlyInr:
+        saved.priceMonthlyInr ?? PLANS[planName].pricing.priceMonthlyInr,
     };
   }
 }

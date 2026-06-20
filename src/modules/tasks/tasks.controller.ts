@@ -38,6 +38,12 @@ import { UpdateTaskAssigneeDto } from './dto/update-task-assignee.dto';
 import { PaginationQueryDto } from '../../common/pagination';
 import { TaskResponseDto } from './dto/task-response.dto';
 import { TaskCommentEntity } from './entities/task-comment.entity';
+import { TaskEntity } from './entities/task.entity';
+import {
+  formatAttachmentFileSize,
+  formatTaskDueDateLabel,
+  escapeHtml,
+} from '../invitations/email-template.util';
 
 interface MulterFile {
   fieldname: string;
@@ -74,12 +80,13 @@ export class TasksController {
     const task = await this.tasksService.create(projectId, organizationId, reporterId, dto);
 
     // Fire-and-forget: send assignment emails + in-app notifications
-    const assigneeIds = task.assigneeIds ?? (task.assigneeId ? [task.assigneeId] : []);
-    if (assigneeIds.length > 0) {
-      this.notifyAssignees(assigneeIds, reporterId, task.title, task.id, projectId).catch((err) =>
-        this.logger.warn(`Failed to send assignment notifications: ${err}`),
-      );
-    }
+    const assigneeIds = this.getTaskAssigneeIds(task);
+    this.scheduleTaskNotifications({
+      actorUserId: reporterId,
+      after: task,
+      newAssigneeIds: assigneeIds,
+      isCreate: true,
+    });
 
     return this.toResponse(task);
   }
@@ -211,6 +218,9 @@ export class TasksController {
     @CurrentUserId() currentUserId: string,
     @Body() body: UpdateTaskAssigneeDto,
   ): Promise<TaskResponseDto | null> {
+    const before = await this.tasksService.findByIdInOrganization(id, tenantId);
+    if (!before) return null;
+
     const patch =
       body.assigneeIds !== undefined
         ? { assigneeIds: body.assigneeIds }
@@ -224,10 +234,14 @@ export class TasksController {
         : body.assigneeId
           ? [body.assigneeId]
           : [];
-    if (notifyIds.length > 0) {
-      this.notifyAssignees(notifyIds, currentUserId, task.title, task.id, task.projectId).catch((err) =>
-        this.logger.warn(`Failed to send assignment notifications: ${err}`),
-      );
+    const newAssigneeIds = this.getNewIds(this.getTaskAssigneeIds(before), notifyIds);
+    if (newAssigneeIds.length > 0) {
+      this.scheduleTaskNotifications({
+        actorUserId: currentUserId,
+        after: task,
+        before,
+        newAssigneeIds,
+      });
     }
 
     return this.toResponse(task);
@@ -240,9 +254,17 @@ export class TasksController {
     @CurrentUserId() userId: string,
     @Body() dto: PatchTaskDto,
   ): Promise<TaskResponseDto> {
+    const before = await this.tasksService.findByIdInOrganization(id, tenantId);
     const task = await this.tasksService.update(id, tenantId, dto, userId);
     if (!task) {
       throw new NotFoundException('Task not found or not in this organization');
+    }
+    if (before) {
+      this.scheduleTaskNotifications({
+        actorUserId: userId,
+        after: task,
+        before,
+      });
     }
     return this.toResponse(task);
   }
@@ -287,45 +309,281 @@ export class TasksController {
     }
   }
 
+  private getTaskAssigneeIds(task: TaskEntity): string[] {
+    return task.assigneeIds ?? (task.assigneeId ? [task.assigneeId] : []);
+  }
+
+  private getNewIds(before: string[], after: string[]): string[] {
+    const seen = new Set(before);
+    return after.filter((id) => id && !seen.has(id));
+  }
+
+  private scheduleTaskNotifications(params: {
+    actorUserId: string;
+    after: TaskEntity;
+    before?: TaskEntity;
+    newAssigneeIds?: string[];
+    isCreate?: boolean;
+  }): void {
+    this.runTaskNotifications(params).catch((err) =>
+      this.logger.error(
+        `Task email notification failed: ${err instanceof Error ? err.message : err}`,
+        err instanceof Error ? err.stack : undefined,
+      ),
+    );
+  }
+
+  private async runTaskNotifications(params: {
+    actorUserId: string;
+    after: TaskEntity;
+    before?: TaskEntity;
+    newAssigneeIds?: string[];
+    isCreate?: boolean;
+  }): Promise<void> {
+    const { actorUserId, after, before, isCreate } = params;
+    const beforeAssignees = before ? this.getTaskAssigneeIds(before) : [];
+    const afterAssignees = this.getTaskAssigneeIds(after);
+    const newAssigneeIds =
+      params.newAssigneeIds ??
+      (before ? this.getNewIds(beforeAssignees, afterAssignees) : afterAssignees);
+
+    const notifiedUserIds = new Set<string>();
+
+    if (newAssigneeIds.length > 0) {
+      const sent = await this.notifyAssignees(after, actorUserId, newAssigneeIds);
+      sent.forEach((id) => notifiedUserIds.add(id));
+    }
+
+    const beforeSubtasks = before?.subtasks ?? [];
+    const afterSubtasks = after.subtasks ?? [];
+    if (afterSubtasks.length === 0 && !isCreate) return;
+
+    const beforeSubtaskIds = new Set(beforeSubtasks.map((subtask) => subtask.id));
+    const addedSubtasks = isCreate
+      ? afterSubtasks
+      : afterSubtasks.filter((subtask) => !beforeSubtaskIds.has(subtask.id));
+
+    for (const subtask of afterSubtasks) {
+      const previous = beforeSubtasks.find((item) => item.id === subtask.id);
+      const assigneeChanged =
+        !!subtask.assigneeId &&
+        subtask.assigneeId !== previous?.assigneeId &&
+        subtask.assigneeId !== actorUserId &&
+        !notifiedUserIds.has(subtask.assigneeId);
+
+      if (!assigneeChanged) continue;
+
+      const sent = await this.notifySubtaskAssignee(after, subtask, actorUserId);
+      if (sent) notifiedUserIds.add(sent);
+    }
+
+    const subtasksNeedingTaskAssigneeNotice = addedSubtasks.filter(
+      (subtask) => !subtask.assigneeId || !notifiedUserIds.has(subtask.assigneeId),
+    );
+    if (subtasksNeedingTaskAssigneeNotice.length > 0) {
+      const taskAssigneeTargets = afterAssignees.filter(
+        (id) => id !== actorUserId && !notifiedUserIds.has(id),
+      );
+      if (taskAssigneeTargets.length > 0) {
+        await this.notifyTaskAssigneesAboutSubtasks(
+          after,
+          actorUserId,
+          taskAssigneeTargets,
+          subtasksNeedingTaskAssigneeNotice,
+        );
+      }
+    }
+  }
+
   private async notifyAssignees(
-    assigneeIds: string[],
+    task: TaskEntity,
     assignerUserId: string,
-    taskTitle: string,
-    taskId: string,
-    projectId: string,
+    notifyAssigneeIds: string[],
+  ): Promise<string[]> {
+    const context = await this.buildTaskEmailContext(task, assignerUserId);
+    const notified: string[] = [];
+
+    for (const assigneeId of notifyAssigneeIds) {
+      if (assigneeId === assignerUserId) continue;
+      const sent = await this.sendTaskEmailToUser(assigneeId, context, {
+        emailSubject: `Task assigned: ${task.title}`,
+        headline: 'Task Assigned to You',
+      });
+      if (sent) {
+        notified.push(assigneeId);
+        await this.notificationsService.createNotification(
+          assigneeId,
+          `Task assigned: ${task.title}`,
+          `${context.assignerName} assigned you to "${task.title}"${context.projectName ? ` in ${context.projectName}` : ''}.`,
+        ).catch((err) => this.logger.warn(`In-app notification failed: ${err}`));
+      }
+    }
+
+    return notified;
+  }
+
+  private async notifySubtaskAssignee(
+    task: TaskEntity,
+    subtask: NonNullable<TaskEntity['subtasks']>[number],
+    assignerUserId: string,
+  ): Promise<string | null> {
+    if (!subtask.assigneeId || subtask.assigneeId === assignerUserId) return null;
+
+    const context = await this.buildTaskEmailContext(task, assignerUserId);
+    const projectLine = context.projectName
+      ? ` in <strong>${escapeHtml(context.projectName)}</strong>`
+      : '';
+
+    return this.sendTaskEmailToUser(subtask.assigneeId, context, {
+      emailSubject: `Subtask assigned: ${subtask.title}`,
+      headline: 'Subtask Assigned to You',
+      introHtml: `<p style="text-align:center;color:#64748b;font-size:15px;line-height:1.6;margin:0 0 20px;">
+  Hi <strong>{{assigneeName}}</strong>, <strong>${escapeHtml(context.assignerName)}</strong> assigned you a subtask${projectLine}.
+</p>`,
+      cardLabel: 'Subtask',
+      highlightTitle: subtask.title,
+      parentTaskTitle: task.title,
+      dueDateLabel: subtask.dueDate
+        ? formatTaskDueDateLabel(subtask.dueDate)
+        : context.dueDateLabel,
+    });
+  }
+
+  private async notifyTaskAssigneesAboutSubtasks(
+    task: TaskEntity,
+    assignerUserId: string,
+    assigneeIds: string[],
+    addedSubtasks: NonNullable<TaskEntity['subtasks']>,
   ): Promise<void> {
-    const [assigner, project] = await Promise.all([
-      this.usersService.findById(assignerUserId),
-      this.projectsService.findById(projectId),
-    ]);
-    const assignerName = assigner?.fullName || assigner?.email || 'Someone';
-    const projectName = project?.name;
-    const frontendUrl = getFrontendUrl();
-    const taskUrl = `${frontendUrl}/dashboard/projects/${projectId}/board?task=${taskId}`;
+    const context = await this.buildTaskEmailContext(task, assignerUserId);
+    const focusSubtasks = addedSubtasks.map((subtask) => ({
+      title: subtask.title,
+      completed: subtask.completed,
+    }));
+    const subtaskList = focusSubtasks.map((subtask) => escapeHtml(subtask.title)).join(', ');
+    const projectLine = context.projectName
+      ? ` in <strong>${escapeHtml(context.projectName)}</strong>`
+      : '';
 
     for (const assigneeId of assigneeIds) {
-      if (assigneeId === assignerUserId) continue; // don't notify self
-      const assignee = await this.usersService.findById(assigneeId);
-      if (!assignee?.email) continue;
-
-      const assigneeName = assignee.fullName || assignee.email;
-
-      // In-app notification
+      if (assigneeId === assignerUserId) continue;
+      await this.sendTaskEmailToUser(assigneeId, context, {
+        emailSubject: `Subtasks added to: ${task.title}`,
+        headline: 'New Subtasks on Your Task',
+        introHtml: `<p style="text-align:center;color:#64748b;font-size:15px;line-height:1.6;margin:0 0 20px;">
+  Hi <strong>{{assigneeName}}</strong>, <strong>${escapeHtml(context.assignerName)}</strong> added subtasks to "${escapeHtml(task.title)}"${projectLine}: <strong>${subtaskList}</strong>.
+</p>`,
+        focusSubtasks,
+      });
       await this.notificationsService.createNotification(
         assigneeId,
-        `Task assigned: ${taskTitle}`,
-        `${assignerName} assigned you to "${taskTitle}"${projectName ? ` in ${projectName}` : ''}.`,
+        `Subtasks added: ${task.title}`,
+        `${context.assignerName} added ${addedSubtasks.length} subtask(s) to "${task.title}".`,
       ).catch((err) => this.logger.warn(`In-app notification failed: ${err}`));
+    }
+  }
 
-      // Email notification
+  private async buildTaskEmailContext(task: TaskEntity, assignerUserId: string) {
+    const [assigner, project, attachments] = await Promise.all([
+      this.usersService.findById(assignerUserId),
+      this.projectsService.findById(task.projectId),
+      this.tasksService.getAttachments(task.id),
+    ]);
+
+    const assignerName = assigner?.fullName || assigner?.email || 'Someone';
+    const assignerEmail = assigner?.email || 'unknown';
+    const projectName = project?.name;
+    const frontendUrl = getFrontendUrl();
+    const taskUrl = `${frontendUrl}/dashboard/projects/${task.projectId}/board?task=${task.id}`;
+    const dueDateLabel = formatTaskDueDateLabel(task.dueDate);
+    const subtasks = (task.subtasks ?? []).map((subtask) => ({
+      title: subtask.title,
+      completed: subtask.completed,
+    }));
+    const attachmentItems = attachments.map((attachment) => ({
+      fileName: attachment.fileName || 'Attachment',
+      fileSize: formatAttachmentFileSize(
+        attachment.fileSizeBytes == null ? null : Number(attachment.fileSizeBytes),
+      ),
+    }));
+
+    const allAssigneeIds = this.getTaskAssigneeIds(task);
+    const assigneeUsers = await Promise.all(
+      Array.from(new Set(allAssigneeIds)).map((id) => this.usersService.findById(id)),
+    );
+    const allAssigneesLabel = assigneeUsers
+      .filter((user) => user?.email)
+      .map((user) => `${user!.fullName || user!.email} (${user!.email})`)
+      .join(', ') || 'Unassigned';
+
+    return {
+      assignerName,
+      assignerEmail,
+      projectName,
+      taskUrl,
+      dueDateLabel,
+      subtasks,
+      attachmentItems,
+      allAssigneesLabel,
+      taskTitle: task.title,
+      taskDescription: task.description,
+    };
+  }
+
+  private async sendTaskEmailToUser(
+    assigneeId: string,
+    context: Awaited<ReturnType<TasksController['buildTaskEmailContext']>>,
+    overrides: {
+      emailSubject: string;
+      headline: string;
+      introHtml?: string;
+      cardLabel?: string;
+      highlightTitle?: string;
+      parentTaskTitle?: string;
+      focusSubtasks?: Array<{ title: string; completed?: boolean }>;
+      dueDateLabel?: string;
+    },
+  ): Promise<string | null> {
+    const assignee = await this.usersService.findById(assigneeId);
+    if (!assignee?.email) {
+      this.logger.warn(`Skipping task email — no email for user ${assigneeId}`);
+      return null;
+    }
+
+    const assigneeName = assignee.fullName || assignee.email;
+    const introHtml = overrides.introHtml?.replace(/\{\{assigneeName\}\}/g, assigneeName);
+
+    try {
       await this.emailService.sendTaskAssignment({
         to: assignee.email,
         assigneeName,
-        taskTitle,
-        projectName,
-        assignerName,
-        taskUrl,
-      }).catch((err) => this.logger.warn(`Task assignment email failed for ${assignee.email}: ${err}`));
+        assigneeEmail: assignee.email,
+        assignerName: context.assignerName,
+        assignerEmail: context.assignerEmail,
+        taskTitle: context.taskTitle,
+        taskDescription: context.taskDescription,
+        projectName: context.projectName,
+        dueDateLabel: overrides.dueDateLabel ?? context.dueDateLabel,
+        subtasks: context.subtasks,
+        attachments: context.attachmentItems,
+        allAssigneesLabel: context.allAssigneesLabel,
+        taskUrl: context.taskUrl,
+        emailSubject: overrides.emailSubject,
+        headline: overrides.headline,
+        introHtml,
+        cardLabel: overrides.cardLabel,
+        highlightTitle: overrides.highlightTitle,
+        parentTaskTitle: overrides.parentTaskTitle,
+        focusSubtasks: overrides.focusSubtasks,
+      });
+      this.logger.log(`Task email sent to ${assignee.email} (${overrides.emailSubject})`);
+      return assigneeId;
+    } catch (err) {
+      this.logger.error(
+        `Task assignment email failed for ${assignee.email}: ${err instanceof Error ? err.message : err}`,
+        err instanceof Error ? err.stack : undefined,
+      );
+      return null;
     }
   }
 

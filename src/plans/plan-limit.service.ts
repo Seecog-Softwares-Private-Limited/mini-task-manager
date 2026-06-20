@@ -162,7 +162,7 @@ export class PlanLimitService {
     const limit = (await this.getLimits(plan)).maxWorkspaces;
     const used = (await this.organizationsRepository.findByOwnerId(userId)).length;
     if (limit !== null && used >= limit) {
-      this.throwLimit('workspace', plan, used, limit);
+      await this.throwLimit('workspace', plan, used, limit);
     }
   }
 
@@ -173,7 +173,7 @@ export class PlanLimitService {
       const user = ownerId ? await this.findUser(ownerId) : null;
       const plan = user ? this.resolveEffectivePlan(user) : 'free';
       const usage = await this.usageService.getOrganizationUsage(organizationId);
-      this.throwLimit('member', plan, usage.users.current, usage.users.limit ?? 0);
+      await this.throwLimit('member', plan, usage.users.current, usage.users.limit ?? 0);
     }
   }
 
@@ -183,7 +183,7 @@ export class PlanLimitService {
     const limitBytes = (await this.getLimits(plan)).storageBytes;
     const used = Number(user?.storageUsed ?? 0);
     if (used + fileSize > limitBytes) {
-      this.throwLimit('storage', plan, used, limitBytes);
+      await this.throwLimit('storage', plan, used, limitBytes);
     }
   }
 
@@ -204,14 +204,24 @@ export class PlanLimitService {
       .execute();
   }
 
-  private throwLimit(
+  private async throwLimit(
     limitType: PlanLimitType,
     plan: UserPlanSlug,
     currentUsage: number,
     planLimit: number,
-  ): never {
+  ): Promise<never> {
+    const configs = await this.planConfigurationsService.getAll();
+    const priceByPlan = Object.fromEntries(
+      configs.map((config) => [config.planName, config.priceMonthlyInr]),
+    ) as Partial<Record<UserPlanSlug, number>>;
     throw new LimitExceededException(
-      buildLimitExceededPayload(limitType, plan, currentUsage, planLimit),
+      buildLimitExceededPayload(
+        limitType,
+        plan,
+        currentUsage,
+        planLimit,
+        priceByPlan,
+      ),
     );
   }
 }

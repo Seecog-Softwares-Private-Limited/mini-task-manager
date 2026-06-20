@@ -1,16 +1,36 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { fetchSuperAdminUsers, setSuperAdminUserActive } from "@/services/api/super-admin.api";
 
+const SEARCH_DEBOUNCE_MS = 400;
+
 export default function SuperAdminUsersPage() {
   const [search, setSearch] = useState("");
-  const { data, isLoading, refetch } = useQuery({
-    queryKey: ["super-admin", "users", search],
-    queryFn: () => fetchSuperAdminUsers({ search: search || undefined }),
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    debounceRef.current = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [search]);
+
+  const { data, isLoading, isFetching, refetch } = useQuery({
+    queryKey: ["super-admin", "users", debouncedSearch],
+    queryFn: ({ signal }) =>
+      fetchSuperAdminUsers(
+        { search: debouncedSearch || undefined },
+        signal
+      ),
+    retry: false,
+    staleTime: 30_000,
   });
 
   async function toggle(id: string, status: string) {
@@ -21,8 +41,12 @@ export default function SuperAdminUsersPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Users</h1>
-      <Input placeholder="Search users..." value={search} onChange={(e) => setSearch(e.target.value)} />
-      {isLoading ? (
+      <Input
+        placeholder="Search users..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
+      {isLoading || (isFetching && !data) ? (
         <p className="text-sm text-muted-foreground">Loading users...</p>
       ) : (
         <div className="overflow-x-auto rounded-lg border">
@@ -61,4 +85,3 @@ export default function SuperAdminUsersPage() {
     </div>
   );
 }
-

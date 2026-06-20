@@ -15,8 +15,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DropdownScrollList } from "@/components/ui/dropdown-scroll-list";
-import { Check, Search, UserRoundX } from "lucide-react";
+import { AssigneeBulkActions } from "@/components/tasks/assignee-bulk-actions";
+import { Check, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  areAllFilteredAssigneesSelected,
+  toggleSelectAllFilteredAssignees,
+} from "@/lib/task-assignees";
 
 interface TaskAssignee {
   id?: string;
@@ -86,6 +91,16 @@ export function TaskAssigneePopover({
     });
   }, [normalizedMembers, search]);
 
+  const allFilteredSelected = useMemo(
+    () => areAllFilteredAssigneesSelected(selectedIds, filtered.map((m) => m.id)),
+    [selectedIds, filtered]
+  );
+
+  const selectedFilteredCount = useMemo(
+    () => filtered.filter((m) => selectedIds.has(m.id)).length,
+    [filtered, selectedIds]
+  );
+
   const assignMutation = useMutation({
     mutationFn: (assigneeIds: string[]) =>
       assigneeIds.length === 1 && !multiAssign
@@ -141,6 +156,14 @@ export function TaskAssigneePopover({
     if (!multiAssign) setOpen(false);
   }
 
+  function handleSelectAllFiltered() {
+    const assigneeIds = toggleSelectAllFilteredAssignees(
+      Array.from(selectedIds),
+      filtered.map((m) => m.id),
+    );
+    assignMutation.mutate(assigneeIds);
+  }
+
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
@@ -166,19 +189,21 @@ export function TaskAssigneePopover({
           </div>
         </div>
         <DropdownMenuSeparator />
+        <AssigneeBulkActions
+          filteredCount={filtered.length}
+          allSelected={allFilteredSelected}
+          selectedCount={selectedFilteredCount}
+          isSearchActive={search.trim().length > 0}
+          showSelectAll={multiAssign}
+          onToggleSelectAll={handleSelectAllFiltered}
+          onClear={() => {
+            assignMutation.mutate([]);
+            setOpen(false);
+          }}
+          disabled={assignMutation.isPending}
+          quickAction
+        />
         <DropdownScrollList>
-          <DropdownMenuItem
-            onClick={() => {
-              assignMutation.mutate([]);
-              setOpen(false);
-            }}
-            data-quick-action
-            className="rounded-md text-xs"
-          >
-            <UserRoundX className="mr-2 h-3.5 w-3.5" />
-            Clear assignment
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
           {filtered.map((member) => {
             const checked = selectedIds.has(member.id);
             return (

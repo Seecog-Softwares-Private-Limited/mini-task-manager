@@ -42,13 +42,14 @@ export function buildLimitExceededPayload(
   currentPlan: UserPlanSlug,
   currentUsage: number,
   planLimit: number | null,
+  priceByPlan?: Partial<Record<UserPlanSlug, number>>,
 ): LimitExceededPayload {
   const upgradeSlugs = getUpgradeOptions(currentPlan);
   const upgradeTo: UpgradeOptionPayload[] = upgradeSlugs.map((slug) => {
     const def = getPlanDefinition(slug);
     return {
       plan: slug,
-      price: def.pricing.priceMonthlyInr,
+      price: priceByPlan?.[slug] ?? def.pricing.priceMonthlyInr,
       currency: 'INR',
       benefits: def.benefits,
     };

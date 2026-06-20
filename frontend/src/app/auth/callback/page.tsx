@@ -30,7 +30,7 @@ function AuthCallbackContent() {
     setStoredToken(token);
     window.dispatchEvent(new CustomEvent("auth:login"));
     setStatus("success");
-    router.replace("/dashboard");
+    router.replace("/dashboard/workspaces");
   }, [searchParams, router]);
 
   if (status === "loading") {

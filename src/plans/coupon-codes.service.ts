@@ -131,7 +131,8 @@ export class CouponCodesService {
     plan: UserPlanSlug,
     userId?: string,
   ): Promise<CouponValidationResult> {
-    const baseInr = getPlanDefinition(plan).pricing.priceMonthlyInr;
+    const config = await this.planConfigurationsService.getByPlanName(plan);
+    const baseInr = config.priceMonthlyInr;
     const invalid = (message: string): CouponValidationResult => ({
       valid: false,
       code: code.trim().toUpperCase(),
@@ -147,7 +148,6 @@ export class CouponCodesService {
       return invalid('Coupons cannot be applied to the Free plan');
     }
 
-    const config = await this.planConfigurationsService.getByPlanName(plan);
     if (!config.allowCoupon) {
       return invalid(`Coupon codes are not enabled for the ${PLANS[plan].name} plan`);
     }

@@ -92,6 +92,11 @@ function SignupForm() {
         fullName: values.fullName.trim(),
         password: values.password,
       });
+      if (res.emailVerified === true && res.accessToken) {
+        window.dispatchEvent(new CustomEvent("auth:login"));
+        window.location.href = "/dashboard/workspaces";
+        return;
+      }
       setSignupEmail(values.email.trim().toLowerCase());
       setSignupEmailVerified(res.emailVerified === true);
       setDevVerificationCode(res.devVerificationCode ?? null);
@@ -174,18 +179,14 @@ function SignupForm() {
         <PremiumAuthCard
           variant="compact"
           title="You’re all set"
-          subtitle={`Account created for ${signupEmail}. You can sign in with your password now.`}
+          subtitle={`Account created for ${signupEmail}. Redirecting to your workspace...`}
           icon={
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/20">
               <Mail className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
             </div>
           }
         >
-          <div className="mt-2">
-            <Button asChild className={authPrimaryButtonClass}>
-              <AuthTransitionLink href="/login">Go to Sign in</AuthTransitionLink>
-            </Button>
-          </div>
+          <div className="mt-2 text-center text-sm text-muted-foreground">Please wait...</div>
         </PremiumAuthCard>
       );
     }
