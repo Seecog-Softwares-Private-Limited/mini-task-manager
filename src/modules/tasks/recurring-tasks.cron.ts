@@ -21,5 +21,20 @@ export class RecurringTasksCron {
       );
     }
   }
+
+  /** Run shortly after midnight to create the day's recurring task cards. */
+  @Cron('5 0 * * *')
+  async materializeAtMidnight() {
+    try {
+      const result = await this.recurringTasksService.generateDueOccurrences();
+      this.logger.log(
+        `Midnight recurring sync: generated ${result.generated} occurrence(s)`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Midnight recurring generation failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
 }
 

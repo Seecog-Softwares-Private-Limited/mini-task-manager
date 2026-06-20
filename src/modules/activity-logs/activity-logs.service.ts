@@ -27,4 +27,22 @@ export class ActivityLogsService {
   }): Promise<void> {
     await this.activityLogsRepository.create(data);
   }
+
+  async exportCsv(organizationId: string): Promise<string> {
+    const [rows] = await this.activityLogsRepository.findByOrganization(organizationId, 1, 10_000);
+    const lines = ['id,user_id,entity_type,entity_id,action,created_at'];
+    for (const row of rows) {
+      lines.push(
+        [
+          row.id,
+          row.userId ?? '',
+          row.entityType,
+          row.entityId ?? '',
+          row.action,
+          row.createdAt?.toISOString?.() ?? '',
+        ].join(','),
+      );
+    }
+    return lines.join('\n');
+  }
 }

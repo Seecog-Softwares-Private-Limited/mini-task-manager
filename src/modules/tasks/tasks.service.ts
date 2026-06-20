@@ -14,6 +14,7 @@ import { TaskAttachmentEntity } from './entities/task-attachment.entity';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { PatchTaskDto } from './dto/patch-task.dto';
 import { RecurringTasksService } from './recurring-tasks.service';
+import { OrgEventsService } from '../org-events/org-events.service';
 import { PaginationQueryDto, PaginatedResult, paginate } from '../../common/pagination';
 import { formatUuid, generateUuid } from '../../common/utils/uuid.util';
 import { Configuration } from '../../config/configuration';
@@ -96,6 +97,8 @@ export class TasksService {
     private readonly planLimitService: PlanLimitService,
     @Inject(forwardRef(() => RecurringTasksService))
     private readonly recurringTasksService: RecurringTasksService,
+    @Inject(forwardRef(() => OrgEventsService))
+    private readonly orgEventsService: OrgEventsService,
   ) {}
 
   async findById(id: string): Promise<TaskEntity | null> {
@@ -183,6 +186,14 @@ export class TasksService {
     }
     this.activityLogsService
       .log({ organizationId, userId: reporterId, entityType: 'task', entityId: task.id, action: 'create', metadata: { name: task.title } })
+      .catch(() => {});
+    this.orgEventsService
+      .taskCreated({
+        organizationId,
+        projectId,
+        taskId: task.id,
+        title: task.title,
+      })
       .catch(() => {});
     return (await this.tasksRepository.findById(task.id)) ?? task;
   }
@@ -272,6 +283,15 @@ export class TasksService {
       const action = dto.statusId !== undefined ? 'move' : 'update';
       this.activityLogsService
         .log({ organizationId, userId: userId ?? undefined, entityType: 'task', entityId: taskId, action, metadata: { name: task.title } })
+        .catch(() => {});
+      this.orgEventsService
+        .taskUpdated({
+          organizationId,
+          projectId: task.projectId,
+          taskId,
+          title: task.title,
+          changes: patch as Record<string, unknown>,
+        })
         .catch(() => {});
     }
 

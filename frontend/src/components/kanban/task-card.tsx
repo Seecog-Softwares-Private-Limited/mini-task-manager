@@ -55,6 +55,7 @@ import {
   UserPlus,
   Wrench,
   Pause,
+  AlarmClock,
 } from "lucide-react";
 import { TaskAssigneePopover } from "@/components/tasks/task-assignee-popover";
 import {
@@ -72,6 +73,12 @@ import {
   getRecurringMissedTone,
   recurrenceBadgeLabel,
 } from "@/lib/recurring-board-utils";
+import { cadenceBarClass, RECURRING_OVERDUE_COLUMN_ID } from "@/lib/recurring-board-constants";
+import {
+  getRecurringCardTheme,
+  recurringCardMissedBadge,
+  recurringCardOverdueSurface,
+} from "@/lib/recurring-card-theme";
 
 export type TaskType =
   | "bug"
@@ -230,6 +237,13 @@ const QUICK_ACTION_BTN = cn(
   "transition-all duration-200",
   "hover:border-violet-300/40 hover:bg-white hover:shadow-sm",
   "dark:bg-card/95 dark:hover:bg-card"
+);
+
+const EXEC_RECURRING_ACTIONS = cn(
+  "absolute inset-x-0 bottom-0 z-20 flex items-center justify-between gap-1 border-t border-border/40 bg-background/95 px-2 py-1.5 backdrop-blur-md",
+  "translate-y-full opacity-0 transition-all duration-300",
+  "group-hover/card:translate-y-0 group-hover/card:opacity-100",
+  "group-focus-within/card:translate-y-0 group-focus-within/card:opacity-100"
 );
 
 const QUICK_ACTIONS_BAR = cn(
@@ -605,6 +619,8 @@ interface TaskCardProps {
   onToggleSelect?: (taskId: string) => void;
   recurringBoardMode?: boolean;
   recurringTemplate?: RecurringTemplateSummary;
+  /** Stagger entrance animation on recurring board */
+  cardIndex?: number;
   recurringTemplateMap?: Record<string, RecurringTemplateSummary>;
 }
 
@@ -627,6 +643,7 @@ export function TaskCard({
   onToggleSelect,
   recurringBoardMode = false,
   recurringTemplate,
+  cardIndex = 0,
   recurringTemplateMap,
 }: TaskCardProps) {
   const canManageTask =
@@ -733,6 +750,8 @@ export function TaskCard({
     subtaskInfo?.completed ??
     task.checklistCompleted ??
     (Array.isArray(task.subtasks) ? task.subtasks.filter((s) => s.completed).length : 0);
+  const canCompleteRecurringOccurrence =
+    !isRecurring || checklistTotal === 0 || checklistCompleted === checklistTotal;
 
   const prioCfg = PRIORITY[normalizePriority(task.priority)] ?? PRIORITY.medium;
   const statusBulbClass =
@@ -760,6 +779,13 @@ export function TaskCard({
           ? STATUS_CARD_SURFACE.in_progress
           : STATUS_CARD_SURFACE.default;
 
+  const recurringTheme = getRecurringCardTheme(
+    recurringTemplate?.repeatType ?? task.recurrenceType
+  );
+  const isRecurringOverdue =
+    recurringBoardMode &&
+    (boardColumnStatus?.id === RECURRING_OVERDUE_COLUMN_ID || missedTone === "critical");
+
   return (
     <div
       role="button"
@@ -781,45 +807,105 @@ export function TaskCard({
         }
       }}
       className={cn(
-        "group/card relative flex min-h-[9rem] cursor-pointer flex-col overflow-hidden rounded-lg border shadow-sm",
-        statusSurfaceClass,
-        "transition-[box-shadow,transform,border-color,opacity] duration-200 ease-out",
-        "hover:-translate-y-px",
-        !isCompleted && "hover:border-slate-300/70 hover:shadow-[0_2px_12px_-4px_rgba(15,23,42,0.1)]",
+        "group/card relative flex min-h-[9rem] cursor-pointer flex-col overflow-hidden border shadow-sm",
+        recurringBoardMode ? "rounded-xl" : "rounded-lg",
+        !recurringBoardMode && statusSurfaceClass,
+        recurringBoardMode
+          ? cn(
+              "shadow-md backdrop-blur-sm",
+              isRecurringOverdue ? recurringCardOverdueSurface() : recurringTheme.surface,
+              !isOverlay && "animate-recurring-card-enter",
+              !isCompleted &&
+                "hover:-translate-y-1 hover:scale-[1.01] hover:shadow-xl hover:shadow-black/5 dark:hover:shadow-black/25",
+              "transition-[box-shadow,transform,border-color,opacity] duration-300 ease-out"
+            )
+          : cn(
+              "transition-[box-shadow,transform,border-color,opacity] duration-200 ease-out",
+              "hover:-translate-y-px",
+              !isCompleted && "hover:border-slate-300/70 hover:shadow-[0_2px_12px_-4px_rgba(15,23,42,0.1)]"
+            ),
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/25 focus-visible:ring-offset-2",
         isOverlay && "scale-[1.02] shadow-lg ring-2 ring-violet-400/30",
         isSelected && "border-violet-400/40 bg-violet-50/30 ring-2 ring-violet-400/20 dark:bg-violet-500/5",
         isMoving && "opacity-65",
         task.id.startsWith("temp-") && "border-dashed",
-        isRecurring && SERIES_CARD_CHROME,
-        recurringBoardMode && "border-indigo-200/35 bg-indigo-50/[0.04] dark:border-indigo-500/15 dark:bg-indigo-500/[0.03]",
+        isRecurring && !recurringBoardMode && SERIES_CARD_CHROME,
         isCompleted && "shadow-none",
         !canWorkflowEdit && "cursor-default hover:translate-y-0 hover:shadow-sm",
       )}
+      style={
+        recurringBoardMode && !isOverlay
+          ? { animationDelay: `${Math.min(cardIndex, 10) * 55}ms` }
+          : undefined
+      }
       data-cy={`task-card-${task.id}`}
       aria-label={`Open task ${task.title}`}
     >
       {/* Status accent rail */}
-      <span
-        className={cn(
-          "pointer-events-none absolute bottom-3 left-0 top-3 w-1 rounded-r-full",
-          leftAccentClass,
-        )}
-        aria-hidden
-      />
+      {!recurringBoardMode ? (
+        <span
+          className={cn(
+            "pointer-events-none absolute bottom-3 left-0 top-3 w-1 rounded-r-full",
+            leftAccentClass,
+          )}
+          aria-hidden
+        />
+      ) : null}
+      {recurringBoardMode && !isOverlay ? (
+        <span
+          className={cn(
+            "recurring-card-glow-orb pointer-events-none absolute -right-8 -top-8 z-0 h-28 w-28 rounded-full blur-3xl",
+            recurringTheme.glow
+          )}
+          aria-hidden
+        />
+      ) : null}
+      {recurringBoardMode ? (
+        <span
+          className="recurring-shine-track pointer-events-none absolute inset-0 z-[5] opacity-0 transition-all duration-700 ease-out"
+          style={{
+            background:
+              "linear-gradient(105deg, transparent 35%, rgba(255,255,255,0.4) 50%, transparent 65%)",
+            transform: "translateX(-120%)",
+          }}
+          aria-hidden
+        />
+      ) : null}
       {isRecurring ? (
         <span
-          className="pointer-events-none absolute left-2 top-3 bottom-3 w-0.5 rounded-full bg-indigo-500/70 shadow-sm dark:bg-indigo-400/60"
+          className={cn(
+            "pointer-events-none absolute rounded-full shadow-sm",
+            recurringBoardMode
+              ? cn("bottom-0 left-0 top-0 w-1 rounded-none rounded-r-full", recurringTheme.rail)
+              : cn(
+                  "left-2 top-3 bottom-3 w-0.5",
+                  cadenceBarClass(recurringTemplate?.repeatType ?? task.recurrenceType)
+                )
+          )}
           aria-hidden
         />
       ) : null}
 
       {ribbonLabel ? (
         <div
-          className="pointer-events-none absolute right-2 top-2 z-[15] flex items-center gap-1 rounded-md border border-indigo-500/20 bg-indigo-500/[0.07] px-1.5 py-0.5 text-[10px] font-semibold text-indigo-800 dark:border-indigo-400/25 dark:bg-indigo-500/10 dark:text-indigo-200"
+          className={cn(
+            "pointer-events-none absolute right-2 top-2 z-[15] flex items-center gap-1 text-[10px] font-semibold",
+            recurringBoardMode
+              ? cn(
+                  "rounded-full border px-2 py-0.5 shadow-sm backdrop-blur-sm",
+                  recurringTheme.ribbon
+                )
+              : "rounded-md border border-indigo-500/20 bg-indigo-500/[0.07] px-1.5 py-0.5 text-indigo-800 dark:border-indigo-400/25 dark:bg-indigo-500/10 dark:text-indigo-200"
+          )}
           aria-label={`Recurring series: ${ribbonLabel}`}
         >
-          <Repeat className="h-3 w-3 shrink-0 opacity-80" aria-hidden />
+          <Repeat
+            className={cn(
+              "h-3 w-3 shrink-0 opacity-80",
+              recurringBoardMode && "recurring-ribbon-icon"
+            )}
+            aria-hidden
+          />
           {ribbonLabel}
         </div>
       ) : null}
@@ -841,7 +927,7 @@ export function TaskCard({
         </button>
       )}
 
-      {showQuickActions && (
+      {showQuickActions && !(recurringBoardMode && isRecurring) ? (
         <div className={QUICK_ACTIONS_BAR}>
           <Button
             type="button"
@@ -867,8 +953,15 @@ export function TaskCard({
                   className={QUICK_ACTION_BTN}
                   data-quick-action
                   aria-label="Mark done"
+                  title={
+                    canCompleteRecurringOccurrence
+                      ? "Mark done"
+                      : "Finish all subtasks before marking this run done"
+                  }
+                  disabled={!canCompleteRecurringOccurrence}
                   onClick={(e) => {
                     e.stopPropagation();
+                    if (!canCompleteRecurringOccurrence) return;
                     suppressOpenRef.current = true;
                     quickActions.onCompleteOccurrence?.(task);
                   }}
@@ -883,7 +976,7 @@ export function TaskCard({
                   size="icon"
                   className={QUICK_ACTION_BTN}
                   data-quick-action
-                  aria-label="Skip today"
+                  aria-label="Skip next run"
                   onClick={(e) => {
                     e.stopPropagation();
                     suppressOpenRef.current = true;
@@ -1024,14 +1117,18 @@ export function TaskCard({
               {isRecurring && quickActions?.onCompleteOccurrence ? (
                 <>
                   <DropdownMenuItem
+                    disabled={!canCompleteRecurringOccurrence}
                     onSelect={() => {
+                      if (!canCompleteRecurringOccurrence) return;
                       suppressOpenRef.current = true;
                       quickActions.onCompleteOccurrence?.(task);
                     }}
                     className="text-xs"
                   >
                     <CheckCircle2 className="mr-2 h-3.5 w-3.5" />
-                    {recurringBoardMode ? "Edit occurrence" : "Complete occurrence"}
+                    {canCompleteRecurringOccurrence
+                      ? "Complete run"
+                      : "Finish subtasks first"}
                   </DropdownMenuItem>
                   {quickActions?.onSkipNextOccurrence ? (
                     <DropdownMenuItem
@@ -1042,7 +1139,7 @@ export function TaskCard({
                       className="text-xs"
                     >
                       <SkipForward className="mr-2 h-3.5 w-3.5" />
-                      {recurringBoardMode ? "Skip today" : "Skip next occurrence"}
+                      Skip next run
                     </DropdownMenuItem>
                   ) : null}
                   {recurringBoardMode && quickActions?.onEdit ? (
@@ -1054,7 +1151,7 @@ export function TaskCard({
                       className="text-xs"
                     >
                       <SquarePen className="mr-2 h-3.5 w-3.5" />
-                      Edit entire series
+                      Edit run details
                     </DropdownMenuItem>
                   ) : null}
                   <DropdownMenuSeparator />
@@ -1081,13 +1178,95 @@ export function TaskCard({
                   className="text-xs text-destructive focus:text-destructive"
                 >
                   <Trash2 className="mr-2 h-3.5 w-3.5" />
-                  {recurringBoardMode && isRecurring ? "Delete series" : "Delete task"}
+                  {recurringBoardMode && isRecurring ? "Delete run" : "Delete task"}
                 </DropdownMenuItem>
               ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-      )}
+      ) : null}
+
+      {showQuickActions && recurringBoardMode && isRecurring ? (
+        <div
+          className={cn(
+            EXEC_RECURRING_ACTIONS,
+            "pointer-events-none group-hover/card:pointer-events-auto group-focus-within/card:pointer-events-auto"
+          )}
+        >
+          {quickActions?.onCompleteOccurrence ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 flex-1 gap-1 px-1 text-[10px] font-semibold"
+              data-quick-action
+              title={
+                canCompleteRecurringOccurrence
+                  ? "Mark done"
+                  : "Finish all subtasks before marking this run done"
+              }
+              disabled={!canCompleteRecurringOccurrence}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!canCompleteRecurringOccurrence) return;
+                suppressOpenRef.current = true;
+                quickActions.onCompleteOccurrence?.(task);
+              }}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Done
+            </Button>
+          ) : null}
+          {quickActions?.onSkipNextOccurrence ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 flex-1 gap-1 px-1 text-[10px] font-semibold"
+              data-quick-action
+              onClick={(e) => {
+                e.stopPropagation();
+                suppressOpenRef.current = true;
+                quickActions.onSkipNextOccurrence?.(task);
+              }}
+            >
+              <SkipForward className="h-3.5 w-3.5" />
+              Skip next
+            </Button>
+          ) : null}
+          {quickActions?.onSnoozeOccurrence ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 flex-1 gap-1 px-1 text-[10px] font-semibold"
+              data-quick-action
+              onClick={(e) => {
+                e.stopPropagation();
+                suppressOpenRef.current = true;
+                quickActions.onSnoozeOccurrence?.(task);
+              }}
+            >
+              <AlarmClock className="h-3.5 w-3.5" />
+              Snooze
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 flex-1 gap-1 px-1 text-[10px] font-semibold"
+            data-quick-action
+            onClick={(e) => {
+              e.stopPropagation();
+              onTaskClick?.(task);
+            }}
+          >
+            <ArrowUpRight className="h-3.5 w-3.5" />
+            Details
+          </Button>
+        </div>
+      ) : null}
 
       {isMoving && (
         <div className="absolute inset-0 z-30 flex items-center justify-center rounded-2xl bg-[#FCFCFD]/80 backdrop-blur-[2px] dark:bg-card/80">
@@ -1098,6 +1277,7 @@ export function TaskCard({
       <div
         className={cn(
           "relative z-10 flex min-h-0 flex-1 flex-col px-3 pb-2.5 pt-2.5 pl-3.5",
+          recurringBoardMode && "pb-10",
           isSelectionMode && "pl-8"
         )}
       >
@@ -1148,6 +1328,31 @@ export function TaskCard({
           {titlePreview}
         </h3>
 
+        {recurringBoardMode && recurringTemplate?.title ? (
+          <p className="mt-0.5 truncate text-[11px] font-semibold text-muted-foreground/90">
+            {recurringTemplate.title}
+          </p>
+        ) : null}
+
+        {recurringBoardMode && ribbonLabel ? (
+          <div className="mt-1 flex flex-wrap items-center gap-1">
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+                getRecurringCardTheme(recurringTemplate?.repeatType ?? task.recurrenceType).ribbon
+              )}
+            >
+              <Repeat className="h-3 w-3 opacity-80" aria-hidden />
+              {ribbonLabel}
+            </span>
+            {typeof task.recurrenceSequence === "number" && task.recurrenceSequence > 0 ? (
+              <span className="rounded-md bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground">
+                Run #{task.recurrenceSequence}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
         {descriptionPreview ? (
           <p className={cn("mt-1", TASK_CARD_DESCRIPTION)}>
             {descriptionPreview}
@@ -1155,7 +1360,14 @@ export function TaskCard({
         ) : null}
 
         {cadenceLine ? (
-          <p className="mt-1 text-[10px] font-medium text-indigo-700/75 dark:text-indigo-300/75">
+          <p
+            className={cn(
+              "mt-1 text-[10px] font-medium",
+              recurringBoardMode
+                ? cn("tracking-wide", recurringTheme.schedule)
+                : "text-indigo-700/75 dark:text-indigo-300/75"
+            )}
+          >
             {cadenceLine}
             {!recurringBoardMode && task.dueDate
               ? ` · due ${new Date(task.dueDate).toLocaleDateString(undefined, { month: "short", day: "numeric" })}`
@@ -1170,9 +1382,11 @@ export function TaskCard({
               className={cn(
                 APP_CHIP_BASE,
                 "gap-1 border-transparent text-[10px] font-semibold",
-                missedTone === "critical"
-                  ? "bg-rose-500/[0.1] text-rose-700 ring-1 ring-rose-500/15 dark:text-rose-300"
-                  : "bg-amber-500/[0.1] text-amber-800 ring-1 ring-amber-500/12 dark:text-amber-300"
+                recurringBoardMode
+                  ? recurringCardMissedBadge(missedTone)
+                  : missedTone === "critical"
+                    ? "bg-rose-500/[0.1] text-rose-700 ring-1 ring-rose-500/15 dark:text-rose-300"
+                    : "bg-amber-500/[0.1] text-amber-800 ring-1 ring-amber-500/12 dark:text-amber-300"
               )}
             >
               <AlertCircle className={APP_CHIP_ICON} />

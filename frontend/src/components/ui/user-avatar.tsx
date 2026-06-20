@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { forwardRef, useEffect, useMemo, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { avatarSrcCandidates, getAvatarInitials } from "@/lib/avatar-url";
 import { cn } from "@/lib/utils";
@@ -14,14 +14,20 @@ interface UserAvatarProps {
   imageClassName?: string;
 }
 
-export function UserAvatar({
-  name,
-  avatarUrl,
-  userId,
-  className,
-  fallbackClassName,
-  imageClassName,
-}: UserAvatarProps) {
+export const UserAvatar = forwardRef<
+  React.ElementRef<typeof Avatar>,
+  UserAvatarProps
+>(function UserAvatar(
+  {
+    name,
+    avatarUrl,
+    userId,
+    className,
+    fallbackClassName,
+    imageClassName,
+  },
+  ref,
+) {
   const candidates = useMemo(
     () => avatarSrcCandidates(avatarUrl, userId, name),
     [avatarUrl, userId, name],
@@ -34,7 +40,7 @@ export function UserAvatar({
   }, [candidates]);
 
   return (
-    <Avatar className={cn("shrink-0", className)}>
+    <Avatar ref={ref} className={cn("shrink-0", className)}>
       {src ? (
         <AvatarImage
           key={src}
@@ -54,4 +60,6 @@ export function UserAvatar({
       </AvatarFallback>
     </Avatar>
   );
-}
+});
+
+UserAvatar.displayName = "UserAvatar";

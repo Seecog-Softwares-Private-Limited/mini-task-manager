@@ -1,6 +1,7 @@
 import { Type, Transform } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsIn,
   IsInt,
   IsOptional,
@@ -130,5 +131,14 @@ export class TaskRecurrenceDto {
     message: 'dueTime must be HH:mm',
   })
   dueTime?: string;
+
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  skipWeekends?: boolean;
+
+  @IsOptional()
+  @IsIn(['ALL_CHECKLIST', 'MANUAL'])
+  completionRule?: 'ALL_CHECKLIST' | 'MANUAL';
 }
 

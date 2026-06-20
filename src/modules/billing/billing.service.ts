@@ -426,6 +426,55 @@ export class BillingService {
 
   // ── Trial Expiry Cron (every hour) ──
 
+  async handleRazorpayWebhook(
+    rawBody: string,
+    signature: string,
+    body: Record<string, unknown>,
+  ): Promise<void> {
+    const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+    if (secret && signature) {
+      const valid = this.razorpayService.verifyWebhookSignature(rawBody, signature, secret);
+      if (!valid) {
+        throw new BadRequestException('Invalid webhook signature');
+      }
+    }
+
+    const event = String(body.event ?? '');
+    const payload = (body.payload as Record<string, unknown>) ?? {};
+    const payment = (payload.payment as { entity?: Record<string, unknown> })?.entity;
+    const subscription = (payload.subscription as { entity?: Record<string, unknown> })?.entity;
+
+    if (event === 'payment.captured' && payment?.order_id) {
+      const orderId = String(payment.order_id);
+      const existing = await this.paymentsRepository.findByRazorpayOrderId(orderId);
+      if (existing && existing.status !== 'SUCCESS') {
+        existing.razorpayPaymentId = String(payment.id ?? '');
+        existing.status = 'SUCCESS';
+        existing.paidAt = new Date();
+        await this.paymentsRepository.save(existing);
+      }
+    }
+
+    if (event === 'payment.failed' && payment?.order_id) {
+      const orderId = String(payment.order_id);
+      const existing = await this.paymentsRepository.findByRazorpayOrderId(orderId);
+      if (existing) {
+        existing.status = 'FAILED';
+        existing.metadata = payment;
+        await this.paymentsRepository.save(existing);
+      }
+    }
+
+    if (event === 'subscription.cancelled' && subscription?.id) {
+      const sub = await this.subscriptionsRepository.findByRazorpaySubscriptionId(String(subscription.id));
+      if (sub) {
+        await this.downgradeToFree(sub.organizationId);
+      }
+    }
+
+    this.logger.log(`Processed Razorpay webhook: ${event || 'unknown'}`);
+  }
+
   @Cron(CronExpression.EVERY_HOUR)
   async handleTrialExpiry() {
     try {

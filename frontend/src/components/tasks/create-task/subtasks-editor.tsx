@@ -44,6 +44,10 @@ export interface SubtaskItem {
   description?: string;
   assigneeId?: string;
   dueDate?: string;
+  /** Recurring planner: days after the run due date (template only). */
+  dueOffsetDays?: number;
+  /** Recurring planner: optional time of day (HH:mm, template only). */
+  dueTime?: string;
   status?: SubtaskStatus;
   priority?: SubtaskPriority;
 }

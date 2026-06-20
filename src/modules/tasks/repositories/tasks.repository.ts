@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { getSkip } from '../../../common/pagination';
 import { generateUuid } from '../../../common/utils/uuid.util';
+import { uuidBinaryTransformer } from '../../../common/base.entity';
 import { TaskEntity } from '../entities/task.entity';
 
 @Injectable()
@@ -30,6 +31,16 @@ export class TasksRepository {
     });
   }
 
+  async findByRecurringTemplate(
+    templateId: string,
+    organizationId: string,
+  ): Promise<TaskEntity[]> {
+    return this.repo.find({
+      where: { recurringTemplateId: templateId, organizationId },
+      relations: ['assignee'],
+    });
+  }
+
   async findByProject(projectId: string, page: number, limit: number): Promise<[TaskEntity[], number]> {
     return this.repo.findAndCount({
       where: { projectId },
@@ -38,6 +49,28 @@ export class TasksRepository {
       skip: getSkip(page, limit),
       take: limit,
     });
+  }
+
+  async findRecurringByProject(projectId: string, organizationId: string): Promise<TaskEntity[]> {
+    // Columns are BINARY(16); the QueryBuilder does not apply the entity's
+    // uuidBinaryTransformer to raw params, so we must pass binary buffers
+    // explicitly or the comparison silently matches nothing.
+    return this.repo
+      .createQueryBuilder('task')
+      .leftJoinAndSelect('task.assignee', 'assignee')
+      .where('task.project_id = :projectId', {
+        projectId: uuidBinaryTransformer.to(projectId),
+      })
+      .andWhere('task.organization_id = :organizationId', {
+        organizationId: uuidBinaryTransformer.to(organizationId),
+      })
+      .andWhere(
+        `(task.recurring_template_id IS NOT NULL OR (task.recurrence_type IS NOT NULL AND task.recurrence_type != 'NONE'))`,
+      )
+      .orderBy('task.dueDate', 'ASC')
+      .addOrderBy('task.createdAt', 'DESC')
+      .take(500)
+      .getMany();
   }
 
   async countByProject(projectId: string): Promise<number> {
@@ -76,7 +109,9 @@ export class TasksRepository {
   async findBySubtaskId(subtaskId: string, organizationId: string): Promise<TaskEntity | null> {
     const rows = await this.repo
       .createQueryBuilder('task')
-      .where('task.organization_id = :organizationId', { organizationId })
+      .where('task.organization_id = :organizationId', {
+        organizationId: uuidBinaryTransformer.to(organizationId),
+      })
       .andWhere('task.subtasks IS NOT NULL')
       .andWhere(
         `JSON_SEARCH(

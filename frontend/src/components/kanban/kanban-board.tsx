@@ -31,12 +31,17 @@ import {
   Plus,
   ArrowRight,
   AlertCircle,
+  AlertTriangle,
   ChevronDown,
   ChevronRight,
   Zap,
   Settings2,
   ChevronsLeftRight,
   CheckSquare2,
+  Circle,
+  CheckCircle2,
+  Clock3,
+  type LucideIcon,
 } from "lucide-react";
 import type { BoardPermissions } from "@/hooks/use-board-permissions";
 import { canUserMoveTask } from "@/lib/task-assignees";
@@ -82,6 +87,7 @@ export interface TaskCardQuickActions {
   onDelete?: (task: Task) => void;
   onCompleteOccurrence?: (task: Task) => void;
   onSkipNextOccurrence?: (task: Task) => void;
+  onSnoozeOccurrence?: (task: Task) => void;
   onPauseSeries?: (task: Task) => void;
 }
 
@@ -114,11 +120,65 @@ function getStatusColor(index: number) {
 }
 
 function getColumnColor(status: WorkflowStatus, index: number) {
+  if (status.id === "__recurring_overdue__") {
+    return { dot: "bg-orange-500", ring: "ring-orange-500/25" };
+  }
   const cat = getWorkflowStatusCategory(status);
   if (cat === "todo") return { dot: "bg-rose-500", ring: "ring-rose-500/20" };
   if (cat === "in_progress") return { dot: "bg-amber-500", ring: "ring-amber-500/20" };
   if (cat === "done") return { dot: "bg-emerald-500", ring: "ring-emerald-500/20" };
   return getStatusColor(index);
+}
+
+function getRecurringColumnChrome(status: WorkflowStatus): {
+  surface: string;
+  header: string;
+  icon: LucideIcon;
+  iconClass: string;
+} {
+  if (status.id === "__recurring_overdue__") {
+    return {
+      surface:
+        "border-orange-300/55 bg-gradient-to-b from-orange-50/90 via-orange-50/35 to-background shadow-[0_4px_24px_-12px_rgba(249,115,22,0.25)] dark:from-orange-950/35 dark:via-orange-950/12",
+      header: "border-orange-200/55 bg-orange-50/80 dark:bg-orange-950/30",
+      icon: AlertTriangle,
+      iconClass: "text-orange-600 dark:text-orange-400",
+    };
+  }
+  const cat = getWorkflowStatusCategory(status);
+  if (cat === "todo") {
+    return {
+      surface:
+        "border-sky-200/50 bg-gradient-to-b from-sky-50/70 via-sky-50/20 to-background dark:from-sky-950/25 dark:via-sky-950/8",
+      header: "border-sky-200/45 bg-sky-50/60 dark:bg-sky-950/20",
+      icon: Circle,
+      iconClass: "text-sky-600 dark:text-sky-400",
+    };
+  }
+  if (cat === "in_progress") {
+    return {
+      surface:
+        "border-amber-200/50 bg-gradient-to-b from-amber-50/70 via-amber-50/20 to-background dark:from-amber-950/25 dark:via-amber-950/8",
+      header: "border-amber-200/45 bg-amber-50/60 dark:bg-amber-950/20",
+      icon: Clock3,
+      iconClass: "text-amber-600 dark:text-amber-400",
+    };
+  }
+  if (cat === "done") {
+    return {
+      surface:
+        "border-emerald-200/50 bg-gradient-to-b from-emerald-50/70 via-emerald-50/20 to-background dark:from-emerald-950/25 dark:via-emerald-950/8",
+      header: "border-emerald-200/45 bg-emerald-50/60 dark:bg-emerald-950/20",
+      icon: CheckCircle2,
+      iconClass: "text-emerald-600 dark:text-emerald-400",
+    };
+  }
+  return {
+    surface: "border-border/50 bg-muted/10",
+    header: "border-border/45 bg-card/90",
+    icon: Circle,
+    iconClass: "text-muted-foreground",
+  };
 }
 
 const COLUMN_SCROLL = "kanban-col-scroll";
@@ -144,6 +204,7 @@ function TaskCard({
   currentUserId,
   recurringBoardMode,
   recurringTemplate,
+  cardIndex,
   recurringTemplateMap,
 }: {
   task: Task;
@@ -164,6 +225,7 @@ function TaskCard({
   currentUserId?: string | null;
   recurringBoardMode?: boolean;
   recurringTemplate?: RecurringTemplateSummary;
+  cardIndex?: number;
   recurringTemplateMap?: Record<string, RecurringTemplateSummary>;
 }) {
   return (
@@ -186,6 +248,7 @@ function TaskCard({
       currentUserId={currentUserId}
       recurringBoardMode={recurringBoardMode}
       recurringTemplate={recurringTemplate}
+      cardIndex={cardIndex}
       recurringTemplateMap={recurringTemplateMap}
     />
   );
@@ -212,6 +275,7 @@ function DraggableCard(props: {
   currentUserId?: string | null;
   recurringBoardMode?: boolean;
   recurringTemplateMap?: Record<string, RecurringTemplateSummary>;
+  cardIndex?: number;
 }) {
   const canDrag =
     !props.isSelectionMode &&
@@ -449,9 +513,11 @@ function DroppableColumn({
   boardVariant?: "default" | "recurring";
   recurringTemplateMap?: Record<string, RecurringTemplateSummary>;
 }) {
+  const isOverdueColumn = status.id === "__recurring_overdue__";
   const { setNodeRef, isOver } = useDroppable({
     id: status.id,
     data: { statusId: status.id },
+    disabled: isOverdueColumn,
   });
 
   const colorSet = getColumnColor(status, statusIndex);
@@ -463,6 +529,8 @@ function DroppableColumn({
   const showSections =
     boardVariant !== "recurring" && recurring.length > 0 && oneTime.length > 0;
   const isRecurringBoard = boardVariant === "recurring";
+  const recurringChrome = isRecurringBoard ? getRecurringColumnChrome(status) : null;
+  const ColumnIcon = recurringChrome?.icon;
 
   const columnHint = useMemo(() => {
     if (isRecurringBoard) return getRecurringColumnHint(status, tasks);
@@ -480,7 +548,7 @@ function DroppableColumn({
     return null;
   }, [tasks, statusCategory, status, isRecurringBoard]);
 
-  const renderTaskCard = (task: Task) => (
+  const renderTaskCard = (task: Task, cardIndex: number) => (
     <DraggableCard
       key={task.id}
       task={task}
@@ -501,6 +569,7 @@ function DroppableColumn({
       currentUserId={currentUserId}
       recurringBoardMode={isRecurringBoard}
       recurringTemplateMap={recurringTemplateMap}
+      cardIndex={cardIndex}
     />
   );
 
@@ -538,17 +607,31 @@ function DroppableColumn({
       ref={setNodeRef}
       data-cy={`kanban-column-${status.id}`}
       className={cn(
-        "group/col flex h-full min-h-0 min-w-[292px] flex-1 flex-col self-stretch rounded-lg border transition-all duration-200",
-        "border-slate-200/65 bg-slate-50/30 shadow-[0_1px_3px_rgba(15,23,42,0.04)] dark:border-border/50 dark:bg-muted/8",
+        "group/col flex h-full min-h-0 min-w-[292px] flex-1 flex-col self-stretch rounded-xl border transition-all duration-300",
+        isRecurringBoard
+          ? cn("shadow-sm", recurringChrome?.surface)
+          : cn(
+              "rounded-lg border-slate-200/65 bg-slate-50/30 shadow-[0_1px_3px_rgba(15,23,42,0.04)] dark:border-border/50 dark:bg-muted/8"
+            ),
         isActiveTarget
           ? "border-violet-300/45 bg-violet-50/15 shadow-md shadow-violet-500/8 ring-1 ring-violet-400/20 dark:border-violet-500/25 dark:bg-violet-500/5"
-          : "hover:border-slate-300/75 dark:hover:border-border/65",
-        isOverWipLimit && !isActiveTarget && "border-red-500/25 bg-red-500/[0.02]"
+          : !isRecurringBoard && "hover:border-slate-300/75 dark:hover:border-border/65",
+        isOverWipLimit && !isActiveTarget && "border-red-500/25 bg-red-500/[0.02]",
+        isOverdueColumn &&
+          !isRecurringBoard &&
+          "border-orange-300/55 bg-orange-50/25 shadow-[0_1px_3px_rgba(249,115,22,0.08)] dark:border-orange-500/30 dark:bg-orange-500/[0.06]"
       )}
       aria-label={`Column: ${status.name}`}
     >
       {/* Header — sticky inside column */}
-      <div className="sticky top-0 z-10 shrink-0 border-b border-slate-200/50 bg-white/95 px-3 py-1.5 backdrop-blur-sm dark:border-border/40 dark:bg-card/95">
+      <div
+        className={cn(
+          "sticky top-0 z-10 shrink-0 border-b px-3 py-2 backdrop-blur-sm",
+          isRecurringBoard
+            ? recurringChrome?.header
+            : "border-slate-200/50 bg-white/95 dark:border-border/40 dark:bg-card/95"
+        )}
+      >
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => onToggleCollapse?.(status.id)}
@@ -556,20 +639,26 @@ function DroppableColumn({
             aria-label={`Collapse ${status.name}`}
           >
             <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground/45" />
-            <span className={cn("h-2 w-2 shrink-0 rounded-full", colorSet.dot)} />
+            {ColumnIcon ? (
+              <ColumnIcon className={cn("h-3.5 w-3.5 shrink-0", recurringChrome?.iconClass)} aria-hidden />
+            ) : (
+              <span className={cn("h-2 w-2 shrink-0 rounded-full", colorSet.dot)} />
+            )}
             <div className="min-w-0 flex-1 text-left">
               <div className="flex items-center gap-1.5">
-                <h3 className="truncate text-[13px] font-semibold leading-tight tracking-[-0.01em] text-foreground">
+                <h3 className="truncate text-[13px] font-bold leading-tight tracking-[-0.01em] text-foreground">
                   {status.name}
                 </h3>
                 <span
                   className={cn(
-                    "app-chip shrink-0 border-transparent px-1.5 py-px text-[10px] font-semibold tabular-nums",
+                    "app-chip shrink-0 border-transparent px-2 py-0.5 text-[10px] font-bold tabular-nums",
                     isOverWipLimit
                       ? "bg-rose-500/10 text-rose-600 dark:text-rose-400"
                       : isAtWipLimit
                         ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                        : "bg-muted/50 text-muted-foreground ring-1 ring-border/35"
+                        : isRecurringBoard
+                          ? "bg-background/70 text-foreground ring-1 ring-border/40"
+                          : "bg-muted/50 text-muted-foreground ring-1 ring-border/35"
                   )}
                 >
                   {tasks.length}
@@ -617,22 +706,35 @@ function DroppableColumn({
         {recurring.length > 0 ? (
           <div className="flex flex-col gap-2.5">
             {showSections ? <ColumnSectionHeader label="Recurring" count={recurring.length} /> : null}
-            {recurring.map(renderTaskCard)}
+            {recurring.map((task, index) => renderTaskCard(task, index))}
           </div>
         ) : null}
         {oneTime.length > 0 ? (
           <div className="flex flex-col gap-2.5">
             {showSections ? <ColumnSectionHeader label="Tasks" count={oneTime.length} /> : null}
-            {oneTime.map(renderTaskCard)}
+            {oneTime.map((task, index) => renderTaskCard(task, recurring.length + index))}
           </div>
         ) : null}
 
         {/* Empty */}
         {tasks.length === 0 && !isActiveTarget && (
-          <div className="flex flex-1 items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/10 p-5">
+          <div
+            className={cn(
+              "flex flex-1 items-center justify-center rounded-xl border-2 border-dashed p-5",
+              isRecurringBoard
+                ? "border-border/35 bg-background/40"
+                : "border-muted-foreground/10"
+            )}
+          >
             <div className="text-center">
-              <Zap className="mx-auto mb-1 h-5 w-5 text-muted-foreground/20" />
-              <p className="text-xs text-muted-foreground/50">
+              {isRecurringBoard ? (
+                ColumnIcon ? (
+                  <ColumnIcon className={cn("mx-auto mb-2 h-6 w-6 opacity-25", recurringChrome?.iconClass)} />
+                ) : null
+              ) : (
+                <Zap className="mx-auto mb-1 h-5 w-5 text-muted-foreground/20" />
+              )}
+              <p className="text-xs font-medium text-muted-foreground/60">
                 {isRecurringBoard
                   ? getRecurringEmptyColumnMessage(status)
                   : "No tasks"}
@@ -650,7 +752,7 @@ function DroppableColumn({
       </div>
 
       {/* Quick add */}
-      {onQuickAdd && !permissions?.isViewer && (
+      {onQuickAdd && !permissions?.isViewer && !isOverdueColumn && (
         <div className="shrink-0 border-t border-slate-200/50 px-2 pb-2.5 pt-2 dark:border-border/40">
           <QuickAddInline onAdd={(title) => onQuickAdd(title, status.id)} />
         </div>

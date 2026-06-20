@@ -50,7 +50,7 @@ function normalize(
     customUnit: value?.customUnit ?? "DAY",
     endType: value?.endType ?? "NEVER",
     endDate: value?.endDate,
-    endAfterOccurrences: value?.endAfterOccurrences ?? 10,
+    endAfterOccurrences: value?.endAfterOccurrences ?? 52,
     createDaysBeforeDue: value?.createDaysBeforeDue ?? 0,
     dueLogic: value?.dueLogic ?? "DUE_DATE",
     dueTime: value?.dueTime,

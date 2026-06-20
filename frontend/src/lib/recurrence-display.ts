@@ -120,7 +120,7 @@ function recurrenceCadence(config: TaskRecurrenceConfig): string {
   return "Does not repeat";
 }
 
-function recurrenceEnd(config: TaskRecurrenceConfig): string {
+export function recurrenceEnd(config: TaskRecurrenceConfig): string {
   if (config.endType === "ON_DATE" && config.endDate) {
     return `Ends on ${config.endDate}`;
   }

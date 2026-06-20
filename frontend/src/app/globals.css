@@ -255,6 +255,68 @@
   .animate-scale-in {
     animation: scaleIn 0.3s ease-out both;
   }
+  .animate-recurring-card-enter {
+    animation: recurringCardEnter 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .recurring-card-overdue-glow {
+    position: relative;
+  }
+  .recurring-card-overdue-glow::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      110deg,
+      rgba(249, 115, 22, 0.05) 0%,
+      rgba(249, 115, 22, 0.45) 35%,
+      rgba(251, 191, 36, 0.35) 65%,
+      rgba(249, 115, 22, 0.05) 100%
+    );
+    background-size: 200% 100%;
+    animation: recurringShimmer 4s ease-in-out infinite;
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    z-index: 1;
+  }
+  .recurring-card-glow-orb {
+    animation: recurringGlowPulse 4s ease-in-out infinite;
+  }
+  .recurring-missed-pulse {
+    animation: recurringGlowPulse 2.5s ease-in-out infinite;
+  }
+  .recurring-ribbon-icon {
+    animation: recurringIconSpin 8s linear infinite;
+  }
+  .group\/card:hover .recurring-shine-track {
+    opacity: 1;
+    transform: translateX(120%);
+  }
+
+  /* Executive Planner Library — Recurring Tasks module */
+  .exec-planner-page,
+  .planner-library-page {
+    background:
+      radial-gradient(ellipse 70% 45% at 12% -8%, rgba(251, 191, 36, 0.07), transparent 50%),
+      radial-gradient(ellipse 60% 40% at 88% 0%, hsl(var(--primary) / 0.05), transparent 45%),
+      linear-gradient(180deg, hsl(var(--muted) / 0.22) 0%, transparent 32%);
+  }
+  .exec-planner-drawer {
+    box-shadow: -12px 0 40px -20px rgba(15, 23, 42, 0.15);
+    transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .dark .exec-planner-drawer {
+    box-shadow: -12px 0 40px -20px rgba(0, 0, 0, 0.45);
+  }
+
   .auth-ambient-blob {
     animation: authBlobDrift 14s cubic-bezier(0.22, 1, 0.36, 1) infinite;
     will-change: transform, opacity;
@@ -440,6 +502,45 @@
 @keyframes scaleIn {
   from { opacity: 0; transform: scale(0.95); }
   to { opacity: 1; transform: scale(1); }
+}
+
+/* ── Recurring board task cards ── */
+@keyframes recurringCardEnter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes recurringGlowPulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.65;
+    transform: scale(1.04);
+  }
+}
+@keyframes recurringShimmer {
+  0% {
+    background-position: 200% center;
+  }
+  100% {
+    background-position: -200% center;
+  }
+}
+@keyframes recurringIconSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 @keyframes authBlobDrift {
   0% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.85; }

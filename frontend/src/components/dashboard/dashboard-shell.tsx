@@ -7,8 +7,6 @@ import { usePlatformAdmin } from "@/hooks/use-platform-admin";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useProjectSelectionOptional } from "@/context/project-selection-context";
 import { buildTasksPageHref } from "@/lib/tasks-page-href";
-import { logout } from "@/services/api/auth.api";
-import { clearAuth } from "@/services/api/client";
 import { TenantGuard } from "@/components/tenant-guard";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -19,11 +17,12 @@ import { TrialBanner } from "@/components/trial-banner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { HeaderContextGreeting } from "@/components/dashboard/header-context-greeting";
+import { HeaderAccountMenu } from "@/components/dashboard/header-account-menu";
 import type { AppRole } from "@/hooks/use-auth";
 import {
   LayoutDashboard, Building2, FolderKanban, ListTodo, Bell,
   CreditCard, Activity, BarChart3, ClipboardList, Settings,
-  Menu, PanelLeftClose, PanelLeft, LogOut, Sparkles, Shield, Repeat,
+  Menu, PanelLeftClose, PanelLeft, Sparkles, Shield, Repeat,
 } from "lucide-react";
 
 const nav: {
@@ -85,16 +84,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
       section,
     }));
 
-  async function handleLogout() {
-    try {
-      await logout();
-    } finally {
-      clearAuth();
-    }
-    router.replace("/login");
-    router.refresh();
-  }
-
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Sidebar
@@ -148,16 +137,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <CommandPalette />
             <NotificationCenter />
             <ThemeToggle />
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleLogout}
-              data-cy="logout-button"
-              className="h-9 w-9 text-muted-foreground transition-colors duration-200 hover:bg-destructive/10 hover:text-destructive"
-              title="Log out"
-            >
-              <LogOut className="h-[18px] w-[18px]" />
-            </Button>
+            <HeaderAccountMenu />
           </div>
         </header>
         <TrialBanner />

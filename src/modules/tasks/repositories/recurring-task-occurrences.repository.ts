@@ -33,6 +33,16 @@ export class RecurringTaskOccurrencesRepository {
     return this.repo.findOne({ where: { templateId, sequenceNumber } });
   }
 
+  /** All occurrences for a template on a specific due date (idempotency guard). */
+  async findByTemplateAndDueDate(
+    templateId: string,
+    dueDate: string,
+  ): Promise<RecurringTaskOccurrenceEntity[]> {
+    return this.repo.find({
+      where: { templateId, dueDate: dueDate as unknown as Date },
+    });
+  }
+
   async update(id: string, patch: Partial<RecurringTaskOccurrenceEntity>): Promise<void> {
     await this.repo.update(id, patch);
   }
@@ -43,6 +53,14 @@ export class RecurringTaskOccurrencesRepository {
       order: { sequenceNumber: 'DESC' },
       take: 500,
     });
+  }
+
+  async deleteByTemplate(templateId: string): Promise<void> {
+    await this.repo.delete({ templateId });
+  }
+
+  async deleteById(id: string): Promise<void> {
+    await this.repo.delete(id);
   }
 
   async markPreviousPendingCompleted(
@@ -61,6 +79,17 @@ export class RecurringTaskOccurrencesRepository {
         completedAt,
       },
     );
+  }
+
+  async findPendingByProject(
+    organizationId: string,
+    projectId: string,
+  ): Promise<RecurringTaskOccurrenceEntity[]> {
+    return this.repo.find({
+      where: { organizationId, projectId, state: 'PENDING' },
+      order: { dueDate: 'ASC' },
+      take: 2000,
+    });
   }
 
   async statsByOrganization(organizationId: string, projectId?: string): Promise<RecurringTaskOccurrenceEntity[]> {

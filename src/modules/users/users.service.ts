@@ -87,6 +87,20 @@ export class UsersService {
     });
   }
 
+  async createFromSso(data: { email: string; fullName: string }): Promise<UserEntity> {
+    const now = new Date();
+    return this.usersRepository.create({
+      email: data.email.toLowerCase(),
+      fullName: data.fullName,
+      passwordHash: null,
+      isEmailVerified: true,
+      currentPlan: 'free',
+      planStartedAt: now,
+      planExpiresAt: null,
+      storageUsed: '0',
+    });
+  }
+
   async deleteById(id: string): Promise<void> {
     await this.usersRepository.deleteById(id);
   }
@@ -125,6 +139,27 @@ export class UsersService {
 
   async updateFullName(userId: string, fullName: string): Promise<void> {
     await this.usersRepository.update(userId, { fullName });
+  }
+
+  /** Update editable profile fields for the current user and return the fresh entity. */
+  async updateProfile(
+    userId: string,
+    data: { fullName?: string },
+  ): Promise<UserEntity> {
+    const patch: Partial<UserEntity> = {};
+    if (data.fullName !== undefined) {
+      const trimmed = data.fullName.trim();
+      if (!trimmed) {
+        throw new BadRequestException('Name cannot be empty');
+      }
+      patch.fullName = trimmed;
+    }
+    if (Object.keys(patch).length > 0) {
+      await this.usersRepository.update(userId, patch);
+    }
+    const updated = await this.usersRepository.findById(userId);
+    if (!updated) throw new NotFoundException('User not found');
+    return updated;
   }
 
   /** Stores bcrypt hash in `password_hash`. */

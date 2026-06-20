@@ -21,6 +21,7 @@ import { PaymentService } from './payment.service';
 import { PlanConfigurationsService } from './plan-configurations.service';
 import { CouponCodesService } from './coupon-codes.service';
 import { VerifyUserPlanPaymentDto } from './dto/verify-user-plan-payment.dto';
+import { UnifiedBillingService } from '../modules/billing/unified-billing.service';
 
 @Injectable()
 export class PlansService {
@@ -33,6 +34,7 @@ export class PlansService {
     private readonly planConfigurationsService: PlanConfigurationsService,
     private readonly paymentService: PaymentService,
     private readonly couponCodesService: CouponCodesService,
+    private readonly unifiedBillingService: UnifiedBillingService,
   ) {}
 
   async listPlans() {
@@ -236,6 +238,7 @@ export class PlansService {
       planStartedAt: now,
       planExpiresAt: expires,
     });
+    await this.unifiedBillingService.syncUserPlanToOwnedOrganizations(userId, plan);
   }
 
   async downgradeExpiredUsers(): Promise<number> {

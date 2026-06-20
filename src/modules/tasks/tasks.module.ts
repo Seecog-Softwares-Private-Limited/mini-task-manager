@@ -25,6 +25,11 @@ import { TasksController } from './tasks.controller';
 import { RecurringTasksController } from './recurring-tasks.controller';
 import { RecurringTasksService } from './recurring-tasks.service';
 import { RecurringTasksCron } from './recurring-tasks.cron';
+import { TaskTimeEntryEntity } from './entities/task-time-entry.entity';
+import { TaskTimeEntriesRepository } from './repositories/task-time-entries.repository';
+import { TimeTrackingService } from './time-tracking.service';
+import { TimeTrackingController } from './time-tracking.controller';
+import { OrgEventsModule } from '../org-events/org-events.module';
 
 @Module({
   imports: [
@@ -34,6 +39,7 @@ import { RecurringTasksCron } from './recurring-tasks.cron';
       TaskAttachmentEntity,
       RecurringTaskTemplateEntity,
       RecurringTaskOccurrenceEntity,
+      TaskTimeEntryEntity,
     ]),
     AuthModule,
     BillingModule,
@@ -45,17 +51,20 @@ import { RecurringTasksCron } from './recurring-tasks.cron';
     NotificationsModule,
     ActivityLogsModule,
     forwardRef(() => PlansModule),
+    forwardRef(() => OrgEventsModule),
   ],
-  controllers: [TasksController, RecurringTasksController],
+  controllers: [TasksController, RecurringTasksController, TimeTrackingController],
   providers: [
     TasksRepository,
     TaskCommentsRepository,
     TaskAttachmentsRepository,
     RecurringTaskTemplatesRepository,
     RecurringTaskOccurrencesRepository,
+    TaskTimeEntriesRepository,
     TasksService,
     RecurringTasksService,
     RecurringTasksCron,
+    TimeTrackingService,
   ],
   exports: [TasksService, TasksRepository],
 })

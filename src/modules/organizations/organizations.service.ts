@@ -18,6 +18,7 @@ import { OrganizationResponseDto } from './dto/organization-response.dto';
 import { generateUuid } from '../../common/utils/uuid.util';
 import { uuidBinaryTransformer } from '../../common/base.entity';
 import { PlanLimitService } from '../../plans/plan-limit.service';
+import { UnifiedBillingService } from '../billing/unified-billing.service';
 
 @Injectable()
 export class OrganizationsService {
@@ -28,6 +29,8 @@ export class OrganizationsService {
     private readonly dataSource: DataSource,
     @Inject(forwardRef(() => PlanLimitService))
     private readonly planLimitService: PlanLimitService,
+    @Inject(forwardRef(() => UnifiedBillingService))
+    private readonly unifiedBillingService: UnifiedBillingService,
   ) {}
 
   async findById(id: string): Promise<OrganizationEntity | null> {
@@ -91,6 +94,7 @@ export class OrganizationsService {
           status: 'ACTIVE',
         });
         await memberRepo.save(memberEntity);
+        await this.unifiedBillingService.ensureFreeSubscription(orgId);
         return orgEntity;
       });
     } catch (err) {
@@ -118,6 +122,11 @@ export class OrganizationsService {
   async canAccess(organizationId: string, userId: string): Promise<boolean> {
     const membership = await this.orgMembersRepository.findByOrganizationAndUser(organizationId, userId);
     return membership != null && membership.status === 'ACTIVE';
+  }
+
+  async getMemberRole(organizationId: string, userId: string): Promise<string | null> {
+    const membership = await this.orgMembersRepository.findByOrganizationAndUser(organizationId, userId);
+    return membership?.role ?? null;
   }
 
   async update(id: string, dto: UpdateOrganizationDto): Promise<OrganizationEntity | null> {

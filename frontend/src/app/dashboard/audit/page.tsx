@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useTenant } from "@/context/tenant-context";
 import { fetchActivityLogs } from "@/services/api/activity-logs.api";
+import { fetchFeatureFlags } from "@/services/api/billing.api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import type { ActivityLog } from "@/types/api";
 import { ScrollablePageLayout } from "@/components/dashboard/scrollable-page-layout";
-import { Shield, Filter, ClipboardList, Building2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Shield, Filter, ClipboardList, Building2, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 
 const PAGE_SIZE = 20;
 
@@ -26,10 +27,20 @@ export default function AuditLogPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
+  const { data: featureFlags, isLoading: flagsLoading } = useQuery({
+    queryKey: ["feature-flags", orgId ?? ""],
+    queryFn: fetchFeatureFlags,
+    enabled: !!orgId && canViewAudit,
+    staleTime: 60_000,
+  });
+  // Undefined while loading; true/false once known. Audit logs are plan-gated (Enterprise).
+  const auditLogsEnabled =
+    featureFlags === undefined ? undefined : featureFlags.auditLogsEnabled === true;
+
   const { data, isLoading } = useQuery({
     queryKey: ["activity-logs", orgId ?? "", page],
     queryFn: () => fetchActivityLogs(page, PAGE_SIZE),
-    enabled: !!orgId && canViewAudit,
+    enabled: !!orgId && canViewAudit && auditLogsEnabled === true,
   });
 
   const logs = data?.data ?? [];
@@ -97,6 +108,46 @@ export default function AuditLogPage() {
                 <Link href="/dashboard/workspaces">Workspaces</Link>
               </Button>
             </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (auditLogsEnabled === false) {
+    return (
+      <div className="space-y-4 animate-slide-up">
+        <h1 className="text-2xl font-bold tracking-tight">Audit Log</h1>
+        <Card className="max-w-lg border-dashed border-2">
+          <CardContent className="flex items-center gap-4 py-8 px-6">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 shrink-0">
+              <Sparkles className="h-6 w-6 text-amber-500" />
+            </div>
+            <div>
+              <p className="font-semibold">Audit logs require an upgrade</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                Workspace audit logging is available on the Enterprise plan. Upgrade to track
+                every action across your workspace.
+              </p>
+              <Button asChild size="sm" className="mt-3">
+                <Link href="/dashboard/plans">View plans</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (flagsLoading || auditLogsEnabled === undefined) {
+    return (
+      <div className="space-y-4 animate-slide-up">
+        <h1 className="text-2xl font-bold tracking-tight">Audit Log</h1>
+        <Card>
+          <CardContent className="space-y-2 py-6">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-12 w-full rounded-lg" />
+            ))}
           </CardContent>
         </Card>
       </div>

@@ -61,7 +61,7 @@ export class SSOService {
    */
   async assertSSOAllowed(organizationId: string): Promise<void> {
     const flags = await this.usageService.getFeatureFlags(organizationId);
-    if (!flags.sso) {
+    if (!flags.ssoEnabled) {
       throw new ForbiddenException({
         statusCode: 403,
         error: 'FEATURE_NOT_AVAILABLE',

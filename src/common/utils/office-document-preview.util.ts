@@ -1,3 +1,4 @@
+/// <reference path="../../types/word-extractor.d.ts" />
 import * as mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 import * as os from 'os';

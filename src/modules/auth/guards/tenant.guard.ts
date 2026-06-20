@@ -29,7 +29,16 @@ export class TenantGuard implements CanActivate {
     ]);
     if (isPublic) return true;
 
-    const request = context.switchToHttp().getRequest<Request & { user?: { userId: string }; tenantId?: string }>();
+    const request = context.switchToHttp().getRequest<
+      Request & {
+        user?: {
+          userId: string;
+          isApiKey?: boolean;
+          apiKeyOrganizationId?: string;
+        };
+        tenantId?: string;
+      }
+    >();
     const userId = request.user?.userId;
     const orgId = (request.headers['x-organization-id'] as string)?.trim?.();
 
@@ -47,6 +56,17 @@ export class TenantGuard implements CanActivate {
           ? `This organization has been suspended: ${org.suspensionReason}`
           : 'This organization has been suspended. Contact support.',
       );
+    }
+
+    if (request.user?.isApiKey) {
+      if (request.user.apiKeyOrganizationId !== orgId) {
+        throw new ForbiddenException('API key is not valid for this organization.');
+      }
+      request.tenantId = orgId;
+      const user = request.user as { userId: string; orgRole?: string; roles?: string[] };
+      user.orgRole = 'member';
+      user.roles = ['member'];
+      return true;
     }
 
     const membership = await this.orgMembersRepo.findByOrganizationAndUser(orgId, userId!);

@@ -18,6 +18,7 @@ import { BillingService } from './billing.service';
 import { BillingController } from './billing.controller';
 import { PlanSeedService } from './plan-seed.service';
 import { SubscriptionGuard } from './guards/subscription.guard';
+import { UnifiedBillingService } from './unified-billing.service';
 
 @Module({
   imports: [
@@ -43,7 +44,8 @@ import { SubscriptionGuard } from './guards/subscription.guard';
     BillingService,
     PlanSeedService,
     SubscriptionGuard,
+    UnifiedBillingService,
   ],
-  exports: [BillingService, UsageService, RazorpayService, SubscriptionGuard],
+  exports: [BillingService, UsageService, RazorpayService, SubscriptionGuard, UnifiedBillingService],
 })
 export class BillingModule {}

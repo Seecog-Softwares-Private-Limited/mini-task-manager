@@ -5,24 +5,32 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Download, ArrowLeft, Check } from "lucide-react";
+import { downloadWorkspaceExport } from "@/services/api/export.api";
+import { useToast } from "@/components/ui/use-toast";
 
 export default function ExportPage() {
+  const { toast } = useToast();
   const [exporting, setExporting] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [done, setDone] = useState(false);
 
-  function handleExport() {
+  async function handleExport() {
     setExporting(true);
-    setProgress(0);
-    const interval = setInterval(() => {
-      setProgress((p) => {
-        if (p >= 100) {
-          clearInterval(interval);
-          setExporting(false);
-          return 100;
-        }
-        return p + 10;
-      });
-    }, 300);
+    setDone(false);
+    try {
+      const blob = await downloadWorkspaceExport();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "workspace-export.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+      setDone(true);
+      toast({ title: "Export downloaded" });
+    } catch {
+      toast({ title: "Export failed", variant: "destructive" });
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -40,34 +48,20 @@ export default function ExportPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
-          <p className="text-sm text-muted-foreground">Download projects and tasks as CSV. Backend export not yet implemented.</p>
+          <p className="text-sm text-muted-foreground">
+            Download projects and tasks as CSV. Includes all projects and tasks in this workspace.
+          </p>
           <Button onClick={handleExport} disabled={exporting}>
-            {exporting ? (
-              <span className="flex items-center gap-2">
-                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                Exporting...
-              </span>
-            ) : (
+            {exporting ? "Exporting..." : (
               <span className="flex items-center gap-2">
                 <Download className="h-4 w-4" /> Export CSV
               </span>
             )}
           </Button>
-          {(exporting || progress > 0) && (
-            <div className="space-y-2">
-              <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
-                <div className="h-full gradient-bg transition-all duration-300 rounded-full" style={{ width: `${progress}%` }} />
-              </div>
-              <p className="text-xs text-muted-foreground">{progress}% complete</p>
-            </div>
-          )}
-          {progress === 100 && !exporting && (
+          {done && !exporting && (
             <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 px-4 py-3 flex items-center gap-2">
               <Check className="h-4 w-4 text-emerald-500" />
-              <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">Export complete (stub). Connect backend for real CSV.</p>
+              <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">Export complete.</p>
             </div>
           )}
         </CardContent>

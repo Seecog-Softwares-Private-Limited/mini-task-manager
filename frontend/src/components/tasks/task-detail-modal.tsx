@@ -62,6 +62,7 @@ import {
   type SubtaskStatus,
 } from "@/lib/subtask-status";
 import { SubtaskCompactRow } from "@/components/tasks/subtasks/subtask-compact-row";
+import { TaskTimeTracking } from "@/components/tasks/task-time-tracking";
 import { AssigneeBulkActions } from "@/components/tasks/assignee-bulk-actions";
 import {
   SubtaskDetailPanel,
@@ -739,6 +740,9 @@ export function TaskDetailModal({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["task", taskId] });
       queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-board", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-templates"] });
       toast({ title: "Recurring occurrence completed", variant: "success" });
       setCompletePromptOpen(false);
       setPendingDoneStatusId(null);
@@ -2177,6 +2181,13 @@ export function TaskDetailModal({
                       </button>
                     )}
                     </div>
+                    {taskId && (
+                      <TaskTimeTracking
+                        taskId={taskId}
+                        loggedMinutes={task.loggedMinutes ?? 0}
+                        readOnly={!canEditAll}
+                      />
+                    )}
                   </div>
                   <div className={tdSidebarSurface}>
                     <span className={tdSidebarHeading}>Tags</span>

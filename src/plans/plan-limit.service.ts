@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -18,6 +18,7 @@ import {
   type PlanLimitType,
 } from './limit-exceeded.exception';
 import { PlanConfigurationsService } from './plan-configurations.service';
+import { UsageService } from '../modules/billing/usage.service';
 
 export interface PlanUsageStats {
   workspaces: { used: number; limit: number | null };
@@ -41,6 +42,8 @@ export class PlanLimitService {
     private readonly organizationsRepository: OrganizationsRepository,
     private readonly orgMembersRepository: OrganizationMembersRepository,
     private readonly planConfigurationsService: PlanConfigurationsService,
+    @Inject(forwardRef(() => UsageService))
+    private readonly usageService: UsageService,
     @InjectRepository(OrganizationInvitationEntity)
     private readonly invitationsRepo: Repository<OrganizationInvitationEntity>,
   ) {}
@@ -93,18 +96,27 @@ export class PlanLimitService {
     const workspaceUsed = ownedWorkspaces.length;
 
     let memberUsed = 0;
+    let storageUsed = Number(user?.storageUsed ?? 0);
+    let memberLimit = limits.maxMembersPerWorkspace;
+    let storageLimit = limits.storageBytes;
+
     if (organizationId) {
-      memberUsed = await this.countWorkspaceSeats(organizationId);
+      const orgUsage = await this.usageService.getOrganizationUsage(organizationId);
+      memberUsed = orgUsage.users.current;
+      memberLimit = orgUsage.users.limit;
+      storageUsed = Math.round(orgUsage.storageGb.current * 1024 * 1024 * 1024);
+      storageLimit =
+        orgUsage.storageGb.limit === null
+          ? limits.storageBytes
+          : Math.round(orgUsage.storageGb.limit * 1024 * 1024 * 1024);
     } else if (ownedWorkspaces.length > 0) {
       memberUsed = await this.countWorkspaceSeats(ownedWorkspaces[0].id);
     }
 
-    const storageUsed = Number(user?.storageUsed ?? 0);
-
     return {
       workspaces: { used: workspaceUsed, limit: limits.maxWorkspaces },
-      members: { used: memberUsed, limit: limits.maxMembersPerWorkspace },
-      storage: { usedBytes: storageUsed, limitBytes: limits.storageBytes },
+      members: { used: memberUsed, limit: memberLimit },
+      storage: { usedBytes: storageUsed, limitBytes: storageLimit },
     };
   }
 
@@ -131,14 +143,9 @@ export class PlanLimitService {
   }
 
   async checkMemberLimit(organizationId: string): Promise<boolean> {
-    const ownerId = await this.getOwnerIdForWorkspace(organizationId);
-    if (!ownerId) return true;
-    const user = await this.findUser(ownerId);
-    const plan = user ? this.resolveEffectivePlan(user) : 'free';
-    const limit = (await this.getLimits(plan)).maxMembersPerWorkspace;
-    if (limit === null) return true;
-    const used = await this.countWorkspaceSeats(organizationId);
-    return used < limit;
+    const usage = await this.usageService.getOrganizationUsage(organizationId);
+    if (usage.users.limit === null) return true;
+    return usage.users.current < usage.users.limit;
   }
 
   async checkStorageLimit(userId: string, fileSize: number): Promise<boolean> {
@@ -160,14 +167,13 @@ export class PlanLimitService {
   }
 
   async assertMemberLimit(organizationId: string): Promise<void> {
-    const ownerId = await this.getOwnerIdForWorkspace(organizationId);
-    if (!ownerId) return;
-    const user = await this.findUser(ownerId);
-    const plan = user ? this.resolveEffectivePlan(user) : 'free';
-    const limit = (await this.getLimits(plan)).maxMembersPerWorkspace;
-    const used = await this.countWorkspaceSeats(organizationId);
-    if (limit !== null && used >= limit) {
-      await this.throwLimit('member', plan, used, limit);
+    const check = await this.usageService.checkLimit(organizationId, 'users', 1);
+    if (!check.allowed) {
+      const ownerId = await this.getOwnerIdForWorkspace(organizationId);
+      const user = ownerId ? await this.findUser(ownerId) : null;
+      const plan = user ? this.resolveEffectivePlan(user) : 'free';
+      const usage = await this.usageService.getOrganizationUsage(organizationId);
+      await this.throwLimit('member', plan, usage.users.current, usage.users.limit ?? 0);
     }
   }
 

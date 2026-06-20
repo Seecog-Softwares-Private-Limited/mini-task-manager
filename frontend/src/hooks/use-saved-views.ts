@@ -1,64 +1,79 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { BoardFilters } from "@/components/kanban/kanban-board";
-import { generateClientId } from "@/lib/generate-client-id";
+import {
+  createSavedView,
+  deleteSavedView,
+  fetchSavedViews,
+  type SavedViewDto,
+} from "@/services/api/saved-views.api";
 
 export interface SavedView {
   id: string;
   name: string;
   filters: BoardFilters;
   createdAt: string;
+  isShared?: boolean;
 }
 
-const STORAGE_KEY = "mini_tm_saved_views";
-
-function loadViews(projectId: string): SavedView[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(`${STORAGE_KEY}_${projectId}`);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function persistViews(projectId: string, views: SavedView[]) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(`${STORAGE_KEY}_${projectId}`, JSON.stringify(views));
+function mapDto(dto: SavedViewDto): SavedView {
+  return {
+    id: dto.id,
+    name: dto.name,
+    filters: dto.filters as BoardFilters,
+    createdAt: dto.createdAt,
+    isShared: dto.isShared,
+  };
 }
 
 export function useSavedViews(projectId: string) {
-  const [views, setViews] = useState<SavedView[]>([]);
+  const queryClient = useQueryClient();
+  const [localViews, setLocalViews] = useState<SavedView[]>([]);
 
+  const { data: serverViews } = useQuery({
+    queryKey: ["saved-views", projectId],
+    queryFn: () => fetchSavedViews(projectId),
+    enabled: Boolean(projectId) && projectId !== "__none__",
+    staleTime: 30_000,
+  });
+
+  // Depend on the stable `data` reference (not a `= []` default, which is a new
+  // array every render and would loop this effect → "Maximum update depth exceeded").
   useEffect(() => {
-    setViews(loadViews(projectId));
-  }, [projectId]);
+    if (serverViews) {
+      setLocalViews(serverViews.map(mapDto));
+    }
+  }, [serverViews]);
 
   const saveView = useCallback(
-    (name: string, filters: BoardFilters) => {
-      const newView: SavedView = {
-        id: generateClientId(),
+    async (name: string, filters: BoardFilters, isShared = false) => {
+      if (!projectId || projectId === "__none__") {
+        throw new Error("Select a project first");
+      }
+      const created = await createSavedView({
+        projectId,
         name,
         filters: { ...filters },
-        createdAt: new Date().toISOString(),
-      };
-      const updated = [...views, newView];
-      setViews(updated);
-      persistViews(projectId, updated);
-      return newView;
+        isShared,
+      });
+      const mapped = mapDto(created);
+      setLocalViews((prev) => [...prev, mapped]);
+      queryClient.invalidateQueries({ queryKey: ["saved-views", projectId] });
+      return mapped;
     },
-    [projectId, views]
+    [projectId, queryClient]
   );
 
   const deleteView = useCallback(
-    (viewId: string) => {
-      const updated = views.filter((v) => v.id !== viewId);
-      setViews(updated);
-      persistViews(projectId, updated);
+    async (viewId: string) => {
+      await deleteSavedView(viewId);
+      setLocalViews((prev) => prev.filter((v) => v.id !== viewId));
+      queryClient.invalidateQueries({ queryKey: ["saved-views", projectId] });
     },
-    [projectId, views]
+    [projectId, queryClient]
   );
 
-  return { savedViews: views, saveView, deleteView };
+  return { savedViews: localViews, saveView, deleteView };
 }

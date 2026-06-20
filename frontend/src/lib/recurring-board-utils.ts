@@ -75,10 +75,21 @@ export function getRecurringMissedTone(
   return daysPast >= 3 ? "critical" : "warning";
 }
 
+export function getRecurringEmptyColumnMessage(status: WorkflowStatus): string {
+  if (status.id === "__recurring_overdue__") return "No overdue occurrences — great job!";
+  const cat = getWorkflowStatusCategory(status);
+  if (cat === "in_progress") return "No active occurrences";
+  if (cat === "done") return "No completed occurrences yet";
+  return "No scheduled occurrences";
+}
+
 export function getRecurringColumnHint(
   status: WorkflowStatus,
   tasks: Task[]
 ): string | null {
+  if (status.id === "__recurring_overdue__") {
+    return tasks.length > 0 ? `${tasks.length} overdue` : null;
+  }
   const cat = getWorkflowStatusCategory(status);
   const now = Date.now();
   if (cat === "done") {
@@ -95,19 +106,43 @@ export function getRecurringColumnHint(
   return null;
 }
 
-export function getRecurringEmptyColumnMessage(status: WorkflowStatus): string {
-  const cat = getWorkflowStatusCategory(status);
-  if (cat === "in_progress") return "No active occurrences";
-  if (cat === "done") return "No completed occurrences yet";
-  return "No scheduled occurrences";
-}
-
 export interface RecurringHealthMetrics {
   completionRate: number;
   missedOccurrences: number;
   pausedSeries: number;
   mostDelayedTitle: string | null;
   mostDelayedDays: number;
+}
+
+export interface ExecutiveHealthMetrics extends RecurringHealthMetrics {
+  onTimeRate: number;
+  healthStatus: "healthy" | "at_risk" | "critical";
+  completedThisWeek: number;
+}
+
+export function computeExecutiveHealth(
+  summary: RecurringTaskSummary | undefined,
+  tasks: Task[],
+  templates: RecurringTemplateSummary[],
+  completedPercent: number,
+  doneStatusId?: string
+): ExecutiveHealthMetrics {
+  const base = computeRecurringHealth(summary, tasks, templates, completedPercent);
+  const completedWeek = countCompletedThisWeek(tasks, doneStatusId);
+  const missed = base.missedOccurrences;
+  const denom = completedWeek + missed;
+  const onTimeRate = denom > 0 ? Math.round((completedWeek / denom) * 100) : completedPercent;
+
+  let healthStatus: ExecutiveHealthMetrics["healthStatus"] = "healthy";
+  if (missed >= 5 || completedPercent < 35) healthStatus = "critical";
+  else if (missed >= 2 || completedPercent < 65) healthStatus = "at_risk";
+
+  return {
+    ...base,
+    onTimeRate,
+    healthStatus,
+    completedThisWeek: completedWeek,
+  };
 }
 
 export function computeRecurringHealth(
@@ -139,11 +174,44 @@ export function computeRecurringHealth(
   };
 }
 
+/** Count of series in the ACTIVE state (excludes paused and archived). */
 export function activeSeriesCount(
   summary: RecurringTaskSummary | undefined,
   templates: RecurringTemplateSummary[]
 ): number {
-  return summary?.totalRecurringTasks ?? templates.filter((t) => !t.isPaused).length;
+  if (templates.length > 0) {
+    return templates.filter((t) =>
+      t.status ? t.status === "ACTIVE" : !t.isPaused
+    ).length;
+  }
+  if (summary) return Math.max(0, summary.totalRecurringTasks - summary.paused);
+  return 0;
+}
+
+/** Aggregate run totals across the project's series (workspace+project scoped). */
+export function aggregateRunHealth(templates: RecurringTemplateSummary[]): {
+  totalGenerated: number;
+  totalCompleted: number;
+  totalMissed: number;
+  healthPercent: number;
+  hasData: boolean;
+} {
+  let totalGenerated = 0;
+  let totalCompleted = 0;
+  let totalMissed = 0;
+  for (const t of templates) {
+    totalGenerated += t.generatedCount ?? 0;
+    totalCompleted += t.completed ?? 0;
+    totalMissed += t.missed ?? 0;
+  }
+  const hasData = totalGenerated > 0;
+  return {
+    totalGenerated,
+    totalCompleted,
+    totalMissed,
+    healthPercent: hasData ? Math.round((totalCompleted / totalGenerated) * 100) : 0,
+    hasData,
+  };
 }
 
 export function recurrenceBadgeLabel(
