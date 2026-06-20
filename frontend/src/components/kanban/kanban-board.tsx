@@ -69,6 +69,12 @@ export const DEFAULT_FILTERS: BoardFilters = {
   sortDir: "asc",
 };
 
+/** Recurring tasks board only shows recurring occurrences — never apply the "normal" recurrence filter. */
+export const RECURRING_BOARD_DEFAULT_FILTERS: BoardFilters = {
+  ...DEFAULT_FILTERS,
+  recurrence: "all",
+};
+
 export interface TaskCardQuickActions {
   onEdit?: (task: Task) => void;
   onChangeStatus?: (task: Task, statusId: string) => void;
@@ -138,6 +144,7 @@ function TaskCard({
   currentUserId,
   recurringBoardMode,
   recurringTemplate,
+  recurringTemplateMap,
 }: {
   task: Task;
   isOverlay?: boolean;
@@ -157,6 +164,7 @@ function TaskCard({
   currentUserId?: string | null;
   recurringBoardMode?: boolean;
   recurringTemplate?: RecurringTemplateSummary;
+  recurringTemplateMap?: Record<string, RecurringTemplateSummary>;
 }) {
   return (
     <EnterpriseTaskCard
@@ -178,6 +186,7 @@ function TaskCard({
       currentUserId={currentUserId}
       recurringBoardMode={recurringBoardMode}
       recurringTemplate={recurringTemplate}
+      recurringTemplateMap={recurringTemplateMap}
     />
   );
 }
@@ -236,6 +245,7 @@ function DraggableCard(props: {
             ? props.recurringTemplateMap[props.task.recurringTemplateId]
             : undefined
         }
+        recurringTemplateMap={props.recurringTemplateMap}
       />
     </div>
   );
@@ -808,12 +818,14 @@ export function KanbanBoard({
 
   const filteredTasksByStatus = useMemo(() => {
     const result: Record<string, Task[]> = {};
+    const effectiveFilters =
+      boardVariant === "recurring" ? { ...filters, recurrence: "all" as const } : filters;
     for (const [statusId, tasks] of Object.entries(tasksByStatus)) {
-      const filtered = applyFilters(tasks, filters);
-      result[statusId] = applyBoardSorting(filtered, filters.sortBy, filters.sortDir);
+      const filtered = applyFilters(tasks, effectiveFilters);
+      result[statusId] = applyBoardSorting(filtered, effectiveFilters.sortBy, effectiveFilters.sortDir);
     }
     return result;
-  }, [tasksByStatus, filters]);
+  }, [tasksByStatus, filters, boardVariant]);
 
   const handleDragStart = useCallback((e: DragStartEvent) => {
     setActiveId(e.active.id as string);

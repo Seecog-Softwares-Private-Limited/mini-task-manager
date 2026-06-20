@@ -40,12 +40,12 @@ import {
   BoardSelectorField,
   BOARD_COMMAND_ACTION_BTN,
 } from "@/components/kanban/board-command-bar";
-import { computeRecurringHealth } from "@/lib/recurring-board-utils";
+import { computeRecurringHealth, dedupeRecurringBoardTasks } from "@/lib/recurring-board-utils";
 import {
   KanbanBoard,
   computeBoardStats,
   computeSubtaskMap,
-  DEFAULT_FILTERS,
+  RECURRING_BOARD_DEFAULT_FILTERS,
   type AssigneeMap,
   type BoardFilters,
 } from "@/components/kanban/kanban-board";
@@ -106,7 +106,7 @@ export default function RecurringTasksPage() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
-  const [filters, setFilters] = useState<BoardFilters>(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<BoardFilters>(RECURRING_BOARD_DEFAULT_FILTERS);
 
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
     queryKey: ["projects", orgId ?? ""],
@@ -187,7 +187,7 @@ export default function RecurringTasksPage() {
   ]);
 
   useEffect(() => {
-    setFilters(DEFAULT_FILTERS);
+    setFilters(RECURRING_BOARD_DEFAULT_FILTERS);
     setSelectedTaskId(null);
     setCreateModalOpen(false);
   }, [selectedProjectId]);
@@ -248,7 +248,10 @@ export default function RecurringTasksPage() {
 
   const tasks = tasksData?.data ?? [];
   const recurringTasks = useMemo(
-    () => tasks.filter((task) => task.projectId === selectedProjectId && isRecurringTask(task)),
+    () =>
+      dedupeRecurringBoardTasks(
+        tasks.filter((task) => task.projectId === selectedProjectId && isRecurringTask(task))
+      ),
     [tasks, selectedProjectId]
   );
 
@@ -294,9 +297,12 @@ export default function RecurringTasksPage() {
 
   const tasksByStatus = useMemo(() => {
     const map: Record<string, Task[]> = {};
+    const fallbackStatusId =
+      statuses.find((s) => s.type === "TODO")?.id ?? statuses[0]?.id ?? "none";
     for (const s of statuses) map[s.id] = [];
     for (const t of recurringTasks) {
-      const key = t.statusId ?? statuses[0]?.id ?? "none";
+      const hasKnownStatus = Boolean(t.statusId && map[t.statusId]);
+      const key = hasKnownStatus ? t.statusId! : fallbackStatusId;
       if (!map[key]) map[key] = [];
       map[key].push(t);
     }

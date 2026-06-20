@@ -29,6 +29,27 @@ function toAttachment(r: TaskAttachmentResponse): TaskAttachment {
 }
 
 /** Fetch attachment file bytes (for export). */
+export async function fetchTaskAttachmentRenderedPreview(
+  attachmentId: string
+): Promise<{ format: "html"; content: string }> {
+  const { data } = await apiClient.get<{ format: "html"; content: string }>(
+    `/tasks/attachments/${attachmentId}/preview-rendered`
+  );
+  return data;
+}
+
+/** Returns null instead of throwing when server preview is unavailable. */
+export async function tryFetchTaskAttachmentRenderedPreview(
+  attachmentId: string
+): Promise<{ format: "html"; content: string } | null> {
+  try {
+    return await fetchTaskAttachmentRenderedPreview(attachmentId);
+  } catch {
+    return null;
+  }
+}
+
+/** Fetch attachment file bytes (for export). */
 export async function fetchAttachmentBlob(
   attachmentId: string,
   fileName?: string

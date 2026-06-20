@@ -20,6 +20,16 @@ export class TasksRepository {
     return this.repo.findOne({ where: { id, organizationId }, relations: ['assignee'] });
   }
 
+  async findByRecurringTemplateAndSequence(
+    templateId: string,
+    sequenceNumber: number,
+  ): Promise<TaskEntity | null> {
+    return this.repo.findOne({
+      where: { recurringTemplateId: templateId, recurrenceSequence: sequenceNumber },
+      relations: ['assignee'],
+    });
+  }
+
   async findByProject(projectId: string, page: number, limit: number): Promise<[TaskEntity[], number]> {
     return this.repo.findAndCount({
       where: { projectId },

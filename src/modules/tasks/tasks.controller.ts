@@ -106,6 +106,15 @@ export class TasksController {
     });
   }
 
+  @Get('attachments/:attachmentId/preview-rendered')
+  @SkipThrottle({ default: true, auth: true })
+  async getAttachmentRenderedPreview(
+    @Param('attachmentId') attachmentId: string,
+    @TenantId() tenantId: string,
+  ) {
+    return this.tasksService.getAttachmentRenderedPreview(attachmentId, tenantId);
+  }
+
   @Get(':id/attachments')
   async getAttachments(
     @Param('id') taskId: string,

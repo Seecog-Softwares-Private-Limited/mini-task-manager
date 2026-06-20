@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import DOMPurify from "dompurify";
 import {
   Download,
   Loader2,
@@ -12,19 +13,37 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { downloadAttachment, fetchAttachmentBlob } from "@/services/api/attachments.api";
+import { parseApiError } from "@/services/api/client";
+import {
+  downloadAttachment,
+  fetchAttachmentBlob,
+  tryFetchTaskAttachmentRenderedPreview,
+} from "@/services/api/attachments.api";
 import {
   downloadEntityAttachment,
-  fetchEntityAttachmentPreviewBlob,
+  fetchEntityAttachmentBlob,
+  tryFetchEntityAttachmentRenderedPreview,
 } from "@/services/api/entity-attachments.api";
 import {
+  isLegacyDocMime,
+  isOfficeDocumentPreviewable,
+  renderDocumentPreview,
+} from "@/lib/attachment-document-preview";
+import {
   ensurePreviewBlob,
+  inferMimeTypeFromFileName,
   isImageMime,
   isPdfMime,
   isTextPreviewMime,
 } from "@/lib/attachment-file-meta";
 
 const PREVIEW_Z = "z-[270]";
+
+const OFFICE_HTML_PURIFY = {
+  USE_PROFILES: { html: true },
+  ADD_TAGS: ["table", "thead", "tbody", "tr", "th", "td", "caption", "colgroup", "col", "pre"],
+  ADD_ATTR: ["colspan", "rowspan", "scope", "id", "class"],
+};
 
 export interface AttachmentPreviewTarget {
   id?: string;
@@ -41,110 +60,202 @@ interface AttachmentPreviewModalProps {
   onClose: () => void;
 }
 
+async function fetchPreviewBlob(
+  target: AttachmentPreviewTarget,
+  fileName: string
+): Promise<Blob> {
+  if (target.localPreviewUrl) {
+    return fetch(target.localPreviewUrl).then((r) => r.blob());
+  }
+  if (!target.id) {
+    throw new Error("No attachment available to preview");
+  }
+  if (target.source === "task") {
+    return fetchAttachmentBlob(target.id, fileName);
+  }
+  return fetchEntityAttachmentBlob(target.id);
+}
+
+async function tryFetchRenderedOfficePreview(
+  target: AttachmentPreviewTarget
+): Promise<string | null> {
+  if (!target.id) return null;
+  const rendered =
+    target.source === "task"
+      ? await tryFetchTaskAttachmentRenderedPreview(target.id)
+      : await tryFetchEntityAttachmentRenderedPreview(target.id);
+  if (!rendered?.content?.trim()) return null;
+  return DOMPurify.sanitize(rendered.content, OFFICE_HTML_PURIFY);
+}
+
+function officePreviewFallbackMessage(fileName: string, mimeType: string): string {
+  if (isLegacyDocMime(mimeType, fileName)) {
+    return "Could not preview this .doc file. Download it to open in Word.";
+  }
+  return "Could not read this document. Try downloading the file instead.";
+}
+
 export function AttachmentPreviewModal({ target, onClose }: AttachmentPreviewModalProps) {
   const [blobUrl, setBlobUrl] = React.useState<string | null>(null);
   const [textContent, setTextContent] = React.useState<string | null>(null);
+  const [htmlContent, setHtmlContent] = React.useState<string | null>(null);
   const [unsupported, setUnsupported] = React.useState(false);
+  const [unsupportedReason, setUnsupportedReason] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [zoom, setZoom] = React.useState(1);
 
   const open = Boolean(target);
-  const mimeType = target?.mimeType;
   const fileName = target?.fileName ?? "file";
-  const isImage = isImageMime(mimeType, fileName);
-  const isPdf = isPdfMime(mimeType, fileName);
-  const isText = isTextPreviewMime(mimeType, fileName);
+  const resolvedMime = target?.mimeType || inferMimeTypeFromFileName(fileName);
+  const isImage = isImageMime(resolvedMime, fileName);
+  const isPdf = isPdfMime(resolvedMime, fileName);
+  const isText = isTextPreviewMime(resolvedMime, fileName);
+  const isOfficeDocument = isOfficeDocumentPreviewable(resolvedMime, fileName);
 
   React.useEffect(() => {
     if (!target) {
       setBlobUrl(null);
       setTextContent(null);
+      setHtmlContent(null);
       setUnsupported(false);
+      setUnsupportedReason(null);
       setError(null);
       setZoom(1);
       return;
     }
 
     let revoked: string | null = null;
+    let cancelled = false;
     setLoading(true);
     setError(null);
     setUnsupported(false);
+    setUnsupportedReason(null);
     setTextContent(null);
+    setHtmlContent(null);
+    setBlobUrl(null);
     setZoom(1);
+
+    const finishUnsupported = (reason: string) => {
+      if (cancelled) return;
+      setUnsupported(true);
+      setUnsupportedReason(reason);
+    };
 
     const load = async () => {
       try {
-        if (target.localPreviewUrl) {
-          if (isText) {
-            const blob = await fetch(target.localPreviewUrl).then((r) => r.blob());
-            setTextContent(await blob.text());
-          } else if (isPdf) {
-            const blob = await fetch(target.localPreviewUrl).then((r) => r.blob());
-            const pdfBlob =
-              blob.type === "application/pdf"
-                ? blob
-                : new Blob([blob], { type: "application/pdf" });
-            const url = URL.createObjectURL(pdfBlob);
-            revoked = url;
-            setBlobUrl(url);
-          } else {
-            setBlobUrl(target.localPreviewUrl);
+        if (!target.localPreviewUrl && !target.id) {
+          finishUnsupported("Preview is not available for this file.");
+          return;
+        }
+
+        if (isLegacyDocMime(resolvedMime, fileName)) {
+          const html = await tryFetchRenderedOfficePreview(target);
+          if (cancelled) return;
+          if (html) {
+            setHtmlContent(html);
+            return;
           }
-          if (!isImage && !isPdf && !isText) setUnsupported(true);
-          return;
-        }
-        if (!target.id) {
-          setUnsupported(true);
+          finishUnsupported(officePreviewFallbackMessage(fileName, resolvedMime));
           return;
         }
 
-        if (!isImage && !isPdf && !isText) {
-          setUnsupported(true);
+        if (isOfficeDocument) {
+          let rawBlob: Blob;
+          try {
+            rawBlob = await fetchPreviewBlob(target, fileName);
+          } catch (blobErr) {
+            finishUnsupported(parseApiError(blobErr));
+            return;
+          }
+          if (cancelled) return;
+
+          const clientResult = await renderDocumentPreview(rawBlob, fileName, resolvedMime);
+          if (clientResult.kind === "html") {
+            setHtmlContent(clientResult.html);
+            return;
+          }
+
+          const serverHtml = await tryFetchRenderedOfficePreview(target);
+          if (cancelled) return;
+          if (serverHtml) {
+            setHtmlContent(serverHtml);
+            return;
+          }
+
+          finishUnsupported(
+            clientResult.kind === "unsupported"
+              ? clientResult.reason
+              : officePreviewFallbackMessage(fileName, resolvedMime)
+          );
           return;
         }
 
-        const rawBlob =
-          target.source === "task"
-            ? await fetchAttachmentBlob(target.id, fileName)
-            : await fetchEntityAttachmentPreviewBlob(target.id);
+        const rawBlob = await fetchPreviewBlob(target, fileName);
+        if (cancelled) return;
+
         if (isText) {
-          const text = await rawBlob.text();
-          setTextContent(text);
+          setTextContent(await rawBlob.text());
           return;
         }
-        const blob = ensurePreviewBlob(rawBlob, mimeType, fileName);
-        const url = URL.createObjectURL(blob);
-        revoked = url;
-        setBlobUrl(url);
+
+        if (isPdf) {
+          const blob = ensurePreviewBlob(rawBlob, resolvedMime, fileName);
+          const url = URL.createObjectURL(blob);
+          revoked = url;
+          setBlobUrl(url);
+          return;
+        }
+
+        if (isImage) {
+          const blob = ensurePreviewBlob(rawBlob, resolvedMime, fileName);
+          const url = URL.createObjectURL(blob);
+          revoked = url;
+          setBlobUrl(url);
+          return;
+        }
+
+        finishUnsupported("Preview is not available for this file type.");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load preview");
+        finishUnsupported(
+          parseApiError(err) || officePreviewFallbackMessage(fileName, resolvedMime)
+        );
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    void load();
+    void load().catch(() => {
+      if (cancelled) return;
+      finishUnsupported(officePreviewFallbackMessage(fileName, resolvedMime));
+      setLoading(false);
+    });
 
     return () => {
+      cancelled = true;
       if (revoked) URL.revokeObjectURL(revoked);
     };
-  }, [target, isImage, isPdf, isText]);
+  }, [target, fileName, resolvedMime, isImage, isPdf, isText, isOfficeDocument]);
 
   const handleDownload = async () => {
-    if (target?.localPreviewUrl && !target.id) {
-      const a = document.createElement("a");
-      a.href = target.localPreviewUrl;
-      a.download = fileName;
-      a.click();
-      return;
+    try {
+      if (target?.localPreviewUrl && !target.id) {
+        const a = document.createElement("a");
+        a.href = target.localPreviewUrl;
+        a.download = fileName;
+        a.click();
+        return;
+      }
+      if (!target?.id) return;
+      if (target.source === "task") {
+        await downloadAttachment(target.id, fileName);
+        return;
+      }
+      await downloadEntityAttachment(target.id, fileName);
+    } catch (err) {
+      setUnsupported(true);
+      setUnsupportedReason(parseApiError(err));
     }
-    if (!target?.id) return;
-    if (target.source === "task") {
-      await downloadAttachment(target.id, fileName);
-      return;
-    }
-    await downloadEntityAttachment(target.id, fileName);
   };
 
   return (
@@ -239,7 +350,7 @@ export function AttachmentPreviewModal({ target, onClose }: AttachmentPreviewMod
             ) : unsupported ? (
               <div className="max-w-md space-y-4 text-center">
                 <p className="text-sm text-white/80">
-                  Preview is not available for this file type.
+                  {unsupportedReason ?? "Preview is not available for this file type."}
                 </p>
                 {target?.id || target?.localPreviewUrl ? (
                   <Button type="button" variant="secondary" onClick={() => void handleDownload()}>
@@ -248,6 +359,11 @@ export function AttachmentPreviewModal({ target, onClose }: AttachmentPreviewMod
                   </Button>
                 ) : null}
               </div>
+            ) : htmlContent ? (
+              <div
+                className="max-h-full w-full overflow-auto rounded-lg bg-white p-6 text-left text-sm text-slate-900 [&_table]:w-full [&_table]:border-collapse [&_td]:border [&_td]:border-slate-200 [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:border-slate-200 [&_th]:bg-slate-50 [&_th]:px-2 [&_th]:py-1 [&_p]:mb-2"
+                dangerouslySetInnerHTML={{ __html: htmlContent }}
+              />
             ) : isText && textContent != null ? (
               <pre className="max-h-full w-full overflow-auto rounded-lg bg-black/40 p-4 text-left text-xs leading-relaxed text-white/90">
                 {textContent}

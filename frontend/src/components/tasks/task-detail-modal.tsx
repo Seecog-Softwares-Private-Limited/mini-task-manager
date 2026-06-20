@@ -1337,6 +1337,35 @@ export function TaskDetailModal({
                       </div>
                     </div>
                     <div className="space-y-2">
+                      <div className="flex gap-2 pb-3">
+                        <div className="td-input-shell flex min-h-11 flex-1 items-center gap-2 rounded-2xl px-1 pl-3 transition-[box-shadow,ring-color] focus-within:ring-2 focus-within:ring-primary/20">
+                          <Plus className="h-4 w-4 shrink-0 text-muted-foreground/50" aria-hidden />
+                          <Input
+                            placeholder="Add an item…"
+                            aria-label="Add checklist item"
+                            value={newCheckItem}
+                            maxLength={SUBTASK_TITLE_MAX_LENGTH}
+                            disabled={!canEditSubtasks || updateSubtasksMutation.isPending}
+                            onChange={(e) => setNewCheckItem(clampSubtaskTitle(e.target.value))}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && newCheckItem.trim()) {
+                                e.preventDefault();
+                                appendSubtask(newCheckItem);
+                              }
+                            }}
+                            className="h-10 flex-1 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          size="default"
+                          className="h-11 shrink-0 rounded-xl px-6 font-semibold shadow-[0_4px_14px_-2px_hsl(var(--primary)/0.45)] transition-[transform,box-shadow] hover:shadow-[0_8px_22px_-4px_hsl(var(--primary)/0.5)] active:scale-[0.98]"
+                          disabled={!canEditSubtasks || !newCheckItem.trim() || updateSubtasksMutation.isPending}
+                          onClick={() => appendSubtask(newCheckItem)}
+                        >
+                          Add
+                        </Button>
+                      </div>
                       {checklist.map((item) => {
                         const expanded = expandedSubtaskId === item.id;
                         return (
@@ -1433,34 +1462,6 @@ export function TaskDetailModal({
                           </div>
                         );
                       })}
-                      <div className="flex gap-2 pt-4">
-                        <div className="td-input-shell flex min-h-11 flex-1 items-center gap-2 rounded-2xl px-1 pl-3 transition-[box-shadow,ring-color] focus-within:ring-2 focus-within:ring-primary/20">
-                          <Plus className="h-4 w-4 shrink-0 text-muted-foreground/50" aria-hidden />
-                          <Input
-                            placeholder="Add an item…"
-                            value={newCheckItem}
-                            maxLength={SUBTASK_TITLE_MAX_LENGTH}
-                            disabled={!canEditSubtasks || updateSubtasksMutation.isPending}
-                            onChange={(e) => setNewCheckItem(clampSubtaskTitle(e.target.value))}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && newCheckItem.trim()) {
-                                e.preventDefault();
-                                appendSubtask(newCheckItem);
-                              }
-                            }}
-                            className="h-10 flex-1 border-0 bg-transparent px-0 text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                          />
-                        </div>
-                        <Button
-                          type="button"
-                          size="default"
-                          className="h-11 shrink-0 rounded-xl px-6 font-semibold shadow-[0_4px_14px_-2px_hsl(var(--primary)/0.45)] transition-[transform,box-shadow] hover:shadow-[0_8px_22px_-4px_hsl(var(--primary)/0.5)] active:scale-[0.98]"
-                          disabled={!canEditSubtasks || !newCheckItem.trim() || updateSubtasksMutation.isPending}
-                          onClick={() => appendSubtask(newCheckItem)}
-                        >
-                          Add
-                        </Button>
-                      </div>
                     </div>
                     </div>
                   </div>

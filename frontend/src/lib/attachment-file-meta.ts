@@ -7,6 +7,7 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { isOfficeDocumentPreviewable } from "@/lib/attachment-document-preview";
 
 export function formatFileSize(bytes: number): string {
   if (!bytes || bytes <= 0) return "—";
@@ -58,6 +59,8 @@ export function inferMimeTypeFromFileName(fileName?: string): string {
     docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     xls: "application/vnd.ms-excel",
     xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    xlsm: "application/vnd.ms-excel.sheet.macroenabled.12",
+    ods: "application/vnd.oasis.opendocument.spreadsheet",
   };
   return map[ext] ?? "application/octet-stream";
 }
@@ -73,25 +76,22 @@ export function isPdfMime(mimeType?: string, fileName?: string): boolean {
   return fileExt(fileName) === "pdf";
 }
 
-/** Whether a local File can be previewed in-browser before upload. */
 export function isLocallyPreviewableFile(file: File): boolean {
   return (
     isImageMime(file.type, file.name) ||
     isPdfMime(file.type, file.name) ||
-    isTextPreviewMime(file.type, file.name)
+    isTextPreviewMime(file.type, file.name) ||
+    isOfficeDocumentPreviewable(file.type, file.name)
   );
 }
 
-export function createLocalPreviewUrl(file: File): string | undefined {
-  if (!isLocallyPreviewableFile(file)) return undefined;
+export function createLocalPreviewUrl(file: File): string {
   return URL.createObjectURL(file);
 }
 
 export function isTextPreviewMime(mimeType?: string, fileName?: string): boolean {
-  if (!mimeType && fileName) {
-    const ext = fileName.split(".").pop()?.toLowerCase();
-    return ext === "csv" || ext === "json" || ext === "txt";
-  }
+  const ext = fileExt(fileName);
+  if (ext === "csv" || ext === "json" || ext === "txt") return true;
   return (
     Boolean(mimeType?.startsWith("text/")) ||
     mimeType === "application/json" ||
@@ -111,6 +111,8 @@ export function getAttachmentFileIcon(
     mimeType?.includes("excel") ||
     ext === "xls" ||
     ext === "xlsx" ||
+    ext === "xlsm" ||
+    ext === "ods" ||
     ext === "csv"
   ) {
     return { Icon: FileSpreadsheet, label: "Spreadsheet" };

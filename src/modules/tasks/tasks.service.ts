@@ -17,6 +17,11 @@ import { RecurringTasksService } from './recurring-tasks.service';
 import { PaginationQueryDto, PaginatedResult, paginate } from '../../common/pagination';
 import { formatUuid, generateUuid } from '../../common/utils/uuid.util';
 import { Configuration } from '../../config/configuration';
+import {
+  isOfficeDocumentPreviewable,
+  renderOfficeDocumentPreview,
+  type OfficePreviewResult,
+} from '../../common/utils/office-document-preview.util';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -29,7 +34,14 @@ function isAllowedMime(mimetype: string): boolean {
     mimetype === 'application/pdf' ||
     mimetype === 'application/json' ||
     mimetype.startsWith('application/zip') ||
-    mimetype === 'application/x-zip-compressed'
+    mimetype === 'application/x-zip-compressed' ||
+    mimetype === 'application/vnd.ms-excel' ||
+    mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+    mimetype === 'application/vnd.ms-excel.sheet.macroenabled.12' ||
+    mimetype === 'application/vnd.oasis.opendocument.spreadsheet' ||
+    mimetype === 'application/msword' ||
+    mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    mimetype === 'text/csv'
   );
 }
 
@@ -536,6 +548,42 @@ export class TasksService {
     const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
     const fullPath = path.join(uploadsPath, attachment.fileUrl);
     return { path: fullPath, fileName: attachment.fileName };
+  }
+
+  async getAttachmentRenderedPreview(
+    attachmentId: string,
+    organizationId: string,
+  ): Promise<OfficePreviewResult> {
+    const attachment = await this.taskAttachmentsRepository.findById(attachmentId);
+    if (!attachment) throw new NotFoundException('Attachment not found');
+    const task = await this.tasksRepository.findByIdAndOrganization(attachment.taskId, organizationId);
+    if (!task) throw new NotFoundException('Task not found');
+    if (!isOfficeDocumentPreviewable(null, attachment.fileName)) {
+      throw new BadRequestException('Preview is not available for this file type.');
+    }
+    const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
+    const fullPath = path.join(uploadsPath, attachment.fileUrl);
+    let buffer: Buffer;
+    try {
+      buffer = await fs.readFile(fullPath);
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException)?.code;
+      if (code === 'ENOENT') {
+        throw new NotFoundException('Attachment file not found');
+      }
+      throw new BadRequestException('Could not read this document. Try downloading the file instead.');
+    }
+    const rendered = await renderOfficeDocumentPreview(
+      buffer,
+      attachment.fileName,
+      null,
+      null,
+      attachment.fileName,
+    );
+    if (!rendered) {
+      throw new BadRequestException('Could not read this document. Try downloading the file instead.');
+    }
+    return rendered;
   }
 
   async deleteAttachment(

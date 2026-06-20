@@ -14,6 +14,11 @@ import { generateUuid } from '../../common/utils/uuid.util';
 import { TasksRepository } from '../tasks/repositories/tasks.repository';
 import { UsageService } from '../billing/usage.service';
 import { PlanLimitService } from '../../plans/plan-limit.service';
+import {
+  isOfficeDocumentPreviewable,
+  renderOfficeDocumentPreview,
+  type OfficePreviewResult,
+} from '../../common/utils/office-document-preview.util';
 import { AttachmentEntity, AttachmentEntityType } from './entities/attachment.entity';
 import { AttachmentsRepository } from './repositories/attachments.repository';
 
@@ -34,6 +39,8 @@ function isAllowedMime(mimetype: string): boolean {
     'application/x-zip-compressed',
     'application/vnd.ms-excel',
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel.sheet.macroenabled.12',
+    'application/vnd.oasis.opendocument.spreadsheet',
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'text/csv',
@@ -166,6 +173,46 @@ export class AttachmentsService {
       fileName: attachment.originalFileName,
       mimeType: attachment.mimeType,
     };
+  }
+
+  async getRenderedPreview(
+    attachmentId: string,
+    organizationId: string,
+  ): Promise<OfficePreviewResult> {
+    const attachment = await this.getAttachmentOrThrow(attachmentId, organizationId);
+    if (
+      !isOfficeDocumentPreviewable(
+        attachment.mimeType,
+        attachment.originalFileName,
+        attachment.fileExtension,
+        attachment.storedFileName,
+      )
+    ) {
+      throw new BadRequestException('Preview is not available for this file type.');
+    }
+    const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
+    const fullPath = path.join(uploadsPath, attachment.storageKey);
+    let buffer: Buffer;
+    try {
+      buffer = await fs.readFile(fullPath);
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException)?.code;
+      if (code === 'ENOENT') {
+        throw new NotFoundException('Attachment file not found');
+      }
+      throw new BadRequestException('Could not read this document. Try downloading the file instead.');
+    }
+    const rendered = await renderOfficeDocumentPreview(
+      buffer,
+      attachment.originalFileName,
+      attachment.mimeType,
+      attachment.fileExtension,
+      attachment.storedFileName,
+    );
+    if (!rendered) {
+      throw new BadRequestException('Could not read this document. Try downloading the file instead.');
+    }
+    return rendered;
   }
 
   async getPreviewInfo(

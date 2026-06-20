@@ -122,10 +122,14 @@ apiClient.interceptors.response.use(
     }
     const msg = (err.response?.data as { message?: string | string[] })?.message;
     const msgStr = Array.isArray(msg) ? msg[0] : msg;
+    const isOptionalPreviewRequest =
+      url.includes("/preview-rendered") ||
+      (url.includes("/attachments/") && url.endsWith("/preview"));
     if (status !== 403 || typeof msgStr !== "string" || (!msgStr.includes("Organization context") && !msgStr.includes("not a member"))) {
       const normalized = normalizeApiError(err);
-      if (normalized.statusCode && normalized.statusCode >= 500) reportGlobalError(normalized);
-      else if (normalized.isRateLimited) reportGlobalError(normalized);
+      if (!isOptionalPreviewRequest && normalized.statusCode && normalized.statusCode >= 500) {
+        reportGlobalError(normalized);
+      } else if (normalized.isRateLimited) reportGlobalError(normalized);
       else if (normalized.isNetwork) reportGlobalError(normalized);
     }
     return Promise.reject(err);
