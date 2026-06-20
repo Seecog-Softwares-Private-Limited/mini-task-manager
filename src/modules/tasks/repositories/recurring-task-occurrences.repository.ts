@@ -63,6 +63,17 @@ export class RecurringTaskOccurrencesRepository {
     );
   }
 
+  async findPendingByProject(
+    organizationId: string,
+    projectId: string,
+  ): Promise<RecurringTaskOccurrenceEntity[]> {
+    return this.repo.find({
+      where: { organizationId, projectId, state: 'PENDING' },
+      order: { dueDate: 'ASC' },
+      take: 2000,
+    });
+  }
+
   async statsByOrganization(organizationId: string, projectId?: string): Promise<RecurringTaskOccurrenceEntity[]> {
     return this.repo.find({
       where: {

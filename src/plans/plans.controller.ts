@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Post, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../modules/auth/guards/jwt-auth.guard';
 import { Public } from '../common/decorators/public.decorator';
 import { PlansService } from './plans.service';
@@ -26,8 +26,11 @@ export class PlansController {
   }
 
   @Get('usage')
-  getUsage(@Req() req: { user: AuthUser }) {
-    return this.plansService.getUsage(req.user.userId, req.user.organizationId);
+  getUsage(
+    @Req() req: { user: AuthUser },
+    @Headers('x-organization-id') organizationId?: string,
+  ) {
+    return this.plansService.getUsage(req.user.userId, organizationId?.trim() || undefined);
   }
 
   @Post('validate-coupon')

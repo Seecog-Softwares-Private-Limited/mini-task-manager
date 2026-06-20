@@ -32,4 +32,13 @@ export class SSOConfigRepository {
   async remove(organizationId: string): Promise<void> {
     await this.repo.delete({ organizationId });
   }
+
+  async findEnabledByDomain(domain: string): Promise<SSOConfigEntity[]> {
+    const enabled = await this.repo.find({ where: { isEnabled: true } });
+    return enabled.filter((cfg) => {
+      if (!cfg.domains) return false;
+      const allowed = cfg.domains.split(',').map((d) => d.trim().toLowerCase());
+      return allowed.includes(domain.toLowerCase());
+    });
+  }
 }

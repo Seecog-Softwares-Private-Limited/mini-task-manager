@@ -11,8 +11,8 @@ import {
   createDefaultWorkflow,
 } from "@/services/api/workflows.api";
 import {
-  fetchTasksByProject,
   createTask,
+  updateTask,
   updateTaskStatus,
   deleteTask,
 } from "@/services/api/tasks.api";
@@ -20,10 +20,13 @@ import { fetchOrgMembers, fetchProjectMembers } from "@/services/api/members.api
 import { fetchCommentCounts } from "@/services/api/comments.api";
 import {
   completeRecurringTaskWithAction,
+  fetchRecurringBoard,
   fetchRecurringSummary,
   fetchRecurringTemplates,
   pauseRecurringTemplate,
+  resumeRecurringTemplate,
   skipNextRecurringOccurrence,
+  syncRecurringBoard,
 } from "@/services/api/recurring-tasks.api";
 import { parseApiError, isRateLimited, getStoredToken } from "@/services/api/client";
 import { createTaskWithDescriptionImages } from "@/lib/upload-task-description-images";
@@ -33,23 +36,43 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
-import { RecurringSummaryStats } from "@/components/recurring/recurring-summary-stats";
-import { RecurringHealthSection } from "@/components/recurring/recurring-health-section";
+import { RecurringPremiumStats } from "@/components/recurring/recurring-premium-stats";
+import { RecurringCompactStats } from "@/components/recurring/recurring-compact-stats";
+import { RecurringBoardToolbar, type RecurringViewMode } from "@/components/recurring/recurring-board-toolbar";
+import { RecurringCalendarView } from "@/components/recurring/recurring-calendar-view";
+import { RecurringAgendaView } from "@/components/recurring/recurring-agenda-view";
+import { PlannerHeader } from "@/components/recurring/planner-header";
+import { PlannerShelf, type ShelfCategory } from "@/components/recurring/planner-shelf";
+import { RecurringTaskDrawer } from "@/components/recurring/recurring-task-drawer";
+import { RecurringDayDrawer } from "@/components/recurring/recurring-day-drawer";
+import {
+  buildRecurringOverdueStatus,
+  isRecurringOverdueColumn,
+  partitionRecurringBoardTasks,
+} from "@/lib/recurring-board-constants";
+import type { RecurringBoardResponse } from "@/services/api/recurring-tasks.api";
+import { RecurringExecutiveHealth } from "@/components/recurring/recurring-executive-health";
+import { formatShortDate, computeExecutiveHealth } from "@/lib/recurring-board-utils";
+import { EXEC_PLANNER } from "@/lib/executive-planner-theme";
+import {
+  applyRecurringBoardFilters,
+  DEFAULT_RECURRING_BOARD_FILTERS,
+  type RecurringBoardFilters,
+} from "@/lib/recurring-board-filters";
 import {
   BoardCommandBar,
   BoardSelectorField,
   BOARD_COMMAND_ACTION_BTN,
 } from "@/components/kanban/board-command-bar";
-import { computeRecurringHealth } from "@/lib/recurring-board-utils";
 import {
   KanbanBoard,
   computeBoardStats,
-  computeSubtaskMap,
-  DEFAULT_FILTERS,
   type AssigneeMap,
-  type BoardFilters,
 } from "@/components/kanban/kanban-board";
-import { BoardToolbar, type ViewMode } from "@/components/kanban/board-toolbar";
+import {
+  allOccurrenceSubtasksDone,
+  computeOccurrenceSubtaskMap,
+} from "@/lib/recurring-subtask-utils";
 import { BoardTableView } from "@/components/kanban/board-table-view";
 import { BoardSkeleton } from "@/components/kanban/board-skeleton";
 import {
@@ -65,7 +88,7 @@ import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useBoardPermissions } from "@/hooks/use-board-permissions";
 import { useRetentionTracking } from "@/hooks/use-retention-tracking";
 import type { Task } from "@/types/api";
-import { isRecurringTask } from "@/lib/recurrence-display";
+import { isRecurringTask, toRecurrenceLabel } from "@/lib/recurrence-display";
 import { cn } from "@/lib/utils";
 import { Building2, Plus, Sparkles, Columns3, Shield, Keyboard } from "lucide-react";
 import {
@@ -104,9 +127,16 @@ export default function RecurringTasksPage() {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [defaultStatusId, setDefaultStatusId] = useState<string | undefined>();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [fullDetailTaskId, setFullDetailTaskId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>("kanban");
-  const [filters, setFilters] = useState<BoardFilters>(DEFAULT_FILTERS);
+  const [viewMode, setViewMode] = useState<RecurringViewMode>("calendar");
+  const [filters, setFilters] = useState<RecurringBoardFilters>(DEFAULT_RECURRING_BOARD_FILTERS);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [shelfCategory, setShelfCategory] = useState<ShelfCategory>("all");
+  const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
+  const [dayDrawerOpen, setDayDrawerOpen] = useState(false);
+  const [overdueTaskIds, setOverdueTaskIds] = useState<string[]>([]);
+  const autoOpenedTodayRef = useRef(false);
 
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
     queryKey: ["projects", orgId ?? ""],
@@ -187,9 +217,15 @@ export default function RecurringTasksPage() {
   ]);
 
   useEffect(() => {
-    setFilters(DEFAULT_FILTERS);
+    setFilters(DEFAULT_RECURRING_BOARD_FILTERS);
     setSelectedTaskId(null);
+    setFullDetailTaskId(null);
     setCreateModalOpen(false);
+    setSelectedTemplateId(null);
+    setShelfCategory("all");
+    setSelectedDayKey(null);
+    setDayDrawerOpen(false);
+    autoOpenedTodayRef.current = false;
   }, [selectedProjectId]);
 
   const { data: workflows = [], isLoading: workflowsLoading, isFetched: workflowsFetched } = useQuery({
@@ -209,11 +245,29 @@ export default function RecurringTasksPage() {
     enabled: !!defaultWorkflow?.id,
   });
 
-  const { data: tasksData, isLoading: tasksLoading } = useQuery({
-    queryKey: ["tasks", selectedProjectId],
-    queryFn: () => fetchTasksByProject(selectedProjectId!, 1, 200),
-    enabled: !!selectedProjectId && !!orgId,
+  const statusIds = useMemo(() => statuses.map((s) => s.id), [statuses]);
+
+  const { data: boardData, isLoading: boardTasksLoading, isError: boardError, failureCount: boardFailureCount } = useQuery({
+    queryKey: ["recurring-board", selectedProjectId, statusIds.join(",")],
+    queryFn: () => fetchRecurringBoard(selectedProjectId!, statusIds),
+    enabled: !!selectedProjectId && !!orgId && statuses.length > 0,
+    retry: 1,
   });
+
+  useEffect(() => {
+    if (!boardError || boardFailureCount < 1) return;
+    toast({
+      title: "Could not load recurring board",
+      description: "Restart the API server so GET /recurring-tasks/board is available, then refresh.",
+      variant: "error",
+    });
+  }, [boardError, boardFailureCount, toast]);
+
+  useEffect(() => {
+    setOverdueTaskIds(boardData?.overdueTaskIds ?? []);
+  }, [boardData?.overdueTaskIds]);
+
+  const tasksLoading = boardTasksLoading;
 
   const summaryQuery = useQuery({
     queryKey: ["recurring-summary", orgId ?? "", selectedProjectId ?? ""],
@@ -246,11 +300,48 @@ export default function RecurringTasksPage() {
     enabled: !!orgId,
   });
 
-  const tasks = tasksData?.data ?? [];
-  const recurringTasks = useMemo(
-    () => tasks.filter((task) => task.projectId === selectedProjectId && isRecurringTask(task)),
-    [tasks, selectedProjectId]
+  const tasks = boardData?.tasks ?? [];
+  const isBoardRecurringTask = useCallback(
+    (task: Task) => isRecurringTask(task) || !!task.recurringTemplateId,
+    []
   );
+  const recurringTasks = useMemo(() => {
+    let list = tasks.filter(
+      (task) => task.projectId === selectedProjectId && isBoardRecurringTask(task)
+    );
+    if (selectedTemplateId) {
+      list = list.filter((t) => t.recurringTemplateId === selectedTemplateId);
+    } else if (shelfCategory !== "all") {
+      const matchingIds = new Set(
+        recurringTemplates
+          .filter((t) => t.repeatType === shelfCategory)
+          .map((t) => t.id)
+      );
+      list = list.filter(
+        (t) => t.recurringTemplateId && matchingIds.has(t.recurringTemplateId)
+      );
+    }
+    return list;
+  }, [tasks, selectedProjectId, selectedTemplateId, shelfCategory, recurringTemplates, isBoardRecurringTask]);
+
+  const filteredRecurringTasks = useMemo(
+    () =>
+      applyRecurringBoardFilters(
+        recurringTasks,
+        filters,
+        currentUserId,
+        overdueTaskIds,
+        recurringTemplates
+      ),
+    [recurringTasks, filters, currentUserId, overdueTaskIds, recurringTemplates]
+  );
+
+  const boardStatuses = useMemo(() => {
+    if (overdueTaskIds.length > 0) {
+      return [buildRecurringOverdueStatus(), ...statuses];
+    }
+    return statuses;
+  }, [statuses, overdueTaskIds]);
 
   const taskIds = useMemo(() => recurringTasks.map((t) => t.id), [recurringTasks]);
   const { data: commentCountMap = {} } = useQuery({
@@ -290,76 +381,137 @@ export default function RecurringTasksPage() {
     () => statuses.find((s) => s.type === "DONE" || s.name.toLowerCase() === "done")?.id,
     [statuses]
   );
-  const subtaskMap = useMemo(() => computeSubtaskMap(recurringTasks, doneStatusId), [recurringTasks, doneStatusId]);
+  const subtaskMap = useMemo(
+    () => computeOccurrenceSubtaskMap(recurringTasks),
+    [recurringTasks]
+  );
+
+  const boardQueryKey = useMemo(
+    () => ["recurring-board", selectedProjectId, statusIds.join(",")] as const,
+    [selectedProjectId, statusIds]
+  );
+
+  const handleOccurrenceTaskUpdated = useCallback(
+    (updated: Task) => {
+      queryClient.setQueryData<RecurringBoardResponse>(boardQueryKey, (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          tasks: old.tasks.map((t) =>
+            t.id === updated.id ? { ...t, subtasks: updated.subtasks } : t
+          ),
+        };
+      });
+    },
+    [queryClient, boardQueryKey]
+  );
+
+  const openDayDrawer = useCallback((dateKey: string) => {
+    setSelectedDayKey(dateKey);
+    setDayDrawerOpen(true);
+  }, []);
+
+  const todayDateKey = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }, []);
+
+  const selectedDayTasks = useMemo(() => {
+    if (!selectedDayKey) return [];
+    return filteredRecurringTasks.filter((t) => {
+      if (!t.dueDate) return false;
+      const match = String(t.dueDate).match(/^(\d{4}-\d{2}-\d{2})/);
+      return match?.[1] === selectedDayKey;
+    });
+  }, [selectedDayKey, filteredRecurringTasks]);
+
+  const executiveHealth = useMemo(
+    () =>
+      computeExecutiveHealth(
+        summaryQuery.data,
+        recurringTasks,
+        recurringTemplates,
+        boardStats.completedPercent,
+        doneStatusId
+      ),
+    [summaryQuery.data, recurringTasks, recurringTemplates, boardStats.completedPercent, doneStatusId]
+  );
 
   const tasksByStatus = useMemo(() => {
-    const map: Record<string, Task[]> = {};
-    for (const s of statuses) map[s.id] = [];
-    for (const t of recurringTasks) {
-      const key = t.statusId ?? statuses[0]?.id ?? "none";
-      if (!map[key]) map[key] = [];
-      map[key].push(t);
-    }
-    if (statuses.length && !map[statuses[0].id]) map[statuses[0].id] = [];
-    return map;
-  }, [recurringTasks, statuses]);
+    const filteredOverdue = overdueTaskIds.filter((id) =>
+      filteredRecurringTasks.some((t) => t.id === id)
+    );
+    return partitionRecurringBoardTasks(filteredRecurringTasks, filteredOverdue, statuses);
+  }, [filteredRecurringTasks, overdueTaskIds, statuses]);
 
   const allTasksFlat = useMemo(() => {
     const all: Task[] = [];
-    for (const s of statuses) all.push(...(tasksByStatus[s.id] ?? []));
+    for (const s of boardStatuses) all.push(...(tasksByStatus[s.id] ?? []));
     return all;
-  }, [statuses, tasksByStatus]);
+  }, [boardStatuses, tasksByStatus]);
+
+  const visibleBoardStatuses = useMemo(() => {
+    const populated = boardStatuses.filter(
+      (s) => (tasksByStatus[s.id] ?? []).length > 0
+    );
+    if (populated.length > 0) return populated;
+    const overdueCol = boardStatuses.find((s) => s.id === "__recurring_overdue__");
+    if (overdueCol && overdueTaskIds.length > 0) return [overdueCol];
+    const fallback = boardStatuses.filter((s) => s.id !== "__recurring_overdue__").slice(0, 2);
+    return fallback.length > 0 ? fallback : boardStatuses.slice(0, 1);
+  }, [boardStatuses, tasksByStatus, overdueTaskIds]);
 
   const filteredTaskCount = useMemo(() => {
     const hasFilter =
       filters.search ||
       filters.priority.length > 0 ||
-      filters.assignee.length > 0;
+      filters.assignee.length > 0 ||
+      filters.statusIds.length > 0 ||
+      filters.recurrenceTypes.length > 0 ||
+      filters.missedOnly ||
+      filters.dueTodayOnly ||
+      filters.overdueOnly ||
+      filters.assignedToMe ||
+      filters.pausedSeriesOnly;
     if (!hasFilter) return undefined;
-    let count = 0;
-    for (const statusTasks of Object.values(tasksByStatus)) {
-      count += statusTasks.filter((t) => {
-        if (filters.search) {
-          const q = filters.search.toLowerCase();
-          if (!t.title.toLowerCase().includes(q) && !t.description?.toLowerCase().includes(q)) return false;
-        }
-        if (filters.priority.length > 0 && !filters.priority.includes(t.priority)) return false;
-        if (filters.assignee.length > 0) {
-          const taskAssignees = t.assigneeIds?.length ? t.assigneeIds : (t.assigneeId ? [t.assigneeId] : []);
-          if (!taskAssignees.some((id) => filters.assignee.includes(id))) return false;
-        }
-        return true;
-      }).length;
-    }
-    return count;
-  }, [tasksByStatus, filters]);
+    return filteredRecurringTasks.length;
+  }, [filteredRecurringTasks, filters]);
 
   const updateMutation = useMutation({
     mutationFn: ({ taskId, statusId }: { taskId: string; statusId: string | null }) =>
       updateTaskStatus(taskId, statusId),
     onMutate: async ({ taskId, statusId: toStatusId }) => {
-      const qk = ["tasks", selectedProjectId];
-      await queryClient.cancelQueries({ queryKey: qk });
-      const prev = queryClient.getQueryData<{ data: Task[] }>(qk);
-      queryClient.setQueryData<{ data: Task[] }>(qk, (old) => {
+      await queryClient.cancelQueries({ queryKey: boardQueryKey });
+      const prev = queryClient.getQueryData<RecurringBoardResponse>(boardQueryKey);
+      queryClient.setQueryData<RecurringBoardResponse>(boardQueryKey, (old) => {
         if (!old) return old;
-        return { ...old, data: old.data.map((t) => (t.id === taskId ? { ...t, statusId: toStatusId ?? undefined } : t)) };
+        const overdueTaskIds = old.overdueTaskIds.filter((id) => id !== taskId);
+        return {
+          ...old,
+          overdueTaskIds,
+          tasks: old.tasks.map((t) =>
+            t.id === taskId ? { ...t, statusId: toStatusId ?? undefined } : t
+          ),
+        };
       });
+      setOverdueTaskIds((ids) => ids.filter((id) => id !== taskId));
       return { previous: prev };
     },
     onSuccess: (updated, { taskId }) => {
       if (!updated?.id) return;
-      queryClient.setQueryData<{ data: Task[] }>(["tasks", selectedProjectId], (old) => {
+      queryClient.setQueryData<RecurringBoardResponse>(boardQueryKey, (old) => {
         if (!old) return old;
         return {
           ...old,
-          data: old.data.map((t) => (t.id === taskId ? { ...t, ...updated } : t)),
+          tasks: old.tasks.map((t) => (t.id === taskId ? { ...t, ...updated } : t)),
         };
       });
       queryClient.setQueryData(["task", taskId], updated);
+      queryClient.invalidateQueries({ queryKey: ["recurring-summary"] });
     },
     onError: (err, _vars, ctx) => {
-      if (ctx?.previous) queryClient.setQueryData(["tasks", selectedProjectId], ctx.previous);
+      if (ctx?.previous) queryClient.setQueryData(boardQueryKey, ctx.previous);
+      if (ctx?.previous?.overdueTaskIds) setOverdueTaskIds(ctx.previous.overdueTaskIds);
       toast({
         title: "Failed to move task",
         description: parseApiError(err),
@@ -371,7 +523,7 @@ export default function RecurringTasksPage() {
   const deleteMutation = useMutation({
     mutationFn: (taskId: string) => deleteTask(taskId),
     onSuccess: (_data, taskId) => {
-      queryClient.invalidateQueries({ queryKey: ["tasks", selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-board", selectedProjectId] });
       queryClient.invalidateQueries({ queryKey: ["recurring-summary"] });
       queryClient.invalidateQueries({ queryKey: ["recurring-templates"] });
       if (selectedTaskId === taskId) setSelectedTaskId(null);
@@ -390,7 +542,7 @@ export default function RecurringTasksPage() {
   const pauseSeriesMutation = useMutation({
     mutationFn: (templateId: string) => pauseRecurringTemplate(templateId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tasks", selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-board", selectedProjectId] });
       queryClient.invalidateQueries({ queryKey: ["recurring-summary"] });
       queryClient.invalidateQueries({ queryKey: ["recurring-templates"] });
       toast({ title: "Series paused", variant: "success" });
@@ -398,6 +550,29 @@ export default function RecurringTasksPage() {
     onError: (err) => {
       toast({
         title: "Could not pause series",
+        description: parseApiError(err),
+        variant: "error",
+      });
+    },
+  });
+
+  const resumeSeriesMutation = useMutation({
+    mutationFn: async (templateId: string) => {
+      await resumeRecurringTemplate(templateId);
+      // Immediately trigger a catch-up sync so the calendar fills in
+      if (selectedProjectId) {
+        await syncRecurringBoard(selectedProjectId);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["recurring-board", selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-templates"] });
+      toast({ title: "Series resumed — generating new runs", variant: "success" });
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not resume series",
         description: parseApiError(err),
         variant: "error",
       });
@@ -414,6 +589,9 @@ export default function RecurringTasksPage() {
         await skipNextRecurringOccurrence(recurringTemplateId);
         return;
       }
+      if (!allOccurrenceSubtasksDone(task.subtasks)) {
+        throw new Error("Finish all subtasks before marking this run done.");
+      }
       const doneStatus = statuses.find((s) => s.type === "DONE")?.id;
       await completeRecurringTaskWithAction(task.id, {
         action: "ONLY_THIS",
@@ -421,12 +599,12 @@ export default function RecurringTasksPage() {
       });
     },
     onSuccess: (_data, vars) => {
-      queryClient.invalidateQueries({ queryKey: ["tasks", selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-board", selectedProjectId] });
       queryClient.invalidateQueries({ queryKey: ["task", vars.task.id] });
       queryClient.invalidateQueries({ queryKey: ["recurring-templates"] });
       queryClient.invalidateQueries({ queryKey: ["recurring-summary"] });
       toast({
-        title: vars.type === "skip" ? "Next occurrence skipped" : "Occurrence completed",
+        title: vars.type === "skip" ? "Next run skipped" : "Run completed",
         variant: "success",
       });
     },
@@ -438,6 +616,77 @@ export default function RecurringTasksPage() {
       });
     },
   });
+
+  const completeDayMutation = useMutation({
+    mutationFn: async (tasksToComplete: Task[]) => {
+      const doneStatus = statuses.find((s) => s.type === "DONE")?.id;
+      for (const task of tasksToComplete) {
+        const status = statuses.find((s) => s.id === task.statusId);
+        const isDone =
+          status?.type === "DONE" || status?.name?.toLowerCase() === "done";
+        if (isDone) continue;
+        if (!allOccurrenceSubtasksDone(task.subtasks)) {
+          throw new Error("Finish all subtasks before completing the day.");
+        }
+        await completeRecurringTaskWithAction(task.id, {
+          action: "ONLY_THIS",
+          doneStatusId: doneStatus,
+        });
+      }
+    },
+    onSuccess: (_data, tasksToComplete) => {
+      queryClient.invalidateQueries({ queryKey: ["recurring-board", selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-templates"] });
+      for (const task of tasksToComplete) {
+        queryClient.invalidateQueries({ queryKey: ["task", task.id] });
+      }
+      toast({ title: "Day completed", variant: "success" });
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not complete day",
+        description: parseApiError(err),
+        variant: "error",
+      });
+    },
+  });
+
+  const handleCompleteDay = useCallback(
+    (tasksToComplete: Task[]) => {
+      completeDayMutation.mutate(tasksToComplete);
+    },
+    [completeDayMutation]
+  );
+
+  useEffect(() => {
+    if (
+      viewMode !== "calendar" ||
+      workflowsLoading ||
+      statusesLoading ||
+      tasksLoading ||
+      autoOpenedTodayRef.current
+    ) {
+      return;
+    }
+    const todayTasks = filteredRecurringTasks.filter((t) => {
+      if (!t.dueDate) return false;
+      const match = String(t.dueDate).match(/^(\d{4}-\d{2}-\d{2})/);
+      return match?.[1] === todayDateKey;
+    });
+    if (todayTasks.length > 0) {
+      openDayDrawer(todayDateKey);
+      autoOpenedTodayRef.current = true;
+    }
+  }, [
+    viewMode,
+    workflowsLoading,
+    statusesLoading,
+    tasksLoading,
+    filteredRecurringTasks,
+    todayDateKey,
+    openDayDrawer,
+  ]);
 
   const createMutation = useMutation({
     mutationFn: ({
@@ -459,7 +708,7 @@ export default function RecurringTasksPage() {
       ),
     onSettled: () => {
       if (!selectedProjectId) return;
-      queryClient.invalidateQueries({ queryKey: ["tasks", selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-board", selectedProjectId] });
       queryClient.invalidateQueries({ queryKey: ["recurring-summary"] });
       queryClient.invalidateQueries({ queryKey: ["recurring-templates"] });
     },
@@ -497,8 +746,8 @@ export default function RecurringTasksPage() {
     onSuccess: () => {
       if (selectedProjectId) {
         queryClient.invalidateQueries({ queryKey: ["workflows", selectedProjectId] });
+        queryClient.invalidateQueries({ queryKey: ["recurring-board", selectedProjectId] });
         queryClient.invalidateQueries({ queryKey: ["workflow-statuses"] });
-        queryClient.invalidateQueries({ queryKey: ["tasks", selectedProjectId] });
       }
     },
     onError: (err) => {
@@ -531,13 +780,15 @@ export default function RecurringTasksPage() {
   ]);
 
   const handleMoveTask = useCallback(
-    (taskId: string, _from: string | null, toStatusId: string) => {
+    (taskId: string, from: string | null, toStatusId: string) => {
+      if (isRecurringOverdueColumn(toStatusId)) return;
       updateMutation.mutate({ taskId, statusId: toStatusId });
     },
     [updateMutation]
   );
 
   const handleQuickAdd = useCallback((title: string, statusId: string) => {
+    if (isRecurringOverdueColumn(statusId)) return;
     if (!orgId || !selectedProjectId) return;
     createMutation.mutate({
       payload: {
@@ -594,6 +845,26 @@ export default function RecurringTasksPage() {
     });
   }, [orgId, selectedProjectId, createMutation, statuses]);
 
+  const snoozeMutation = useMutation({
+    mutationFn: async (task: Task) => {
+      const base = task.dueDate ? new Date(task.dueDate) : new Date();
+      base.setDate(base.getDate() + 1);
+      return updateTask(task.id, { dueDate: base.toISOString() });
+    },
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({ queryKey: ["recurring-board", selectedProjectId] });
+      queryClient.setQueryData(["task", updated.id], updated);
+      toast({ title: "Snoozed until tomorrow", variant: "success" });
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not snooze",
+        description: parseApiError(err),
+        variant: "error",
+      });
+    },
+  });
+
   const quickActions = useMemo(() => ({
     onEdit: (task: Task) => setSelectedTaskId(task.id),
     onChangeStatus: (task: Task, statusId: string) => updateMutation.mutate({ taskId: task.id, statusId }),
@@ -601,27 +872,40 @@ export default function RecurringTasksPage() {
       recurringActionMutation.mutate({ type: "complete", task }),
     onSkipNextOccurrence: (task: Task) =>
       recurringActionMutation.mutate({ type: "skip", task }),
+    onSnoozeOccurrence: (task: Task) => snoozeMutation.mutate(task),
     onPauseSeries: (task: Task) => {
       if (!task.recurringTemplateId) return;
       pauseSeriesMutation.mutate(task.recurringTemplateId);
     },
     onDelete: (task: Task) => setDeleteTarget(task),
-  }), [updateMutation, recurringActionMutation, pauseSeriesMutation]);
+  }), [updateMutation, recurringActionMutation, pauseSeriesMutation, snoozeMutation]);
 
-  const healthMetrics = useMemo(
-    () =>
-      computeRecurringHealth(
-        summaryQuery.data,
-        recurringTasks,
-        recurringTemplates,
-        boardStats.completedPercent
-      ),
-    [summaryQuery.data, recurringTasks, recurringTemplates, boardStats.completedPercent]
+  const selectedDrawerTask = useMemo(
+    () => recurringTasks.find((t) => t.id === selectedTaskId) ?? tasks.find((t) => t.id === selectedTaskId),
+    [recurringTasks, tasks, selectedTaskId]
   );
+
+  const nextUpcomingTemplate = useMemo(() => {
+    const active = recurringTemplates.filter((t) => !t.isPaused && t.nextDueDate);
+    if (!active.length) return null;
+    return [...active].sort((a, b) =>
+      String(a.nextDueDate).localeCompare(String(b.nextDueDate))
+    )[0];
+  }, [recurringTemplates]);
+
+  const showBoardEmptyState =
+    recurringTasks.length === 0 &&
+    overdueTaskIds.length === 0 &&
+    !boardTasksLoading &&
+    !summaryQuery.data?.overdue;
 
   useKeyboardShortcuts(useMemo(() => [
     { key: "n", ctrl: true, handler: () => { if (permissions.canCreateTask && selectedProjectId) setCreateModalOpen(true); }, description: "Create recurring task" },
-    { key: "b", handler: () => setViewMode((m) => (m === "kanban" ? "table" : "kanban")), description: "Cycle view (Kanban/Table)" },
+    { key: "b", handler: () => setViewMode((m) => {
+      const order: RecurringViewMode[] = ["agenda", "calendar", "shelf", "board", "table"];
+      const idx = order.indexOf(m);
+      return order[(idx + 1) % order.length];
+    }), description: "Cycle views" },
   ], [permissions.canCreateTask, selectedProjectId]));
 
   if (!orgId) {
@@ -680,7 +964,7 @@ export default function RecurringTasksPage() {
   const isBoardLoading = workflowsLoading || statusesLoading || tasksLoading || setupWorkflowMutation.isPending;
 
   return (
-    <div className="flex h-0 min-h-0 flex-1 flex-col gap-2 overflow-hidden animate-slide-up">
+    <div className={cn(EXEC_PLANNER.page, "flex h-0 min-h-0 flex-1 flex-col gap-3 overflow-hidden animate-slide-up")}>
       {celebrationLayer}
       <BoardCommandBar
         selectors={
@@ -721,7 +1005,7 @@ export default function RecurringTasksPage() {
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="text-xs">
-                  Ctrl+N create · B cycle Kanban/Table
+                  Ctrl+N create · B cycle views
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -739,99 +1023,186 @@ export default function RecurringTasksPage() {
             )}
           </>
         }
-        stats={
-          recurringTasks.length > 0 || summaryQuery.data ? (
-            <RecurringSummaryStats
+      />
+
+      {(recurringTasks.length > 0 || summaryQuery.data) && !isBoardLoading ? (
+        viewMode === "calendar" ? (
+          <RecurringCompactStats
+            summary={summaryQuery.data}
+            tasks={recurringTasks}
+            templates={recurringTemplates}
+            doneStatusId={doneStatusId}
+            isLoading={summaryQuery.isLoading}
+            className="shrink-0"
+            onDueTodayClick={() => openDayDrawer(todayDateKey)}
+            onMissedClick={() => {
+              setFilters((f) => ({ ...f, missedOnly: true }));
+              setViewMode("calendar");
+            }}
+            onResumeSeries={(id) => resumeSeriesMutation.mutate(id)}
+          />
+        ) : (
+          <>
+            <PlannerHeader
+              summary={summaryQuery.data}
+              tasks={recurringTasks}
+              projectName={selectedProject.name}
+              className="shrink-0"
+            />
+            <RecurringPremiumStats
               summary={summaryQuery.data}
               tasks={recurringTasks}
               templates={recurringTemplates}
               completedPercent={boardStats.completedPercent}
               doneStatusId={doneStatusId}
-              isLoading={summaryQuery.isLoading || isBoardLoading}
+              healthStatus={executiveHealth.healthStatus}
+              isLoading={summaryQuery.isLoading}
+              className="shrink-0"
             />
-          ) : undefined
-        }
-        toolbar={
-          !isBoardLoading && statuses.length > 0 ? (
-            <BoardToolbar
+          </>
+        )
+      ) : null}
+
+      {!isBoardLoading && statuses.length > 0 ? (
+        <div className="flex h-0 min-h-0 flex-1 gap-3 overflow-hidden">
+          {viewMode !== "shelf" && viewMode !== "calendar" ? (
+            <PlannerShelf
+              templates={recurringTemplates}
+              selectedTemplateId={selectedTemplateId}
+              selectedCategory={shelfCategory}
+              onSelectTemplate={setSelectedTemplateId}
+              onSelectCategory={setShelfCategory}
+              variant="sidebar"
+            />
+          ) : null}
+
+          <div className="flex min-w-0 flex-1 flex-col gap-2 overflow-hidden">
+            <RecurringBoardToolbar
               filters={filters}
               onFiltersChange={setFilters}
               assigneeMap={assigneeMap}
+              statuses={statuses}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
               taskCount={recurringTasks.length}
               filteredCount={filteredTaskCount}
-              showRecurrenceFilter={false}
             />
-          ) : undefined
-        }
-      />
 
-      {isBoardLoading ? (
-        <BoardSkeleton />
-      ) : statuses.length > 0 ? (
-        <>
-          <div className="flex h-0 min-h-0 flex-1 flex-col gap-2 overflow-hidden">
-            {(viewMode === "kanban" || viewMode === "scrum") ? (
-              <KanbanBoard
-                className="min-h-0 flex-1"
-                statuses={statuses}
-                tasksByStatus={tasksByStatus}
-                onMoveTask={handleMoveTask}
-                onQuickAdd={permissions.canCreateTask ? handleQuickAdd : undefined}
-                onTaskClick={(task) => setSelectedTaskId(task.id)}
-                assigneeMap={assigneeMap}
-                commentCountMap={commentCountMap}
-                subtaskMap={subtaskMap}
-                filters={filters}
-                quickActions={quickActions}
-                permissions={permissions}
-                currentUserId={currentUserId}
-                boardVariant="recurring"
-                recurringTemplateMap={recurringTemplateMap}
-                aria-label={`Recurring tasks for ${selectedProject.name}`}
-              />
-            ) : (
-              <div className="min-h-0 flex-1 basis-0 overflow-y-auto">
-                <BoardTableView
-                  tasks={allTasksFlat}
-                  statuses={statuses}
+            <div className="flex h-0 min-h-0 flex-1 flex-col overflow-hidden">
+              {viewMode === "agenda" ? (
+                <RecurringAgendaView
+                  className="min-h-0 flex-1"
+                  tasks={filteredRecurringTasks}
+                  statuses={boardStatuses}
+                  overdueTaskIds={overdueTaskIds}
+                  recurringTemplateMap={recurringTemplateMap}
                   assigneeMap={assigneeMap}
                   subtaskMap={subtaskMap}
+                  commentCountMap={commentCountMap}
+                  doneStatusId={doneStatusId}
+                  readOnly={!permissions.canEditTask}
                   onTaskClick={(task) => setSelectedTaskId(task.id)}
-                  permissions={permissions}
+                  onMarkDone={(task) => recurringActionMutation.mutate({ type: "complete", task })}
+                  onSkip={(task) => recurringActionMutation.mutate({ type: "skip", task })}
+                  onSnooze={(task) => snoozeMutation.mutate(task)}
                 />
+              ) : viewMode === "calendar" ? (
+                <RecurringCalendarView
+                  className="min-h-0 flex-1"
+                  tasks={filteredRecurringTasks}
+                  statuses={boardStatuses}
+                  overdueTaskIds={overdueTaskIds}
+                  selectedDateKey={selectedDayKey}
+                  onDateClick={(dateKey) => openDayDrawer(dateKey)}
+                  onTaskClick={(task) => {
+                    const match = task.dueDate ? String(task.dueDate).match(/^(\d{4}-\d{2}-\d{2})/) : null;
+                    if (match?.[1]) openDayDrawer(match[1]);
+                  }}
+                />
+              ) : viewMode === "shelf" ? (
+                <PlannerShelf
+                  templates={recurringTemplates}
+                  selectedTemplateId={selectedTemplateId}
+                  selectedCategory={shelfCategory}
+                  onSelectTemplate={setSelectedTemplateId}
+                  onSelectCategory={setShelfCategory}
+                  variant="grid"
+                  className="min-h-0 flex-1"
+                />
+              ) : viewMode === "board" ? (
+                <KanbanBoard
+                  className="min-h-0 flex-1"
+                  statuses={visibleBoardStatuses}
+                  tasksByStatus={tasksByStatus}
+                  onMoveTask={handleMoveTask}
+                  onQuickAdd={permissions.canCreateTask ? handleQuickAdd : undefined}
+                  onTaskClick={(task) => setSelectedTaskId(task.id)}
+                  assigneeMap={assigneeMap}
+                  commentCountMap={commentCountMap}
+                  subtaskMap={subtaskMap}
+                  filters={filters}
+                  quickActions={quickActions}
+                  permissions={permissions}
+                  currentUserId={currentUserId}
+                  boardVariant="recurring"
+                  recurringTemplateMap={recurringTemplateMap}
+                  aria-label={`Recurring tasks for ${selectedProject.name}`}
+                />
+              ) : (
+                <div className="min-h-0 flex-1 basis-0 overflow-y-auto rounded-xl border border-border/45 bg-card/50 p-2">
+                  <BoardTableView
+                    tasks={allTasksFlat}
+                    statuses={boardStatuses}
+                    assigneeMap={assigneeMap}
+                    subtaskMap={subtaskMap}
+                    onTaskClick={(task) => setSelectedTaskId(task.id)}
+                    permissions={permissions}
+                  />
+                </div>
+              )}
+            </div>
+
+            {recurringTasks.length > 0 && viewMode !== "calendar" ? (
+              <RecurringExecutiveHealth metrics={executiveHealth} className="shrink-0" />
+            ) : null}
+
+            {showBoardEmptyState && viewMode !== "shelf" && (
+              <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed bg-muted/10 py-10 text-center">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
+                  <Sparkles className="h-7 w-7 text-primary" />
+                </div>
+                <p className="mt-4 text-lg font-semibold">
+                  {recurringTemplates.length > 0 ? "No open occurrences" : "Start your planner library"}
+                </p>
+                <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                  {nextUpcomingTemplate ? (
+                    <>
+                      Next up: <span className="font-medium text-foreground">{nextUpcomingTemplate.title}</span>
+                      {" "}on {formatShortDate(String(nextUpcomingTemplate.nextDueDate).slice(0, 10))}
+                      {" "}({toRecurrenceLabel(nextUpcomingTemplate.repeatType)}).
+                    </>
+                  ) : (
+                    "Create a recurring planner series to schedule repeating work for this project."
+                  )}
+                </p>
+                {permissions.canCreateTask && (
+                  <Button
+                    className="mt-5 shadow-lg shadow-primary/20"
+                    onClick={() => {
+                      setDefaultStatusId(statuses[0]?.id);
+                      setCreateModalOpen(true);
+                    }}
+                  >
+                    <Sparkles className="mr-1.5 h-4 w-4" />{" "}
+                    {recurringTemplates.length > 0 ? "Add planner series" : "Create first planner"}
+                  </Button>
+                )}
               </div>
             )}
           </div>
-
-          {recurringTasks.length > 0 ? (
-            <RecurringHealthSection metrics={healthMetrics} />
-          ) : null}
-
-          {recurringTasks.length === 0 && (
-            <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed bg-muted/10 py-14 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-                <Sparkles className="h-7 w-7 text-primary" />
-              </div>
-              <p className="mt-4 text-lg font-semibold">No recurring tasks yet</p>
-              <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                Create a recurring task to schedule repeating work for this project.
-              </p>
-              {permissions.canCreateTask && (
-                <Button
-                  className="mt-5 shadow-lg shadow-primary/20"
-                  onClick={() => {
-                    setDefaultStatusId(statuses[0]?.id);
-                    setCreateModalOpen(true);
-                  }}
-                >
-                  <Sparkles className="mr-1.5 h-4 w-4" /> Create First Recurring Task
-                </Button>
-              )}
-            </div>
-          )}
-        </>
+        </div>
+      ) : isBoardLoading ? (
+        <BoardSkeleton />
       ) : (
         <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed bg-muted/10 py-16 text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
@@ -874,27 +1245,81 @@ export default function RecurringTasksPage() {
       />
 
       {orgId && selectedProjectId && (
-        <TaskDetailModal
-          taskId={selectedTaskId}
-          projectId={selectedProjectId}
-          organizationId={orgId}
-          statuses={statuses}
-          open={selectedTaskId !== null}
-          onOpenChange={(open) => !open && setSelectedTaskId(null)}
-          readOnly={!permissions.canEditTask}
-        />
+        <>
+          <RecurringDayDrawer
+            dateKey={selectedDayKey}
+            open={dayDrawerOpen}
+            onOpenChange={setDayDrawerOpen}
+            tasks={selectedDayTasks}
+            recurringTemplateMap={recurringTemplateMap}
+            statuses={statuses}
+            overdueTaskIds={overdueTaskIds}
+            readOnly={!permissions.canEditTask}
+            boardQueryKey={boardQueryKey}
+            onTaskUpdated={handleOccurrenceTaskUpdated}
+            onMarkDone={(task) => recurringActionMutation.mutate({ type: "complete", task })}
+            onSkip={(task) => recurringActionMutation.mutate({ type: "skip", task })}
+            onSnooze={(task) => snoozeMutation.mutate(task)}
+            onOpenDetails={(id) => {
+              setDayDrawerOpen(false);
+              setSelectedTaskId(id);
+            }}
+            onCompleteDay={handleCompleteDay}
+            isLoading={tasksLoading}
+            isCompletingDay={completeDayMutation.isPending}
+          />
+          <RecurringTaskDrawer
+            taskId={selectedTaskId}
+            open={selectedTaskId !== null && fullDetailTaskId === null}
+            onOpenChange={(open) => !open && setSelectedTaskId(null)}
+            template={
+              selectedDrawerTask?.recurringTemplateId
+                ? recurringTemplateMap[selectedDrawerTask.recurringTemplateId]
+                : undefined
+            }
+            assigneeMap={assigneeMap}
+            statuses={statuses}
+            overdueTaskIds={overdueTaskIds}
+            boardQueryKey={boardQueryKey}
+            onTaskUpdated={handleOccurrenceTaskUpdated}
+            commentCount={selectedTaskId ? commentCountMap[selectedTaskId] : 0}
+            readOnly={!permissions.canEditTask}
+            onMarkDone={(task) => recurringActionMutation.mutate({ type: "complete", task })}
+            onSkip={(task) => recurringActionMutation.mutate({ type: "skip", task })}
+            onSnooze={(task) => snoozeMutation.mutate(task)}
+            onPauseSeries={(task) => {
+              if (task.recurringTemplateId) pauseSeriesMutation.mutate(task.recurringTemplateId);
+            }}
+            onOpenFullDetails={(id) => setFullDetailTaskId(id)}
+          />
+          <TaskDetailModal
+            taskId={fullDetailTaskId}
+            projectId={selectedProjectId}
+            organizationId={orgId}
+            statuses={statuses}
+            open={fullDetailTaskId !== null}
+            onOpenChange={(open) => !open && setFullDetailTaskId(null)}
+            onTaskUpdated={(task) => {
+              handleOccurrenceTaskUpdated(task);
+              queryClient.invalidateQueries({ queryKey: ["recurring-board", selectedProjectId] });
+              queryClient.invalidateQueries({ queryKey: ["recurring-summary"] });
+              queryClient.invalidateQueries({ queryKey: ["recurring-templates"] });
+            }}
+            readOnly={!permissions.canEditTask}
+          />
+        </>
       )}
 
       <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => !open && setDeleteTarget(null)}
-        title="Delete task"
+        title="Delete run"
         description={
           deleteTarget
-            ? `Permanently delete "${deleteTarget.title}"? This cannot be undone.`
+            ? `Permanently delete this run for "${deleteTarget.title}"? The recurring series will continue creating future runs.`
             : undefined
         }
-        confirmLabel="Delete"
+        confirmLabel="Delete run"
         variant="destructive"
         loading={deleteMutation.isPending}
         onConfirm={() => {

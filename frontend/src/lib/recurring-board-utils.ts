@@ -75,10 +75,21 @@ export function getRecurringMissedTone(
   return daysPast >= 3 ? "critical" : "warning";
 }
 
+export function getRecurringEmptyColumnMessage(status: WorkflowStatus): string {
+  if (status.id === "__recurring_overdue__") return "No overdue occurrences — great job!";
+  const cat = getWorkflowStatusCategory(status);
+  if (cat === "in_progress") return "No active occurrences";
+  if (cat === "done") return "No completed occurrences yet";
+  return "No scheduled occurrences";
+}
+
 export function getRecurringColumnHint(
   status: WorkflowStatus,
   tasks: Task[]
 ): string | null {
+  if (status.id === "__recurring_overdue__") {
+    return tasks.length > 0 ? `${tasks.length} overdue` : null;
+  }
   const cat = getWorkflowStatusCategory(status);
   const now = Date.now();
   if (cat === "done") {
@@ -95,19 +106,43 @@ export function getRecurringColumnHint(
   return null;
 }
 
-export function getRecurringEmptyColumnMessage(status: WorkflowStatus): string {
-  const cat = getWorkflowStatusCategory(status);
-  if (cat === "in_progress") return "No active occurrences";
-  if (cat === "done") return "No completed occurrences yet";
-  return "No scheduled occurrences";
-}
-
 export interface RecurringHealthMetrics {
   completionRate: number;
   missedOccurrences: number;
   pausedSeries: number;
   mostDelayedTitle: string | null;
   mostDelayedDays: number;
+}
+
+export interface ExecutiveHealthMetrics extends RecurringHealthMetrics {
+  onTimeRate: number;
+  healthStatus: "healthy" | "at_risk" | "critical";
+  completedThisWeek: number;
+}
+
+export function computeExecutiveHealth(
+  summary: RecurringTaskSummary | undefined,
+  tasks: Task[],
+  templates: RecurringTemplateSummary[],
+  completedPercent: number,
+  doneStatusId?: string
+): ExecutiveHealthMetrics {
+  const base = computeRecurringHealth(summary, tasks, templates, completedPercent);
+  const completedWeek = countCompletedThisWeek(tasks, doneStatusId);
+  const missed = base.missedOccurrences;
+  const denom = completedWeek + missed;
+  const onTimeRate = denom > 0 ? Math.round((completedWeek / denom) * 100) : completedPercent;
+
+  let healthStatus: ExecutiveHealthMetrics["healthStatus"] = "healthy";
+  if (missed >= 5 || completedPercent < 35) healthStatus = "critical";
+  else if (missed >= 2 || completedPercent < 65) healthStatus = "at_risk";
+
+  return {
+    ...base,
+    onTimeRate,
+    healthStatus,
+    completedThisWeek: completedWeek,
+  };
 }
 
 export function computeRecurringHealth(

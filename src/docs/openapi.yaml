@@ -1,0 +1,140 @@
+openapi: 3.0.3
+info:
+  title: Mini Task Manager API
+  version: 1.0.0
+  description: |
+    REST API for Mini Task Manager. Authenticate with JWT (`Authorization: Bearer <token>`)
+    or API key (`Authorization: Bearer mtm_...`). Organization-scoped routes require
+    `X-Organization-Id` header.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: OK
+  /tasks:
+    get:
+      summary: List tasks
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+      responses:
+        '200':
+          description: Task list
+    post:
+      summary: Create task
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+      responses:
+        '201':
+          description: Created
+  /webhooks:
+    get:
+      summary: List outbound webhooks
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+      responses:
+        '200':
+          description: Webhook list
+    post:
+      summary: Create webhook endpoint
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+      responses:
+        '201':
+          description: Created
+  /automations:
+    get:
+      summary: List automation rules
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+      responses:
+        '200':
+          description: Automation rules
+  /integrations:
+    get:
+      summary: List integrations
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+      responses:
+        '200':
+          description: Integrations
+  /saved-views:
+    get:
+      summary: List saved board views
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - name: projectId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Saved views
+  /tasks/{taskId}/time-entries:
+    post:
+      summary: Log time on a task
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                minutes:
+                  type: integer
+                note:
+                  type: string
+      responses:
+        '201':
+          description: Time entry created
+  /export/csv:
+    get:
+      summary: Export workspace data as CSV
+      parameters:
+        - $ref: '#/components/parameters/OrganizationId'
+      responses:
+        '200':
+          description: CSV export
+  /auth/sso/start:
+    get:
+      summary: Start SSO login
+      security: []
+      parameters:
+        - name: organizationId
+          in: query
+          schema:
+            type: string
+        - name: email
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Redirect URL
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT or API key (mtm_...)
+  parameters:
+    OrganizationId:
+      name: X-Organization-Id
+      in: header
+      required: true
+      schema:
+        type: string

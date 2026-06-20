@@ -12,6 +12,17 @@ export async function fetchCurrentUserProfile(): Promise<CurrentUserProfile | nu
   return data;
 }
 
+export interface UpdateCurrentUserProfilePayload {
+  fullName?: string;
+}
+
+export async function updateCurrentUserProfile(
+  payload: UpdateCurrentUserProfilePayload
+): Promise<CurrentUserProfile> {
+  const { data } = await apiClient.patch<CurrentUserProfile>("users/me", payload);
+  return data;
+}
+
 export async function uploadMyAvatar(file: File): Promise<CurrentUserProfile> {
   const form = new FormData();
   form.append("file", file);

@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerGuard } from '@nestjs/throttler';
-import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
+import { CompositeAuthGuard } from './modules/auth/guards/composite-auth.guard';
 import { LastSeenInterceptor } from './modules/users/last-seen.interceptor';
 import { ConfigModule } from './config/config.module';
 import { DatabaseModule } from './infrastructure/database/database.module';
@@ -24,12 +24,18 @@ import { ApiKeysModule } from './modules/api-keys/api-keys.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { PlansModule } from './plans/plans.module';
+import { WebhooksModule } from './modules/webhooks/webhooks.module';
+import { AutomationsModule } from './modules/automations/automations.module';
+import { IntegrationsModule } from './modules/integrations/integrations.module';
+import { SavedViewsModule } from './modules/saved-views/saved-views.module';
+import { ExportModule } from './modules/export/export.module';
+import { OrgEventsModule } from './modules/org-events/org-events.module';
 import { RootController } from './root.controller';
 
 @Module({
   controllers: [RootController],
   providers: [
-    { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: CompositeAuthGuard },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_INTERCEPTOR, useClass: LastSeenInterceptor },
   ],
@@ -39,6 +45,7 @@ import { RootController } from './root.controller';
     HealthModule,
     ThrottleModule,
     AuthModule,
+    ApiKeysModule,
     UsersModule,
     OrganizationsModule,
     ProjectsModule,
@@ -55,6 +62,12 @@ import { RootController } from './root.controller';
     AnalyticsModule,
     AdminModule,
     PlansModule,
+    WebhooksModule,
+    AutomationsModule,
+    IntegrationsModule,
+    SavedViewsModule,
+    ExportModule,
+    OrgEventsModule,
   ],
 })
 export class AppModule {}

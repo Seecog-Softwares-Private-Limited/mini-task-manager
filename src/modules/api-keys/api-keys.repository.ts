@@ -31,4 +31,12 @@ export class ApiKeysRepository {
   async delete(id: string): Promise<void> {
     await this.repo.delete(id);
   }
+
+  async findByKeyPrefix(keyPrefix: string): Promise<ApiKeyEntity[]> {
+    return this.repo.find({ where: { keyPrefix } });
+  }
+
+  async touchLastUsed(id: string): Promise<void> {
+    await this.repo.update(id, { lastUsedAt: new Date() });
+  }
 }

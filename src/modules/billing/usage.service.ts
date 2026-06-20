@@ -108,27 +108,55 @@ export class UsageService {
     let storageGb = 0;
     try {
       const [result] = await this.dataSource.query(
-        `SELECT COALESCE(SUM(ta.file_size_bytes), 0) as total
-         FROM task_attachments ta
-         JOIN tasks t ON ta.task_id = t.id
-         WHERE t.organization_id = ?`,
-        [organizationId],
+        `SELECT COALESCE(SUM(bytes), 0) as total FROM (
+           SELECT ta.file_size_bytes as bytes
+           FROM task_attachments ta
+           JOIN tasks t ON ta.task_id = t.id
+           WHERE t.organization_id = ?
+           UNION ALL
+           SELECT a.file_size as bytes
+           FROM attachments a
+           WHERE a.workspace_id = ? AND (a.is_deleted = 0 OR a.is_deleted IS NULL)
+         ) storage_union`,
+        [organizationId, organizationId],
       );
       const totalBytes = Number(result?.total ?? 0);
       storageGb = Math.round((totalBytes / (1024 * 1024 * 1024)) * 100) / 100;
     } catch { storageGb = 0; }
 
-    // Automations and Integrations — from usage table or 0
+    // Automations and Integrations — count from live tables when available
     let automationsUsed = 0;
     let integrationsUsed = 0;
     try {
-      const [result] = await this.dataSource.query(
-        `SELECT automation_used, integrations_used FROM organization_usage WHERE organization_id = ?`,
+      const [autoResult] = await this.dataSource.query(
+        `SELECT COUNT(*) as cnt FROM automation_rules WHERE organization_id = ? AND is_enabled = 1`,
         [organizationId],
       );
-      automationsUsed = Number(result?.automation_used ?? 0);
-      integrationsUsed = Number(result?.integrations_used ?? 0);
-    } catch { /* table might not exist yet */ }
+      automationsUsed = Number(autoResult?.cnt ?? 0);
+    } catch {
+      try {
+        const [result] = await this.dataSource.query(
+          `SELECT automation_used FROM organization_usage WHERE organization_id = ?`,
+          [organizationId],
+        );
+        automationsUsed = Number(result?.automation_used ?? 0);
+      } catch { automationsUsed = 0; }
+    }
+    try {
+      const [intResult] = await this.dataSource.query(
+        `SELECT COUNT(*) as cnt FROM organization_integrations WHERE organization_id = ? AND is_active = 1`,
+        [organizationId],
+      );
+      integrationsUsed = Number(intResult?.cnt ?? 0);
+    } catch {
+      try {
+        const [result] = await this.dataSource.query(
+          `SELECT integrations_used FROM organization_usage WHERE organization_id = ?`,
+          [organizationId],
+        );
+        integrationsUsed = Number(result?.integrations_used ?? 0);
+      } catch { integrationsUsed = 0; }
+    }
 
     // API keys count from api_keys table
     let apiKeysCount = 0;

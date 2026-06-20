@@ -3,8 +3,36 @@ import type {
   RecurringTaskOccurrence,
   RecurringTaskSummary,
   RecurringTemplateSummary,
+  Task,
   TaskRecurrenceConfig,
 } from "@/types/api";
+
+export interface RecurringBoardResponse {
+  tasks: Task[];
+  overdueTaskIds: string[];
+}
+
+export async function fetchRecurringBoard(
+  projectId: string,
+  statusIds: string[]
+): Promise<RecurringBoardResponse> {
+  const { data } = await apiClient.get<RecurringBoardResponse>("/recurring-tasks/board", {
+    params: {
+      projectId,
+      statusIds: statusIds.length ? statusIds.join(",") : undefined,
+    },
+  });
+  return data;
+}
+
+export async function syncRecurringBoard(projectId: string): Promise<{ materialized: number; repaired: number }> {
+  const { data } = await apiClient.post<{ materialized: number; repaired: number }>(
+    "/recurring-tasks/sync",
+    null,
+    { params: { projectId } }
+  );
+  return data;
+}
 
 export async function fetchRecurringSummary(projectId?: string): Promise<RecurringTaskSummary> {
   const { data } = await apiClient.get<RecurringTaskSummary>("/recurring-tasks/summary", {
@@ -70,5 +98,12 @@ export async function completeRecurringTaskWithAction(
   }
 ): Promise<void> {
   await apiClient.post(`/recurring-tasks/tasks/${taskId}/complete`, payload);
+}
+
+export async function ensureRecurringOccurrenceSubtasks(taskId: string): Promise<Task> {
+  const { data } = await apiClient.post<Task>(
+    `/recurring-tasks/tasks/${taskId}/ensure-subtasks`
+  );
+  return data;
 }
 

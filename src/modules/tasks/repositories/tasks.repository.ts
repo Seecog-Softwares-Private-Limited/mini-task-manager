@@ -30,6 +30,21 @@ export class TasksRepository {
     });
   }
 
+  async findRecurringByProject(projectId: string, organizationId: string): Promise<TaskEntity[]> {
+    return this.repo
+      .createQueryBuilder('task')
+      .leftJoinAndSelect('task.assignee', 'assignee')
+      .where('task.project_id = :projectId', { projectId })
+      .andWhere('task.organization_id = :organizationId', { organizationId })
+      .andWhere(
+        `(task.recurring_template_id IS NOT NULL OR (task.recurrence_type IS NOT NULL AND task.recurrence_type != 'NONE'))`,
+      )
+      .orderBy('task.dueDate', 'ASC')
+      .addOrderBy('task.createdAt', 'DESC')
+      .take(500)
+      .getMany();
+  }
+
   async countByProject(projectId: string): Promise<number> {
     return this.repo.count({ where: { projectId } });
   }

@@ -1,0 +1,255 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
+import { updateTask } from "@/services/api/tasks.api";
+import { ensureRecurringOccurrenceSubtasks } from "@/services/api/recurring-tasks.api";
+import { parseApiError } from "@/services/api/client";
+import { generateClientId } from "@/lib/generate-client-id";
+import {
+  allOccurrenceSubtasksDone,
+  formatSubtaskProgressLabel,
+  getOccurrenceSubtaskProgress,
+} from "@/lib/recurring-subtask-utils";
+import { resolveSubtaskStatus, subtaskWithCompleted } from "@/lib/subtask-status";
+import { EXEC_PLANNER } from "@/lib/executive-planner-theme";
+import type { Task, TaskSubtask } from "@/types/api";
+import { ListChecks, Plus } from "lucide-react";
+
+interface RecurringSubtaskChecklistProps {
+  task: Task | undefined;
+  taskId: string | null;
+  open: boolean;
+  readOnly?: boolean;
+  allowAdd?: boolean;
+  showWhenEmpty?: boolean;
+  stickyAdd?: boolean;
+  boardQueryKey?: readonly unknown[];
+  onTaskUpdated?: (task: Task) => void;
+}
+
+export function RecurringSubtaskChecklist({
+  task,
+  taskId,
+  open,
+  readOnly,
+  allowAdd,
+  showWhenEmpty,
+  stickyAdd,
+  boardQueryKey,
+  onTaskUpdated,
+}: RecurringSubtaskChecklistProps) {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const ensureAttemptedRef = useRef<string | null>(null);
+  const [newTitle, setNewTitle] = useState("");
+
+  const ensureMutation = useMutation({
+    mutationFn: () => ensureRecurringOccurrenceSubtasks(taskId!),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["task", taskId], updated);
+      onTaskUpdated?.(updated);
+    },
+  });
+
+  useEffect(() => {
+    if (!open || !taskId || readOnly || !task) return;
+    if ((task.subtasks?.length ?? 0) > 0) return;
+    if (!task.recurringTemplateId) return;
+    if (ensureAttemptedRef.current === taskId) return;
+    ensureAttemptedRef.current = taskId;
+    ensureMutation.mutate();
+  }, [open, taskId, task, readOnly, ensureMutation]);
+
+  const updateMutation = useMutation({
+    mutationFn: (subtasks: TaskSubtask[]) => updateTask(taskId!, { subtasks }),
+    onMutate: async (subtasks) => {
+      await queryClient.cancelQueries({ queryKey: ["task", taskId ?? ""] });
+      const previous = queryClient.getQueryData<Task>(["task", taskId ?? ""]);
+      if (previous) {
+        const optimistic = { ...previous, subtasks };
+        queryClient.setQueryData(["task", taskId], optimistic);
+        onTaskUpdated?.(optimistic);
+      }
+      return { previous };
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx?.previous) {
+        queryClient.setQueryData(["task", taskId], ctx.previous);
+        onTaskUpdated?.(ctx.previous);
+      }
+      toast({
+        title: "Could not update subtask",
+        description: parseApiError(err),
+        variant: "error",
+      });
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["task", taskId], updated);
+      onTaskUpdated?.(updated);
+      if (boardQueryKey) {
+        queryClient.invalidateQueries({ queryKey: boardQueryKey as string[] });
+      }
+    },
+  });
+
+  const subtasks = task?.subtasks ?? [];
+  const progress = useMemo(() => getOccurrenceSubtaskProgress(subtasks), [subtasks]);
+  const allDone = allOccurrenceSubtasksDone(subtasks);
+
+  if (ensureMutation.isPending && subtasks.length === 0) {
+    return (
+      <section>
+        <Skeleton className="h-24 w-full rounded-xl" />
+      </section>
+    );
+  }
+
+  if (subtasks.length === 0 && !showWhenEmpty) {
+    return null;
+  }
+
+  function toggleSubtask(subtaskId: string) {
+    if (readOnly || !task) return;
+    const next = subtasks.map((s) =>
+      s.id === subtaskId ? subtaskWithCompleted(s, !s.completed) : s
+    );
+    updateMutation.mutate(next);
+  }
+
+  function addSubtask() {
+    const title = newTitle.trim();
+    if (readOnly || !task || !title) return;
+    const next: TaskSubtask[] = [
+      ...subtasks,
+      {
+        id: generateClientId(),
+        title,
+        completed: false,
+        status: "TODO",
+      },
+    ];
+    updateMutation.mutate(next);
+    setNewTitle("");
+  }
+
+  return (
+    <section>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h3 className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <ListChecks className="h-3.5 w-3.5" />
+          Subtasks
+        </h3>
+        {progress.total > 0 ? (
+          <span
+            className={cn(
+              "rounded-full px-2 py-0.5 text-[10px] font-semibold tabular-nums",
+              allDone
+                ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                : "bg-muted text-muted-foreground"
+            )}
+          >
+            {formatSubtaskProgressLabel(progress)}
+          </span>
+        ) : null}
+      </div>
+      <div className={cn(EXEC_PLANNER.paperCard, "space-y-2 p-3")}>
+        {progress.total > 0 ? (
+          <div className="h-1.5 overflow-hidden rounded-full bg-muted/50">
+            <div
+              className="h-full rounded-full bg-emerald-500 transition-all duration-300"
+              style={{
+                width: `${progress.total ? (progress.completed / progress.total) * 100 : 0}%`,
+              }}
+            />
+          </div>
+        ) : null}
+        {subtasks.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            No subtasks yet — add steps for this run below.
+          </p>
+        ) : (
+          <ul className="space-y-1.5" aria-label="Occurrence subtasks">
+            {subtasks.map((s) => {
+              const done = s.completed || resolveSubtaskStatus(s) === "DONE";
+              return (
+                <li
+                  key={s.id}
+                  className={cn(
+                    "flex items-start gap-2.5 rounded-lg border border-border/35 bg-background/70 px-2.5 py-2 transition-all duration-200",
+                    done && "opacity-80 bg-emerald-500/5"
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={done}
+                    disabled={readOnly || updateMutation.isPending}
+                    onChange={() => toggleSubtask(s.id)}
+                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-input accent-primary transition-transform duration-150 checked:scale-105"
+                    aria-label={`Mark "${s.title}" ${done ? "incomplete" : "complete"}`}
+                  />
+                  <span
+                    className={cn(
+                      "min-w-0 flex-1 text-sm leading-snug transition-all duration-300",
+                      done && "text-muted-foreground line-through decoration-emerald-500/40"
+                    )}
+                  >
+                    {s.title}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {allowAdd && !readOnly ? (
+          <form
+            className={cn(
+              "flex gap-2 pt-1",
+              stickyAdd &&
+                "sticky bottom-0 -mx-1 border-t border-border/30 bg-card/95 px-1 py-2 backdrop-blur-sm"
+            )}
+            onSubmit={(e) => {
+              e.preventDefault();
+              addSubtask();
+            }}
+          >
+            <Input
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              placeholder="Add a subtask…"
+              disabled={updateMutation.isPending}
+              className="h-9 flex-1 text-sm"
+            />
+            <Button
+              type="submit"
+              size="sm"
+              variant="secondary"
+              className="h-9 shrink-0 gap-1 px-3"
+              disabled={!newTitle.trim() || updateMutation.isPending}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add
+            </Button>
+          </form>
+        ) : null}
+        {!readOnly && progress.total > 0 && !allDone ? (
+          <p className="text-[10px] text-muted-foreground">
+            Complete all subtasks to enable Mark done.
+          </p>
+        ) : null}
+        {!readOnly && allDone && progress.total > 0 ? (
+          <p className="text-[10px] font-medium text-emerald-700 dark:text-emerald-300">
+            All subtasks complete — you can mark this run done.
+          </p>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+export { allOccurrenceSubtasksDone, getOccurrenceSubtaskProgress };

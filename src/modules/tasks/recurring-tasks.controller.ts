@@ -6,6 +6,8 @@ import { TenantId } from '../../common/decorators/tenant.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { RecurringTasksService } from './recurring-tasks.service';
+import { TaskResponseDto } from './dto/task-response.dto';
+import { formatUuid } from '../../common/utils/uuid.util';
 import {
   CompleteRecurringTaskDto,
   RecurringTasksQueryDto,
@@ -18,6 +20,28 @@ import {
 @UseGuards(JwtAuthGuard, TenantGuard)
 export class RecurringTasksController {
   constructor(private readonly recurringTasksService: RecurringTasksService) {}
+
+  @Get('board')
+  async getBoard(
+    @TenantId() organizationId: string,
+    @Query('projectId') projectId: string,
+    @Query('statusIds') statusIds?: string,
+  ) {
+    const validStatusIds = statusIds?.split(',').map((s) => s.trim()).filter(Boolean) ?? [];
+    const view = await this.recurringTasksService.getBoardView(organizationId, projectId, validStatusIds);
+    return {
+      tasks: view.tasks.map((t) => this.toTaskResponse(t)),
+      overdueTaskIds: view.overdueTaskIds,
+    };
+  }
+
+  @Post('sync')
+  async syncBoard(
+    @TenantId() organizationId: string,
+    @Query('projectId') projectId: string,
+  ) {
+    return this.recurringTasksService.syncBoardTasks(organizationId, projectId);
+  }
 
   @Get('summary')
   async getSummary(
@@ -93,6 +117,63 @@ export class RecurringTasksController {
     @Body() dto: CompleteRecurringTaskDto,
   ) {
     return this.recurringTasksService.completeTaskWithRecurringAction(taskId, organizationId, dto);
+  }
+
+  @Post('tasks/:taskId/ensure-subtasks')
+  async ensureOccurrenceSubtasks(
+    @Param('taskId') taskId: string,
+    @TenantId() organizationId: string,
+  ) {
+    const task = await this.recurringTasksService.ensureOccurrenceSubtasks(taskId, organizationId);
+    return this.toTaskResponse(task);
+  }
+
+  private toTaskResponse(t: import('./entities/task.entity').TaskEntity): TaskResponseDto {
+    const id = formatUuid(t.id as string | Buffer) ?? String(t.id);
+    const projectId = formatUuid(t.projectId as string | Buffer) ?? String(t.projectId);
+    const organizationId = formatUuid(t.organizationId as string | Buffer) ?? String(t.organizationId);
+    const statusId = t.statusId ? formatUuid(t.statusId as string | Buffer) : undefined;
+    const assigneeId = t.assigneeId ? formatUuid(t.assigneeId as string | Buffer) : undefined;
+    const assigneeIdsRaw = t.assigneeIds ?? (assigneeId ? [assigneeId] : undefined);
+    const assigneeIds = assigneeIdsRaw
+      ?.map((aid) => formatUuid(aid as string | Buffer))
+      .filter((aid): aid is string => !!aid);
+    return {
+      id,
+      projectId,
+      organizationId,
+      title: t.title,
+      description: t.description ?? undefined,
+      statusId: statusId ?? undefined,
+      priority: t.priority,
+      assigneeId: assigneeId ?? undefined,
+      assigneeIds: assigneeIds?.length ? assigneeIds : undefined,
+      assignee: t.assignee
+        ? {
+            id: formatUuid(t.assignee.id as string | Buffer) ?? String(t.assignee.id),
+            fullName: t.assignee.fullName,
+            email: t.assignee.email,
+            avatarUrl: t.assignee.avatarUrl ?? undefined,
+          }
+        : undefined,
+      reporterId: formatUuid(t.reporterId as string | Buffer) ?? String(t.reporterId),
+      parentTaskId: t.parentTaskId ? formatUuid(t.parentTaskId as string | Buffer) : undefined,
+      storyPoints: t.storyPoints ?? undefined,
+      dueDate: t.dueDate ?? undefined,
+      completedAt: t.completedAt ?? undefined,
+      estimatedMinutes: t.estimatedMinutes ?? undefined,
+      loggedMinutes: t.loggedMinutes,
+      sprintId: t.sprintId ? formatUuid(t.sprintId as string | Buffer) : undefined,
+      recurringTemplateId: t.recurringTemplateId
+        ? (formatUuid(t.recurringTemplateId as string | Buffer) ?? String(t.recurringTemplateId))
+        : undefined,
+      recurrenceType: t.recurrenceType ?? undefined,
+      recurrenceSequence: t.recurrenceSequence ?? undefined,
+      tags: t.tags ?? undefined,
+      subtasks: t.subtasks ?? undefined,
+      createdAt: t.createdAt,
+      updatedAt: t.updatedAt,
+    };
   }
 }
 

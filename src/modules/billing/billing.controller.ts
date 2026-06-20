@@ -299,16 +299,19 @@ export class BillingController {
   }
 
   // ── POST /billing/webhook (Razorpay webhook) ──
+  @Public()
   @Post('webhook')
   @HttpCode(200)
   @SkipThrottle()
   async handleWebhook(
-    @Req() req: Request,
+    @Req() req: Request & { rawBody?: Buffer },
     @Headers('x-razorpay-signature') signature: string,
-    @Body() body: any,
+    @Body() body: Record<string, unknown>,
   ) {
-    // Webhook handling for Razorpay events
-    // This would be used in production for handling subscription renewals, failures, etc.
+    const rawBody =
+      req.rawBody?.toString('utf8') ??
+      (typeof body === 'string' ? body : JSON.stringify(body));
+    await this.billingService.handleRazorpayWebhook(rawBody, signature, body);
     return { status: 'ok' };
   }
 }

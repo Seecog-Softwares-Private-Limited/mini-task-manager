@@ -1,6 +1,8 @@
 import {
+  Body,
   Controller,
   Get,
+  Patch,
   Post,
   Param,
   UseGuards,
@@ -14,6 +16,7 @@ import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUserId } from '../../common/decorators/current-user.decorator';
 import { UserResponseDto } from './dto/user-response.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { Public } from '../../common/decorators/public.decorator';
 
 function toUserDto(user: {
@@ -57,6 +60,17 @@ export class UsersController {
   async getMe(@CurrentUserId() userId: string): Promise<UserResponseDto | null> {
     const user = await this.usersService.findById(userId);
     if (!user) return null;
+    return toUserDto(user);
+  }
+
+  @Patch('me')
+  async updateMe(
+    @CurrentUserId() userId: string,
+    @Body() dto: UpdateProfileDto,
+  ): Promise<UserResponseDto> {
+    const user = await this.usersService.updateProfile(userId, {
+      fullName: dto.fullName,
+    });
     return toUserDto(user);
   }
 

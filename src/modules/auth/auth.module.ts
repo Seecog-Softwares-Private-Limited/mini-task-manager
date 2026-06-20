@@ -18,6 +18,11 @@ import { SmsService } from './services/sms.service';
 import { UsersModule } from '../users/users.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { InvitationsModule } from '../invitations/invitations.module';
+import { ApiKeysModule } from '../api-keys/api-keys.module';
+import { BillingModule } from '../billing/billing.module';
+import { SSOAuthController } from './sso-auth.controller';
+import { SSOAuthService } from './sso-auth.service';
+import { CompositeAuthGuard } from './guards/composite-auth.guard';
 
 @Module({
   imports: [
@@ -25,6 +30,8 @@ import { InvitationsModule } from '../invitations/invitations.module';
     UsersModule,
     forwardRef(() => OrganizationsModule),
     forwardRef(() => InvitationsModule),
+    forwardRef(() => ApiKeysModule),
+    forwardRef(() => BillingModule),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -37,9 +44,11 @@ import { InvitationsModule } from '../invitations/invitations.module';
       inject: [ConfigService],
     }),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, SSOAuthController],
   providers: [
     AuthService,
+    SSOAuthService,
+    CompositeAuthGuard,
     SmsService,
     JwtStrategy,
     GoogleConfigGuard,
@@ -47,6 +56,6 @@ import { InvitationsModule } from '../invitations/invitations.module';
     TenantGuard,
     RolesGuard,
   ],
-  exports: [AuthService, JwtModule, TenantGuard, RolesGuard],
+  exports: [AuthService, JwtModule, TenantGuard, RolesGuard, CompositeAuthGuard, SSOAuthService],
 })
 export class AuthModule {}
