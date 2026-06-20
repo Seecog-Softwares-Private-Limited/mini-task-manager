@@ -83,6 +83,31 @@ export async function deleteEntityAttachment(attachmentId: string): Promise<void
   await apiClient.delete(`/attachments/${attachmentId}`);
 }
 
+export interface RenderedOfficePreview {
+  format: "html";
+  content: string;
+}
+
+export async function fetchEntityAttachmentRenderedPreview(
+  attachmentId: string
+): Promise<RenderedOfficePreview> {
+  const { data } = await apiClient.get<RenderedOfficePreview>(
+    `/attachments/${attachmentId}/preview-rendered`
+  );
+  return data;
+}
+
+/** Returns null instead of throwing when server preview is unavailable. */
+export async function tryFetchEntityAttachmentRenderedPreview(
+  attachmentId: string
+): Promise<RenderedOfficePreview | null> {
+  try {
+    return await fetchEntityAttachmentRenderedPreview(attachmentId);
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchEntityAttachmentBlob(attachmentId: string): Promise<Blob> {
   const { data } = await apiClient.get(`/attachments/${attachmentId}/download`, {
     responseType: "blob",

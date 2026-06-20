@@ -1,8 +1,6 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { countDueToday } from "@/lib/recurring-board-utils";
-import { getPlannerGreeting } from "@/lib/planner-agenda-utils";
 import { EXEC_PLANNER } from "@/lib/executive-planner-theme";
 import type { RecurringTaskSummary, Task } from "@/types/api";
 import { BookOpen, Sparkles } from "lucide-react";
@@ -16,19 +14,10 @@ interface PlannerHeaderProps {
 
 export function PlannerHeader({
   summary,
-  tasks = [],
   projectName,
   className,
 }: PlannerHeaderProps) {
-  const greeting = getPlannerGreeting();
-  const missed = summary?.overdue ?? 0;
-  const dueToday = countDueToday(tasks);
   const paused = summary?.paused ?? 0;
-
-  const summaryLine =
-    missed === 0 && dueToday === 0
-      ? "Your planner is clear — enjoy the calm."
-      : `${greeting}, your planner has ${missed} missed ${missed === 1 ? "entry" : "entries"}${dueToday > 0 ? ` and ${dueToday} due today` : ""}.`;
 
   return (
     <header
@@ -47,13 +36,17 @@ export function PlannerHeader({
               <BookOpen className="h-4 w-4" aria-hidden />
             </div>
             <div>
-              <p className={EXEC_PLANNER.sectionLabel}>Executive Planner Library</p>
+              <p className={EXEC_PLANNER.sectionLabel}>
+                {projectName ? projectName : "Recurring planner"}
+              </p>
               <h1 className="text-base font-semibold tracking-tight sm:text-lg">
-                {projectName ? `${projectName} routines` : "Recurring routines"}
+                Recurring Planner Library
               </h1>
             </div>
           </div>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{summaryLine}</p>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+            Manage all recurring task series for this project.
+          </p>
         </div>
         {paused > 0 ? (
           <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300/40 bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-800 dark:text-amber-200">

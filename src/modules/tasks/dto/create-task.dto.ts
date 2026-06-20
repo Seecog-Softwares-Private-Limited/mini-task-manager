@@ -47,6 +47,20 @@ class CreateTaskSubtaskDto {
   @IsDateString()
   dueDate?: string;
 
+  /** Days after the run due date when this checklist item is due (recurring templates). */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(365)
+  dueOffsetDays?: number;
+
+  /** Optional time of day (HH:mm) applied when the run is generated. */
+  @IsOptional()
+  @IsString()
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
+  dueTime?: string;
+
   @IsOptional()
   @IsIn(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'])
   priority?: string;

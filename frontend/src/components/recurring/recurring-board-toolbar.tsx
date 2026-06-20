@@ -9,7 +9,6 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -27,32 +26,38 @@ import {
   User,
   X,
   SlidersHorizontal,
-  LayoutGrid,
-  List,
   CalendarDays,
-  BookOpen,
-  ListTodo,
+  Library,
   Repeat,
   AlertTriangle,
   Clock,
   UserCheck,
   PauseCircle,
-  ChevronDown,
 } from "lucide-react";
 
 export type RecurringViewMode = "agenda" | "calendar" | "shelf" | "board" | "table";
 
-const PRIMARY_VIEW: RecurringViewMode = "calendar";
-
-const MORE_VIEWS: {
+const VIEW_SEGMENTS: {
   mode: RecurringViewMode;
   label: string;
-  icon: typeof ListTodo;
+  icon: typeof CalendarDays;
+  iconActive: string;
+  iconIdle: string;
 }[] = [
-  { mode: "agenda", label: "Agenda list", icon: ListTodo },
-  { mode: "board", label: "Board", icon: LayoutGrid },
-  { mode: "table", label: "Table", icon: List },
-  { mode: "shelf", label: "Manage series", icon: BookOpen },
+  {
+    mode: "calendar",
+    label: "Calendar",
+    icon: CalendarDays,
+    iconActive: "text-sky-600 dark:text-sky-400",
+    iconIdle: "text-sky-500/80 dark:text-sky-400/80",
+  },
+  {
+    mode: "shelf",
+    label: "Series",
+    icon: Library,
+    iconActive: "text-violet-600 dark:text-violet-400",
+    iconIdle: "text-violet-500/80 dark:text-violet-400/80",
+  },
 ];
 
 const RECURRENCE_TYPES: { value: RecurrenceTypeFilter; label: string }[] = [
@@ -90,7 +95,6 @@ export function RecurringBoardToolbar({
   filteredCount,
 }: RecurringBoardToolbarProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const isCalendarPrimary = viewMode === PRIMARY_VIEW;
 
   const hasAdvancedFilters =
     filters.recurrenceTypes.length > 0 ||
@@ -107,7 +111,7 @@ export function RecurringBoardToolbar({
     filters.assignee.length > 0 ||
     hasAdvancedFilters;
 
-  const activeMoreView = MORE_VIEWS.find((v) => v.mode === viewMode);
+  const isSeriesView = viewMode !== "calendar";
 
   const updateFilter = useCallback(
     <K extends keyof RecurringBoardFilters>(key: K, value: RecurringBoardFilters[K]) => {
@@ -147,60 +151,38 @@ export function RecurringBoardToolbar({
 
   return (
     <div className={cn(EXEC_PLANNER.paperCard, "min-w-0 shrink-0 overflow-hidden")}>
-      <div className="flex border-b border-border/40 px-2 pt-1.5">
-        <button
-          type="button"
-          onClick={() => onViewModeChange(PRIMARY_VIEW)}
-          className={cn(
-            EXEC_PLANNER.bookmarkTab,
-            "flex items-center gap-1.5",
-            isCalendarPrimary && EXEC_PLANNER.bookmarkTabActive
-          )}
-          aria-current={isCalendarPrimary ? "page" : undefined}
+      <div className="flex items-center gap-2 border-b border-border/40 px-2.5 py-2">
+        <div
+          role="tablist"
+          aria-label="Recurring view"
+          className="inline-flex items-center gap-1 rounded-lg border border-border/50 bg-muted/30 p-0.5"
         >
-          <CalendarDays className="h-3.5 w-3.5" />
-          Calendar
-        </button>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className={cn(
-                EXEC_PLANNER.bookmarkTab,
-                "flex items-center gap-1.5",
-                !isCalendarPrimary && EXEC_PLANNER.bookmarkTabActive
-              )}
-              aria-current={!isCalendarPrimary ? "page" : undefined}
-            >
-              {activeMoreView ? (
-                <>
-                  <activeMoreView.icon className="h-3.5 w-3.5" />
-                  {activeMoreView.label}
-                </>
-              ) : (
-                <>More views</>
-              )}
-              <ChevronDown className="h-3 w-3 opacity-60" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-44">
-            <DropdownMenuLabel className="text-xs">Other views</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {MORE_VIEWS.map(({ mode, label, icon: Icon }) => (
-              <DropdownMenuItem
+          {VIEW_SEGMENTS.map(({ mode, label, icon: Icon, iconActive, iconIdle }) => {
+            const active = mode === "calendar" ? viewMode === "calendar" : isSeriesView;
+            return (
+              <button
                 key={mode}
+                type="button"
+                role="tab"
+                aria-selected={active}
                 onClick={() => onViewModeChange(mode)}
-                className={cn(viewMode === mode && "bg-muted/50")}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-200",
+                  active
+                    ? "bg-background text-foreground shadow-sm ring-1 ring-border/60"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
               >
-                <Icon className="mr-2 h-3.5 w-3.5" />
+                <Icon className={cn("h-3.5 w-3.5", active ? iconActive : iconIdle)} />
                 {label}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
+      {isSeriesView ? null : (
+      <>
       <div className="flex min-w-0 flex-wrap items-center gap-1.5 p-2.5">
         <div className="relative w-full min-w-[10rem] shrink-0 sm:w-48 md:w-56">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground/50" />
@@ -376,6 +358,8 @@ export function RecurringBoardToolbar({
           ))}
         </div>
       ) : null}
+      </>
+      )}
     </div>
   );
 }

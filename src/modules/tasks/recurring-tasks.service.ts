@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, NotFoundException, forwardRef } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException, BadRequestException, forwardRef } from '@nestjs/common';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { TaskRecurrenceDto } from './dto/recurrence.dto';
 import {
@@ -16,6 +16,7 @@ import type { TaskEntity } from './entities/task.entity';
 import { generateUuid } from '../../common/utils/uuid.util';
 import {
   computeNextRecurringDueDate,
+  computeChecklistItemDueDate,
   shouldStopRecurrence,
   subtractDays,
   toYmd,
@@ -25,21 +26,49 @@ type TemplateSubtask = NonNullable<
   import('./entities/recurring-task-template.entity').RecurringTaskTemplateEntity['templateSubtasks']
 >[number];
 
-function cloneTemplateSubtasksForOccurrence(
-  templateSubtasks: import('./entities/recurring-task-template.entity').RecurringTaskTemplateEntity['templateSubtasks'],
-): NonNullable<TaskEntity['subtasks']> {
-  if (!templateSubtasks?.length) return [];
-  return templateSubtasks.map((s: TemplateSubtask) => ({
-    id: generateUuid(),
+function normalizeTemplateSubtasks(
+  subtasks?: CreateTaskDto['subtasks'],
+): import('./entities/recurring-task-template.entity').RecurringTaskTemplateEntity['templateSubtasks'] {
+  if (!subtasks?.length) return null;
+  return subtasks.map((s) => ({
+    id: s.id ?? generateUuid(),
     title: s.title,
     completed: false,
     description: s.description,
     assigneeId: s.assigneeId,
-    dueDate: s.dueDate,
-    status: 'TODO' as const,
     priority: s.priority,
+    status: (s.status as 'TODO' | 'IN_PROGRESS' | 'DONE') ?? 'TODO',
     statusId: s.statusId,
+    dueOffsetDays: s.dueOffsetDays ?? 0,
+    ...(s.dueTime ? { dueTime: s.dueTime } : {}),
   }));
+}
+
+function cloneTemplateSubtasksForOccurrence(
+  templateSubtasks: import('./entities/recurring-task-template.entity').RecurringTaskTemplateEntity['templateSubtasks'],
+  runDueDateYmd: string,
+): NonNullable<TaskEntity['subtasks']> {
+  if (!templateSubtasks?.length) return [];
+  return templateSubtasks.map((s: TemplateSubtask) => {
+    let dueDate: string | undefined;
+    if (s.dueOffsetDays != null || s.dueTime) {
+      dueDate = computeChecklistItemDueDate(runDueDateYmd, s.dueOffsetDays ?? 0);
+    } else if (s.dueDate) {
+      dueDate = String(s.dueDate).slice(0, 10);
+    }
+    return {
+      id: generateUuid(),
+      title: s.title,
+      completed: false,
+      description: s.description,
+      assigneeId: s.assigneeId,
+      ...(dueDate ? { dueDate } : {}),
+      ...(s.dueTime ? { dueTime: s.dueTime } : {}),
+      status: 'TODO' as const,
+      priority: s.priority,
+      statusId: s.statusId,
+    };
+  });
 }
 
 function nowYmd(): string {
@@ -102,6 +131,7 @@ export class RecurringTasksService {
 
     const dueDate = params.dueDate ?? nowYmd();
     const nextDueDate = computeNextRecurringDueDate(dueDate, dueDate, params.recurrence);
+    const templateSubtasks = normalizeTemplateSubtasks(params.subtasks);
     const template = await this.templatesRepository.create({
       organizationId: params.organizationId,
       projectId: params.projectId,
@@ -113,7 +143,7 @@ export class RecurringTasksService {
       assigneeId: params.assigneeId ?? null,
       assigneeIds: params.assigneeIds?.length ? params.assigneeIds : null,
       storyPoints: params.storyPoints ?? null,
-      templateSubtasks: params.subtasks?.length ? (params.subtasks as any) : null,
+      templateSubtasks,
       tags: params.tags?.length ? params.tags : null,
       repeatType: repeat,
       ruleConfig: params.recurrence as unknown as Record<string, unknown>,
@@ -146,6 +176,12 @@ export class RecurringTasksService {
       recurrenceType: repeat,
       recurrenceSequence: 1,
     } as never);
+
+    if (templateSubtasks?.length) {
+      await this.tasksRepository.update(params.taskId, {
+        subtasks: cloneTemplateSubtasksForOccurrence(templateSubtasks, dueDate),
+      } as never);
+    }
   }
 
   async updateRecurrenceFromTask(
@@ -281,7 +317,14 @@ export class RecurringTasksService {
         template.id,
         nextSequence,
       );
-      if (!existing) {
+      // Idempotency: never create a second non-skipped run for the same date,
+      // even if the scheduler runs concurrently or sequence math repeats a date.
+      const sameDate = await this.occurrencesRepository.findByTemplateAndDueDate(
+        template.id,
+        nextDueDate,
+      );
+      const hasActiveRunForDate = sameDate.some((o) => o.state !== 'SKIPPED');
+      if (!existing && !hasActiveRunForDate) {
         const createdTask = await this.tasksService.create(
           projectCtx.projectId,
           projectCtx.organizationId,
@@ -298,7 +341,7 @@ export class RecurringTasksService {
             dueDate: nextDueDate,
             storyPoints: template.storyPoints ?? undefined,
             tags: template.tags ?? undefined,
-            subtasks: cloneTemplateSubtasksForOccurrence(template.templateSubtasks),
+            subtasks: cloneTemplateSubtasksForOccurrence(template.templateSubtasks, nextDueDate),
           },
         );
         await this.tasksRepository.update(createdTask.id, {
@@ -388,6 +431,7 @@ export class RecurringTasksService {
     await this.generateDueOccurrences(nowYmd(), { organizationId, projectId });
     const templates = await this.templatesRepository.findByOrganization(organizationId, projectId);
     const templateMap = new Map(templates.map((t) => [t.id, t]));
+    await this.purgeOrphanRecurringRuns(organizationId, projectId, templateMap);
     const pending = await this.occurrencesRepository.findPendingByProject(organizationId, projectId);
     let materialized = 0;
     let repaired = 0;
@@ -442,7 +486,10 @@ export class RecurringTasksService {
         template.templateSubtasks?.length
       ) {
         await this.tasksRepository.update(task.id, {
-          subtasks: cloneTemplateSubtasksForOccurrence(template.templateSubtasks),
+          subtasks: cloneTemplateSubtasksForOccurrence(
+            template.templateSubtasks,
+            String(task.dueDate).slice(0, 10),
+          ),
         } as never);
         repaired += 1;
       }
@@ -521,14 +568,58 @@ export class RecurringTasksService {
     organizationId: string,
     overdueTaskIds: string[],
   ): Promise<import('./entities/task.entity').TaskEntity[]> {
+    const templates = await this.templatesRepository.findByOrganization(organizationId, projectId);
+    const activeTemplateIds = new Set(templates.map((t) => t.id));
     const tasks = await this.tasksRepository.findRecurringByProject(projectId, organizationId);
-    const byId = new Map(tasks.map((t) => [t.id, t]));
+    const byId = new Map<string, import('./entities/task.entity').TaskEntity>();
+
+    for (const task of tasks) {
+      if (task.recurringTemplateId && !activeTemplateIds.has(task.recurringTemplateId)) {
+        continue;
+      }
+      byId.set(task.id, task);
+    }
+
     for (const taskId of overdueTaskIds) {
       if (byId.has(taskId)) continue;
       const task = await this.tasksRepository.findByIdAndOrganization(taskId, organizationId);
-      if (task) byId.set(task.id, task);
+      if (!task) continue;
+      if (task.recurringTemplateId && !activeTemplateIds.has(task.recurringTemplateId)) {
+        continue;
+      }
+      byId.set(task.id, task);
     }
     return [...byId.values()];
+  }
+
+  /** Remove generated runs left behind when a series template was deleted. */
+  private async purgeOrphanRecurringRuns(
+    organizationId: string,
+    projectId: string,
+    templateMap: Map<string, import('./entities/recurring-task-template.entity').RecurringTaskTemplateEntity>,
+  ): Promise<void> {
+    const occurrences = await this.occurrencesRepository.statsByOrganization(organizationId, projectId);
+    for (const occ of occurrences) {
+      if (templateMap.has(occ.templateId)) continue;
+      if (occ.taskId) {
+        try {
+          await this.tasksService.delete(occ.taskId, organizationId);
+        } catch {
+          await this.tasksRepository.delete(occ.taskId).catch(() => {});
+        }
+      }
+      await this.occurrencesRepository.deleteById(occ.id);
+    }
+
+    const recurringTasks = await this.tasksRepository.findRecurringByProject(projectId, organizationId);
+    for (const task of recurringTasks) {
+      if (!task.recurringTemplateId || templateMap.has(task.recurringTemplateId)) continue;
+      try {
+        await this.tasksService.delete(task.id, organizationId);
+      } catch {
+        await this.tasksRepository.delete(task.id).catch(() => {});
+      }
+    }
   }
 
   private async materializeOccurrence(
@@ -561,7 +652,7 @@ export class RecurringTasksService {
           dueDate: dueYmd,
           storyPoints: template.storyPoints ?? undefined,
           tags: template.tags ?? undefined,
-          subtasks: cloneTemplateSubtasksForOccurrence(template.templateSubtasks),
+          subtasks: cloneTemplateSubtasksForOccurrence(template.templateSubtasks, dueYmd),
         },
       );
       await this.tasksRepository.update(createdTask.id, {
@@ -612,15 +703,28 @@ export class RecurringTasksService {
 
   async listTemplates(organizationId: string, query: RecurringTasksQueryDto) {
     const templates = await this.templatesRepository.findByOrganization(organizationId, query.projectId);
+    const now = new Date();
     const items: Array<{
       id: string;
       title: string;
+      description: string | null;
       repeatType: string;
       nextDueDate: Date;
       isPaused: boolean;
+      status: 'ACTIVE' | 'PAUSED' | 'ARCHIVED';
+      stoppedAt: Date | null;
       generatedCount: number;
       upcoming: number;
       completed: number;
+      missed: number;
+      lastRunState: string | null;
+      completionHealth: number;
+      subtaskCount: number;
+      assigneeId: string | null;
+      assigneeIds: string[] | null;
+      priority: string;
+      createdBy: string;
+      startDueDate: Date;
       endType: string;
       createDaysBeforeDue: number;
     }> = [];
@@ -628,15 +732,43 @@ export class RecurringTasksService {
       const history = await this.occurrencesRepository.findByTemplate(tpl.id);
       const upcoming = history.filter((h) => h.state === 'PENDING').length;
       const completed = history.filter((h) => h.state === 'COMPLETED').length;
+      const missed = history.filter(
+        (h) => h.state === 'PENDING' && new Date(h.dueDate) < now,
+      ).length;
+      // Most recent resolved run (completed/skipped) by sequence for "last run status".
+      const lastResolved = [...history]
+        .filter((h) => h.state === 'COMPLETED' || h.state === 'SKIPPED')
+        .sort((a, b) => b.sequenceNumber - a.sequenceNumber)[0];
+      const status: 'ACTIVE' | 'PAUSED' | 'ARCHIVED' = tpl.isPaused
+        ? tpl.stoppedAt
+          ? 'ARCHIVED'
+          : 'PAUSED'
+        : 'ACTIVE';
+      const completionHealth =
+        tpl.generatedCount > 0
+          ? Math.round((completed / tpl.generatedCount) * 100)
+          : 0;
       items.push({
         id: tpl.id,
         title: tpl.title,
+        description: tpl.description ?? null,
         repeatType: tpl.repeatType,
         nextDueDate: tpl.nextDueDate,
         isPaused: tpl.isPaused,
+        status,
+        stoppedAt: tpl.stoppedAt ?? null,
         generatedCount: tpl.generatedCount,
         upcoming,
         completed,
+        missed,
+        lastRunState: lastResolved?.state ?? null,
+        completionHealth,
+        subtaskCount: tpl.templateSubtasks?.length ?? 0,
+        assigneeId: tpl.assigneeId ?? null,
+        assigneeIds: tpl.assigneeIds ?? null,
+        priority: tpl.priority,
+        createdBy: tpl.createdBy,
+        startDueDate: tpl.startDueDate,
         endType: tpl.endType,
         createDaysBeforeDue: tpl.createDaysBeforeDue,
       });
@@ -653,7 +785,22 @@ export class RecurringTasksService {
   async pauseTemplate(templateId: string, organizationId: string) {
     const template = await this.templatesRepository.findByIdAndOrganization(templateId, organizationId);
     if (!template) throw new NotFoundException('Recurring template not found');
-    await this.templatesRepository.update(template.id, { isPaused: true });
+    await this.templatesRepository.update(template.id, { isPaused: true, stoppedAt: null });
+    return { success: true };
+  }
+
+  /**
+   * Archive a series: paused + stopped so it no longer generates runs.
+   * Distinct from pause (which is reversible without losing the "active" intent).
+   * Resume clears both flags, returning the series to active.
+   */
+  async archiveTemplate(templateId: string, organizationId: string) {
+    const template = await this.templatesRepository.findByIdAndOrganization(templateId, organizationId);
+    if (!template) throw new NotFoundException('Recurring template not found');
+    await this.templatesRepository.update(template.id, {
+      isPaused: true,
+      stoppedAt: new Date(),
+    });
     return { success: true };
   }
 
@@ -699,8 +846,75 @@ export class RecurringTasksService {
   async deleteSeries(templateId: string, organizationId: string) {
     const template = await this.templatesRepository.findByIdAndOrganization(templateId, organizationId);
     if (!template) throw new NotFoundException('Recurring template not found');
+
+    const occurrences = await this.occurrencesRepository.findByTemplate(templateId);
+    const taskIds = new Set<string>();
+    for (const occ of occurrences) {
+      if (occ.taskId) taskIds.add(occ.taskId);
+    }
+
+    const linkedTasks = await this.tasksRepository.findByRecurringTemplate(templateId, organizationId);
+    for (const task of linkedTasks) {
+      taskIds.add(task.id);
+    }
+
+    for (const taskId of taskIds) {
+      try {
+        await this.tasksService.delete(taskId, organizationId);
+      } catch {
+        await this.tasksRepository.delete(taskId).catch(() => {});
+      }
+    }
+
+    await this.occurrencesRepository.deleteByTemplate(templateId);
     await this.templatesRepository.delete(template.id);
     return { success: true };
+  }
+
+  /**
+   * Duplicate a series as a fresh active planner. Copies config + checklist
+   * template but resets run history so it starts generating from the next due
+   * date (today if the original anchor is already in the past).
+   */
+  async duplicateTemplate(templateId: string, organizationId: string) {
+    const source = await this.templatesRepository.findByIdAndOrganization(templateId, organizationId);
+    if (!source) throw new NotFoundException('Recurring template not found');
+
+    const today = nowYmd();
+    const sourceNext = String(source.nextDueDate).slice(0, 10);
+    const startDate = sourceNext >= today ? sourceNext : today;
+
+    const copy = await this.templatesRepository.create({
+      organizationId: source.organizationId,
+      projectId: source.projectId,
+      createdBy: source.createdBy,
+      title: `${source.title} (Copy)`.slice(0, 300),
+      description: source.description ?? null,
+      statusId: source.statusId ?? null,
+      priority: source.priority,
+      assigneeId: source.assigneeId ?? null,
+      assigneeIds: source.assigneeIds?.length ? [...source.assigneeIds] : null,
+      storyPoints: source.storyPoints ?? null,
+      templateSubtasks: source.templateSubtasks?.length
+        ? source.templateSubtasks.map((s) => ({ ...s, id: generateUuid() }))
+        : null,
+      tags: source.tags?.length ? source.tags.map((t) => ({ ...t })) : null,
+      repeatType: source.repeatType,
+      ruleConfig: source.ruleConfig ?? null,
+      createDaysBeforeDue: source.createDaysBeforeDue,
+      startDueDate: startDate as unknown as Date,
+      nextDueDate: startDate as unknown as Date,
+      lastGeneratedDueDate: null,
+      lastSequence: 0,
+      generatedCount: 0,
+      endType: source.endType,
+      endDate: source.endDate ?? null,
+      endAfterOccurrences: source.endAfterOccurrences ?? null,
+      isPaused: false,
+      stoppedAt: null,
+    });
+    await this.generateOccurrencesForTemplate(copy, nowYmd());
+    return { id: copy.id, success: true };
   }
 
   /** Copy series template subtasks onto an occurrence task when missing (per-run checklist). */
@@ -720,7 +934,8 @@ export class RecurringTasksService {
     );
     if (!template?.templateSubtasks?.length) return task;
 
-    const subtasks = cloneTemplateSubtasksForOccurrence(template.templateSubtasks);
+    const runDueDate = task.dueDate ? String(task.dueDate).slice(0, 10) : nowYmd();
+    const subtasks = cloneTemplateSubtasksForOccurrence(template.templateSubtasks, runDueDate);
     await this.tasksRepository.update(task.id, { subtasks } as never);
     const refreshed = await this.tasksRepository.findByIdAndOrganization(taskId, organizationId);
     if (!refreshed) throw new NotFoundException('Recurring task not found');
@@ -739,6 +954,23 @@ export class RecurringTasksService {
       organizationId,
     );
     if (!template) throw new NotFoundException('Recurring template not found');
+    const recurrence = (template.ruleConfig ?? {}) as TaskRecurrenceDto;
+    const completionRule = recurrence.completionRule ?? 'ALL_CHECKLIST';
+    if (completionRule === 'ALL_CHECKLIST') {
+      const subs = task.subtasks ?? [];
+      if (subs.length > 0) {
+        const hasIncomplete = subs.some((s) => {
+          const status = String(s?.status ?? '').toUpperCase();
+          if (status) return status !== 'DONE';
+          return !Boolean(s?.completed);
+        });
+        if (hasIncomplete) {
+          throw new BadRequestException(
+            'Complete all checklist items before marking this run done',
+          );
+        }
+      }
+    }
     const occurrence = await this.occurrencesRepository.findByTaskId(taskId);
     const now = new Date();
     const doneStatusId = dto.doneStatusId ?? task.statusId ?? undefined;

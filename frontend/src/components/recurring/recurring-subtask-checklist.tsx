@@ -18,8 +18,13 @@ import {
 } from "@/lib/recurring-subtask-utils";
 import { resolveSubtaskStatus, subtaskWithCompleted } from "@/lib/subtask-status";
 import { EXEC_PLANNER } from "@/lib/executive-planner-theme";
+import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-selector";
+import {
+  SubtaskPrioritySelector,
+  type SubtaskPriority,
+} from "@/components/tasks/subtask-priority-selector";
 import type { Task, TaskSubtask } from "@/types/api";
-import { ListChecks, Plus } from "lucide-react";
+import { CalendarDays, Check, ListChecks, Plus } from "lucide-react";
 
 interface RecurringSubtaskChecklistProps {
   task: Task | undefined;
@@ -47,7 +52,12 @@ export function RecurringSubtaskChecklist({
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const ensureAttemptedRef = useRef<string | null>(null);
-  const [newTitle, setNewTitle] = useState("");
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [draftTitle, setDraftTitle] = useState("");
+  const [draftDescription, setDraftDescription] = useState("");
+  const [draftAssigneeId, setDraftAssigneeId] = useState<string | undefined>(undefined);
+  const [draftDueDate, setDraftDueDate] = useState("");
+  const [draftPriority, setDraftPriority] = useState<SubtaskPriority>("MEDIUM");
 
   const ensureMutation = useMutation({
     mutationFn: () => ensureRecurringOccurrenceSubtasks(taskId!),
@@ -122,9 +132,19 @@ export function RecurringSubtaskChecklist({
     updateMutation.mutate(next);
   }
 
+  function resetComposer() {
+    setDraftTitle("");
+    setDraftDescription("");
+    setDraftAssigneeId(undefined);
+    setDraftDueDate("");
+    setDraftPriority("MEDIUM");
+    setComposerOpen(false);
+  }
+
   function addSubtask() {
-    const title = newTitle.trim();
+    const title = draftTitle.trim();
     if (readOnly || !task || !title) return;
+    const description = draftDescription.trim();
     const next: TaskSubtask[] = [
       ...subtasks,
       {
@@ -132,10 +152,14 @@ export function RecurringSubtaskChecklist({
         title,
         completed: false,
         status: "TODO",
+        ...(description ? { description } : {}),
+        ...(draftAssigneeId ? { assigneeId: draftAssigneeId } : {}),
+        ...(draftDueDate ? { dueDate: draftDueDate } : {}),
+        priority: draftPriority,
       },
     ];
     updateMutation.mutate(next);
-    setNewTitle("");
+    resetComposer();
   }
 
   return (
@@ -207,35 +231,97 @@ export function RecurringSubtaskChecklist({
           </ul>
         )}
         {allowAdd && !readOnly ? (
-          <form
+          <div
             className={cn(
-              "flex gap-2 pt-1",
+              "pt-1",
               stickyAdd &&
                 "sticky bottom-0 -mx-1 border-t border-border/30 bg-card/95 px-1 py-2 backdrop-blur-sm"
             )}
-            onSubmit={(e) => {
-              e.preventDefault();
-              addSubtask();
-            }}
           >
-            <Input
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              placeholder="Add a subtask…"
-              disabled={updateMutation.isPending}
-              className="h-9 flex-1 text-sm"
-            />
-            <Button
-              type="submit"
-              size="sm"
-              variant="secondary"
-              className="h-9 shrink-0 gap-1 px-3"
-              disabled={!newTitle.trim() || updateMutation.isPending}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Add
-            </Button>
-          </form>
+            {composerOpen ? (
+              <form
+                className="space-y-2 rounded-lg border border-border/40 bg-background/70 p-2.5"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  addSubtask();
+                }}
+              >
+                <Input
+                  autoFocus
+                  value={draftTitle}
+                  onChange={(e) => setDraftTitle(e.target.value)}
+                  placeholder="Subtask title"
+                  disabled={updateMutation.isPending}
+                  className="h-9 text-sm"
+                />
+                <Input
+                  value={draftDescription}
+                  onChange={(e) => setDraftDescription(e.target.value)}
+                  placeholder="Subtask description (optional)"
+                  disabled={updateMutation.isPending}
+                  className="h-9 text-sm"
+                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <SubtaskPrioritySelector
+                    value={draftPriority}
+                    onChange={setDraftPriority}
+                    disabled={updateMutation.isPending}
+                    variant="field"
+                  />
+                  <span className="text-[11px] text-muted-foreground">Assignee</span>
+                  <SubtaskAssigneeSelector
+                    projectId={task?.projectId ?? ""}
+                    value={draftAssigneeId}
+                    onChange={setDraftAssigneeId}
+                    disabled={updateMutation.isPending}
+                  />
+                  <div className="relative">
+                    <CalendarDays className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      type="date"
+                      value={draftDueDate}
+                      onChange={(e) => setDraftDueDate(e.target.value)}
+                      disabled={updateMutation.isPending}
+                      className="h-9 w-[150px] pl-7 text-xs"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-8"
+                    onClick={resetComposer}
+                    disabled={updateMutation.isPending}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    size="sm"
+                    className="h-8 gap-1"
+                    disabled={!draftTitle.trim() || updateMutation.isPending}
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                    Add
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="h-9 gap-1 px-3"
+                onClick={() => setComposerOpen(true)}
+                disabled={updateMutation.isPending}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Add subtask
+              </Button>
+            )}
+          </div>
         ) : null}
         {!readOnly && progress.total > 0 && !allDone ? (
           <p className="text-[10px] text-muted-foreground">

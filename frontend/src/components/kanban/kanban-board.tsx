@@ -74,6 +74,12 @@ export const DEFAULT_FILTERS: BoardFilters = {
   sortDir: "asc",
 };
 
+/** Recurring tasks board only shows recurring occurrences — never apply the "normal" recurrence filter. */
+export const RECURRING_BOARD_DEFAULT_FILTERS: BoardFilters = {
+  ...DEFAULT_FILTERS,
+  recurrence: "all",
+};
+
 export interface TaskCardQuickActions {
   onEdit?: (task: Task) => void;
   onChangeStatus?: (task: Task, statusId: string) => void;
@@ -199,6 +205,7 @@ function TaskCard({
   recurringBoardMode,
   recurringTemplate,
   cardIndex,
+  recurringTemplateMap,
 }: {
   task: Task;
   isOverlay?: boolean;
@@ -219,6 +226,7 @@ function TaskCard({
   recurringBoardMode?: boolean;
   recurringTemplate?: RecurringTemplateSummary;
   cardIndex?: number;
+  recurringTemplateMap?: Record<string, RecurringTemplateSummary>;
 }) {
   return (
     <EnterpriseTaskCard
@@ -241,6 +249,7 @@ function TaskCard({
       recurringBoardMode={recurringBoardMode}
       recurringTemplate={recurringTemplate}
       cardIndex={cardIndex}
+      recurringTemplateMap={recurringTemplateMap}
     />
   );
 }
@@ -300,6 +309,7 @@ function DraggableCard(props: {
             ? props.recurringTemplateMap[props.task.recurringTemplateId]
             : undefined
         }
+        recurringTemplateMap={props.recurringTemplateMap}
       />
     </div>
   );
@@ -910,16 +920,11 @@ export function KanbanBoard({
 
   const filteredTasksByStatus = useMemo(() => {
     const result: Record<string, Task[]> = {};
-    if (boardVariant === "recurring") {
-      for (const [statusId, tasks] of Object.entries(tasksByStatus)) {
-        result[statusId] = tasks;
-      }
-      return result;
-    }
-    const boardFilters = filters;
+    const effectiveFilters =
+      boardVariant === "recurring" ? { ...filters, recurrence: "all" as const } : filters;
     for (const [statusId, tasks] of Object.entries(tasksByStatus)) {
-      const filtered = applyFilters(tasks, boardFilters);
-      result[statusId] = applyBoardSorting(filtered, boardFilters.sortBy, boardFilters.sortDir);
+      const filtered = applyFilters(tasks, effectiveFilters);
+      result[statusId] = applyBoardSorting(filtered, effectiveFilters.sortBy, effectiveFilters.sortDir);
     }
     return result;
   }, [tasksByStatus, filters, boardVariant]);

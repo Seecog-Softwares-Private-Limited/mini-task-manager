@@ -45,7 +45,10 @@ export class RecurringTaskTemplateEntity extends BaseEntity {
     completed: boolean;
     description?: string;
     assigneeId?: string;
+    /** @deprecated Legacy absolute date — use dueOffsetDays for recurring templates. */
     dueDate?: string;
+    dueOffsetDays?: number;
+    dueTime?: string;
     status?: 'TODO' | 'IN_PROGRESS' | 'DONE';
     priority?: string;
     statusId?: string;

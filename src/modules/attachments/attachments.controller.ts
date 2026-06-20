@@ -89,6 +89,14 @@ export class AttachmentsController {
     return items.map(AttachmentResponseDto.fromEntity);
   }
 
+  @Get(':id/preview-rendered')
+  async previewRendered(
+    @Param('id') id: string,
+    @TenantId() tenantId: string,
+  ) {
+    return this.attachmentsService.getRenderedPreview(id, tenantId);
+  }
+
   @Get(':id/preview')
   async preview(
     @Param('id') id: string,

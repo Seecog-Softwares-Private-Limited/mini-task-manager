@@ -4,17 +4,15 @@ import { cn } from "@/lib/utils";
 import type { RecurringTaskSummary, RecurringTemplateSummary, Task } from "@/types/api";
 import {
   activeSeriesCount,
-  countCompletedThisWeek,
+  aggregateRunHealth,
   countDueToday,
 } from "@/lib/recurring-board-utils";
-import { computePlannerStreak } from "@/lib/planner-agenda-utils";
 import { EXEC_PLANNER, EXEC_HEALTH_STYLES } from "@/lib/executive-planner-theme";
 import type { ExecutiveHealthStatus } from "@/lib/executive-planner-theme";
 import {
   AlertCircle,
-  CheckCircle2,
   Clock,
-  Flame,
+  Info,
   Library,
   TrendingUp,
   type LucideIcon,
@@ -46,23 +44,33 @@ export function RecurringPremiumStats({
   tasks = [],
   templates = [],
   completedPercent = 0,
-  doneStatusId,
   healthStatus = "healthy",
   isLoading,
   className,
 }: RecurringPremiumStatsProps) {
   const dueToday = countDueToday(tasks);
-  const completedWeek = countCompletedThisWeek(tasks, doneStatusId);
-  const activePlanners = activeSeriesCount(summary, templates);
-  const missed = summary?.overdue ?? 0;
-  const streak = computePlannerStreak(tasks, doneStatusId);
-  const healthStyle = EXEC_HEALTH_STYLES[healthStatus];
+  const activeSeries = activeSeriesCount(summary, templates);
+  // Completion Health + Missed Runs are derived from the project's series
+  // aggregate so they stay consistent (completed runs / total generated runs).
+  const runHealth = aggregateRunHealth(templates);
+  const missed = templates.length > 0 ? runHealth.totalMissed : (summary?.overdue ?? 0);
+  const hasData = templates.length > 0 ? runHealth.hasData : !!summary;
+  const healthPercent = templates.length > 0 ? runHealth.healthPercent : completedPercent;
+  const resolvedHealthStatus: ExecutiveHealthStatus = !hasData
+    ? healthStatus
+    : healthPercent >= 65
+      ? "healthy"
+      : healthPercent >= 35
+        ? "at_risk"
+        : "critical";
+  const healthStyle = EXEC_HEALTH_STYLES[resolvedHealthStatus];
+  const showInconsistentNote = !isLoading && activeSeries === 0 && missed > 0;
 
   const chips: StatChip[] = [
     {
       key: "active",
-      label: "Active Planners",
-      value: activePlanners,
+      label: "Active Series",
+      value: activeSeries,
       sublabel: "Live series",
       icon: Library,
       accent: "text-foreground",
@@ -79,7 +87,7 @@ export function RecurringPremiumStats({
     },
     {
       key: "missed",
-      label: "Missed Entries",
+      label: "Missed Runs",
       value: missed,
       sublabel: missed > 0 ? "Needs catch-up" : "All caught up",
       icon: AlertCircle,
@@ -89,81 +97,72 @@ export function RecurringPremiumStats({
     {
       key: "health",
       label: "Completion Health",
-      value: `${completedPercent}%`,
-      sublabel: healthStyle.label,
+      value: hasData ? `${healthPercent}%` : "No data yet",
+      sublabel: hasData ? healthStyle.label : "No runs generated",
       icon: TrendingUp,
-      accent:
-        healthStatus === "healthy"
+      accent: !hasData
+        ? "text-muted-foreground"
+        : resolvedHealthStatus === "healthy"
           ? "text-emerald-800 dark:text-emerald-200"
-          : healthStatus === "at_risk"
+          : resolvedHealthStatus === "at_risk"
             ? "text-amber-800 dark:text-amber-200"
             : "text-rose-800 dark:text-rose-200",
-      iconBg:
-        healthStatus === "healthy"
+      iconBg: !hasData
+        ? "bg-muted text-muted-foreground"
+        : resolvedHealthStatus === "healthy"
           ? "bg-emerald-500/10 text-emerald-600"
-          : healthStatus === "at_risk"
+          : resolvedHealthStatus === "at_risk"
             ? "bg-amber-500/10 text-amber-600"
             : "bg-rose-500/10 text-rose-600",
-    },
-    {
-      key: "streak",
-      label: "Streak",
-      value: streak > 0 ? `${streak}d` : "—",
-      sublabel: streak > 1 ? "Consistency building" : "Start a streak",
-      icon: Flame,
-      accent: streak > 0 ? "text-amber-800 dark:text-amber-200" : "text-muted-foreground",
-      iconBg: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-    },
-    {
-      key: "week",
-      label: "Done This Week",
-      value: completedWeek,
-      sublabel: "Runs completed",
-      icon: CheckCircle2,
-      accent:
-        completedWeek > 0
-          ? "text-emerald-800 dark:text-emerald-200"
-          : "text-foreground",
-      iconBg: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
     },
   ];
 
   return (
-    <section
-      className={cn(
-        "grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6",
-        className
-      )}
-      aria-label="Planner summary"
-    >
-      {chips.map((chip) => {
-        const Icon = chip.icon;
-        return (
-          <div
-            key={chip.key}
-            className={cn(
-              EXEC_PLANNER.plannerChip,
-              EXEC_PLANNER.paperCardHover,
-              "flex items-center gap-2.5 p-2.5"
-            )}
-          >
-            <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", chip.iconBg)}>
-              <Icon className="h-3.5 w-3.5" aria-hidden />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[10px] font-medium text-muted-foreground">{chip.label}</p>
-              {isLoading ? (
-                <div className="mt-1 h-5 w-10 animate-pulse rounded bg-muted/50" />
-              ) : (
-                <p className={cn("text-lg font-bold tabular-nums leading-tight", chip.accent)}>
-                  {chip.value}
-                </p>
+    <section className={cn("flex flex-col gap-2", className)} aria-label="Planner summary">
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        {chips.map((chip) => {
+          const Icon = chip.icon;
+          return (
+            <div
+              key={chip.key}
+              className={cn(
+                EXEC_PLANNER.plannerChip,
+                EXEC_PLANNER.paperCardHover,
+                "flex items-center gap-2.5 p-2.5"
               )}
-              <p className="truncate text-[9px] text-muted-foreground">{chip.sublabel}</p>
+            >
+              <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg", chip.iconBg)}>
+                <Icon className="h-3.5 w-3.5" aria-hidden />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[10px] font-medium text-muted-foreground">{chip.label}</p>
+                {isLoading ? (
+                  <div className="mt-1 h-5 w-10 animate-pulse rounded bg-muted/50" />
+                ) : (
+                  <p
+                    className={cn(
+                      "font-bold tabular-nums leading-tight",
+                      typeof chip.value === "string" && /[a-z]/i.test(chip.value)
+                        ? "text-sm"
+                        : "text-lg",
+                      chip.accent
+                    )}
+                  >
+                    {chip.value}
+                  </p>
+                )}
+                <p className="truncate text-[9px] text-muted-foreground">{chip.sublabel}</p>
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
+      {showInconsistentNote ? (
+        <p className="flex items-center gap-1.5 rounded-lg border border-amber-300/30 bg-amber-50/50 px-2.5 py-1.5 text-[11px] text-amber-800 dark:bg-amber-950/20 dark:text-amber-200">
+          <Info className="h-3.5 w-3.5 shrink-0" />
+          Missed runs may belong to archived or inactive recurring series.
+        </p>
+      ) : null}
     </section>
   );
 }

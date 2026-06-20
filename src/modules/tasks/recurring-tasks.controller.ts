@@ -94,6 +94,13 @@ export class RecurringTasksController {
 
   @UseGuards(RolesGuard)
   @Roles('owner', 'admin')
+  @Post(':id/archive')
+  async archive(@Param('id') id: string, @TenantId() organizationId: string) {
+    return this.recurringTasksService.archiveTemplate(id, organizationId);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles('owner', 'admin')
   @Post(':id/skip-next')
   async skipNext(
     @Param('id') id: string,
@@ -101,6 +108,13 @@ export class RecurringTasksController {
     @Body() dto: SkipNextOccurrenceDto,
   ) {
     return this.recurringTasksService.skipNextOccurrence(id, organizationId, dto);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles('owner', 'admin')
+  @Post(':id/duplicate')
+  async duplicate(@Param('id') id: string, @TenantId() organizationId: string) {
+    return this.recurringTasksService.duplicateTemplate(id, organizationId);
   }
 
   @UseGuards(RolesGuard)

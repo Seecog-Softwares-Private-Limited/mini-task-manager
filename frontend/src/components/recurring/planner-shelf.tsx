@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { formatShortDate } from "@/lib/recurring-board-utils";
 import { toRecurrenceLabel } from "@/lib/recurrence-display";
 import { cadenceAccentClass } from "@/lib/recurring-board-constants";
@@ -12,7 +13,9 @@ import {
   Flame,
   Library,
   PauseCircle,
+  Plus,
   Repeat,
+  Sparkles,
 } from "lucide-react";
 
 export type ShelfCategory = "all" | "DAILY" | "WEEKLY" | "MONTHLY";
@@ -41,6 +44,10 @@ interface PlannerShelfProps {
   selectedCategory: ShelfCategory;
   onSelectTemplate: (templateId: string | null) => void;
   onSelectCategory: (category: ShelfCategory) => void;
+  /** When provided, clicking a series card opens it (manage view) instead of toggling selection. */
+  onOpenSeries?: (template: RecurringTemplateSummary) => void;
+  /** When provided, the empty state shows a "New recurring task" call-to-action. */
+  onCreateSeries?: () => void;
   variant?: "sidebar" | "grid";
   className?: string;
 }
@@ -51,6 +58,8 @@ export function PlannerShelf({
   selectedCategory,
   onSelectTemplate,
   onSelectCategory,
+  onOpenSeries,
+  onCreateSeries,
   variant = "sidebar",
   className,
 }: PlannerShelfProps) {
@@ -126,9 +135,55 @@ export function PlannerShelf({
           )}
         >
           {filteredTemplates.length === 0 ? (
-            <div className="col-span-full rounded-xl border border-dashed border-border/50 px-3 py-8 text-center">
-              <Library className="mx-auto h-6 w-6 text-muted-foreground/40" />
-              <p className="mt-2 text-xs font-medium">No planners in this section</p>
+            <div className="col-span-full flex flex-col items-center rounded-xl border-2 border-dashed border-border/50 px-4 py-10 text-center">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+                {templates.length === 0 ? (
+                  <Sparkles className="h-6 w-6 text-primary" />
+                ) : (
+                  <Library className="h-6 w-6 text-primary/70" />
+                )}
+              </div>
+              {templates.length === 0 ? (
+                <>
+                  <p className="mt-3 text-sm font-semibold">Start your recurring library</p>
+                  <p className="mt-1 max-w-xs text-xs text-muted-foreground">
+                    A recurring series automatically generates runs on a schedule —
+                    daily standups, weekly reviews, monthly reports. Create your first
+                    one to get going.
+                  </p>
+                  {onCreateSeries ? (
+                    <Button size="sm" className="mt-4 gap-1.5" onClick={onCreateSeries}>
+                      <Plus className="h-3.5 w-3.5" /> New recurring task
+                    </Button>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <p className="mt-3 text-sm font-medium">No planners in this section</p>
+                  <p className="mt-1 max-w-xs text-xs text-muted-foreground">
+                    Nothing matches this cadence yet. Switch to “All Planners”, or add a
+                    new series.
+                  </p>
+                  <div className="mt-4 flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      onClick={() => {
+                        onSelectCategory("all");
+                        onSelectTemplate(null);
+                      }}
+                    >
+                      <Library className="h-3.5 w-3.5" /> All Planners
+                    </Button>
+                    {onCreateSeries ? (
+                      <Button size="sm" className="gap-1.5" onClick={onCreateSeries}>
+                        <Plus className="h-3.5 w-3.5" /> New recurring task
+                      </Button>
+                    ) : null}
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             filteredTemplates.map((tpl) => (
@@ -137,7 +192,9 @@ export function PlannerShelf({
                 template={tpl}
                 selected={selectedTemplateId === tpl.id}
                 onClick={() =>
-                  onSelectTemplate(selectedTemplateId === tpl.id ? null : tpl.id)
+                  onOpenSeries
+                    ? onOpenSeries(tpl)
+                    : onSelectTemplate(selectedTemplateId === tpl.id ? null : tpl.id)
                 }
               />
             ))

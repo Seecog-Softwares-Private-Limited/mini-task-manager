@@ -68,12 +68,25 @@ export async function resumeRecurringTemplate(templateId: string): Promise<void>
   await apiClient.post(`/recurring-tasks/${templateId}/resume`);
 }
 
+export async function archiveRecurringTemplate(templateId: string): Promise<void> {
+  await apiClient.post(`/recurring-tasks/${templateId}/archive`);
+}
+
 export async function skipNextRecurringOccurrence(templateId: string): Promise<void> {
   await apiClient.post(`/recurring-tasks/${templateId}/skip-next`, { steps: 1 });
 }
 
 export async function deleteRecurringSeries(templateId: string): Promise<void> {
   await apiClient.delete(`/recurring-tasks/${templateId}`);
+}
+
+export async function duplicateRecurringTemplate(
+  templateId: string
+): Promise<{ id: string; success: boolean }> {
+  const { data } = await apiClient.post<{ id: string; success: boolean }>(
+    `/recurring-tasks/${templateId}/duplicate`
+  );
+  return data;
 }
 
 export async function updateRecurringTemplate(

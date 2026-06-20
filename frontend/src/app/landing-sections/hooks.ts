@@ -11,7 +11,7 @@ export function useScrollReveal() {
     if (!container) return;
 
     const targets = container.querySelectorAll(
-      ".scroll-reveal, .scroll-reveal-scale, .scroll-reveal-left, .scroll-reveal-right, .reveal-list"
+      ".scroll-reveal, .scroll-reveal-scale, .scroll-reveal-left, .scroll-reveal-right, .reveal-list, .lp-reveal"
     );
 
     const observer = new IntersectionObserver(

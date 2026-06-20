@@ -11,6 +11,7 @@ interface DueDateFieldProps {
   onChange: (value: string) => void;
   disabled?: boolean;
   hint?: string;
+  label?: string;
 }
 
 function toInputDate(d: Date): string {
@@ -44,7 +45,7 @@ const QUICK_BTN = cn(
   "border-border/50 bg-background hover:bg-muted/40"
 );
 
-export function DueDateField({ value, onChange, disabled, hint }: DueDateFieldProps) {
+export function DueDateField({ value, onChange, disabled, hint, label = "Due date" }: DueDateFieldProps) {
   const quick = getQuickDates();
   const activeQuick =
     value === quick.today
@@ -60,7 +61,7 @@ export function DueDateField({ value, onChange, disabled, hint }: DueDateFieldPr
   return (
     <div className="space-y-2">
       <label className={cn(CREATE_FIELD_LABEL, "flex items-center gap-1.5")}>
-        <CalendarDays className="h-3.5 w-3.5" /> Due date
+        <CalendarDays className="h-3.5 w-3.5" /> {label}
       </label>
 
       <div className="flex flex-wrap gap-1">

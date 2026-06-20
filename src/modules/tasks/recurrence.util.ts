@@ -19,6 +19,32 @@ function addDays(ymd: string, days: number): string {
   return toYmd(d);
 }
 
+/** Resolve a checklist item due date from the run date and template offset. */
+export function computeChecklistItemDueDate(
+  runDueDateYmd: string,
+  dueOffsetDays?: number | null,
+): string {
+  return addDays(runDueDateYmd, dueOffsetDays ?? 0);
+}
+
+function isWeekendYmd(ymd: string): boolean {
+  const day = toDate(ymd).getDay();
+  return day === 0 || day === 6;
+}
+
+function skipWeekendsFrom(ymd: string): string {
+  let next = ymd;
+  while (isWeekendYmd(next)) {
+    next = addDays(next, 1);
+  }
+  return next;
+}
+
+function applyRecurrenceAdjustments(ymd: string, recurrence: TaskRecurrenceDto): string {
+  if (recurrence.skipWeekends) return skipWeekendsFrom(ymd);
+  return ymd;
+}
+
 function addMonths(ymd: string, months: number): string {
   const d = toDate(ymd);
   const originalDay = d.getDate();
@@ -69,10 +95,11 @@ export function computeNextRecurringDueDate(
   startDueDate: string,
   recurrence: TaskRecurrenceDto,
 ): string {
+  const finish = (ymd: string) => applyRecurrenceAdjustments(ymd, recurrence);
   const repeat = recurrence.repeat ?? 'NONE';
   const interval = Math.max(1, recurrence.interval ?? 1);
   if (repeat === 'NONE') return currentDueDate;
-  if (repeat === 'DAILY') return addDays(currentDueDate, interval);
+  if (repeat === 'DAILY') return finish(addDays(currentDueDate, interval));
 
   if (repeat === 'WEEKLY') {
     const weeklyDays = Array.from(new Set((recurrence.weeklyDays ?? []).map((d) => Number(d))))
@@ -89,9 +116,9 @@ export function computeNextRecurringDueDate(
         (candidate.getTime() - new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime()) /
           (7 * DAY_MS),
       );
-      if (weekDiff % interval === 0) return toYmd(candidate);
+      if (weekDiff % interval === 0) return finish(toYmd(candidate));
     }
-    return addDays(currentDueDate, 7 * interval);
+    return finish(addDays(currentDueDate, 7 * interval));
   }
 
   if (repeat === 'MONTHLY') {
@@ -103,17 +130,17 @@ export function computeNextRecurringDueDate(
     const month1 = targetDate.getMonth() + 1;
 
     if (mode === 'LAST_DAY') {
-      return toYmd(new Date(year, month1 - 1, lastDayOfMonth(year, month1)));
+      return finish(toYmd(new Date(year, month1 - 1, lastDayOfMonth(year, month1))));
     }
     if (mode === 'NTH_WEEKDAY') {
       const nthWeek = recurrence.nthWeek ?? 1;
       const weekday = recurrence.weekday ?? toDate(startDueDate).getDay();
       const day = nthWeekdayOfMonth(year, month1, nthWeek, weekday);
-      return toYmd(new Date(year, month1 - 1, day));
+      return finish(toYmd(new Date(year, month1 - 1, day)));
     }
     const preferredDay = recurrence.dayOfMonth ?? toDate(startDueDate).getDate();
     const day = Math.min(preferredDay, lastDayOfMonth(year, month1));
-    return toYmd(new Date(year, month1 - 1, day));
+    return finish(toYmd(new Date(year, month1 - 1, day)));
   }
 
   if (repeat === 'YEARLY') {
@@ -122,15 +149,15 @@ export function computeNextRecurringDueDate(
     const month1 = recurrence.monthOfYear ?? toDate(startDueDate).getMonth() + 1;
     const preferredDay = recurrence.dayOfYearMonth ?? toDate(startDueDate).getDate();
     const day = Math.min(preferredDay, lastDayOfMonth(year, month1));
-    return toYmd(new Date(year, month1 - 1, day));
+    return finish(toYmd(new Date(year, month1 - 1, day)));
   }
 
   // CUSTOM
   const customUnit = recurrence.customUnit ?? 'DAY';
-  if (customUnit === 'WEEK') return addDays(currentDueDate, interval * 7);
-  if (customUnit === 'MONTH') return addMonths(currentDueDate, interval);
-  if (customUnit === 'YEAR') return addYears(currentDueDate, interval);
-  return addDays(currentDueDate, interval);
+  if (customUnit === 'WEEK') return finish(addDays(currentDueDate, interval * 7));
+  if (customUnit === 'MONTH') return finish(addMonths(currentDueDate, interval));
+  if (customUnit === 'YEAR') return finish(addYears(currentDueDate, interval));
+  return finish(addDays(currentDueDate, interval));
 }
 
 export function shouldStopRecurrence(

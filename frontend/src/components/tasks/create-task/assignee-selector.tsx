@@ -104,6 +104,18 @@ export function AssigneeSelector({
     onChange([...value, memberId]);
   }
 
+  const filteredIds = filtered.map((m) => m.id);
+  const allFilteredSelected =
+    filteredIds.length > 0 && filteredIds.every((id) => value.includes(id));
+
+  function selectAllFiltered() {
+    if (allFilteredSelected) {
+      onChange(value.filter((id) => !filteredIds.includes(id)));
+      return;
+    }
+    onChange([...new Set([...value, ...filteredIds])]);
+  }
+
   return (
     <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
       <div
@@ -203,6 +215,35 @@ export function AssigneeSelector({
             <UserRoundX className="mr-2 h-3.5 w-3.5" />
             Clear assignment
           </DropdownMenuItem>
+          {!isLoading && filtered.length > 0 ? (
+            <DropdownMenuItem
+              onSelect={(event) => {
+                event.preventDefault();
+                selectAllFiltered();
+              }}
+              className="rounded-md text-xs"
+            >
+              <Users className="mr-2 h-3.5 w-3.5" />
+              {allFilteredSelected
+                ? search.trim()
+                  ? "Deselect all matching"
+                  : "Deselect all members"
+                : search.trim()
+                  ? `Select all matching (${filtered.length})`
+                  : "Select all members"}
+              <span
+                className={cn(
+                  "ml-auto flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors duration-200",
+                  allFilteredSelected
+                    ? "border-primary bg-primary text-white"
+                    : "border-border bg-background text-transparent"
+                )}
+                aria-hidden
+              >
+                <Check className="h-3 w-3" />
+              </span>
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuSeparator />
           {isLoading ? (
             <div className="flex items-center justify-center gap-2 px-2 py-6 text-xs text-muted-foreground">

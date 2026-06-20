@@ -324,6 +324,11 @@ export function RecurringDayDrawer({
                             size="sm"
                             className="h-8 gap-1.5 text-xs"
                             disabled={!canMarkDone}
+                            title={
+                              !canMarkDone && progress.total > 0
+                                ? "Complete all checklist items first"
+                                : undefined
+                            }
                             onClick={() => onMarkDone?.(task)}
                           >
                             <CheckCircle2 className="h-3.5 w-3.5" />
@@ -345,7 +350,7 @@ export function RecurringDayDrawer({
                             onClick={() => onSkip?.(task)}
                           >
                             <SkipForward className="h-3.5 w-3.5" />
-                            Skip next run
+                            Skip
                           </Button>
                           {onOpenDetails ? (
                             <Button
@@ -355,7 +360,7 @@ export function RecurringDayDrawer({
                               onClick={() => onOpenDetails(task.id)}
                             >
                               <ExternalLink className="h-3.5 w-3.5" />
-                              Details
+                              Open details
                             </Button>
                           ) : null}
                         </div>

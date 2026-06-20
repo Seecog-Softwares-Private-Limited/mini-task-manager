@@ -37,10 +37,28 @@ import {
 } from "@/components/tasks/task-description-field";
 import { useToast } from "@/components/ui/use-toast";
 import { getWorkflowStatusCategory } from "@/components/kanban/task-card";
-import { X, ArrowRight, Flag, Layers, AlertCircle } from "lucide-react";
-import { RecurrenceEditor } from "@/components/tasks/recurrence/recurrence-editor";
+import {
+  X,
+  ArrowRight,
+  Flag,
+  Layers,
+  AlertCircle,
+  Repeat,
+  FileText,
+  Users,
+  Settings2,
+  CalendarRange,
+} from "lucide-react";
 import type { TaskRecurrenceConfig } from "@/types/api";
 import { recurrenceSummary } from "@/lib/recurrence-display";
+import { formatShortDate } from "@/lib/recurring-board-utils";
+import {
+  PlannerSectionCard,
+  PlannerCollapsibleCard,
+  RepeatScheduleControl,
+  RecurrencePreviewCard,
+  PlannerChecklist,
+} from "@/components/tasks/create-task/recurring-planner-sections";
 
 const PRIORITIES = [
   {
@@ -137,6 +155,8 @@ const schema = z.object({
           .refine((value) => !value || !Number.isNaN(Date.parse(value)), {
             message: "Subtask due date must be valid",
           }),
+        dueOffsetDays: z.coerce.number().min(0).max(365).optional(),
+        dueTime: z.string().optional(),
       })
     )
     .default([]),
@@ -218,7 +238,7 @@ export function CreateTaskModal({
     },
   });
 
-  const { fields, prepend, remove } = useFieldArray({
+  const { fields, prepend, append, remove } = useFieldArray({
     control,
     name: "subtasks",
   });
@@ -234,8 +254,37 @@ export function CreateTaskModal({
     [statuses, selectedStatusId]
   );
 
+  const dueDateValue = watch("dueDate");
   const titleValid = (watchedTitle ?? "").trim().length > 0;
-  const canSubmit = titleValid && !isSubmitting;
+  const frequencyValid = Boolean(
+    watchedRecurrence?.repeat && watchedRecurrence.repeat !== "NONE"
+  );
+  const startDateValid = Boolean(dueDateValue);
+  const canSubmit = showRecurrence
+    ? titleValid && frequencyValid && startDateValid && !isSubmitting
+    : titleValid && !isSubmitting;
+
+  const checklistCount = (watchedSubtasks ?? []).filter(
+    (s) => (s?.title ?? "").trim().length > 0
+  ).length;
+  const footerBlocker = useMemo(() => {
+    if (!showRecurrence) return null;
+    if (!titleValid) return "Planner name is required.";
+    if (!frequencyValid) return "Pick a frequency to continue.";
+    if (!startDateValid) return "Select a start date to create the planner.";
+    return null;
+  }, [showRecurrence, titleValid, frequencyValid, startDateValid]);
+  const footerSummary = useMemo(() => {
+    if (!showRecurrence) return "";
+    const parts: string[] = [];
+    const cadence = recurrenceSummary(watchedRecurrence);
+    parts.push(cadence ? cadence.split(" • ")[0] : "Pick a frequency");
+    if (dueDateValue) parts.push(`Starts ${formatShortDate(dueDateValue)}`);
+    parts.push(
+      `${checklistCount} checklist ${checklistCount === 1 ? "item" : "items"}`
+    );
+    return parts.join(" · ");
+  }, [showRecurrence, watchedRecurrence, checklistCount, dueDateValue]);
 
   useEffect(() => {
     if (!open) return;
@@ -327,14 +376,15 @@ export function CreateTaskModal({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1 space-y-1">
               <SheetTitle id="create-task-title" className="text-base font-semibold tracking-tight">
-                Create task
+                {showRecurrence ? "Create recurring planner" : "Create task"}
               </SheetTitle>
               {projectName ? (
                 <p className="truncate text-[13px] text-muted-foreground">
-                  in <span className="font-medium text-foreground/90">{projectName}</span>
+                  {showRecurrence ? "New recurring series in " : "in "}
+                  <span className="font-medium text-foreground/90">{projectName}</span>
                 </p>
               ) : null}
-              {selectedStatus ? (
+              {!showRecurrence && selectedStatus ? (
                 <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                   <span
                     className={cn("h-1.5 w-1.5 shrink-0 rounded-full", getStatusChipStyles(selectedStatus).dot)}
@@ -363,7 +413,304 @@ export function CreateTaskModal({
           onKeyDown={handleFormKeyDown}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="flex-1 space-y-0 overflow-y-auto px-6 py-4 pb-5">
+          <div
+            className={cn(
+              "flex-1 overflow-y-auto",
+              showRecurrence ? "space-y-3 px-5 py-4 pb-5" : "space-y-0 px-6 py-4 pb-5"
+            )}
+          >
+            {showRecurrence ? (
+              <>
+                <PlannerSectionCard
+                  icon={<Repeat className="h-4 w-4" />}
+                  title="Repeat schedule"
+                  description="How often this planner generates a new run."
+                >
+                  <Controller
+                    control={control}
+                    name="recurrence"
+                    render={({ field }) => (
+                      <RepeatScheduleControl
+                        value={field.value}
+                        onChange={(next) => {
+                          field.onChange(next);
+                          if (next?.repeat && next.repeat !== "NONE") {
+                            setRecurrenceError(null);
+                          }
+                        }}
+                        disabled={isSubmitting}
+                        error={recurrenceError}
+                      />
+                    )}
+                  />
+                </PlannerSectionCard>
+
+                <RecurrencePreviewCard
+                  recurrence={watchedRecurrence}
+                  startDate={dueDateValue}
+                />
+
+                <PlannerSectionCard
+                  icon={<FileText className="h-4 w-4" />}
+                  title="Routine details"
+                  description="Name and describe what should happen each run."
+                >
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="planner-name" className={CREATE_FIELD_LABEL}>
+                        Planner name <span className="text-destructive/80">*</span>
+                      </Label>
+                      <Input
+                        id="planner-name"
+                        placeholder="e.g. Daily standup, Weekly report…"
+                        data-cy="task-title-input"
+                        {...register("title")}
+                        autoFocus
+                        className={cn(
+                          "h-11 rounded-lg border-border/55 bg-background px-3 text-[15px] font-medium shadow-sm",
+                          "transition-all duration-200 placeholder:font-normal placeholder:text-muted-foreground/55",
+                          "focus-visible:border-violet-500/40 focus-visible:ring-2 focus-visible:ring-violet-500/15",
+                          errors.title && "border-destructive/40 focus-visible:ring-destructive/15"
+                        )}
+                      />
+                      {errors.title ? (
+                        <p className="flex items-center gap-1 text-[11px] text-destructive">
+                          <AlertCircle className="h-3 w-3" /> {errors.title.message}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <Controller
+                      control={control}
+                      name="description"
+                      render={({ field }) => (
+                        <TaskDescriptionField
+                          ref={descriptionFieldRef}
+                          id="planner-desc"
+                          value={field.value ?? ""}
+                          onChange={field.onChange}
+                          disabled={isSubmitting}
+                          onPasteError={(message) =>
+                            toast({
+                              title: "Could not paste image",
+                              description: message,
+                              variant: "error",
+                            })
+                          }
+                        />
+                      )}
+                    />
+
+                    <div className="space-y-2">
+                      <Label className={cn(CREATE_FIELD_LABEL, "flex items-center gap-1.5")}>
+                        <Flag className="h-3 w-3" /> Priority
+                      </Label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {PRIORITIES.map((p) => (
+                          <button
+                            key={p.value}
+                            type="button"
+                            onClick={() => setValue("priority", p.value)}
+                            className={cn(
+                              CHIP_BASE,
+                              selectedPriority === p.value
+                                ? cn("border-transparent shadow-sm ring-1", p.selected)
+                                : "text-muted-foreground"
+                            )}
+                          >
+                            <span className={cn("h-2 w-2 rounded-full", p.color)} />
+                            {p.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {statuses.length > 0 ? (
+                      <div className="space-y-2">
+                        <Label className={cn(CREATE_FIELD_LABEL, "flex items-center gap-1.5")}>
+                          <Layers className="h-3 w-3" /> Start status
+                        </Label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {statuses.map((s) => {
+                            const styles = getStatusChipStyles(s);
+                            return (
+                              <button
+                                key={s.id}
+                                type="button"
+                                onClick={() => setValue("statusId", s.id)}
+                                className={cn(
+                                  CHIP_BASE,
+                                  selectedStatusId === s.id
+                                    ? cn("shadow-sm", styles.selected)
+                                    : "text-muted-foreground"
+                                )}
+                              >
+                                <span className={cn("h-2 w-2 rounded-full", styles.dot)} />
+                                {s.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                </PlannerSectionCard>
+
+                <PlannerSectionCard
+                  icon={<Users className="h-4 w-4" />}
+                  title="Assignment"
+                  description="Who owns each run and when the first run is due."
+                >
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label className={CREATE_FIELD_LABEL}>Assignee</Label>
+                      <Controller
+                        control={control}
+                        name="assigneeIds"
+                        render={({ field }) => (
+                          <AssigneeSelector
+                            projectId={projectId}
+                            value={field.value ?? []}
+                            onChange={field.onChange}
+                            disabled={isSubmitting}
+                          />
+                        )}
+                      />
+                    </div>
+                    <Controller
+                      control={control}
+                      name="dueDate"
+                      render={({ field }) => (
+                        <DueDateField
+                          value={field.value}
+                          onChange={field.onChange}
+                          disabled={isSubmitting}
+                          label="First run date"
+                          hint="Anchor date — the series repeats from here."
+                        />
+                      )}
+                    />
+                  </div>
+                </PlannerSectionCard>
+
+                <PlannerSectionCard
+                  icon={<CalendarRange className="h-4 w-4" />}
+                  title="Checklist"
+                  description="Items copied into every generated run."
+                  action={
+                    checklistCount > 0 ? (
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                        {checklistCount}
+                      </span>
+                    ) : null
+                  }
+                >
+                  <PlannerChecklist
+                    projectId={projectId}
+                    fields={fields as Array<{ id: string } & SubtaskItem>}
+                    values={watchedSubtasks}
+                    register={register}
+                    setValue={setValue}
+                    append={append}
+                    remove={remove}
+                    errors={errors}
+                    disabled={isSubmitting}
+                  />
+                </PlannerSectionCard>
+
+                <PlannerCollapsibleCard
+                  icon={<Settings2 className="h-4 w-4" />}
+                  title="Advanced options"
+                  description="Lead time, labels, and attachments."
+                >
+                  <div className="space-y-3.5">
+                    <div className="space-y-1.5">
+                      <Label className={CREATE_FIELD_LABEL}>Create run days before due</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={365}
+                        value={watchedRecurrence?.createDaysBeforeDue ?? 0}
+                        disabled={isSubmitting}
+                        onChange={(e) =>
+                          setValue("recurrence", {
+                            ...(watchedRecurrence ?? {}),
+                            createDaysBeforeDue: Math.max(0, Number(e.target.value) || 0),
+                          })
+                        }
+                        className="h-9 w-28"
+                      />
+                      <p className="text-[10px] text-muted-foreground/80">
+                        Generate the run ahead of its due date so the team can prepare.
+                      </p>
+                    </div>
+
+                    <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border/50 bg-muted/15 px-3 py-2.5">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5 h-4 w-4 rounded border-border"
+                        checked={Boolean(watchedRecurrence?.skipWeekends)}
+                        disabled={isSubmitting}
+                        onChange={(e) =>
+                          setValue("recurrence", {
+                            ...(watchedRecurrence ?? {}),
+                            skipWeekends: e.target.checked,
+                          })
+                        }
+                      />
+                      <span className="space-y-0.5">
+                        <span className="block text-[12px] font-medium">Skip weekends</span>
+                        <span className="block text-[10px] text-muted-foreground">
+                          Working days only — runs land on the next weekday when a date falls on Sat/Sun.
+                        </span>
+                      </span>
+                    </label>
+
+                    <div className="space-y-1.5">
+                      <Label className={CREATE_FIELD_LABEL}>Completion rule</Label>
+                      <select
+                        value={watchedRecurrence?.completionRule ?? "ALL_CHECKLIST"}
+                        disabled={isSubmitting}
+                        onChange={(e) =>
+                          setValue("recurrence", {
+                            ...(watchedRecurrence ?? {}),
+                            completionRule: e.target.value as "ALL_CHECKLIST" | "MANUAL",
+                          })
+                        }
+                        className="h-9 w-full rounded-lg border border-border/60 bg-background px-3 text-sm"
+                      >
+                        <option value="ALL_CHECKLIST">All checklist items required</option>
+                        <option value="MANUAL">Allow manual completion</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className={CREATE_FIELD_LABEL}>Labels</Label>
+                      <Controller
+                        control={control}
+                        name="labels"
+                        render={({ field }) => (
+                          <LabelsMultiSelect
+                            value={(field.value ?? []) as TaskLabelDraft[]}
+                            onChange={field.onChange}
+                            disabled={isSubmitting}
+                          />
+                        )}
+                      />
+                    </div>
+
+                    <TaskAttachmentsSection
+                      persist={false}
+                      pendingAttachments={pendingTaskAttachments}
+                      onPendingChange={setPendingTaskAttachments}
+                      disabled={isSubmitting}
+                      createDrawer
+                    />
+                  </div>
+                </PlannerCollapsibleCard>
+              </>
+            ) : (
+            <>
             <CreateTaskFormSection title="Basic details">
               <div className="space-y-2">
                 <Label htmlFor="task-title" className={CREATE_FIELD_LABEL}>
@@ -547,7 +894,6 @@ export function CreateTaskModal({
                 remove={remove}
                 errors={errors}
                 disabled={isSubmitting}
-                hideQuickAdd={showRecurrence}
                 pendingAttachmentsBySubtask={pendingSubtaskAttachments}
                 onPendingAttachmentsChange={(subtaskKey, items) =>
                   setPendingSubtaskAttachments((prev) => ({ ...prev, [subtaskKey]: items }))
@@ -555,33 +901,8 @@ export function CreateTaskModal({
               />
             </CreateTaskFormSection>
 
-            {showRecurrence ? (
-              <CreateTaskFormSection title="Recurrence">
-                <Controller
-                  control={control}
-                  name="recurrence"
-                  render={({ field }) => (
-                    <RecurrenceEditor
-                      value={field.value}
-                      onChange={(next) => {
-                        field.onChange(next);
-                        if (next?.repeat && next.repeat !== "NONE") {
-                          setRecurrenceError(null);
-                        }
-                      }}
-                      disabled={isSubmitting}
-                      requireRecurrence
-                      error={recurrenceError}
-                    />
-                  )}
-                />
-                {watchedRecurrence?.repeat && watchedRecurrence.repeat !== "NONE" ? (
-                  <p className="rounded-lg bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground">
-                    {recurrenceSummary(watchedRecurrence) ?? "Recurring schedule enabled"}
-                  </p>
-                ) : null}
-              </CreateTaskFormSection>
-            ) : null}
+            </>
+            )}
 
             {errors.dueDate && (
               <p className="flex items-center gap-1 text-[11px] text-destructive">
@@ -599,17 +920,26 @@ export function CreateTaskModal({
           </div>
 
           <div className="sticky bottom-0 z-10 flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border/50 bg-card/95 px-6 py-3 backdrop-blur-sm">
-            <p className="text-[11px] text-muted-foreground/90">
-              Press{" "}
-              <kbd className="rounded border border-border/50 bg-muted/25 px-1.5 py-0.5 font-mono text-[10px]">
-                Ctrl
-              </kbd>
-              {" + "}
-              <kbd className="rounded border border-border/50 bg-muted/25 px-1.5 py-0.5 font-mono text-[10px]">
-                Enter
-              </kbd>
-              {" "}to create
-            </p>
+            {showRecurrence ? (
+              <p className="flex min-w-0 flex-1 items-center gap-1.5 text-[11px] font-medium text-muted-foreground/90">
+                <Repeat className="h-3.5 w-3.5 shrink-0 text-violet-500" />
+                <span className="truncate">
+                  {footerBlocker ?? footerSummary}
+                </span>
+              </p>
+            ) : (
+              <p className="text-[11px] text-muted-foreground/90">
+                Press{" "}
+                <kbd className="rounded border border-border/50 bg-muted/25 px-1.5 py-0.5 font-mono text-[10px]">
+                  Ctrl
+                </kbd>
+                {" + "}
+                <kbd className="rounded border border-border/50 bg-muted/25 px-1.5 py-0.5 font-mono text-[10px]">
+                  Enter
+                </kbd>
+                {" "}to create
+              </p>
+            )}
             <div className="flex gap-2">
               <Button
                 variant="ghost"
@@ -638,7 +968,8 @@ export function CreateTaskModal({
                   </span>
                 ) : (
                   <span className="flex items-center gap-1.5">
-                    Create task <ArrowRight className="h-4 w-4" />
+                    {showRecurrence ? "Create planner" : "Create task"}{" "}
+                    <ArrowRight className="h-4 w-4" />
                   </span>
                 )}
               </Button>

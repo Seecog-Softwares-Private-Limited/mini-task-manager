@@ -118,17 +118,35 @@ export interface TaskRecurrenceConfig {
   createDaysBeforeDue?: number;
   dueLogic?: "DUE_DATE" | "DUE_TIME";
   dueTime?: string;
+  /** Skip Saturday/Sunday when computing next run dates. */
+  skipWeekends?: boolean;
+  /** How run completion is validated: all checklist items vs manual. */
+  completionRule?: "ALL_CHECKLIST" | "MANUAL";
 }
+
+export type RecurringSeriesStatus = "ACTIVE" | "PAUSED" | "ARCHIVED";
 
 export interface RecurringTemplateSummary {
   id: string;
   title: string;
+  description?: string | null;
   repeatType: "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY" | "CUSTOM";
   nextDueDate: string;
   isPaused: boolean;
+  status?: RecurringSeriesStatus;
+  stoppedAt?: string | null;
   generatedCount: number;
   upcoming: number;
   completed: number;
+  missed?: number;
+  lastRunState?: "PENDING" | "COMPLETED" | "SKIPPED" | null;
+  completionHealth?: number;
+  subtaskCount?: number;
+  assigneeId?: string | null;
+  assigneeIds?: string[] | null;
+  priority?: string;
+  createdBy?: string;
+  startDueDate?: string;
   endType: "NEVER" | "ON_DATE" | "AFTER_OCCURRENCES";
   createDaysBeforeDue: number;
 }
@@ -161,6 +179,8 @@ export interface TaskSubtask {
   description?: string;
   assigneeId?: string;
   dueDate?: string;
+  dueOffsetDays?: number;
+  dueTime?: string;
   status?: SubtaskStatus;
   /** @deprecated Legacy field — kept for old data; UI uses `status` instead. */
   priority?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";

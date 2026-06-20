@@ -19,7 +19,10 @@ import {
 import { fetchOrgMembers, fetchProjectMembers } from "@/services/api/members.api";
 import { fetchCommentCounts } from "@/services/api/comments.api";
 import {
+  archiveRecurringTemplate,
+  duplicateRecurringTemplate,
   completeRecurringTaskWithAction,
+  deleteRecurringSeries,
   fetchRecurringBoard,
   fetchRecurringSummary,
   fetchRecurringTemplates,
@@ -27,6 +30,7 @@ import {
   resumeRecurringTemplate,
   skipNextRecurringOccurrence,
   syncRecurringBoard,
+  updateRecurringTemplate,
 } from "@/services/api/recurring-tasks.api";
 import { parseApiError, isRateLimited, getStoredToken } from "@/services/api/client";
 import { createTaskWithDescriptionImages } from "@/lib/upload-task-description-images";
@@ -37,13 +41,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
 import { RecurringPremiumStats } from "@/components/recurring/recurring-premium-stats";
-import { RecurringCompactStats } from "@/components/recurring/recurring-compact-stats";
 import { RecurringBoardToolbar, type RecurringViewMode } from "@/components/recurring/recurring-board-toolbar";
 import { RecurringCalendarView } from "@/components/recurring/recurring-calendar-view";
 import { RecurringAgendaView } from "@/components/recurring/recurring-agenda-view";
 import { PlannerHeader } from "@/components/recurring/planner-header";
 import { PlannerShelf, type ShelfCategory } from "@/components/recurring/planner-shelf";
 import { RecurringTaskDrawer } from "@/components/recurring/recurring-task-drawer";
+import { RecurringSeriesDrawer } from "@/components/recurring/recurring-series-drawer";
+import { RecurringSeriesLibrary } from "@/components/recurring/recurring-series-library";
 import { RecurringDayDrawer } from "@/components/recurring/recurring-day-drawer";
 import {
   buildRecurringOverdueStatus,
@@ -52,7 +57,7 @@ import {
 } from "@/lib/recurring-board-constants";
 import type { RecurringBoardResponse } from "@/services/api/recurring-tasks.api";
 import { RecurringExecutiveHealth } from "@/components/recurring/recurring-executive-health";
-import { formatShortDate, computeExecutiveHealth } from "@/lib/recurring-board-utils";
+import { formatShortDate, computeExecutiveHealth, dedupeRecurringBoardTasks } from "@/lib/recurring-board-utils";
 import { EXEC_PLANNER } from "@/lib/executive-planner-theme";
 import {
   applyRecurringBoardFilters,
@@ -87,7 +92,7 @@ import { OrgSwitcher } from "@/components/dashboard/org-switcher";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useBoardPermissions } from "@/hooks/use-board-permissions";
 import { useRetentionTracking } from "@/hooks/use-retention-tracking";
-import type { Task } from "@/types/api";
+import type { Task, TaskRecurrenceConfig, RecurringTemplateSummary } from "@/types/api";
 import { isRecurringTask, toRecurrenceLabel } from "@/lib/recurrence-display";
 import { cn } from "@/lib/utils";
 import { Building2, Plus, Sparkles, Columns3, Shield, Keyboard } from "lucide-react";
@@ -133,6 +138,10 @@ export default function RecurringTasksPage() {
   const [filters, setFilters] = useState<RecurringBoardFilters>(DEFAULT_RECURRING_BOARD_FILTERS);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [shelfCategory, setShelfCategory] = useState<ShelfCategory>("all");
+  const [seriesDetailId, setSeriesDetailId] = useState<string | null>(null);
+  const [seriesDrawerOpen, setSeriesDrawerOpen] = useState(false);
+  const [seriesDrawerStartEdit, setSeriesDrawerStartEdit] = useState(false);
+  const [deleteSeriesTarget, setDeleteSeriesTarget] = useState<RecurringTemplateSummary | null>(null);
   const [selectedDayKey, setSelectedDayKey] = useState<string | null>(null);
   const [dayDrawerOpen, setDayDrawerOpen] = useState(false);
   const [overdueTaskIds, setOverdueTaskIds] = useState<string[]>([]);
@@ -223,6 +232,9 @@ export default function RecurringTasksPage() {
     setCreateModalOpen(false);
     setSelectedTemplateId(null);
     setShelfCategory("all");
+    setSeriesDetailId(null);
+    setSeriesDrawerOpen(false);
+    setDeleteSeriesTarget(null);
     setSelectedDayKey(null);
     setDayDrawerOpen(false);
     autoOpenedTodayRef.current = false;
@@ -321,7 +333,7 @@ export default function RecurringTasksPage() {
         (t) => t.recurringTemplateId && matchingIds.has(t.recurringTemplateId)
       );
     }
-    return list;
+    return dedupeRecurringBoardTasks(list);
   }, [tasks, selectedProjectId, selectedTemplateId, shelfCategory, recurringTemplates, isBoardRecurringTask]);
 
   const filteredRecurringTasks = useMemo(
@@ -579,6 +591,89 @@ export default function RecurringTasksPage() {
     },
   });
 
+  const deleteSeriesMutation = useMutation({
+    mutationFn: (templateId: string) => deleteRecurringSeries(templateId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["recurring-board", selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-templates"] });
+      setDeleteSeriesTarget(null);
+      setSeriesDrawerOpen(false);
+      setSeriesDetailId(null);
+      toast({ title: "Series deleted", variant: "success" });
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not delete series",
+        description: parseApiError(err),
+        variant: "error",
+      });
+    },
+  });
+
+  const archiveSeriesMutation = useMutation({
+    mutationFn: (templateId: string) => archiveRecurringTemplate(templateId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["recurring-board", selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-templates"] });
+      toast({ title: "Series archived", variant: "success" });
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not archive series",
+        description: parseApiError(err),
+        variant: "error",
+      });
+    },
+  });
+
+  const duplicateSeriesMutation = useMutation({
+    mutationFn: (templateId: string) => duplicateRecurringTemplate(templateId),
+    onSuccess: async () => {
+      if (selectedProjectId) {
+        await syncRecurringBoard(selectedProjectId).catch(() => undefined);
+      }
+      queryClient.invalidateQueries({ queryKey: ["recurring-board", selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-templates"] });
+      toast({ title: "Planner duplicated", variant: "success" });
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not duplicate planner",
+        description: parseApiError(err),
+        variant: "error",
+      });
+    },
+  });
+
+  const updateTemplateMutation = useMutation({
+    mutationFn: ({
+      templateId,
+      payload,
+    }: {
+      templateId: string;
+      payload: { title?: string; recurrence?: TaskRecurrenceConfig };
+    }) => updateRecurringTemplate(templateId, payload),
+    onSuccess: async () => {
+      if (selectedProjectId) {
+        await syncRecurringBoard(selectedProjectId).catch(() => undefined);
+      }
+      queryClient.invalidateQueries({ queryKey: ["recurring-board", selectedProjectId] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-templates"] });
+      toast({ title: "Series updated", variant: "success" });
+    },
+    onError: (err) => {
+      toast({
+        title: "Could not update series",
+        description: parseApiError(err),
+        variant: "error",
+      });
+    },
+  });
+
   const recurringActionMutation = useMutation({
     mutationFn: async ({ type, task }: { type: "complete" | "skip"; task: Task }) => {
       const recurringTemplateId = task.recurringTemplateId;
@@ -829,7 +924,8 @@ export default function RecurringTasksPage() {
             description: s.description?.trim() || undefined,
             completed: s.completed,
             assigneeId: s.assigneeId || undefined,
-            dueDate: s.dueDate || undefined,
+            dueOffsetDays: s.dueOffsetDays ?? 0,
+            dueTime: s.dueTime || undefined,
             status: s.status ?? (s.completed ? "DONE" : "TODO"),
             priority: s.priority || undefined,
           }))
@@ -885,6 +981,35 @@ export default function RecurringTasksPage() {
     [recurringTasks, tasks, selectedTaskId]
   );
 
+  const seriesDetailTemplate = useMemo(
+    () => (seriesDetailId ? recurringTemplateMap[seriesDetailId] ?? null : null),
+    [seriesDetailId, recurringTemplateMap]
+  );
+
+  const seriesOccurrences = useMemo(() => {
+    if (!seriesDetailId) return [];
+    return dedupeRecurringBoardTasks(
+      tasks.filter((t) => t.recurringTemplateId === seriesDetailId)
+    );
+  }, [tasks, seriesDetailId]);
+
+  const openSeriesDrawer = useCallback(
+    (template: RecurringTemplateSummary, startEdit = false) => {
+      setSeriesDetailId(template.id);
+      setSeriesDrawerStartEdit(startEdit);
+      setSeriesDrawerOpen(true);
+    },
+    []
+  );
+
+  const isSeriesMutating =
+    pauseSeriesMutation.isPending ||
+    resumeSeriesMutation.isPending ||
+    deleteSeriesMutation.isPending ||
+    archiveSeriesMutation.isPending ||
+    duplicateSeriesMutation.isPending ||
+    updateTemplateMutation.isPending;
+
   const nextUpcomingTemplate = useMemo(() => {
     const active = recurringTemplates.filter((t) => !t.isPaused && t.nextDueDate);
     if (!active.length) return null;
@@ -901,11 +1026,7 @@ export default function RecurringTasksPage() {
 
   useKeyboardShortcuts(useMemo(() => [
     { key: "n", ctrl: true, handler: () => { if (permissions.canCreateTask && selectedProjectId) setCreateModalOpen(true); }, description: "Create recurring task" },
-    { key: "b", handler: () => setViewMode((m) => {
-      const order: RecurringViewMode[] = ["agenda", "calendar", "shelf", "board", "table"];
-      const idx = order.indexOf(m);
-      return order[(idx + 1) % order.length];
-    }), description: "Cycle views" },
+    { key: "b", handler: () => setViewMode((m) => (m === "calendar" ? "shelf" : "calendar")), description: "Toggle calendar/series" },
   ], [permissions.canCreateTask, selectedProjectId]));
 
   if (!orgId) {
@@ -1018,49 +1139,33 @@ export default function RecurringTasksPage() {
                 data-cy="create-recurring-task-button"
                 className={cn(BOARD_COMMAND_ACTION_BTN, "px-2.5 shadow-sm")}
               >
-                <Plus className="h-3 w-3" /> New recurring task
+                <Plus className="h-3 w-3" /> New recurring planner
               </Button>
             )}
           </>
         }
       />
 
-      {(recurringTasks.length > 0 || summaryQuery.data) && !isBoardLoading ? (
-        viewMode === "calendar" ? (
-          <RecurringCompactStats
-            summary={summaryQuery.data}
-            tasks={recurringTasks}
-            templates={recurringTemplates}
-            doneStatusId={doneStatusId}
-            isLoading={summaryQuery.isLoading}
-            className="shrink-0"
-            onDueTodayClick={() => openDayDrawer(todayDateKey)}
-            onMissedClick={() => {
-              setFilters((f) => ({ ...f, missedOnly: true }));
-              setViewMode("calendar");
-            }}
-            onResumeSeries={(id) => resumeSeriesMutation.mutate(id)}
-          />
-        ) : (
-          <>
-            <PlannerHeader
-              summary={summaryQuery.data}
-              tasks={recurringTasks}
-              projectName={selectedProject.name}
-              className="shrink-0"
-            />
-            <RecurringPremiumStats
-              summary={summaryQuery.data}
-              tasks={recurringTasks}
-              templates={recurringTemplates}
-              completedPercent={boardStats.completedPercent}
-              doneStatusId={doneStatusId}
-              healthStatus={executiveHealth.healthStatus}
-              isLoading={summaryQuery.isLoading}
-              className="shrink-0"
-            />
-          </>
-        )
+      {viewMode === "shelf" ? (
+        <PlannerHeader
+          summary={summaryQuery.data}
+          tasks={recurringTasks}
+          projectName={selectedProject.name}
+          className="shrink-0"
+        />
+      ) : null}
+
+      {!isBoardLoading && selectedProjectId ? (
+        <RecurringPremiumStats
+          summary={summaryQuery.data}
+          tasks={recurringTasks}
+          templates={recurringTemplates}
+          completedPercent={boardStats.completedPercent}
+          doneStatusId={doneStatusId}
+          healthStatus={executiveHealth.healthStatus}
+          isLoading={summaryQuery.isLoading}
+          className="shrink-0"
+        />
       ) : null}
 
       {!isBoardLoading && statuses.length > 0 ? (
@@ -1120,14 +1225,28 @@ export default function RecurringTasksPage() {
                   }}
                 />
               ) : viewMode === "shelf" ? (
-                <PlannerShelf
-                  templates={recurringTemplates}
-                  selectedTemplateId={selectedTemplateId}
-                  selectedCategory={shelfCategory}
-                  onSelectTemplate={setSelectedTemplateId}
-                  onSelectCategory={setShelfCategory}
-                  variant="grid"
+                <RecurringSeriesLibrary
                   className="min-h-0 flex-1"
+                  templates={recurringTemplates}
+                  assigneeMap={assigneeMap}
+                  canManage={permissions.canEditTask}
+                  isMutating={isSeriesMutating}
+                  onOpen={(t) => openSeriesDrawer(t)}
+                  onEdit={(t) => openSeriesDrawer(t, true)}
+                  onViewHistory={(t) => openSeriesDrawer(t)}
+                  onPause={(id) => pauseSeriesMutation.mutate(id)}
+                  onResume={(id) => resumeSeriesMutation.mutate(id)}
+                  onArchive={(t) => archiveSeriesMutation.mutate(t.id)}
+                  onDuplicate={(t) => duplicateSeriesMutation.mutate(t.id)}
+                  onDelete={(t) => setDeleteSeriesTarget(t)}
+                  onCreate={
+                    permissions.canCreateTask
+                      ? () => {
+                          setDefaultStatusId(statuses[0]?.id);
+                          setCreateModalOpen(true);
+                        }
+                      : undefined
+                  }
                 />
               ) : viewMode === "board" ? (
                 <KanbanBoard
@@ -1162,11 +1281,13 @@ export default function RecurringTasksPage() {
               )}
             </div>
 
-            {recurringTasks.length > 0 && viewMode !== "calendar" ? (
+            {recurringTasks.length > 0 &&
+            viewMode !== "calendar" &&
+            viewMode !== "shelf" ? (
               <RecurringExecutiveHealth metrics={executiveHealth} className="shrink-0" />
             ) : null}
 
-            {showBoardEmptyState && viewMode !== "shelf" && (
+            {showBoardEmptyState && viewMode !== "shelf" && viewMode !== "calendar" && (
               <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed bg-muted/10 py-10 text-center">
                 <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
                   <Sparkles className="h-7 w-7 text-primary" />
@@ -1268,6 +1389,30 @@ export default function RecurringTasksPage() {
             isLoading={tasksLoading}
             isCompletingDay={completeDayMutation.isPending}
           />
+          <RecurringSeriesDrawer
+            template={seriesDetailTemplate}
+            open={seriesDrawerOpen && seriesDetailTemplate !== null}
+            onOpenChange={(open) => {
+              setSeriesDrawerOpen(open);
+              if (!open) setSeriesDetailId(null);
+            }}
+            occurrences={seriesOccurrences}
+            statuses={statuses}
+            overdueTaskIds={overdueTaskIds}
+            readOnly={!permissions.canEditTask}
+            isMutating={isSeriesMutating}
+            startInEdit={seriesDrawerStartEdit}
+            onPause={(id) => pauseSeriesMutation.mutate(id)}
+            onResume={(id) => resumeSeriesMutation.mutate(id)}
+            onDelete={(tpl) => setDeleteSeriesTarget(tpl)}
+            onSaveCadence={(templateId, payload) =>
+              updateTemplateMutation.mutate({ templateId, payload })
+            }
+            onOpenOccurrence={(task) => {
+              setSeriesDrawerOpen(false);
+              setSelectedTaskId(task.id);
+            }}
+          />
           <RecurringTaskDrawer
             taskId={selectedTaskId}
             open={selectedTaskId !== null && fullDetailTaskId === null}
@@ -1324,6 +1469,23 @@ export default function RecurringTasksPage() {
         loading={deleteMutation.isPending}
         onConfirm={() => {
           if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
+        }}
+      />
+
+      <ConfirmDialog
+        open={deleteSeriesTarget !== null}
+        onOpenChange={(open) => !open && setDeleteSeriesTarget(null)}
+        title="Delete series"
+        description={
+          deleteSeriesTarget
+            ? `Permanently delete the recurring series "${deleteSeriesTarget.title}"? All generated runs on the calendar will also be removed.`
+            : undefined
+        }
+        confirmLabel="Delete series"
+        variant="destructive"
+        loading={deleteSeriesMutation.isPending}
+        onConfirm={() => {
+          if (deleteSeriesTarget) deleteSeriesMutation.mutate(deleteSeriesTarget.id);
         }}
       />
     </div>

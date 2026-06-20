@@ -621,6 +621,7 @@ interface TaskCardProps {
   recurringTemplate?: RecurringTemplateSummary;
   /** Stagger entrance animation on recurring board */
   cardIndex?: number;
+  recurringTemplateMap?: Record<string, RecurringTemplateSummary>;
 }
 
 export function TaskCard({
@@ -643,6 +644,7 @@ export function TaskCard({
   recurringBoardMode = false,
   recurringTemplate,
   cardIndex = 0,
+  recurringTemplateMap,
 }: TaskCardProps) {
   const canManageTask =
     !!permissions?.canEditTask ||
@@ -662,7 +664,10 @@ export function TaskCard({
   );
   const isRecurring = isRecurringTask(task);
   const ribbonLabel = recurringBoardMode
-    ? recurrenceBadgeLabel(task)
+    ? recurrenceBadgeLabel(
+        task,
+        recurringTemplateMap ? Object.values(recurringTemplateMap) : undefined
+      )
     : recurrenceRibbonLabel(task);
   const cadenceLine = recurringBoardMode
     ? formatRecurringScheduleLine(task, recurringTemplate)
