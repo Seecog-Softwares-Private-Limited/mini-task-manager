@@ -22,5 +22,8 @@ export class PlanConfigurationEntity extends BaseEntity {
 
   @Column({ name: 'allow_coupon', type: 'boolean', default: false })
   allowCoupon!: boolean;
+
+  @Column({ name: 'price_monthly_inr', type: 'int', unsigned: true, default: 0 })
+  priceMonthlyInr!: number;
 }
 

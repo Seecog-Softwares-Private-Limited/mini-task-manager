@@ -12,8 +12,11 @@ export async function fetchSuperAdminDashboard() {
   return data;
 }
 
-export async function fetchSuperAdminTenants(params?: Record<string, string | number | undefined>) {
-  const { data } = await apiClient.get("/super-admin/tenants", { params });
+export async function fetchSuperAdminTenants(
+  params?: Record<string, string | number | undefined>,
+  signal?: AbortSignal
+) {
+  const { data } = await apiClient.get("/super-admin/tenants", { params, signal });
   return data;
 }
 
@@ -27,8 +30,11 @@ export async function setSuperAdminTenantStatus(id: string, status: "ACTIVE" | "
   return data;
 }
 
-export async function fetchSuperAdminUsers(params?: Record<string, string | number | undefined>) {
-  const { data } = await apiClient.get("/super-admin/users", { params });
+export async function fetchSuperAdminUsers(
+  params?: Record<string, string | number | undefined>,
+  signal?: AbortSignal
+) {
+  const { data } = await apiClient.get("/super-admin/users", { params, signal });
   return data;
 }
 
@@ -48,6 +54,7 @@ export interface UserPlanConfiguration {
   maxStorage: number;
   maxWorkspaces: number | null;
   allowCoupon?: boolean;
+  priceMonthlyInr: number;
 }
 
 export interface CouponCodeItem {
@@ -105,6 +112,7 @@ export async function updateSuperAdminPlanConfiguration(
     maxStorage?: number;
     maxWorkspaces?: number | null;
     allowCoupon?: boolean;
+    priceMonthlyInr?: number;
   }
 ) {
   const { data } = await apiClient.put<UserPlanConfiguration>(

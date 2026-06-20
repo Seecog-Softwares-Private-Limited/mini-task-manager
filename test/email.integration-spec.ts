@@ -47,7 +47,7 @@ describe('EmailService (integration)', () => {
     await emailService.sendVerificationEmail({
       to: 'user@example.com',
       fullName: 'Test User',
-      verifyUrl: 'http://localhost:3001/verify-email?token=abc123',
+      verifyUrl: 'http://localhost:3001/api/v1/auth/verify-email?token=abc123',
       verifyPageUrl: 'http://localhost:3001/verify-email',
       shortCode: '482913',
     });
@@ -56,7 +56,41 @@ describe('EmailService (integration)', () => {
     const mail = sendMailMock.mock.calls[0][0];
     expect(mail.to).toBe('user@example.com');
     expect(mail.subject).toContain('Verify your email');
-    expect(mail.html).toContain('verify-email?token=abc123');
+    expect(mail.html).toContain('/api/v1/auth/verify-email?token=abc123');
+  });
+
+  it('sendTaskAssignment includes full task details in HTML', async () => {
+    await emailService.sendTaskAssignment({
+      to: 'assignee@example.com',
+      assigneeName: 'Vinik Dhariwal',
+      assigneeEmail: 'vinik@example.com',
+      assignerName: 'Pankaj',
+      assignerEmail: 'pankaj@example.com',
+      taskTitle: 'Functional Module',
+      taskDescription: '<p>Build the HR module screens.</p>',
+      projectName: 'mini-hr-360',
+      dueDateLabel: 'Fri, Jun 20, 2026',
+      subtasks: [
+        { title: 'Login flow', completed: false },
+        { title: 'Dashboard', completed: true },
+      ],
+      attachments: [{ fileName: 'spec.pdf', fileSize: '1.2 MB' }],
+      allAssigneesLabel: 'Vinik Dhariwal (vinik@example.com)',
+      taskUrl: 'http://localhost:3000/dashboard/projects/abc/board?task=xyz',
+    });
+
+    expect(sendMailMock).toHaveBeenCalledTimes(1);
+    const mail = sendMailMock.mock.calls[0][0];
+    expect(mail.to).toBe('assignee@example.com');
+    expect(mail.subject).toContain('Functional Module');
+    expect(mail.html).toContain('Task Assigned to You');
+    expect(mail.html).toContain('Assigned by');
+    expect(mail.html).toContain('pankaj@example.com');
+    expect(mail.html).toContain('Due date');
+    expect(mail.html).toContain('Login flow');
+    expect(mail.html).toContain('spec.pdf');
+    expect(mail.html).toContain('View Task');
+    expect(mail.text).toContain('Build the HR module screens.');
   });
 
   it('sendInvitation calls transporter.sendMail with accept link', async () => {

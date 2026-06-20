@@ -84,6 +84,21 @@ export function getUpgradeOptions(current: UserPlanSlug): UserPlanSlug[] {
   return PLAN_ORDER.slice(idx + 1);
 }
 
+export function formatPlanPriceDisplay(
+  slug: UserPlanSlug,
+  priceMonthlyInr: number,
+): string {
+  if (slug === 'free' || priceMonthlyInr <= 0) {
+    return '₹0 / forever';
+  }
+  return `₹${priceMonthlyInr} / month`;
+}
+
+export function formatPlanPriceLabel(priceMonthlyInr: number): string {
+  if (priceMonthlyInr <= 0) return 'Free';
+  return `₹${priceMonthlyInr}/month`;
+}
+
 export function formatStorageBytes(bytes: number): string {
   if (bytes >= GB) return `${(bytes / GB).toFixed(bytes % GB === 0 ? 0 : 1)} GB`;
   if (bytes >= MB) return `${Math.round(bytes / MB)} MB`;

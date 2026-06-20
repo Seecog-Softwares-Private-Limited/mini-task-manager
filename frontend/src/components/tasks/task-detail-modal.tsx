@@ -40,6 +40,8 @@ import {
   isUserTaskReporter,
   normalizeAssigneeUserId,
   resolveTaskAssignees,
+  areAllFilteredAssigneesSelected,
+  toggleSelectAllFilteredAssignees,
 } from "@/lib/task-assignees";
 import { fetchTask, updateTask, updateTaskAssignees, deleteTask } from "@/services/api/tasks.api";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -60,6 +62,7 @@ import {
   type SubtaskStatus,
 } from "@/lib/subtask-status";
 import { SubtaskCompactRow } from "@/components/tasks/subtasks/subtask-compact-row";
+import { AssigneeBulkActions } from "@/components/tasks/assignee-bulk-actions";
 import {
   SubtaskDetailPanel,
   type SubtaskDraft,
@@ -112,7 +115,6 @@ import {
   Hash,
   Search,
   UserRoundPlus,
-  UserRoundX,
   User,
   Activity,
   Loader2,
@@ -453,6 +455,25 @@ export function TaskDetailModal({
   const taskAssigneeIds = React.useMemo(
     () => (taskForAssigneeDisplay ? getTaskAssigneeIdList(taskForAssigneeDisplay) : []),
     [taskForAssigneeDisplay]
+  );
+
+  const allAssigneesFilteredSelected = React.useMemo(
+    () =>
+      areAllFilteredAssigneesSelected(
+        taskAssigneeIds,
+        assigneeFilteredMembers.map((m) => m.userId)
+      ),
+    [taskAssigneeIds, assigneeFilteredMembers]
+  );
+
+  const selectedAssigneeFilteredCount = React.useMemo(
+    () =>
+      assigneeFilteredMembers.filter((m) =>
+        taskAssigneeIds.some(
+          (id) => normalizeAssigneeUserId(id) === normalizeAssigneeUserId(m.userId)
+        )
+      ).length,
+    [assigneeFilteredMembers, taskAssigneeIds]
   );
 
   const currentMember = React.useMemo(
@@ -1820,18 +1841,23 @@ export function TaskDetailModal({
                           </div>
                         </div>
                         <DropdownMenuSeparator />
+                        <AssigneeBulkActions
+                          filteredCount={assigneeFilteredMembers.length}
+                          allSelected={allAssigneesFilteredSelected}
+                          selectedCount={selectedAssigneeFilteredCount}
+                          isSearchActive={assigneeSearch.trim().length > 0}
+                          onToggleSelectAll={() =>
+                            assigneeMutation.mutate(
+                              toggleSelectAllFilteredAssignees(
+                                taskAssigneeIds,
+                                assigneeFilteredMembers.map((m) => m.userId)
+                              )
+                            )
+                          }
+                          onClear={() => assigneeMutation.mutate([])}
+                          disabled={assigneeMutation.isPending}
+                        />
                         <DropdownScrollList>
-                          <DropdownMenuItem
-                            onSelect={(e) => {
-                              e.preventDefault();
-                              assigneeMutation.mutate([]);
-                            }}
-                            className="rounded-md text-xs"
-                          >
-                            <UserRoundX className="mr-2 h-3.5 w-3.5" />
-                            Clear assignment
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
                           {assigneeFilteredMembers.map((m) => {
                             const checked = taskAssigneeIds.some(
                               (id) =>

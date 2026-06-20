@@ -10,6 +10,7 @@ import {
   PLANS,
   PLAN_ORDER,
   buildPlanBenefitsFromLimits,
+  formatPlanPriceLabel,
   getPlanDefinition,
   normalizePlanSlug,
   type UserPlanSlug,
@@ -44,18 +45,20 @@ export class PlansService {
         maxUsers: def.limits.maxMembersPerWorkspace,
         maxStorage: def.limits.storageBytes,
         allowCoupon: slug === 'silver' || slug === 'gold',
+        priceMonthlyInr: def.pricing.priceMonthlyInr,
       };
       const resolvedLimits = {
         maxWorkspaces: limits.maxWorkspaces,
         maxMembersPerWorkspace: limits.maxUsers,
         storageBytes: limits.maxStorage,
       };
+      const priceMonthlyInr = limits.priceMonthlyInr ?? def.pricing.priceMonthlyInr;
       return {
         slug: def.slug,
         name: def.name,
-        price: def.pricing.priceMonthlyInr,
+        price: priceMonthlyInr,
         currency: def.pricing.currency,
-        priceLabel: def.pricing.label,
+        priceLabel: formatPlanPriceLabel(priceMonthlyInr),
         limits: resolvedLimits,
         benefits: buildPlanBenefitsFromLimits({
           maxWorkspaces: resolvedLimits.maxWorkspaces,
@@ -111,7 +114,8 @@ export class PlansService {
     couponCode?: string,
   ) {
     const def = getPlanDefinition(targetPlan);
-    const originalAmount = def.pricing.priceMonthlyInr;
+    const config = await this.planConfigurationsService.getByPlanName(targetPlan);
+    const originalAmount = config.priceMonthlyInr;
     let amount = originalAmount;
     const normalizedCoupon = couponCode?.trim() || undefined;
 

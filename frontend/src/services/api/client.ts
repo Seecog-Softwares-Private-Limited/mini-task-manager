@@ -127,6 +127,10 @@ apiClient.interceptors.response.use(
       (url.includes("/attachments/") && url.endsWith("/preview"));
     if (status !== 403 || typeof msgStr !== "string" || (!msgStr.includes("Organization context") && !msgStr.includes("not a member"))) {
       const normalized = normalizeApiError(err);
+      const isCanceled = axios.isAxiosError(err) && err.code === "ERR_CANCELED";
+      if (isCanceled) {
+        return Promise.reject(err);
+      }
       if (!isOptionalPreviewRequest && normalized.statusCode && normalized.statusCode >= 500) {
         reportGlobalError(normalized);
       } else if (normalized.isRateLimited) reportGlobalError(normalized);

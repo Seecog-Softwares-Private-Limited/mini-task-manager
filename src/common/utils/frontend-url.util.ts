@@ -99,5 +99,18 @@ export function buildInviteAcceptUrls(token: string): {
   return { acceptUrl: directAppUrl, directAppUrl };
 }
 
+/** One-click email verification via frontend API proxy (auto-login redirect). */
+export function buildEmailVerificationUrls(token: string): {
+  /** Button link — GET verifies then redirects to /auth/callback with JWT. */
+  verifyUrl: string;
+  /** Manual code entry page (fallback when the button is blocked). */
+  verifyPageUrl: string;
+} {
+  const frontend = resolveFrontendPublicUrl();
+  const verifyPageUrl = `${frontend}/verify-email`;
+  const verifyUrl = `${frontend}/api/v1/auth/verify-email?token=${encodeURIComponent(token)}`;
+  return { verifyUrl, verifyPageUrl };
+}
+
 /** @deprecated alias — use resolveFrontendPublicUrl */
 export const getFrontendUrl = resolveFrontendPublicUrl;

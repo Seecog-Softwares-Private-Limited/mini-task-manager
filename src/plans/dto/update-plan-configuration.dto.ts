@@ -21,5 +21,10 @@ export class UpdatePlanConfigurationDto {
   @IsOptional()
   @IsBoolean()
   allowCoupon?: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  priceMonthlyInr?: number;
 }
 

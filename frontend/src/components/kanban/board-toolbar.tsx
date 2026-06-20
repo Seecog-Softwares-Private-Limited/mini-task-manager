@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { AssigneeBulkActions } from "@/components/tasks/assignee-bulk-actions";
 import type { BoardFilters, AssigneeMap } from "./kanban-board";
 import {
   Search,
@@ -162,6 +163,20 @@ export function BoardToolbar({
   }
 
   const assigneeEntries = Object.entries(assigneeMap ?? {});
+  const allAssigneesFilterSelected =
+    assigneeEntries.length > 0 &&
+    assigneeEntries.every(([userId]) => filters.assignee.includes(userId));
+  const selectedAssigneeFilterCount = assigneeEntries.filter(([userId]) =>
+    filters.assignee.includes(userId)
+  ).length;
+
+  function toggleAllAssigneeFilters() {
+    if (allAssigneesFilterSelected) {
+      updateFilter("assignee", []);
+      return;
+    }
+    updateFilter("assignee", assigneeEntries.map(([userId]) => userId));
+  }
 
   return (
     <div className="min-w-0 space-y-1.5">
@@ -252,9 +267,20 @@ export function BoardToolbar({
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-80 max-h-80 overflow-y-auto">
-              <DropdownMenuLabel className="text-xs">Filter by assignee</DropdownMenuLabel>
+            <DropdownMenuContent align="start" className="w-80 max-h-80 overflow-y-auto p-0">
+              <div className="p-3 pb-2">
+                <DropdownMenuLabel className="px-0 text-xs">Filter by assignee</DropdownMenuLabel>
+              </div>
+              <AssigneeBulkActions
+                filteredCount={assigneeEntries.length}
+                allSelected={allAssigneesFilterSelected}
+                selectedCount={selectedAssigneeFilterCount}
+                onToggleSelectAll={toggleAllAssigneeFilters}
+                clearLabel="Clear filters"
+                onClear={() => updateFilter("assignee", [])}
+              />
               <DropdownMenuSeparator />
+              <div className="max-h-60 overflow-y-auto px-1 pb-1">
               {assigneeEntries.map(([userId, info]) => (
                 <DropdownMenuCheckboxItem
                   key={userId}
@@ -276,6 +302,7 @@ export function BoardToolbar({
                   </div>
                 </DropdownMenuCheckboxItem>
               ))}
+              </div>
             </DropdownMenuContent>
           </DropdownMenu>
         )}

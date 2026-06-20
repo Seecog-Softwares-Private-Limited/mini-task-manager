@@ -7,8 +7,12 @@ import {
   emailLayout,
   emailPasswordResetBody,
   emailPlainTextInvite,
+  emailPlainTextTaskAssignment,
   emailPlainTextWithLink,
+  emailTaskAssignmentBody,
   emailVerificationBody,
+  type TaskAssignmentAttachment,
+  type TaskAssignmentSubtask,
 } from './email-template.util';
 
 export interface InviteEmailPayload {
@@ -25,10 +29,24 @@ export interface InviteEmailPayload {
 export interface TaskAssignmentEmailPayload {
   to: string;
   assigneeName: string;
-  taskTitle: string;
-  projectName?: string;
+  assigneeEmail: string;
   assignerName: string;
+  assignerEmail: string;
+  taskTitle: string;
+  taskDescription?: string | null;
+  projectName?: string;
+  dueDateLabel: string;
+  subtasks: TaskAssignmentSubtask[];
+  attachments: TaskAssignmentAttachment[];
+  allAssigneesLabel: string;
   taskUrl: string;
+  emailSubject?: string;
+  headline?: string;
+  introHtml?: string;
+  cardLabel?: string;
+  highlightTitle?: string;
+  parentTaskTitle?: string;
+  focusSubtasks?: TaskAssignmentSubtask[];
 }
 
 export interface VerificationEmailPayload {
@@ -105,39 +123,50 @@ export class EmailService implements OnModuleInit {
   }
 
   async sendTaskAssignment(payload: TaskAssignmentEmailPayload): Promise<void> {
-    const { to, assigneeName, taskTitle, projectName, assignerName, taskUrl } = payload;
-    const projectLine = projectName ? ` in <strong>${projectName}</strong>` : '';
+    const {
+      to,
+      assigneeName,
+      assigneeEmail,
+      assignerName,
+      assignerEmail,
+      taskTitle,
+      taskDescription,
+      projectName,
+      dueDateLabel,
+      subtasks,
+      attachments,
+      allAssigneesLabel,
+      taskUrl,
+    } = payload;
+
+    const templateParams = {
+      assigneeName,
+      assigneeEmail,
+      assignerName,
+      assignerEmail,
+      taskTitle,
+      taskDescription,
+      projectName,
+      dueDateLabel,
+      subtasks,
+      attachments,
+      allAssigneesLabel,
+      taskUrl,
+      emailSubject: payload.emailSubject,
+      headline: payload.headline,
+      introHtml: payload.introHtml,
+      cardLabel: payload.cardLabel,
+      highlightTitle: payload.highlightTitle,
+      parentTaskTitle: payload.parentTaskTitle,
+      focusSubtasks: payload.focusSubtasks,
+    };
 
     await this.deliver({
       kind: 'task-assignment',
       to,
-      subject: `Task assigned: ${taskTitle}`,
-      text: `Hi ${assigneeName}, ${assignerName} has assigned you a task${projectName ? ` in ${projectName}` : ''}: "${taskTitle}". View it here: ${taskUrl}`,
-      html: `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:600px;margin:0 auto;padding:40px 20px;color:#1a1a2e;">
-  <div style="text-align:center;margin-bottom:32px;">
-    <div style="display:inline-block;width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#6366f1,#8b5cf6);line-height:48px;color:#fff;font-weight:700;font-size:20px;">M</div>
-  </div>
-  <h1 style="font-size:24px;font-weight:700;text-align:center;margin:0 0 8px;">Task Assigned to You</h1>
-  <p style="text-align:center;color:#64748b;margin:0 0 32px;">
-    Hi <strong>${assigneeName}</strong>, <strong>${assignerName}</strong> has assigned you a task${projectLine}.
-  </p>
-  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:20px;margin:0 0 32px;">
-    <p style="font-size:18px;font-weight:600;margin:0 0 4px;">${taskTitle}</p>
-    ${projectName ? `<p style="color:#94a3b8;font-size:13px;margin:0;">Project: ${projectName}</p>` : ''}
-  </div>
-  <div style="text-align:center;margin:32px 0;">
-    <a href="${taskUrl}" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;text-decoration:none;border-radius:10px;font-weight:600;font-size:16px;">
-      View Task
-    </a>
-  </div>
-  <hr style="border:none;border-top:1px solid #e2e8f0;margin:32px 0;" />
-  <p style="text-align:center;color:#cbd5e1;font-size:12px;">Mini Task Manager</p>
-</body>
-</html>`.trim(),
+      subject: payload.emailSubject ?? `Task assigned: ${taskTitle}`,
+      text: emailPlainTextTaskAssignment(templateParams),
+      html: emailLayout(emailTaskAssignmentBody(templateParams)),
     });
   }
 
