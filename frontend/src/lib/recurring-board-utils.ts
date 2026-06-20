@@ -146,12 +146,53 @@ export function activeSeriesCount(
   return summary?.totalRecurringTasks ?? templates.filter((t) => !t.isPaused).length;
 }
 
-export function recurrenceBadgeLabel(task: Task): string | null {
+export function recurrenceBadgeLabel(
+  task: Task,
+  templates?: RecurringTemplateSummary[],
+): string | null {
   if (!task.recurrenceType || task.recurrenceType === "NONE") return null;
   const freq = toRecurrenceLabel(task.recurrenceType);
   const run =
     typeof task.recurrenceSequence === "number" && task.recurrenceSequence > 0
       ? ` · Run #${task.recurrenceSequence}`
       : "";
-  return `${freq}${run}`;
+  const seriesSuffix = getRecurringSeriesSuffix(task, templates);
+  return `${freq}${run}${seriesSuffix}`;
+}
+
+/** When multiple recurring series share a title, disambiguate in the UI. */
+export function getRecurringSeriesSuffix(
+  task: Task,
+  templates?: RecurringTemplateSummary[],
+): string {
+  if (!task.recurringTemplateId || !templates?.length) return "";
+  const template = templates.find((t) => t.id === task.recurringTemplateId);
+  if (!template) return "";
+  const sameTitle = templates.filter(
+    (t) => t.title.trim().toLowerCase() === template.title.trim().toLowerCase()
+  );
+  if (sameTitle.length <= 1) return "";
+  const index = sameTitle.findIndex((t) => t.id === template.id);
+  return index >= 0 ? ` · Series ${index + 1}` : "";
+}
+
+/** Keep one board card per recurring template + run number (drops orphan duplicates). */
+export function dedupeRecurringBoardTasks(tasks: Task[]): Task[] {
+  const byKey = new Map<string, Task>();
+  for (const task of tasks) {
+    const key = task.recurringTemplateId
+      ? `${task.recurringTemplateId}:${task.recurrenceSequence ?? 0}`
+      : task.id;
+    const prev = byKey.get(key);
+    if (!prev) {
+      byKey.set(key, task);
+      continue;
+    }
+    const prevTime = new Date(prev.updatedAt).getTime();
+    const taskTime = new Date(task.updatedAt).getTime();
+    if (taskTime >= prevTime) {
+      byKey.set(key, task);
+    }
+  }
+  return Array.from(byKey.values());
 }

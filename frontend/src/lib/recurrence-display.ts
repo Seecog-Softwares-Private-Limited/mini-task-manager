@@ -26,7 +26,10 @@ export function toRecurrenceLabel(repeat?: TaskRecurrenceConfig["repeat"] | Task
   return `${lower[0].toUpperCase()}${lower.slice(1)}`;
 }
 
-export function isRecurringTask(task: Pick<Task, "recurrenceType">): boolean {
+export function isRecurringTask(
+  task: Pick<Task, "recurrenceType" | "recurringTemplateId">
+): boolean {
+  if (task.recurringTemplateId) return true;
   return !!task.recurrenceType && task.recurrenceType !== "NONE";
 }
 

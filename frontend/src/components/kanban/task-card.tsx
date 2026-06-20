@@ -605,6 +605,7 @@ interface TaskCardProps {
   onToggleSelect?: (taskId: string) => void;
   recurringBoardMode?: boolean;
   recurringTemplate?: RecurringTemplateSummary;
+  recurringTemplateMap?: Record<string, RecurringTemplateSummary>;
 }
 
 export function TaskCard({
@@ -626,6 +627,7 @@ export function TaskCard({
   onToggleSelect,
   recurringBoardMode = false,
   recurringTemplate,
+  recurringTemplateMap,
 }: TaskCardProps) {
   const canManageTask =
     !!permissions?.canEditTask ||
@@ -645,7 +647,10 @@ export function TaskCard({
   );
   const isRecurring = isRecurringTask(task);
   const ribbonLabel = recurringBoardMode
-    ? recurrenceBadgeLabel(task)
+    ? recurrenceBadgeLabel(
+        task,
+        recurringTemplateMap ? Object.values(recurringTemplateMap) : undefined
+      )
     : recurrenceRibbonLabel(task);
   const cadenceLine = recurringBoardMode
     ? formatRecurringScheduleLine(task, recurringTemplate)

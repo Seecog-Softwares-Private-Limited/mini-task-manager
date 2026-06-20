@@ -207,11 +207,27 @@ export class RecurringTasksService {
         }
 
         const nextSequence = (template.lastSequence ?? 0) + 1;
-        const existing = await this.occurrencesRepository.findByTemplateAndSequence(
+        const existingOccurrence = await this.occurrencesRepository.findByTemplateAndSequence(
           template.id,
           nextSequence,
         );
-        if (!existing) {
+        const existingTask = await this.tasksRepository.findByRecurringTemplateAndSequence(
+          template.id,
+          nextSequence,
+        );
+
+        if (!existingOccurrence && existingTask) {
+          await this.occurrencesRepository.create({
+            templateId: template.id,
+            organizationId: template.organizationId,
+            projectId: template.projectId,
+            taskId: existingTask.id,
+            sequenceNumber: nextSequence,
+            dueDate: nextDueDate as unknown as Date,
+            state: 'PENDING',
+            completedAt: null,
+          });
+        } else if (!existingOccurrence && !existingTask) {
           const createdTask = await this.tasksService.create(
             template.projectId,
             template.organizationId,
@@ -236,17 +252,21 @@ export class RecurringTasksService {
             recurrenceType: template.repeatType,
             recurrenceSequence: nextSequence,
           } as never);
-          await this.occurrencesRepository.create({
-            templateId: template.id,
-            organizationId: template.organizationId,
-            projectId: template.projectId,
-            taskId: createdTask.id,
-            sequenceNumber: nextSequence,
-            dueDate: nextDueDate as unknown as Date,
-            state: 'PENDING',
-            completedAt: null,
-          });
-          generated += 1;
+          try {
+            await this.occurrencesRepository.create({
+              templateId: template.id,
+              organizationId: template.organizationId,
+              projectId: template.projectId,
+              taskId: createdTask.id,
+              sequenceNumber: nextSequence,
+              dueDate: nextDueDate as unknown as Date,
+              state: 'PENDING',
+              completedAt: null,
+            });
+            generated += 1;
+          } catch {
+            await this.tasksRepository.delete(createdTask.id);
+          }
         }
 
         const following = computeNextRecurringDueDate(

@@ -11,6 +11,12 @@ const EXT_MIME: Record<string, string> = {
   ".csv": "text/csv",
   ".json": "application/json",
   ".zip": "application/zip",
+  ".doc": "application/msword",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".xls": "application/vnd.ms-excel",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".xlsm": "application/vnd.ms-excel.sheet.macroenabled.12",
+  ".ods": "application/vnd.oasis.opendocument.spreadsheet",
 };
 
 /** Infer MIME from filename when ZIP blobs have no type (backend rejects octet-stream). */

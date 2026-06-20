@@ -263,13 +263,21 @@ export function WorkspaceCard({
       className={cn(
         "group/card relative flex h-full min-h-[180px] cursor-pointer flex-col overflow-hidden rounded-xl border bg-gradient-to-br",
         "from-white via-[#FCFCFD] to-violet-50/10 dark:from-card/80 dark:via-card/60 dark:to-violet-950/10",
-        "border-slate-200/90 shadow-[0_1px_3px_rgba(15,23,42,0.05)]",
         "transition-[transform,box-shadow,border-color] duration-200 ease-out",
-        "hover:-translate-y-0.5 hover:border-slate-300/90 hover:shadow-[0_4px_16px_rgba(15,23,42,0.07),0_8px_24px_-12px_rgba(109,40,217,0.12)]",
+        "hover:-translate-y-0.5",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/25 focus-visible:ring-offset-2",
         isCurrent
-          ? "border-violet-300/40 bg-gradient-to-br from-violet-50/35 via-indigo-50/20 to-fuchsia-50/10 ring-1 ring-violet-200/20 dark:border-violet-500/20 dark:from-violet-500/[0.05] dark:via-indigo-500/[0.02] dark:to-fuchsia-500/[0.02] dark:ring-violet-500/10"
-          : "",
+          ? cn(
+              "border-violet-300/70 bg-gradient-to-br from-violet-50/35 via-indigo-50/20 to-fuchsia-50/10",
+              "shadow-[0_4px_16px_rgba(15,23,42,0.08)] ring-2 ring-violet-200/40",
+              "dark:border-white/80 dark:from-violet-500/[0.08] dark:via-indigo-500/[0.04] dark:to-fuchsia-500/[0.02]",
+              "dark:ring-white/30 dark:shadow-lg dark:shadow-black/35"
+            )
+          : cn(
+              "border-slate-200/90 shadow-[0_1px_3px_rgba(15,23,42,0.05)]",
+              "hover:border-slate-300/90 hover:shadow-[0_4px_16px_rgba(15,23,42,0.07),0_8px_24px_-12px_rgba(109,40,217,0.12)]",
+              "dark:border-border/45 dark:shadow-none dark:hover:border-border/60 dark:hover:shadow-md dark:hover:shadow-black/20"
+            ),
         org.isArchived && "opacity-80 saturate-[0.92]"
       )}
       onClick={onOpen}

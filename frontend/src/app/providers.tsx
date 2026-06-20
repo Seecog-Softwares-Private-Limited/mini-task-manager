@@ -51,7 +51,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   );
   return (
     <ErrorBoundary>
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange={false}>
+      <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange={false}>
         <QueryClientProvider client={queryClient}>
           <ErrorProvider>
             <TenantProvider>
