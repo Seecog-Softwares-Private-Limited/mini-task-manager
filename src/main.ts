@@ -17,9 +17,13 @@ async function bootstrap() {
 
   app.setGlobalPrefix(apiPrefix, { exclude: ['/'] });
 
-  // If CORS_ORIGIN is unset: reflect the browser's Origin (works for any localhost port, e.g. 3008 with FRONTEND_PORT).
-  // A single hard-coded dev origin breaks logins when the UI runs on a different port than FRONTEND_PORT in env.
-  const corsOrigin = process.env.CORS_ORIGIN || true;
+  // In development, reflect the browser Origin so Next (:3008), Flutter web (:8090), etc. all work.
+  // In production, use CORS_ORIGIN from env (set by resolve-env-urls from properties.env).
+  const isProduction = nodeEnv === 'production';
+  const corsOrigin =
+    isProduction && process.env.CORS_ORIGIN?.trim()
+      ? process.env.CORS_ORIGIN.trim()
+      : true;
   app.enableCors({
     origin: corsOrigin,
     credentials: true,
