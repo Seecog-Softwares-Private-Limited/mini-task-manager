@@ -5,6 +5,7 @@ import { CompositeAuthGuard } from './modules/auth/guards/composite-auth.guard';
 import { LastSeenInterceptor } from './modules/users/last-seen.interceptor';
 import { ConfigModule } from './config/config.module';
 import { DatabaseModule } from './infrastructure/database/database.module';
+import { ThrottleModule } from './infrastructure/throttle/throttle.module';
 import { HealthModule } from './infrastructure/health/health.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
@@ -40,6 +41,7 @@ import { RootController } from './root.controller';
   ],
   imports: [
     ConfigModule,
+    ThrottleModule,
     DatabaseModule,
     HealthModule,
     AuthModule,

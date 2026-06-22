@@ -97,13 +97,8 @@ function applyEnvironmentUrls() {
     } else {
       process.env.FRONTEND_URL = stripTrailingSlash(localFrontend);
     }
-    process.env.CORS_ORIGIN = stripTrailingSlash(
-      explicit && !isLocalhostUrl(explicit)
-        ? explicit
-        : prodCors && !isLocalhostUrl(prodCors)
-          ? prodCors
-          : fromApi || localCors,
-    );
+    // Local dev: always use local CORS (never production URL from PUBLIC_API_URL / prod keys).
+    process.env.CORS_ORIGIN = stripTrailingSlash(localCors);
   }
 
   return {
