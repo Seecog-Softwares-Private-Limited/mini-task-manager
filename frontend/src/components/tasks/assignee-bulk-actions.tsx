@@ -14,6 +14,8 @@ export interface AssigneeBulkActionsProps {
   disabled?: boolean;
   showSelectAll?: boolean;
   clearLabel?: string;
+  selectAllLabel?: string;
+  showPartialIndicator?: boolean;
   className?: string;
   /** Prevents kanban card drag/click when used inside task cards. */
   quickAction?: boolean;
@@ -29,6 +31,8 @@ export function AssigneeBulkActions({
   disabled = false,
   showSelectAll = true,
   clearLabel = "Clear assignment",
+  selectAllLabel = "Select all",
+  showPartialIndicator = true,
   className,
   quickAction = false,
 }: AssigneeBulkActionsProps) {
@@ -71,7 +75,7 @@ export function AssigneeBulkActions({
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-foreground">
-                {allSelected ? "Deselect all" : "Select all"}
+                {allSelected ? selectAllLabel : "Select all"}
               </p>
               <p className="text-[10px] leading-snug text-muted-foreground">
                 {isSearchActive
@@ -90,7 +94,7 @@ export function AssigneeBulkActions({
                 "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-all duration-200",
                 allSelected
                   ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                  : partialSelection
+                  : showPartialIndicator && partialSelection
                     ? "border-amber-500/60 bg-amber-500/15"
                     : "border-border/80 bg-background"
               )}
@@ -98,7 +102,7 @@ export function AssigneeBulkActions({
             >
               {allSelected ? (
                 <Check className="h-3 w-3" />
-              ) : partialSelection ? (
+              ) : showPartialIndicator && partialSelection ? (
                 <span className="h-1.5 w-1.5 rounded-sm bg-amber-600 dark:bg-amber-400" />
               ) : null}
             </span>

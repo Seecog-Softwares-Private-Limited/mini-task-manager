@@ -1850,6 +1850,8 @@ export function TaskDetailModal({
                           allSelected={allAssigneesFilteredSelected}
                           selectedCount={selectedAssigneeFilteredCount}
                           isSearchActive={assigneeSearch.trim().length > 0}
+                          selectAllLabel="Select all"
+                          showPartialIndicator={false}
                           onToggleSelectAll={() =>
                             assigneeMutation.mutate(
                               toggleSelectAllFilteredAssignees(
