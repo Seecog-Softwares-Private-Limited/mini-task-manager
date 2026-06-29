@@ -11,6 +11,7 @@ export class TaskSubtaskResponseDto {
   completed!: boolean;
   description?: string;
   assigneeId?: string;
+  assigneeIds?: string[];
   dueDate?: string;
   status?: string;
   priority?: string;

@@ -16,9 +16,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DropdownScrollList } from "@/components/ui/dropdown-scroll-list";
-import { Check, Loader2, Search, UserRound, UserRoundPlus, UserRoundX } from "lucide-react";
+import { AssigneeBulkActions } from "@/components/tasks/assignee-bulk-actions";
+import { Check, Loader2, Search, UserRound, UserRoundPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { OrgMember } from "@/types/api";
+import {
+  areAllFilteredAssigneesSelected,
+  normalizeAssigneeUserId,
+  toggleSelectAllFilteredAssignees,
+} from "@/lib/task-assignees";
 
 const DROPDOWN_Z = "z-[110]";
 
@@ -34,8 +40,8 @@ interface SubtaskAssigneeSelectorProps {
   organizationId?: string;
   /** Reuse members already loaded by the task modal (avoids duplicate fetches). */
   prefetchedOrgMembers?: OrgMember[];
-  value?: string;
-  onChange: (assigneeId?: string) => void;
+  value?: string[];
+  onChange: (assigneeIds: string[]) => void;
   disabled?: boolean;
   /** Pre-resolved members from the task modal (project + org + task assignee). */
   knownMembers?: MemberOption[];
@@ -92,6 +98,8 @@ export function SubtaskAssigneeSelector({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
+  const selectedIds = useMemo(() => value ?? [], [value]);
+
   const { data: projectMembers = [], isLoading: projectLoading } = useQuery({
     queryKey: ["project-members", projectId],
     queryFn: () => fetchProjectMembers(projectId),
@@ -125,7 +133,40 @@ export function SubtaskAssigneeSelector({
     return options.filter((m) => m.name.toLowerCase().includes(q) || (m.email ?? "").toLowerCase().includes(q));
   }, [options, search]);
 
-  const selected = value ? options.find((m) => m.id === value) : undefined;
+  const selected = useMemo(
+    () => options.filter((m) =>
+      selectedIds.some((id) => normalizeAssigneeUserId(id) === normalizeAssigneeUserId(m.id))
+    ),
+    [options, selectedIds]
+  );
+
+  const allFilteredSelected = useMemo(
+    () => areAllFilteredAssigneesSelected(selectedIds, filtered.map((m) => m.id)),
+    [selectedIds, filtered]
+  );
+
+  const selectedFilteredCount = useMemo(
+    () =>
+      filtered.filter((m) =>
+        selectedIds.some((id) => normalizeAssigneeUserId(id) === normalizeAssigneeUserId(m.id))
+      ).length,
+    [filtered, selectedIds]
+  );
+
+  function toggle(memberId: string) {
+    const isSelected = selectedIds.some(
+      (id) => normalizeAssigneeUserId(id) === normalizeAssigneeUserId(memberId)
+    );
+    if (isSelected) {
+      onChange(
+        selectedIds.filter(
+          (id) => normalizeAssigneeUserId(id) !== normalizeAssigneeUserId(memberId)
+        )
+      );
+      return;
+    }
+    onChange([...selectedIds, memberId]);
+  }
 
   return (
     <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
@@ -136,17 +177,40 @@ export function SubtaskAssigneeSelector({
           size="icon"
           disabled={disabled}
           className="h-7 w-7 shrink-0 rounded-full p-0"
-          aria-label={selected ? `Assignee ${selected.name}` : value ? "Assigned member" : "Assign subtask"}
+          aria-label={
+            selected.length === 1
+              ? `Assignee ${selected[0].name}`
+              : selected.length > 1
+                ? `${selected.length} assignees`
+                : selectedIds.length
+                  ? "Assigned members"
+                  : "Assign subtask"
+          }
         >
-          {selected ? (
+          {selected.length === 1 ? (
             <UserAvatar
-              userId={selected.id}
-              name={selected.name}
-              avatarUrl={selected.avatarUrl}
+              userId={selected[0].id}
+              name={selected[0].name}
+              avatarUrl={selected[0].avatarUrl}
               className="h-7 w-7 ring-1 ring-border/60"
               fallbackClassName="bg-muted text-[10px] font-semibold text-foreground"
             />
-          ) : value ? (
+          ) : selected.length > 1 ? (
+            <div className="flex h-7 w-7 items-center justify-center">
+              <div className="flex -space-x-1.5">
+                {selected.slice(0, 2).map((member) => (
+                  <UserAvatar
+                    key={member.id}
+                    userId={member.id}
+                    name={member.name}
+                    avatarUrl={member.avatarUrl}
+                    className="h-5 w-5 border border-background ring-1 ring-border/50"
+                    fallbackClassName="text-[8px]"
+                  />
+                ))}
+              </div>
+            </div>
+          ) : selectedIds.length > 0 ? (
             <span className="flex h-7 w-7 items-center justify-center rounded-full border border-border/40 bg-muted/40">
               <UserRound className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
             </span>
@@ -180,19 +244,20 @@ export function SubtaskAssigneeSelector({
           </div>
         </div>
         <DropdownMenuSeparator />
+        <AssigneeBulkActions
+          filteredCount={filtered.length}
+          allSelected={allFilteredSelected}
+          selectedCount={selectedFilteredCount}
+          isSearchActive={search.trim().length > 0}
+          selectAllLabel="Select all"
+          showPartialIndicator={false}
+          onToggleSelectAll={() =>
+            onChange(toggleSelectAllFilteredAssignees(selectedIds, filtered.map((m) => m.id)))
+          }
+          onClear={() => onChange([])}
+          disabled={disabled || isLoading}
+        />
         <DropdownScrollList>
-          <DropdownMenuItem
-            onSelect={(event) => {
-              event.preventDefault();
-              onChange(undefined);
-              setOpen(false);
-            }}
-            className="rounded-md text-xs"
-          >
-            <UserRoundX className="mr-2 h-3.5 w-3.5" />
-            Clear assignee
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
           {isLoading ? (
             <div className="flex items-center justify-center gap-2 px-2 py-6 text-xs text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -200,42 +265,43 @@ export function SubtaskAssigneeSelector({
             </div>
           ) : (
             filtered.map((member) => {
-            const checked = member.id === value;
-            return (
-              <DropdownMenuItem
-                key={member.id}
-                onSelect={(event) => {
-                  event.preventDefault();
-                  onChange(member.id);
-                  setOpen(false);
-                }}
-                className="rounded-md py-2"
-              >
-                <div className="flex w-full items-center gap-2.5">
-                  <UserAvatar
-                    userId={member.id}
-                    name={member.name}
-                    avatarUrl={member.avatarUrl}
-                    className="h-7 w-7"
-                    fallbackClassName="text-[10px]"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-medium">{member.name}</p>
-                    <p className="truncate text-[11px] text-muted-foreground">{member.email}</p>
+              const checked = selectedIds.some(
+                (id) => normalizeAssigneeUserId(id) === normalizeAssigneeUserId(member.id)
+              );
+              return (
+                <DropdownMenuItem
+                  key={member.id}
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    toggle(member.id);
+                  }}
+                  className="rounded-md py-2"
+                >
+                  <div className="flex w-full items-center gap-2.5">
+                    <UserAvatar
+                      userId={member.id}
+                      name={member.name}
+                      avatarUrl={member.avatarUrl}
+                      className="h-7 w-7"
+                      fallbackClassName="text-[10px]"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-medium">{member.name}</p>
+                      <p className="truncate text-[11px] text-muted-foreground">{member.email}</p>
+                    </div>
+                    <span
+                      className={cn(
+                        "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
+                        checked ? "border-primary bg-primary text-white" : "border-border bg-background text-transparent"
+                      )}
+                      aria-label={checked ? "Selected" : "Not selected"}
+                    >
+                      <Check className="h-3 w-3" />
+                    </span>
                   </div>
-                  <span
-                    className={cn(
-                      "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors",
-                      checked ? "border-primary bg-primary text-white" : "border-border bg-background text-transparent"
-                    )}
-                    aria-label={checked ? "Selected" : "Not selected"}
-                  >
-                    <Check className="h-3 w-3" />
-                  </span>
-                </div>
-              </DropdownMenuItem>
-            );
-          })
+                </DropdownMenuItem>
+              );
+            })
           )}
           {!isLoading && filtered.length === 0 && (
             <div className="px-2 py-3 text-center text-xs text-muted-foreground">

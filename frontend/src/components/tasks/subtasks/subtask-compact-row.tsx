@@ -7,6 +7,8 @@ import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-sel
 import { SubtaskStatusSelector } from "@/components/tasks/subtask-status-selector";
 import type { SubtaskStatus } from "@/lib/subtask-status";
 import type { OrgMember } from "@/types/api";
+import { getSubtaskAssigneeIds } from "@/lib/subtask-assignees";
+import { UserAvatar } from "@/components/ui/user-avatar";
 
 function formatCompactDueDate(value?: string): string {
   if (!value) return "";
@@ -27,6 +29,7 @@ interface SubtaskCompactRowProps {
   status?: SubtaskStatus | string;
   dueDate?: string;
   assigneeId?: string;
+  assigneeIds?: string[];
   attachmentCount: number;
   projectId: string;
   organizationId?: string;
@@ -40,7 +43,7 @@ interface SubtaskCompactRowProps {
   onStatusChange?: (status: SubtaskStatus) => void;
   onRowClick: () => void;
   onDelete: () => void;
-  onAssigneeChange?: (assigneeId?: string) => void;
+  onAssigneeChange?: (assigneeIds: string[]) => void;
 }
 
 export function SubtaskCompactRow({
@@ -49,6 +52,7 @@ export function SubtaskCompactRow({
   status,
   dueDate,
   assigneeId,
+  assigneeIds,
   attachmentCount,
   projectId,
   organizationId,
@@ -64,6 +68,10 @@ export function SubtaskCompactRow({
   onAssigneeChange,
 }: SubtaskCompactRowProps) {
   const dueLabel = formatCompactDueDate(dueDate);
+  const resolvedAssigneeIds = getSubtaskAssigneeIds({ assigneeId, assigneeIds });
+  const assigneeMembers = resolvedAssigneeIds
+    .map((id) => knownMembers?.find((m) => m.id === id) ?? { id, name: "User" })
+    .filter(Boolean);
 
   return (
     <div
@@ -127,21 +135,46 @@ export function SubtaskCompactRow({
             prefetchedOrgMembers={prefetchedOrgMembers}
             knownMembers={knownMembers}
             taskAssigneesOnly={taskAssigneesOnly}
-            value={assigneeId}
+            value={resolvedAssigneeIds}
             onChange={onAssigneeChange}
             disabled={editDisabled}
           />
         ) : (
-          <SubtaskAssigneeSelector
-            projectId={projectId}
-            organizationId={organizationId}
-            prefetchedOrgMembers={prefetchedOrgMembers}
-            knownMembers={knownMembers}
-            taskAssigneesOnly={taskAssigneesOnly}
-            value={assigneeId}
-            onChange={() => {}}
-            disabled
-          />
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center">
+            {assigneeMembers.length === 1 ? (
+              <UserAvatar
+                userId={assigneeMembers[0].id}
+                name={assigneeMembers[0].name}
+                avatarUrl={assigneeMembers[0].avatarUrl}
+                className="h-7 w-7 ring-1 ring-border/60"
+                fallbackClassName="text-[10px]"
+              />
+            ) : assigneeMembers.length > 1 ? (
+              <div className="flex -space-x-1.5">
+                {assigneeMembers.slice(0, 2).map((member) => (
+                  <UserAvatar
+                    key={member.id}
+                    userId={member.id}
+                    name={member.name}
+                    avatarUrl={member.avatarUrl}
+                    className="h-5 w-5 border border-background ring-1 ring-border/50"
+                    fallbackClassName="text-[8px]"
+                  />
+                ))}
+              </div>
+            ) : (
+              <SubtaskAssigneeSelector
+                projectId={projectId}
+                organizationId={organizationId}
+                prefetchedOrgMembers={prefetchedOrgMembers}
+                knownMembers={knownMembers}
+                taskAssigneesOnly={taskAssigneesOnly}
+                value={[]}
+                onChange={() => {}}
+                disabled
+              />
+            )}
+          </div>
         )}
         <span
           className="inline-flex h-7 w-9 shrink-0 items-center justify-center"

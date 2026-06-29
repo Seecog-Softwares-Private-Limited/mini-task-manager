@@ -313,6 +313,16 @@ export class TasksController {
     return task.assigneeIds ?? (task.assigneeId ? [task.assigneeId] : []);
   }
 
+  private getSubtaskAssigneeIds(
+    subtask: NonNullable<TaskEntity['subtasks']>[number],
+  ): string[] {
+    return subtask.assigneeIds?.length
+      ? subtask.assigneeIds
+      : subtask.assigneeId
+        ? [subtask.assigneeId]
+        : [];
+  }
+
   private getNewIds(before: string[], after: string[]): string[] {
     const seen = new Set(before);
     return after.filter((id) => id && !seen.has(id));
@@ -365,21 +375,22 @@ export class TasksController {
 
     for (const subtask of afterSubtasks) {
       const previous = beforeSubtasks.find((item) => item.id === subtask.id);
-      const assigneeChanged =
-        !!subtask.assigneeId &&
-        subtask.assigneeId !== previous?.assigneeId &&
-        subtask.assigneeId !== actorUserId &&
-        !notifiedUserIds.has(subtask.assigneeId);
+      const previousAssignees = previous ? this.getSubtaskAssigneeIds(previous) : [];
+      const nextAssignees = this.getSubtaskAssigneeIds(subtask);
+      const newlyAssigned = this.getNewIds(previousAssignees, nextAssignees).filter(
+        (assigneeId) => assigneeId !== actorUserId && !notifiedUserIds.has(assigneeId),
+      );
 
-      if (!assigneeChanged) continue;
-
-      const sent = await this.notifySubtaskAssignee(after, subtask, actorUserId);
-      if (sent) notifiedUserIds.add(sent);
+      for (const assigneeId of newlyAssigned) {
+        const sent = await this.notifySubtaskAssignee(after, subtask, actorUserId, assigneeId);
+        if (sent) notifiedUserIds.add(sent);
+      }
     }
 
-    const subtasksNeedingTaskAssigneeNotice = addedSubtasks.filter(
-      (subtask) => !subtask.assigneeId || !notifiedUserIds.has(subtask.assigneeId),
-    );
+    const subtasksNeedingTaskAssigneeNotice = addedSubtasks.filter((subtask) => {
+      const assigneeIds = this.getSubtaskAssigneeIds(subtask);
+      return assigneeIds.length === 0 || assigneeIds.every((id) => !notifiedUserIds.has(id));
+    });
     if (subtasksNeedingTaskAssigneeNotice.length > 0) {
       const taskAssigneeTargets = afterAssignees.filter(
         (id) => id !== actorUserId && !notifiedUserIds.has(id),
@@ -426,15 +437,16 @@ export class TasksController {
     task: TaskEntity,
     subtask: NonNullable<TaskEntity['subtasks']>[number],
     assignerUserId: string,
+    assigneeId: string,
   ): Promise<string | null> {
-    if (!subtask.assigneeId || subtask.assigneeId === assignerUserId) return null;
+    if (!assigneeId || assigneeId === assignerUserId) return null;
 
     const context = await this.buildTaskEmailContext(task, assignerUserId);
     const projectLine = context.projectName
       ? ` in <strong>${escapeHtml(context.projectName)}</strong>`
       : '';
 
-    return this.sendTaskEmailToUser(subtask.assigneeId, context, {
+    return this.sendTaskEmailToUser(assigneeId, context, {
       emailSubject: `Subtask assigned: ${subtask.title}`,
       headline: 'Subtask Assigned to You',
       introHtml: `<p style="text-align:center;color:#64748b;font-size:15px;line-height:1.6;margin:0 0 20px;">

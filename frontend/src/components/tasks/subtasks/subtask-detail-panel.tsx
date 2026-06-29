@@ -29,12 +29,13 @@ import { parseApiError } from "@/services/api/client";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SUBTASK_TITLE_MAX_LENGTH, clampSubtaskTitle } from "@/lib/subtask-limits";
 import { cn } from "@/lib/utils";
+import { getSubtaskAssigneeIds, subtaskAssigneesEqual, withSubtaskAssignees } from "@/lib/subtask-assignees";
 
 type MemberHint = { id: string; name: string; email?: string; avatarUrl?: string };
 
 export type SubtaskDraft = Pick<
   TaskSubtask,
-  "id" | "title" | "description" | "completed" | "assigneeId" | "dueDate" | "status" | "priority"
+  "id" | "title" | "description" | "completed" | "assigneeId" | "assigneeIds" | "dueDate" | "status" | "priority"
 >;
 
 interface SubtaskDetailPanelProps {
@@ -94,7 +95,7 @@ export function SubtaskDetailPanel({
       a.title === b.title &&
       (a.description ?? "") === (b.description ?? "") &&
       a.completed === b.completed &&
-      a.assigneeId === b.assigneeId &&
+      subtaskAssigneesEqual(a, b) &&
       a.dueDate === b.dueDate &&
       resolveSubtaskStatus(a) === resolveSubtaskStatus(b) &&
       resolveSubtaskPriority(a.priority) === resolveSubtaskPriority(b.priority)
@@ -117,6 +118,7 @@ export function SubtaskDetailPanel({
     initialDraft.description,
     initialDraft.completed,
     initialDraft.assigneeId,
+    initialDraft.assigneeIds,
     initialDraft.dueDate,
     initialDraft.status,
     initialDraft.priority,
@@ -264,8 +266,14 @@ export function SubtaskDetailPanel({
           prefetchedOrgMembers={prefetchedOrgMembers}
           knownMembers={knownMembers}
           taskAssigneesOnly={taskAssigneesOnly}
-          value={draft.assigneeId}
-          onChange={(assigneeId) => update("assigneeId", assigneeId)}
+          value={getSubtaskAssigneeIds(draft)}
+          onChange={(assigneeIds) =>
+            setDraft((prev) => {
+              const next = withSubtaskAssignees(prev, assigneeIds);
+              onDraftChange?.(next);
+              return next;
+            })
+          }
           disabled={fieldsDisabled}
         />
       </div>

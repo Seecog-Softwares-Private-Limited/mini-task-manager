@@ -178,6 +178,7 @@ export interface TaskSubtask {
   completed: boolean;
   description?: string;
   assigneeId?: string;
+  assigneeIds?: string[];
   dueDate?: string;
   dueOffsetDays?: number;
   dueTime?: string;

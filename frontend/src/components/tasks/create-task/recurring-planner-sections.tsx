@@ -30,6 +30,7 @@ import {
   formatRunTime,
 } from "@/lib/recurrence-preview";
 import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-selector";
+import { getSubtaskAssigneeIds } from "@/lib/subtask-assignees";
 import {
   SubtaskPrioritySelector,
   type SubtaskPriority,
@@ -803,12 +804,16 @@ export function PlannerChecklist({
                       />
                       <SubtaskAssigneeSelector
                         projectId={projectId}
-                        value={current?.assigneeId}
-                        onChange={(assigneeId) =>
-                          setValue(`subtasks.${index}.assigneeId` as const, assigneeId, {
+                        value={getSubtaskAssigneeIds(current ?? {})}
+                        onChange={(assigneeIds) => {
+                          const normalized = getSubtaskAssigneeIds({ assigneeIds });
+                          setValue(`subtasks.${index}.assigneeIds` as const, normalized.length ? normalized : undefined, {
                             shouldDirty: true,
-                          })
-                        }
+                          });
+                          setValue(`subtasks.${index}.assigneeId` as const, normalized[0], {
+                            shouldDirty: true,
+                          });
+                        }}
                         disabled={disabled}
                       />
                     </div>

@@ -19,6 +19,7 @@ import {
 import { resolveSubtaskStatus, subtaskWithCompleted } from "@/lib/subtask-status";
 import { EXEC_PLANNER } from "@/lib/executive-planner-theme";
 import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-selector";
+import { withSubtaskAssignees } from "@/lib/subtask-assignees";
 import {
   SubtaskPrioritySelector,
   type SubtaskPriority,
@@ -55,7 +56,7 @@ export function RecurringSubtaskChecklist({
   const [composerOpen, setComposerOpen] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftDescription, setDraftDescription] = useState("");
-  const [draftAssigneeId, setDraftAssigneeId] = useState<string | undefined>(undefined);
+  const [draftAssigneeIds, setDraftAssigneeIds] = useState<string[]>([]);
   const [draftDueDate, setDraftDueDate] = useState("");
   const [draftPriority, setDraftPriority] = useState<SubtaskPriority>("MEDIUM");
 
@@ -135,7 +136,7 @@ export function RecurringSubtaskChecklist({
   function resetComposer() {
     setDraftTitle("");
     setDraftDescription("");
-    setDraftAssigneeId(undefined);
+    setDraftAssigneeIds([]);
     setDraftDueDate("");
     setDraftPriority("MEDIUM");
     setComposerOpen(false);
@@ -147,16 +148,18 @@ export function RecurringSubtaskChecklist({
     const description = draftDescription.trim();
     const next: TaskSubtask[] = [
       ...subtasks,
-      {
-        id: generateClientId(),
-        title,
-        completed: false,
-        status: "TODO",
-        ...(description ? { description } : {}),
-        ...(draftAssigneeId ? { assigneeId: draftAssigneeId } : {}),
-        ...(draftDueDate ? { dueDate: draftDueDate } : {}),
-        priority: draftPriority,
-      },
+      withSubtaskAssignees(
+        {
+          id: generateClientId(),
+          title,
+          completed: false,
+          status: "TODO",
+          ...(description ? { description } : {}),
+          ...(draftDueDate ? { dueDate: draftDueDate } : {}),
+          priority: draftPriority,
+        },
+        draftAssigneeIds
+      ),
     ];
     updateMutation.mutate(next);
     resetComposer();
@@ -271,8 +274,8 @@ export function RecurringSubtaskChecklist({
                   <span className="text-[11px] text-muted-foreground">Assignee</span>
                   <SubtaskAssigneeSelector
                     projectId={task?.projectId ?? ""}
-                    value={draftAssigneeId}
-                    onChange={setDraftAssigneeId}
+                    value={draftAssigneeIds}
+                    onChange={setDraftAssigneeIds}
                     disabled={updateMutation.isPending}
                   />
                   <div className="relative">

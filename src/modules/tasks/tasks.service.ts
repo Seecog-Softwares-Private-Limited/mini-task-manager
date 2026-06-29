@@ -430,6 +430,19 @@ export class TasksService {
     return 'TODO';
   }
 
+  private normalizeSubtaskAssignees(subtask: {
+    assigneeId?: string;
+    assigneeIds?: string[];
+  }): { assigneeId?: string; assigneeIds?: string[] } {
+    const ids = subtask.assigneeIds?.length
+      ? Array.from(new Set(subtask.assigneeIds.map((id) => String(id).trim()).filter(Boolean)))
+      : subtask.assigneeId
+        ? [String(subtask.assigneeId).trim()]
+        : [];
+    if (!ids.length) return {};
+    return { assigneeIds: ids, assigneeId: ids[0] };
+  }
+
   private normalizeSubtasks(
     subtasks?: Array<{
       id?: string;
@@ -437,6 +450,7 @@ export class TasksService {
       completed?: boolean;
       description?: string;
       assigneeId?: string;
+      assigneeIds?: string[];
       dueDate?: string;
       priority?: string;
       status?: string;
@@ -448,6 +462,7 @@ export class TasksService {
     completed: boolean;
     description?: string;
     assigneeId?: string;
+    assigneeIds?: string[];
     dueDate?: string;
     status: 'TODO' | 'IN_PROGRESS' | 'DONE';
     priority?: string;
@@ -458,13 +473,14 @@ export class TasksService {
       .map((s) => {
         const description = s.description?.trim();
         const status = this.normalizeSubtaskStatus(s);
+        const assignees = this.normalizeSubtaskAssignees(s);
         return {
           id: s.id ?? generateUuid(),
           title: s.title?.trim() ?? '',
           completed: status === 'DONE',
           status,
           ...(description ? { description } : {}),
-          assigneeId: s.assigneeId || undefined,
+          ...assignees,
           dueDate: s.dueDate ? String(s.dueDate).slice(0, 10) : undefined,
           ...(s.priority ? { priority: s.priority } : {}),
           ...(s.statusId ? { statusId: s.statusId } : {}),
