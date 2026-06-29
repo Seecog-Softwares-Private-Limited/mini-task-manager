@@ -36,6 +36,7 @@ import {
 import type { PendingSubtaskAttachment } from "@/components/tasks/subtasks/subtask-attachments-section";
 import { useToast } from "@/components/ui/use-toast";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { getSubtaskAssigneeIds, withSubtaskAssignees } from "@/lib/subtask-assignees";
 
 export interface SubtaskItem {
   id?: string;
@@ -43,6 +44,7 @@ export interface SubtaskItem {
   completed: boolean;
   description?: string;
   assigneeId?: string;
+  assigneeIds?: string[];
   dueDate?: string;
   /** Recurring planner: days after the run due date (template only). */
   dueOffsetDays?: number;
@@ -102,7 +104,7 @@ export function SubtasksEditor({
   const [draftKey, setDraftKey] = useState("");
   const [draftTitle, setDraftTitle] = useState("");
   const [draftDescription, setDraftDescription] = useState("");
-  const [draftAssigneeId, setDraftAssigneeId] = useState<string | undefined>();
+  const [draftAssigneeIds, setDraftAssigneeIds] = useState<string[]>([]);
   const [draftDueDate, setDraftDueDate] = useState("");
   const [draftPriority, setDraftPriority] = useState<SubtaskPriority>("MEDIUM");
   const [pasteFlash, setPasteFlash] = useState(false);
@@ -186,7 +188,7 @@ export function SubtasksEditor({
     setEditingIndex(null);
     setDraftTitle("");
     setDraftDescription("");
-    setDraftAssigneeId(undefined);
+    setDraftAssigneeIds([]);
     setDraftDueDate("");
     setDraftPriority("MEDIUM");
     setComposerOpen(true);
@@ -200,7 +202,7 @@ export function SubtasksEditor({
     setEditingIndex(index);
     setDraftTitle(value?.title ?? "");
     setDraftDescription(value?.description ?? "");
-    setDraftAssigneeId(value?.assigneeId);
+    setDraftAssigneeIds(getSubtaskAssigneeIds(value ?? {}));
     setDraftDueDate(value?.dueDate ?? "");
     setDraftPriority(resolveSubtaskPriority(value?.priority));
     setComposerOpen(true);
@@ -216,7 +218,7 @@ export function SubtasksEditor({
     setDraftKey("");
     setDraftTitle("");
     setDraftDescription("");
-    setDraftAssigneeId(undefined);
+    setDraftAssigneeIds([]);
     setDraftDueDate("");
     setDraftPriority("MEDIUM");
     setPasteFlash(false);
@@ -233,7 +235,12 @@ export function SubtasksEditor({
         shouldDirty: true,
         shouldTouch: true,
       });
-      setValue(`subtasks.${editingIndex}.assigneeId`, draftAssigneeId, {
+      const normalized = getSubtaskAssigneeIds({ assigneeIds: draftAssigneeIds });
+      setValue(`subtasks.${editingIndex}.assigneeIds`, normalized.length ? normalized : undefined, {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
+      setValue(`subtasks.${editingIndex}.assigneeId`, normalized[0], {
         shouldDirty: true,
         shouldTouch: true,
       });
@@ -249,16 +256,20 @@ export function SubtasksEditor({
         setValue(`subtasks.${editingIndex}.id`, draftKey, { shouldDirty: true });
       }
     } else {
-      prepend({
-        id: draftKey,
-        title,
-        completed: false,
-        description: description ? description : undefined,
-        assigneeId: draftAssigneeId,
-        dueDate: draftDueDate || undefined,
-        status: "TODO",
-        priority: draftPriority,
-      });
+      prepend(
+        withSubtaskAssignees(
+          {
+            id: draftKey,
+            title,
+            completed: false,
+            description: description ? description : undefined,
+            dueDate: draftDueDate || undefined,
+            status: "TODO",
+            priority: draftPriority,
+          },
+          draftAssigneeIds
+        )
+      );
     }
 
     setComposerOpen(false);
@@ -266,7 +277,7 @@ export function SubtasksEditor({
     setDraftKey("");
     setDraftTitle("");
     setDraftDescription("");
-    setDraftAssigneeId(undefined);
+    setDraftAssigneeIds([]);
     setDraftDueDate("");
     setDraftPriority("MEDIUM");
   }
@@ -371,8 +382,8 @@ export function SubtasksEditor({
               <span className="text-[10px] text-muted-foreground">Assignee</span>
               <SubtaskAssigneeSelector
                 projectId={projectId}
-                value={draftAssigneeId}
-                onChange={setDraftAssigneeId}
+                value={draftAssigneeIds}
+                onChange={setDraftAssigneeIds}
                 disabled={disabled}
               />
             </div>
@@ -432,7 +443,13 @@ export function SubtasksEditor({
         <ul className="space-y-1">
           {savedEntries.map(({ field, index, value, key }) => {
             const message = subtaskErrors[index]?.title?.message ?? "";
-            const assignee = value?.assigneeId ? memberById.get(value.assigneeId) : undefined;
+            const assigneeIds = getSubtaskAssigneeIds(value ?? {});
+            const assignees = assigneeIds
+              .map((id) => {
+                const member = memberById.get(id);
+                return member ? { id, ...member } : null;
+              })
+              .filter(Boolean);
             const dueLabel = formatCompactDueDate(value?.dueDate);
             const completed = resolveSubtaskStatus(value ?? { completed: false }) === "DONE";
             const rowAttachments = pendingAttachmentsBySubtask[key] ?? [];
@@ -471,14 +488,19 @@ export function SubtasksEditor({
                     {value?.title}
                   </span>
 
-                  {assignee ? (
-                    <UserAvatar
-                      userId={value!.assigneeId!}
-                      name={assignee.name}
-                      avatarUrl={assignee.avatarUrl}
-                      className="h-5 w-5 shrink-0"
-                      fallbackClassName="text-[8px]"
-                    />
+                  {assignees.length > 0 ? (
+                    <div className="flex -space-x-1">
+                      {assignees.slice(0, 2).map((assignee) => (
+                        <UserAvatar
+                          key={assignee!.id}
+                          userId={assignee!.id}
+                          name={assignee!.name}
+                          avatarUrl={assignee!.avatarUrl}
+                          className="h-5 w-5 border border-background"
+                          fallbackClassName="text-[8px]"
+                        />
+                      ))}
+                    </div>
                   ) : null}
 
                   {dueLabel ? (

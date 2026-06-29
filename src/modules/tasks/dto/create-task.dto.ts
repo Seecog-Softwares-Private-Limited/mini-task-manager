@@ -44,6 +44,11 @@ class CreateTaskSubtaskDto {
   assigneeId?: string;
 
   @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  assigneeIds?: string[];
+
+  @IsOptional()
   @IsDateString()
   dueDate?: string;
 

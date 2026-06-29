@@ -44,6 +44,7 @@ export class TaskEntity extends BaseEntity {
     completed: boolean;
     description?: string;
     assigneeId?: string;
+    assigneeIds?: string[];
     dueDate?: string;
     dueTime?: string;
     status?: 'TODO' | 'IN_PROGRESS' | 'DONE';

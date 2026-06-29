@@ -30,18 +30,29 @@ function normalizeTemplateSubtasks(
   subtasks?: CreateTaskDto['subtasks'],
 ): import('./entities/recurring-task-template.entity').RecurringTaskTemplateEntity['templateSubtasks'] {
   if (!subtasks?.length) return null;
-  return subtasks.map((s) => ({
-    id: s.id ?? generateUuid(),
-    title: s.title,
-    completed: false,
-    description: s.description,
-    assigneeId: s.assigneeId,
-    priority: s.priority,
-    status: (s.status as 'TODO' | 'IN_PROGRESS' | 'DONE') ?? 'TODO',
-    statusId: s.statusId,
-    dueOffsetDays: s.dueOffsetDays ?? 0,
-    ...(s.dueTime ? { dueTime: s.dueTime } : {}),
-  }));
+  return subtasks.map((s) => {
+    const assigneeIds = s.assigneeIds?.length
+      ? Array.from(new Set(s.assigneeIds.map((id) => String(id).trim()).filter(Boolean)))
+      : s.assigneeId
+        ? [String(s.assigneeId).trim()]
+        : [];
+    return {
+      id: s.id ?? generateUuid(),
+      title: s.title,
+      completed: false,
+      description: s.description,
+      ...(assigneeIds.length
+        ? { assigneeIds, assigneeId: assigneeIds[0] }
+        : s.assigneeId
+          ? { assigneeId: s.assigneeId }
+          : {}),
+      priority: s.priority,
+      status: (s.status as 'TODO' | 'IN_PROGRESS' | 'DONE') ?? 'TODO',
+      statusId: s.statusId,
+      dueOffsetDays: s.dueOffsetDays ?? 0,
+      ...(s.dueTime ? { dueTime: s.dueTime } : {}),
+    };
+  });
 }
 
 function cloneTemplateSubtasksForOccurrence(
@@ -56,12 +67,17 @@ function cloneTemplateSubtasksForOccurrence(
     } else if (s.dueDate) {
       dueDate = String(s.dueDate).slice(0, 10);
     }
+    const assigneeIds = s.assigneeIds?.length
+      ? s.assigneeIds
+      : s.assigneeId
+        ? [s.assigneeId]
+        : [];
     return {
       id: generateUuid(),
       title: s.title,
       completed: false,
       description: s.description,
-      assigneeId: s.assigneeId,
+      ...(assigneeIds.length ? { assigneeIds, assigneeId: assigneeIds[0] } : {}),
       ...(dueDate ? { dueDate } : {}),
       ...(s.dueTime ? { dueTime: s.dueTime } : {}),
       status: 'TODO' as const,

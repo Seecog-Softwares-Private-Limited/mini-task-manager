@@ -6,6 +6,7 @@ import { resolveSubtaskStatus } from "@/lib/subtask-status";
 import type { TaskSubtask } from "@/types/api";
 import type { TaskRecurrenceConfig } from "@/types/api";
 import { clampSubtaskTitle } from "@/lib/subtask-limits";
+import { getSubtaskAssigneeIds } from "@/lib/subtask-assignees";
 
 /** Fields accepted by backend CreateTaskDto. */
 export interface CreateTaskPayload {
@@ -22,7 +23,7 @@ export interface CreateTaskPayload {
   subtasks?: Array<
     Pick<
       TaskSubtask,
-      "title" | "completed" | "description" | "assigneeId" | "dueDate" | "priority" | "statusId"
+      "title" | "completed" | "description" | "assigneeId" | "assigneeIds" | "dueDate" | "priority" | "statusId"
     > & {
       id?: string;
     }
@@ -42,7 +43,11 @@ export function serializeSubtasksForApi(subtasks: TaskSubtask[]): TaskSubtask[] 
       completed: Boolean(s.completed),
     };
     if (s.description?.trim()) item.description = s.description.trim();
-    if (s.assigneeId) item.assigneeId = s.assigneeId;
+    const assigneeIds = getSubtaskAssigneeIds(s);
+    if (assigneeIds.length) {
+      item.assigneeIds = assigneeIds;
+      item.assigneeId = assigneeIds[0];
+    }
     const status = resolveSubtaskStatus(s);
     item.status = status;
     item.completed = status === "DONE";

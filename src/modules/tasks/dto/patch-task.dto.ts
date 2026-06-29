@@ -64,6 +64,11 @@ class PatchTaskSubtaskDto {
   assigneeId?: string;
 
   @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  assigneeIds?: string[];
+
+  @IsOptional()
   @Transform(patchSubtaskDueDate)
   @ValidateIf((_o, v) => v != null && v !== '')
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'subtask dueDate must be YYYY-MM-DD' })

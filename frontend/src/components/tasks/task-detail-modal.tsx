@@ -43,6 +43,7 @@ import {
   areAllFilteredAssigneesSelected,
   toggleSelectAllFilteredAssignees,
 } from "@/lib/task-assignees";
+import { getSubtaskAssigneeIds, withSubtaskAssignees } from "@/lib/subtask-assignees";
 import { fetchTask, updateTask, updateTaskAssignees, deleteTask } from "@/services/api/tasks.api";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { NoticeDialog, useNoticeDialog } from "@/components/ui/notice-dialog";
@@ -1401,6 +1402,7 @@ export function TaskDetailModal({
                               status={resolveSubtaskStatus(item)}
                               dueDate={item.dueDate}
                               assigneeId={item.assigneeId}
+                              assigneeIds={item.assigneeIds}
                               attachmentCount={attachmentCountBySubtaskId.get(item.id) ?? 0}
                               projectId={projectId}
                               organizationId={organizationId}
@@ -1424,10 +1426,12 @@ export function TaskDetailModal({
                                   )
                                 );
                               }}
-                              onAssigneeChange={(nextAssigneeId?: string) => {
+                              onAssigneeChange={(nextAssigneeIds) => {
                                 updateSubtasksMutation.mutate(
                                   checklist.map((i) =>
-                                    i.id === item.id ? { ...i, assigneeId: nextAssigneeId } : i
+                                    i.id === item.id
+                                      ? withSubtaskAssignees(i, nextAssigneeIds)
+                                      : i
                                   )
                                 );
                               }}
@@ -1462,6 +1466,7 @@ export function TaskDetailModal({
                                   description: item.description,
                                   completed: resolveSubtaskStatus(item) === "DONE",
                                   assigneeId: item.assigneeId,
+                                  assigneeIds: item.assigneeIds ?? getSubtaskAssigneeIds(item),
                                   dueDate: item.dueDate,
                                   status: resolveSubtaskStatus(item),
                                   priority: item.priority,
@@ -1850,6 +1855,8 @@ export function TaskDetailModal({
                           allSelected={allAssigneesFilteredSelected}
                           selectedCount={selectedAssigneeFilteredCount}
                           isSearchActive={assigneeSearch.trim().length > 0}
+                          selectAllLabel="Select all"
+                          showPartialIndicator={false}
                           onToggleSelectAll={() =>
                             assigneeMutation.mutate(
                               toggleSelectAllFilteredAssignees(
