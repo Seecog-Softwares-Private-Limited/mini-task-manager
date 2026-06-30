@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/api/api_client.dart';
-import '../../core/preferences/app_preferences.dart';
 import '../../core/router/app_router.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../shared/widgets/app_widgets.dart';
+import '../../shared/widgets/user_avatar.dart';
 import '../auth/session_controller.dart';
+import 'account_settings_screen.dart';
+import 'my_profile_screen.dart';
+import 'security_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -15,90 +18,117 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionControllerProvider);
-    final config = ref.watch(appConfigProvider);
+    final user = session.user;
     final org = ref.watch(selectedOrgProvider);
-    final themeMode = ref.watch(themeModeProvider);
+    final role = org?.myRole;
+
+    final displayName = user != null &&
+            user.fullName.trim().isNotEmpty &&
+            user.fullName != user.email
+        ? user.fullName
+        : user?.email ?? 'Account';
 
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.md),
       children: [
         SurfaceCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Text('Account', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: AppSpacing.sm),
-              Text(session.user?.fullName ?? 'Signed in', style: Theme.of(context).textTheme.bodyLarge),
-              const SizedBox(height: 4),
-              Text(
-                session.user?.email ?? '—',
-                style: Theme.of(context).textTheme.bodyMedium,
+              UserAvatar(user: user, size: 56, showOnlineIndicator: true),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(displayName, style: Theme.of(context).textTheme.titleLarge),
+                    const SizedBox(height: 4),
+                    Text(
+                      [
+                        if (role != null) role[0].toUpperCase() + role.substring(1),
+                        if (user?.email != null) user!.email,
+                      ].join(' · '),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: AppColors.textMuted,
+                          ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: AppSpacing.sm),
-        SurfaceCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Workspace', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: AppSpacing.sm),
-              Text(org?.name ?? session.orgId ?? 'Not selected'),
-              const SizedBox(height: AppSpacing.sm),
-              SecondaryButton(
-                label: 'Switch workspace',
-                onPressed: () async {
-                  await ref.read(sessionControllerProvider.notifier).refreshOrganizations();
-                  if (context.mounted) await context.push(AppRoutes.workspaces);
-                },
-              ),
-            ],
+        const SizedBox(height: AppSpacing.md),
+        _ProfileMenuTile(
+          icon: Icons.person_outline_rounded,
+          label: 'My Profile',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const MyProfileScreen()),
+          ),
+        ),
+        _ProfileMenuTile(
+          icon: Icons.settings_outlined,
+          label: 'Account Settings',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const AccountSettingsScreen()),
+          ),
+        ),
+        _ProfileMenuTile(
+          icon: Icons.verified_user_outlined,
+          label: 'Security',
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(builder: (_) => const SecurityScreen()),
           ),
         ),
         const SizedBox(height: AppSpacing.sm),
         SurfaceCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Appearance', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: AppSpacing.sm),
-              SegmentedButton<ThemeMode>(
-                segments: const [
-                  ButtonSegment(value: ThemeMode.system, label: Text('Auto')),
-                  ButtonSegment(value: ThemeMode.light, label: Text('Light')),
-                  ButtonSegment(value: ThemeMode.dark, label: Text('Dark')),
-                ],
-                selected: {themeMode},
-                onSelectionChanged: (selection) {
-                  ref.read(themeModeProvider.notifier).setThemeMode(selection.first);
-                },
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        SurfaceCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Environment', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: AppSpacing.sm),
-              Text('Flavor: ${config.flavor}'),
-              const SizedBox(height: 4),
-              Text('API: ${config.apiBaseUrl}', style: Theme.of(context).textTheme.bodyMedium),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        SecondaryButton(
-          label: 'Sign out',
-          onPressed: () async {
+          onTap: () async {
             await ref.read(sessionControllerProvider.notifier).logout();
             if (context.mounted) context.go(AppRoutes.login);
           },
+          child: Row(
+            children: [
+              Icon(Icons.logout_rounded, color: AppColors.danger, size: 20),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                'Log out',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: AppColors.danger,
+                    ),
+              ),
+            ],
+          ),
         ),
       ],
+    );
+  }
+}
+
+class _ProfileMenuTile extends StatelessWidget {
+  const _ProfileMenuTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: SurfaceCard(
+        onTap: onTap,
+        child: Row(
+          children: [
+            Icon(icon, size: 20),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(child: Text(label, style: Theme.of(context).textTheme.titleSmall)),
+            const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+          ],
+        ),
+      ),
     );
   }
 }

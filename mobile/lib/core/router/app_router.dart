@@ -19,12 +19,13 @@ abstract final class AppRoutes {
 }
 
 final appRouterProvider = Provider<GoRouter>((ref) {
-  final session = ref.watch(sessionControllerProvider);
+  final refresh = _RouterRefresh(ref);
 
   return GoRouter(
     initialLocation: AppRoutes.login,
-    refreshListenable: _RouterRefresh(ref),
+    refreshListenable: refresh,
     redirect: (context, state) {
+      final session = ref.read(sessionControllerProvider);
       final path = state.uri.path;
       final status = session.status;
 
@@ -43,6 +44,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       if (status == SessionStatus.authenticated) {
         if (path == AppRoutes.login) {
+          return AppRoutes.home;
+        }
+        // Workspace picker is only for the post-login selection flow.
+        // Switching workspaces uses a modal sheet to avoid GoRouter stack resets.
+        if (path == AppRoutes.workspaces &&
+            session.orgId != null &&
+            session.orgId!.isNotEmpty) {
           return AppRoutes.home;
         }
         return null;

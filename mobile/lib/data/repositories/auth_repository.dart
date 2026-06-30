@@ -62,4 +62,32 @@ class AuthRepository {
       throw ApiException.fromDio(error);
     }
   }
+
+  Future<bool> fetchHasPassword() async {
+    try {
+      final response = await _api.dio.get<Map<String, dynamic>>('/auth/password-status');
+      return response.data?['hasPassword'] as bool? ?? true;
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<String> changePassword({
+    String? currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final response = await _api.dio.post<Map<String, dynamic>>(
+        '/auth/change-password',
+        data: {
+          if (currentPassword != null && currentPassword.isNotEmpty)
+            'currentPassword': currentPassword,
+          'newPassword': newPassword,
+        },
+      );
+      return response.data?['message'] as String? ?? 'Password updated';
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
 }
