@@ -109,7 +109,9 @@ class ApiClient {
 
   Options withOrgHeader(String orgId, {Options? base}) {
     final headers = Map<String, dynamic>.from(base?.headers ?? {});
-    headers[StorageKeys.orgHeader] = orgId;
+    if (orgId.trim().isNotEmpty) {
+      headers[StorageKeys.orgHeader] = orgId.trim();
+    }
     return (base ?? Options()).copyWith(headers: headers);
   }
 }

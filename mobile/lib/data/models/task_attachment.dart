@@ -15,7 +15,8 @@ class TaskAttachment {
     return TaskAttachment(
       id: json['id'] as String? ?? '',
       fileName: (json['fileName'] ?? json['originalFileName'] ?? 'Attachment').toString(),
-      fileSizeBytes: (json['fileSizeBytes'] as num?)?.toInt(),
+      fileSizeBytes: (json['fileSizeBytes'] as num?)?.toInt() ??
+          (json['fileSize'] as num?)?.toInt(),
       mimeType: json['mimeType'] as String?,
     );
   }

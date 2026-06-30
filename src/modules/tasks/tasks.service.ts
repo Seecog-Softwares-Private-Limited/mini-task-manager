@@ -109,6 +109,54 @@ export class TasksService {
     return this.tasksRepository.findByIdAndOrganization(id, organizationId);
   }
 
+  /** Remove a user from all task/subtask assignee lists in an organization. */
+  async removeUserFromAssigneesInOrganization(
+    organizationId: string,
+    userId: string,
+  ): Promise<void> {
+    const target = normalizeAssigneeUserId(userId);
+    if (!target) return;
+
+    const tasks = await this.tasksRepository.findAssigneeFieldsByOrganization(organizationId);
+    for (const task of tasks) {
+      const currentIds = task.assigneeIds ?? (task.assigneeId ? [task.assigneeId] : []);
+      const filteredIds = currentIds.filter((id) => normalizeAssigneeUserId(id) !== target);
+      const hadAssignee =
+        currentIds.some((id) => normalizeAssigneeUserId(id) === target) ||
+        normalizeAssigneeUserId(task.assigneeId) === target;
+
+      const subtasks = task.subtasks ?? [];
+      let subtasksChanged = false;
+      const nextSubtasks = subtasks.map((subtask) => {
+        const subIds = subtask.assigneeIds?.length
+          ? subtask.assigneeIds
+          : subtask.assigneeId
+            ? [subtask.assigneeId]
+            : [];
+        const filteredSub = subIds.filter((id) => normalizeAssigneeUserId(id) !== target);
+        const subChanged =
+          filteredSub.length !== subIds.length ||
+          normalizeAssigneeUserId(subtask.assigneeId) === target;
+        if (!subChanged) return subtask;
+        subtasksChanged = true;
+        const nextAssigneeIds = filteredSub.length ? filteredSub : undefined;
+        return {
+          ...subtask,
+          assigneeIds: nextAssigneeIds,
+          assigneeId: nextAssigneeIds?.[0],
+        };
+      });
+
+      if (!hadAssignee && !subtasksChanged) continue;
+
+      await this.tasksRepository.update(task.id, {
+        assigneeIds: filteredIds.length ? filteredIds : null,
+        assigneeId: filteredIds[0] ?? null,
+        ...(subtasksChanged ? { subtasks: nextSubtasks } : {}),
+      });
+    }
+  }
+
   async findByProject(
     projectId: string,
     organizationId: string,
@@ -583,6 +631,17 @@ export class TasksService {
     if (!task) throw new NotFoundException('Task not found');
     const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
     const fullPath = path.join(uploadsPath, attachment.fileUrl);
+    try {
+      await fs.access(fullPath);
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException)?.code;
+      if (code === 'ENOENT') {
+        throw new NotFoundException(
+          'Attachment file is missing on the server. Re-upload the file.',
+        );
+      }
+      throw err;
+    }
     return { path: fullPath, fileName: attachment.fileName };
   }
 

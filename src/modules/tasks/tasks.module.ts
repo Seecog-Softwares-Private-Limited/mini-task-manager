@@ -43,7 +43,7 @@ import { OrgEventsModule } from '../org-events/org-events.module';
     ]),
     AuthModule,
     BillingModule,
-    OrganizationsModule,
+    forwardRef(() => OrganizationsModule),
     forwardRef(() => ProjectsModule),
     forwardRef(() => WorkflowsModule),
     InvitationsModule,

@@ -6,6 +6,7 @@ import {
   Injectable,
   forwardRef,
 } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource, QueryFailedError } from 'typeorm';
 import { OrganizationsRepository } from './repositories/organizations.repository';
@@ -31,6 +32,7 @@ export class OrganizationsService {
     private readonly planLimitService: PlanLimitService,
     @Inject(forwardRef(() => UnifiedBillingService))
     private readonly unifiedBillingService: UnifiedBillingService,
+    private readonly moduleRef: ModuleRef,
   ) {}
 
   async findById(id: string): Promise<OrganizationEntity | null> {
@@ -283,6 +285,14 @@ export class OrganizationsService {
     }
 
     await this.orgMembersRepository.update(memberId, { status: 'REMOVED' });
+    const { TasksService } = await import('../tasks/tasks.service');
+    const tasksService = this.moduleRef.get(TasksService, { strict: false });
+    if (tasksService) {
+      await tasksService.removeUserFromAssigneesInOrganization(
+        organizationId,
+        target.userId,
+      );
+    }
   }
 
   /** Delete organization. Owner only. Clears task FKs before cascade delete. */

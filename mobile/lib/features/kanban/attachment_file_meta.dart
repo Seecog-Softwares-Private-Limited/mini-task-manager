@@ -1,0 +1,112 @@
+import 'package:flutter/material.dart';
+
+import '../../data/models/task_attachment.dart';
+
+enum AttachmentPreviewKind { image, pdf, text, unsupported }
+
+bool isImageAttachment(TaskAttachment attachment) {
+  return isImageMime(attachment.mimeType, attachment.fileName);
+}
+
+bool isPdfAttachment(TaskAttachment attachment) {
+  return isPdfMime(attachment.mimeType, attachment.fileName);
+}
+
+bool isTextAttachment(TaskAttachment attachment) {
+  return isTextPreviewMime(attachment.mimeType, attachment.fileName);
+}
+
+AttachmentPreviewKind previewKindFor(TaskAttachment attachment) {
+  if (isImageMime(attachment.mimeType, attachment.fileName)) {
+    return AttachmentPreviewKind.image;
+  }
+  if (isPdfMime(attachment.mimeType, attachment.fileName)) {
+    return AttachmentPreviewKind.pdf;
+  }
+  if (isTextPreviewMime(attachment.mimeType, attachment.fileName)) {
+    return AttachmentPreviewKind.text;
+  }
+  return AttachmentPreviewKind.unsupported;
+}
+
+String resolveAttachmentMimeType(TaskAttachment attachment) {
+  return inferMimeTypeFromFileName(attachment.mimeType, attachment.fileName);
+}
+
+bool isImageMime(String? mimeType, String fileName) {
+  if (mimeType?.toLowerCase().startsWith('image/') == true) return true;
+  return _imageExtensions.contains(_fileExt(fileName));
+}
+
+bool isPdfMime(String? mimeType, String fileName) {
+  if (mimeType?.toLowerCase() == 'application/pdf') return true;
+  return _fileExt(fileName) == 'pdf';
+}
+
+bool isTextPreviewMime(String? mimeType, String fileName) {
+  final ext = _fileExt(fileName);
+  if (ext == 'csv' || ext == 'json' || ext == 'txt' || ext == 'md') return true;
+  final mime = mimeType?.toLowerCase() ?? '';
+  return mime.startsWith('text/') ||
+      mime == 'application/json' ||
+      mime == 'text/csv';
+}
+
+bool isSvgMime(String? mimeType, String fileName) {
+  if (mimeType?.toLowerCase() == 'image/svg+xml') return true;
+  return _fileExt(fileName) == 'svg';
+}
+
+String inferMimeTypeFromFileName(String? mimeType, String fileName) {
+  final normalized = mimeType?.trim().toLowerCase() ?? '';
+  if (normalized.isNotEmpty && normalized != 'application/octet-stream') {
+    return normalized;
+  }
+  const map = {
+    'png': 'image/png',
+    'jpg': 'image/jpeg',
+    'jpeg': 'image/jpeg',
+    'gif': 'image/gif',
+    'webp': 'image/webp',
+    'bmp': 'image/bmp',
+    'svg': 'image/svg+xml',
+    'pdf': 'application/pdf',
+    'txt': 'text/plain',
+    'md': 'text/markdown',
+    'csv': 'text/csv',
+    'json': 'application/json',
+  };
+  return map[_fileExt(fileName)] ?? 'application/octet-stream';
+}
+
+String formatFileSize(int bytes) {
+  if (bytes < 1024) return '$bytes B';
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+}
+
+IconData iconForAttachment(TaskAttachment attachment) {
+  final kind = previewKindFor(attachment);
+  return switch (kind) {
+    AttachmentPreviewKind.image => Icons.image_outlined,
+    AttachmentPreviewKind.pdf => Icons.picture_as_pdf_outlined,
+    AttachmentPreviewKind.text => Icons.description_outlined,
+    AttachmentPreviewKind.unsupported => Icons.insert_drive_file_rounded,
+  };
+}
+
+const _imageExtensions = {
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'webp',
+  'bmp',
+  'svg',
+};
+
+String _fileExt(String fileName) {
+  final parts = fileName.split('.');
+  if (parts.length < 2) return '';
+  return parts.last.toLowerCase();
+}

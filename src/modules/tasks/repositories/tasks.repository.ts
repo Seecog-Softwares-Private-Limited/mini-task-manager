@@ -93,6 +93,15 @@ export class TasksRepository {
     return (await this.findById(id)) ?? entity;
   }
 
+  async findAssigneeFieldsByOrganization(
+    organizationId: string,
+  ): Promise<Array<Pick<TaskEntity, 'id' | 'assigneeId' | 'assigneeIds' | 'subtasks'>>> {
+    return this.repo.find({
+      where: { organizationId },
+      select: ['id', 'assigneeId', 'assigneeIds', 'subtasks'],
+    });
+  }
+
   async update(id: string, data: Partial<TaskEntity>): Promise<void> {
     await this.repo.update(id, data);
   }

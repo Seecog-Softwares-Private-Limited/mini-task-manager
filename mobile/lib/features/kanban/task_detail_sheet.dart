@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
+import '../../core/api/api_client.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -8,11 +10,16 @@ import '../../data/models/project_member.dart';
 import '../../data/models/task.dart';
 import '../../data/models/task_attachment.dart';
 import '../../data/models/task_comment.dart';
+import '../../data/repositories/attachments_repository.dart';
 import '../../data/models/workflow.dart';
 import '../../shared/widgets/app_widgets.dart';
+import '../../shared/widgets/user_avatar.dart';
 import '../auth/session_controller.dart';
 import '../kanban/kanban_providers.dart';
 import '../projects/projects_providers.dart';
+import 'subtask_detail_panel.dart';
+import 'attachment_preview.dart';
+import 'assignee_picker_sheet.dart';
 
 class TaskDetailSheet extends ConsumerStatefulWidget {
   const TaskDetailSheet({
@@ -34,21 +41,23 @@ class TaskDetailSheet extends ConsumerStatefulWidget {
 
 class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
   late TextEditingController _titleController;
+  late Task _task;
   final _commentController = TextEditingController();
   late List<TaskSubtask> _subtasks;
   int? _expandedSubtaskIndex;
   bool _saving = false;
   bool _loadingMeta = true;
   bool _postingComment = false;
+  int? _savingSubtaskIndex;
   String? _error;
   List<ProjectMember> _members = const [];
   List<TaskAttachment> _attachments = const [];
   List<TaskComment> _comments = const [];
-  static const _subtaskStatuses = ['TODO', 'IN_PROGRESS', 'DONE'];
 
   @override
   void initState() {
     super.initState();
+    _task = widget.task;
     _titleController = TextEditingController(text: widget.task.title);
     _subtasks = List.of(widget.task.subtasks);
     _loadMeta();
@@ -75,14 +84,27 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
           projectId: widget.projectId,
           organizationId: orgId,
         ),
+        tasksRepo.fetchTask(widget.task.id),
         tasksRepo.fetchAttachments(widget.task.id),
         tasksRepo.fetchComments(widget.task.id),
       ]);
       if (!mounted) return;
+      final members = results[0] as List<ProjectMember>;
+      var task = results[1] as Task;
+      final activeAssigneeIds = _activeAssigneeIds(task, members);
+      final storedAssigneeIds = _storedAssigneeIds(task);
+      if (_assigneeListsDiffer(storedAssigneeIds, activeAssigneeIds)) {
+        task = await tasksRepo.updateTask(
+          taskId: task.id,
+          assigneeIds: activeAssigneeIds,
+        );
+        widget.onUpdated();
+      }
       setState(() {
-        _members = results[0] as List<ProjectMember>;
-        _attachments = results[1] as List<TaskAttachment>;
-        _comments = results[2] as List<TaskComment>;
+        _members = members;
+        _task = task;
+        _attachments = results[2] as List<TaskAttachment>;
+        _comments = results[3] as List<TaskComment>;
         _loadingMeta = false;
       });
     } on ApiException catch (e) {
@@ -96,19 +118,64 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
 
   Future<void> _saveTitle() async {
     final title = _titleController.text.trim();
-    if (title.isEmpty || title == widget.task.title) return;
+    if (title.isEmpty || title == _task.title) return;
+    await _patchTask(title: title);
+  }
+
+  Future<void> _patchTask({
+    String? title,
+    String? statusId,
+    String? priority,
+    String? dueDate,
+    bool clearDueDate = false,
+    List<String>? tags,
+    List<String>? assigneeIds,
+    List<TaskSubtask>? subtasks,
+  }) async {
     await _run(() => ref.read(tasksRepositoryProvider).updateTask(
-          taskId: widget.task.id,
+          taskId: _task.id,
           title: title,
+          statusId: statusId,
+          priority: priority,
+          dueDate: dueDate,
+          clearDueDate: clearDueDate,
+          tags: tags,
+          assigneeIds: assigneeIds,
+          subtasks: subtasks,
         ));
   }
 
-  Future<void> _moveStatus(String? statusId) async {
-    await _run(() => ref.read(tasksRepositoryProvider).updateTask(
-          taskId: widget.task.id,
-          statusId: statusId,
-        ));
-    if (mounted) Navigator.of(context).pop();
+  Future<void> _pickDueDate() async {
+    final current = _parseDueDate(_task.dueDate);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: current ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+    if (picked == null) return;
+    final formatted = DateFormat('yyyy-MM-dd').format(picked);
+    if (formatted == _task.dueDate) return;
+    await _patchTask(dueDate: formatted);
+  }
+
+  Future<void> _clearDueDate() async {
+    if (_task.dueDate == null) return;
+    await _patchTask(clearDueDate: true);
+  }
+
+  Future<void> _addTag(String rawName) async {
+    final name = rawName.trim();
+    if (name.isEmpty) return;
+    final exists = _task.tags.any((tag) => tag.toLowerCase() == name.toLowerCase());
+    if (exists) return;
+    await _patchTask(tags: [..._task.tags, name]);
+  }
+
+  Future<void> _removeTag(String name) async {
+    final next = _task.tags.where((tag) => tag != name).toList();
+    if (next.length == _task.tags.length) return;
+    await _patchTask(tags: next);
   }
 
   Future<void> _toggleSubtask(int index, bool? value) async {
@@ -119,23 +186,36 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     updated[index] = item.copyWith(completed: value, status: resolvedStatus);
     setState(() => _subtasks = updated);
     await _run(() => ref.read(tasksRepositoryProvider).updateTask(
-          taskId: widget.task.id,
+          taskId: _task.id,
           subtasks: updated,
         ));
   }
 
-  Future<void> _updateSubtaskStatus(int index, String? status) async {
-    if (status == null) return;
+  Future<void> _saveSubtask(int index, TaskSubtask draft) async {
     final updated = List<TaskSubtask>.from(_subtasks);
-    updated[index] = updated[index].copyWith(
-      status: status,
-      completed: status == 'DONE' ? true : updated[index].completed,
-    );
-    setState(() => _subtasks = updated);
-    await _run(() => ref.read(tasksRepositoryProvider).updateTask(
-          taskId: widget.task.id,
-          subtasks: updated,
-        ));
+    updated[index] = draft;
+    setState(() {
+      _subtasks = updated;
+      _savingSubtaskIndex = index;
+      _error = null;
+    });
+    try {
+      final saved = await ref.read(tasksRepositoryProvider).updateTask(
+            taskId: _task.id,
+            subtasks: updated,
+          );
+      if (!mounted) return;
+      setState(() {
+        _task = saved;
+        _subtasks = List.of(saved.subtasks);
+        _expandedSubtaskIndex = null;
+      });
+      widget.onUpdated();
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _savingSubtaskIndex = null);
+    }
   }
 
   Future<void> _run(Future<Task> Function() action) async {
@@ -144,10 +224,12 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       _error = null;
     });
     try {
-      await action();
+      final updated = await action();
+      if (!mounted) return;
+      setState(() => _task = updated);
       widget.onUpdated();
     } on ApiException catch (e) {
-      setState(() => _error = e.message);
+      if (mounted) setState(() => _error = e.message);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -159,7 +241,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     setState(() => _postingComment = true);
     try {
       final comment = await ref.read(tasksRepositoryProvider).addComment(
-            taskId: widget.task.id,
+            taskId: _task.id,
             body: body,
           );
       if (!mounted) return;
@@ -178,6 +260,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
   @override
   Widget build(BuildContext context) {
     final currentUserId = ref.watch(sessionControllerProvider).user?.id;
+    final orgId = ref.watch(sessionControllerProvider).orgId ?? '';
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.78,
@@ -234,33 +317,19 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
               ),
               const SizedBox(height: AppSpacing.lg),
               _TaskMetaSection(
-                task: widget.task,
+                task: _task,
                 statuses: widget.statuses,
                 currentUserId: currentUserId,
                 members: _members,
+                saving: _saving,
+                onStatusChanged: (statusId) => _patchTask(statusId: statusId),
+                onPriorityChanged: (priority) => _patchTask(priority: priority),
+                onPickDueDate: _pickDueDate,
+                onClearDueDate: _clearDueDate,
+                onAddTag: _addTag,
+                onRemoveTag: _removeTag,
+                onAssigneesChanged: (assigneeIds) => _patchTask(assigneeIds: assigneeIds),
               ),
-              const SizedBox(height: AppSpacing.lg),
-              Text('Move to column', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: AppSpacing.sm),
-              ...widget.statuses.map((status) {
-                final selected = widget.task.statusId == status.id;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                  child: ListTile(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(
-                        color: selected ? AppColors.primary : AppColors.border,
-                      ),
-                    ),
-                    title: Text(status.name),
-                    trailing: selected
-                        ? const Icon(Icons.check_circle, color: AppColors.primary)
-                        : null,
-                    onTap: selected ? null : () => _moveStatus(status.id),
-                  ),
-                );
-              }),
               if (_subtasks.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.lg),
                 Row(
@@ -316,61 +385,21 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                         if (expanded)
                           Padding(
                             padding: const EdgeInsets.fromLTRB(
-                              AppSpacing.md,
+                              AppSpacing.sm,
                               0,
-                              AppSpacing.md,
-                              AppSpacing.md,
+                              AppSpacing.sm,
+                              AppSpacing.sm,
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                DropdownButtonFormField<String>(
-                                  initialValue: _subtaskStatuses.contains(item.status)
-                                      ? item.status
-                                      : (item.completed ? 'DONE' : 'TODO'),
-                                  decoration: const InputDecoration(
-                                    labelText: 'Subtask status',
-                                  ),
-                                  items: _subtaskStatuses
-                                      .map(
-                                        (status) => DropdownMenuItem(
-                                          value: status,
-                                          child: Text(_labelForSubtaskStatus(status)),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: _saving
-                                      ? null
-                                      : (value) => _updateSubtaskStatus(index, value),
-                                ),
-                                if ((item.description ?? '').trim().isNotEmpty) ...[
-                                  const SizedBox(height: AppSpacing.sm),
-                                  Text(
-                                    item.description!.trim(),
-                                    style: Theme.of(context).textTheme.bodyMedium,
-                                  ),
-                                ],
-                                if ((item.priority ?? '').isNotEmpty ||
-                                    (item.dueDate ?? '').isNotEmpty ||
-                                    item.assigneeIds.isNotEmpty) ...[
-                                  const SizedBox(height: AppSpacing.sm),
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    children: [
-                                      if ((item.priority ?? '').isNotEmpty)
-                                        _MetaChip(label: 'Priority: ${item.priority}'),
-                                      if ((item.dueDate ?? '').isNotEmpty)
-                                        _MetaChip(label: 'Due: ${item.dueDate}'),
-                                      if (item.assigneeIds.isNotEmpty)
-                                        _MetaChip(
-                                          label:
-                                              'Assignees: ${item.assigneeIds.length}',
-                                        ),
-                                    ],
-                                  ),
-                                ],
-                              ],
+                            child: SubtaskDetailPanel(
+                              subtask: item,
+                              members: _members,
+                              taskId: _task.id,
+                              organizationId: orgId,
+                              saving: _savingSubtaskIndex == index,
+                              onCancel: () {
+                                setState(() => _expandedSubtaskIndex = null);
+                              },
+                              onSave: (draft) => _saveSubtask(index, draft),
                             ),
                           ),
                       ],
@@ -382,6 +411,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
               _AttachmentsSection(
                 loading: _loadingMeta,
                 attachments: _attachments,
+                organizationId: orgId,
               ),
               const SizedBox(height: AppSpacing.lg),
               _CommentsSection(
@@ -399,33 +429,86 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
   }
 }
 
-class _TaskMetaSection extends StatelessWidget {
+class _TaskMetaSection extends StatefulWidget {
   const _TaskMetaSection({
     required this.task,
     required this.statuses,
     required this.currentUserId,
     required this.members,
+    required this.saving,
+    required this.onStatusChanged,
+    required this.onPriorityChanged,
+    required this.onPickDueDate,
+    required this.onClearDueDate,
+    required this.onAddTag,
+    required this.onRemoveTag,
+    required this.onAssigneesChanged,
   });
 
   final Task task;
   final List<WorkflowStatus> statuses;
   final String? currentUserId;
   final List<ProjectMember> members;
+  final bool saving;
+  final ValueChanged<String> onStatusChanged;
+  final ValueChanged<String> onPriorityChanged;
+  final VoidCallback onPickDueDate;
+  final VoidCallback onClearDueDate;
+  final ValueChanged<String> onAddTag;
+  final ValueChanged<String> onRemoveTag;
+  final ValueChanged<List<String>> onAssigneesChanged;
+
+  @override
+  State<_TaskMetaSection> createState() => _TaskMetaSectionState();
+
+  static const priorities = [
+    ('LOW', 'Low'),
+    ('MEDIUM', 'Medium'),
+    ('HIGH', 'High'),
+    ('CRITICAL', 'Critical'),
+  ];
+
+  static WorkflowStatus? findStatus(List<WorkflowStatus> statuses, String? statusId) {
+    if (statusId == null) return null;
+    for (final status in statuses) {
+      if (status.id == statusId) return status;
+    }
+    return null;
+  }
+
+  static (String, String) findPriority(String priorityValue) {
+    for (final item in priorities) {
+      if (item.$1 == priorityValue) return item;
+    }
+    return priorities[1];
+  }
+}
+
+class _TaskMetaSectionState extends State<_TaskMetaSection> {
+  final _tagController = TextEditingController();
+
+  @override
+  void dispose() {
+    _tagController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    String? taskStatus;
-    for (final status in statuses) {
-      if (status.id == task.statusId) {
-        taskStatus = status.name;
-        break;
-      }
-    }
-    final assignedBy = _resolveMember(task.reporterId, members, currentUserId);
-    final assignedTo = task.assigneeIds
-        .map((id) => _resolveMember(id, members, currentUserId))
+    final assignedBy =
+        _resolveMember(widget.task.reporterId, widget.members, widget.currentUserId);
+    final assignedTo = _activeAssigneeIds(widget.task, widget.members)
+        .map((id) => _resolveMember(id, widget.members, widget.currentUserId))
         .toList();
-    final detailsText = _stripHtml(task.description ?? '');
+    final detailsText = _stripHtml(widget.task.description ?? '');
+    final selectedStatus = _TaskMetaSection.findStatus(
+      widget.statuses,
+      widget.task.statusId,
+    );
+    final priorityValue = widget.task.priority.toUpperCase();
+    final selectedPriority = _TaskMetaSection.findPriority(priorityValue);
+    final dueDate = _parseDueDate(widget.task.dueDate);
+    final isOverdue = dueDate != null && _isDueDateOverdue(dueDate);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -434,31 +517,213 @@ class _TaskMetaSection extends StatelessWidget {
         const SizedBox(height: AppSpacing.sm),
         if (detailsText.isNotEmpty) Text(detailsText),
         const SizedBox(height: AppSpacing.sm),
-        _AssignmentCard(
-          title: 'ASSIGNED BY',
-          subtitle: 'Task owner',
-          members: [assignedBy],
+        _AssignedBySection(member: assignedBy),
+        const SizedBox(height: AppSpacing.md),
+        _AssignedToSection(
+          assignedMembers: assignedTo,
+          allMembers: widget.members,
+          selectedAssigneeIds: _activeAssigneeIds(widget.task, widget.members),
+          currentUserId: widget.currentUserId,
+          saving: widget.saving,
+          onAssigneesChanged: widget.onAssigneesChanged,
         ),
-        const SizedBox(height: AppSpacing.sm),
-        _AssignmentCard(
-          title: 'ASSIGNED TO',
-          subtitle: assignedTo.isEmpty
-              ? 'No assignees'
-              : '${assignedTo.length} member${assignedTo.length == 1 ? '' : 's'}',
-          members: assignedTo,
+        const SizedBox(height: AppSpacing.lg),
+        Text(
+          'OCCURRENCE',
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                letterSpacing: 1.6,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textMuted,
+              ),
         ),
-        const SizedBox(height: AppSpacing.sm),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        const SizedBox(height: AppSpacing.md),
+        _FieldLabel(text: 'Due date'),
+        const SizedBox(height: AppSpacing.xs),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: widget.saving ? null : widget.onPickDueDate,
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: isOverdue ? AppColors.danger.withValues(alpha: 0.35) : AppColors.border,
+                ),
+                borderRadius: BorderRadius.circular(14),
+                color: isOverdue ? AppColors.dangerSoft.withValues(alpha: 0.35) : null,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.calendar_today_rounded,
+                    size: 18,
+                    color: AppColors.textMuted,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      dueDate == null
+                          ? 'No date selected'
+                          : DateFormat('MMM d, yyyy').format(dueDate),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: dueDate == null ? AppColors.textMuted : null,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (dueDate != null) ...[
+          const SizedBox(height: AppSpacing.xs),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  DateFormat('EEE, MMM d, yyyy').format(dueDate),
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textMuted,
+                      ),
+                ),
+              ),
+              TextButton(
+                onPressed: widget.saving ? null : widget.onClearDueDate,
+                child: const Text('Clear'),
+              ),
+            ],
+          ),
+          if (isOverdue) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.dangerSoft,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                'Overdue',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: AppColors.danger,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ),
+          ],
+        ],
+        const SizedBox(height: AppSpacing.md),
+        _FieldLabel(text: 'Task status'),
+        const SizedBox(height: AppSpacing.xs),
+        _SidebarDropdown<String>(
+          value: selectedStatus?.id,
+          enabled: !widget.saving && widget.statuses.isNotEmpty,
+          hint: 'Select status',
+          items: widget.statuses
+              .map(
+                (status) => DropdownMenuItem(
+                  value: status.id,
+                  child: Row(
+                    children: [
+                      _StatusDot(color: _parseStatusColor(status.color)),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(status.name)),
+                    ],
+                  ),
+                ),
+              )
+              .toList(),
+          selectedChild: selectedStatus == null
+              ? null
+              : Row(
+                  children: [
+                    _StatusDot(color: _parseStatusColor(selectedStatus.color)),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(selectedStatus.name)),
+                  ],
+                ),
+          onChanged: widget.onStatusChanged,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _FieldLabel(text: 'Priority'),
+        const SizedBox(height: AppSpacing.xs),
+        _SidebarDropdown<String>(
+          value: selectedPriority.$1,
+          enabled: !widget.saving,
+          hint: 'Select priority',
+          items: _TaskMetaSection.priorities
+              .map(
+                (item) => DropdownMenuItem(
+                  value: item.$1,
+                  child: Row(
+                    children: [
+                      _StatusDot(color: _priorityColor(item.$1)),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(item.$2)),
+                    ],
+                  ),
+                ),
+              )
+              .toList(),
+          selectedChild: Row(
+            children: [
+              _StatusDot(color: _priorityColor(selectedPriority.$1)),
+              const SizedBox(width: 10),
+              Expanded(child: Text(selectedPriority.$2)),
+            ],
+          ),
+          onChanged: widget.onPriorityChanged,
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        _FieldLabel(text: 'Tags'),
+        const SizedBox(height: AppSpacing.xs),
+        if (widget.task.tags.isNotEmpty) ...[
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: widget.task.tags
+                .map(
+                  (tag) => InputChip(
+                    label: Text(tag),
+                    onDeleted: widget.saving ? null : () => widget.onRemoveTag(tag),
+                  ),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+        ],
+        Row(
           children: [
-            _MetaChip(label: 'Status: ${taskStatus ?? 'Not set'}'),
-            _MetaChip(label: 'Priority: ${task.priority.toUpperCase()}'),
-            _MetaChip(label: 'Due date: ${task.dueDate ?? 'Not set'}'),
-            _MetaChip(
-              label: task.tags.isEmpty
-                  ? 'Tags: Not set'
-                  : 'Tags: ${task.tags.take(2).join(', ')}${task.tags.length > 2 ? ' +' : ''}',
+            Expanded(
+              child: TextField(
+                controller: _tagController,
+                enabled: !widget.saving,
+                decoration: InputDecoration(
+                  hintText: 'Add a tag',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                ),
+                onSubmitted: (value) {
+                  widget.onAddTag(value);
+                  _tagController.clear();
+                },
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            IconButton.filled(
+              onPressed: widget.saving
+                  ? null
+                  : () {
+                      widget.onAddTag(_tagController.text);
+                      _tagController.clear();
+                    },
+              icon: const Icon(Icons.add_rounded),
             ),
           ],
         ),
@@ -467,86 +732,266 @@ class _TaskMetaSection extends StatelessWidget {
   }
 }
 
-class _AssignmentCard extends StatefulWidget {
-  const _AssignmentCard({
-    required this.title,
-    required this.subtitle,
-    required this.members,
-  });
+class _FieldLabel extends StatelessWidget {
+  const _FieldLabel({required this.text});
 
-  final String title;
-  final String subtitle;
-  final List<_MemberView> members;
-
-  @override
-  State<_AssignmentCard> createState() => _AssignmentCardState();
-}
-
-class _AssignmentCardState extends State<_AssignmentCard> {
-  bool _expanded = false;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
-    final shown = widget.members.isEmpty
-        ? const <_MemberView>[]
-        : (_expanded ? widget.members : [widget.members.first]);
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(16),
+    return Text(
+      text,
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: AppColors.textMuted,
+            fontWeight: FontWeight.w500,
+          ),
+    );
+  }
+}
+
+class _SidebarDropdown<T> extends StatelessWidget {
+  const _SidebarDropdown({
+    required this.value,
+    required this.items,
+    required this.onChanged,
+    required this.enabled,
+    this.hint,
+    this.selectedChild,
+  });
+
+  final T? value;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T> onChanged;
+  final bool enabled;
+  final String? hint;
+  final Widget? selectedChild;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<T>(
+      value: value,
+      items: items,
+      onChanged: enabled ? (next) { if (next != null) onChanged(next); } : null,
+      decoration: InputDecoration(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.border),
+        ),
       ),
-      child: Column(
-        children: [
-          ListTile(
-            title: Text(
-              widget.title,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    letterSpacing: 2.2,
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-            subtitle: Text(widget.subtitle),
-            trailing: widget.members.length <= 1
-                ? null
-                : IconButton(
-                    onPressed: () => setState(() => _expanded = !_expanded),
-                    icon: Icon(
-                      _expanded
-                          ? Icons.keyboard_arrow_up_rounded
-                          : Icons.keyboard_arrow_down_rounded,
+      isExpanded: true,
+      hint: hint == null ? null : Text(hint!),
+      selectedItemBuilder: selectedChild == null
+          ? null
+          : (context) => List.generate(items.length, (_) => selectedChild!),
+      icon: Icon(
+        Icons.keyboard_arrow_down_rounded,
+        color: AppColors.textMuted.withValues(alpha: 0.8),
+      ),
+    );
+  }
+}
+
+class _StatusDot extends StatelessWidget {
+  const _StatusDot({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 10,
+      height: 10,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+}
+
+class _AssignedBySection extends ConsumerWidget {
+  const _AssignedBySection({required this.member});
+
+  final _MemberView member;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Assigned by',
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                letterSpacing: 1.6,
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _AssignmentSummaryRow(member: member),
+      ],
+    );
+  }
+}
+
+class _AssignedToSection extends ConsumerWidget {
+  const _AssignedToSection({
+    required this.assignedMembers,
+    required this.allMembers,
+    required this.selectedAssigneeIds,
+    required this.currentUserId,
+    required this.saving,
+    required this.onAssigneesChanged,
+  });
+
+  final List<_MemberView> assignedMembers;
+  final List<ProjectMember> allMembers;
+  final List<String> selectedAssigneeIds;
+  final String? currentUserId;
+  final bool saving;
+  final ValueChanged<List<String>> onAssigneesChanged;
+
+  void _openMembersSheet(BuildContext context, WidgetRef ref) {
+    if (allMembers.isEmpty) return;
+    showAssigneePickerSheet(
+      context: context,
+      members: allMembers,
+      selectedAssigneeIds: selectedAssigneeIds,
+      sessionUser: ref.read(sessionControllerProvider).user,
+      enabled: !saving,
+      title: 'Assign members',
+      showDoneButton: true,
+      onSelectionChanged: onAssigneesChanged,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final members = assignedMembers;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Assigned to',
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                letterSpacing: 1.6,
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: allMembers.isEmpty ? null : () => _openMembersSheet(context, ref),
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: 12,
+              ),
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.border),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  if (members.isEmpty)
+                    const _PlaceholderAvatar()
+                  else if (members.length == 1)
+                    _MemberAvatar(member: members.first, size: 40)
+                  else
+                    _AvatarStack(members: members.take(3).toList()),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Text(
+                      members.isEmpty
+                          ? 'Unassigned'
+                          : members.length == 1
+                              ? _truncateName(members.first.name, 18)
+                              : '${members.length} assigned',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: members.isEmpty ? AppColors.textMuted : null,
+                          ),
                     ),
                   ),
+                  Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: AppColors.textMuted.withValues(alpha: 0.8),
+                  ),
+                ],
+              ),
+            ),
           ),
-          if (shown.isEmpty)
-            const Padding(
-              padding: EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                0,
-                AppSpacing.md,
-                AppSpacing.md,
-              ),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Not set'),
-              ),
-            )
+        ),
+      ],
+    );
+  }
+}
+
+class _AssignmentSummaryRow extends ConsumerWidget {
+  const _AssignmentSummaryRow({required this.member});
+
+  final _MemberView member;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isEmpty = member.name == 'Not set';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: 12,
+      ),
+      decoration: BoxDecoration(
+        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          if (isEmpty)
+            const _PlaceholderAvatar()
           else
-            ...shown.map((member) => _MemberTile(member: member)),
-          if (!_expanded && widget.members.length > 1)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                0,
-                AppSpacing.md,
-                AppSpacing.md,
-              ),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  '+${widget.members.length - 1} more',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ),
+            _MemberAvatar(member: member, size: 40),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              isEmpty ? 'Unknown' : _truncateName(member.name, 18),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: isEmpty ? AppColors.textMuted : null,
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AvatarStack extends ConsumerWidget {
+  const _AvatarStack({required this.members});
+
+  final List<_MemberView> members;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SizedBox(
+      width: 28 + (members.length - 1) * 18.0,
+      height: 36,
+      child: Stack(
+        children: [
+          for (var i = 0; i < members.length; i++)
+            Positioned(
+              left: i * 18.0,
+              child: _MemberAvatar(member: members[i], size: 36),
             ),
         ],
       ),
@@ -554,56 +999,42 @@ class _AssignmentCardState extends State<_AssignmentCard> {
   }
 }
 
-class _MemberTile extends StatelessWidget {
-  const _MemberTile({required this.member});
+class _MemberAvatar extends ConsumerWidget {
+  const _MemberAvatar({required this.member, required this.size});
 
   final _MemberView member;
+  final double size;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final apiBaseUrl = ref.watch(appConfigProvider).apiBaseUrl;
+    final imageUrl = _avatarImageUrl(apiBaseUrl, member);
+    return CircleAvatar(
+      radius: size / 2,
+      backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+      backgroundImage: imageUrl.isEmpty ? null : NetworkImage(imageUrl),
+      child: imageUrl.isEmpty
+          ? Text(
+              _initials(member.name),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: size * 0.34,
+              ),
+            )
+          : null,
+    );
+  }
+}
+
+class _PlaceholderAvatar extends StatelessWidget {
+  const _PlaceholderAvatar();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.sm),
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      decoration: BoxDecoration(
-        border: Border.all(color: AppColors.border),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: AppColors.primary.withValues(alpha: 0.15),
-            backgroundImage: _networkOrNull(member.avatarUrl),
-            child: _networkOrNull(member.avatarUrl) == null
-                ? Text(
-                    _initials(member.name),
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  )
-                : null,
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  member.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                if ((member.email ?? '').isNotEmpty)
-                  Text(
-                    member.email!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return CircleAvatar(
+      radius: 20,
+      backgroundColor: AppColors.border.withValues(alpha: 0.45),
+      child: Icon(Icons.person_outline_rounded, color: AppColors.textMuted, size: 20),
     );
   }
 }
@@ -611,38 +1042,44 @@ class _MemberTile extends StatelessWidget {
 class _MemberView {
   const _MemberView({
     required this.name,
+    this.userId,
     this.email,
     this.avatarUrl,
   });
 
   final String name;
+  final String? userId;
   final String? email;
   final String? avatarUrl;
 }
 
-class _MetaChip extends StatelessWidget {
-  const _MetaChip({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(label, style: Theme.of(context).textTheme.bodySmall),
-    );
-  }
+DateTime? _parseDueDate(String? raw) {
+  if (raw == null || raw.isEmpty) return null;
+  return DateTime.tryParse(raw);
 }
 
-String _labelForSubtaskStatus(String status) {
-  return switch (status) {
-    'IN_PROGRESS' => 'In Progress',
-    'DONE' => 'Done',
-    _ => 'To Do',
+bool _isDueDateOverdue(DateTime dueDate) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final due = DateTime(dueDate.year, dueDate.month, dueDate.day);
+  return due.isBefore(today);
+}
+
+Color _parseStatusColor(String? raw) {
+  if (raw == null || raw.isEmpty) return AppColors.primary;
+  var value = raw.replaceAll('#', '');
+  if (value.length == 6) value = 'FF$value';
+  final parsed = int.tryParse(value, radix: 16);
+  if (parsed == null) return AppColors.primary;
+  return Color(parsed);
+}
+
+Color _priorityColor(String priority) {
+  return switch (priority.toUpperCase()) {
+    'LOW' => AppColors.textMuted,
+    'HIGH' => AppColors.warning,
+    'CRITICAL' => AppColors.danger,
+    _ => AppColors.sky,
   };
 }
 
@@ -656,30 +1093,76 @@ String _compactId(String value) {
   return '${value.substring(0, 6)}...';
 }
 
+String _normalizeUserId(String id) =>
+    id.trim().toLowerCase().replaceAll('-', '');
+
+Set<String> _memberIdSet(List<ProjectMember> members) =>
+    members.map((member) => _normalizeUserId(member.userId)).toSet();
+
+List<String> _storedAssigneeIds(Task task) {
+  if (task.assigneeIds.isNotEmpty) return task.assigneeIds;
+  if (task.assigneeId != null && task.assigneeId!.isNotEmpty) {
+    return [task.assigneeId!];
+  }
+  return const [];
+}
+
+List<String> _activeAssigneeIds(Task task, List<ProjectMember> members) {
+  final memberIds = _memberIdSet(members);
+  final seen = <String>{};
+  final active = <String>[];
+  for (final id in _storedAssigneeIds(task)) {
+    final key = _normalizeUserId(id);
+    if (memberIds.contains(key) && seen.add(key)) {
+      active.add(id);
+    }
+  }
+  return active;
+}
+
+bool _assigneeListsDiffer(List<String> stored, List<String> active) {
+  if (stored.length != active.length) return true;
+  final activeNorm = active.map(_normalizeUserId).toSet();
+  return stored.any((id) => !activeNorm.contains(_normalizeUserId(id)));
+}
+
 _MemberView _resolveMember(String? userId, List<ProjectMember> members, String? currentUserId) {
   if (userId == null || userId.isEmpty) return const _MemberView(name: 'Not set');
+  final normalizedUserId = _normalizeUserId(userId);
   for (final member in members) {
-    if (member.userId == userId) {
+    if (_normalizeUserId(member.userId) == normalizedUserId) {
       final name = member.user?.fullName.trim() ?? '';
       if (name.isNotEmpty) {
         return _MemberView(
-          name: userId == currentUserId ? 'You' : name,
+          userId: userId,
+          name: name,
           email: member.user?.email,
           avatarUrl: member.user?.avatarUrl,
         );
       }
       final email = member.user?.email.trim() ?? '';
-      if (email.isNotEmpty) return _MemberView(name: email, email: email);
+      if (email.isNotEmpty) {
+        return _MemberView(userId: userId, name: email, email: email);
+      }
       break;
     }
   }
-  return _MemberView(name: _compactId(userId));
+  return _MemberView(userId: userId, name: _compactId(userId));
 }
 
-ImageProvider<Object>? _networkOrNull(String? avatarUrl) {
-  if (avatarUrl == null || avatarUrl.isEmpty) return null;
-  if (!avatarUrl.startsWith('http')) return null;
-  return NetworkImage(avatarUrl);
+String _avatarImageUrl(String apiBaseUrl, _MemberView member) {
+  final resolved = resolveUserAvatarUrl(apiBaseUrl, member.avatarUrl);
+  if (resolved.isNotEmpty) return resolved;
+  final userId = member.userId;
+  if (userId == null || userId.isEmpty) return '';
+  final origin = apiBaseUrl.replaceAll(RegExp(r'/api/v1$'), '');
+  return '$origin/api/v1/users/avatar/$userId';
+}
+
+String _truncateName(String value, int maxChars) {
+  final trimmed = value.trim();
+  if (trimmed.length <= maxChars) return trimmed;
+  return '${trimmed.substring(0, maxChars)}...';
 }
 
 String _initials(String name) {
@@ -689,17 +1172,19 @@ String _initials(String name) {
   return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
 }
 
-class _AttachmentsSection extends StatelessWidget {
+class _AttachmentsSection extends ConsumerWidget {
   const _AttachmentsSection({
     required this.loading,
     required this.attachments,
+    required this.organizationId,
   });
 
   final bool loading;
   final List<TaskAttachment> attachments;
+  final String organizationId;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -711,15 +1196,10 @@ class _AttachmentsSection extends StatelessWidget {
           Text('No task attachments yet', style: Theme.of(context).textTheme.bodySmall)
         else
           ...attachments.take(6).map(
-                (item) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.attach_file_rounded),
-                  title: Text(
-                    item.fileName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: item.mimeType == null ? null : Text(item.mimeType!),
+                (item) => AttachmentListTile(
+                  attachment: item,
+                  organizationId: organizationId,
+                  source: AttachmentSource.task,
                 ),
               ),
       ],

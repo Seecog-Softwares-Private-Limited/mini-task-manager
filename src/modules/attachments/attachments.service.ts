@@ -50,17 +50,23 @@ function isAllowedMime(mimetype: string): boolean {
   );
 }
 
-function isPreviewableMime(mimetype: string | null): 'image' | 'pdf' | 'text' | 'none' {
-  if (!mimetype) return 'none';
-  if (mimetype.startsWith('image/')) return 'image';
+function isPreviewableMime(
+  mimetype: string | null,
+  fileName?: string | null,
+): 'image' | 'pdf' | 'text' | 'none' {
+  if (mimetype?.startsWith('image/')) return 'image';
   if (mimetype === 'application/pdf') return 'pdf';
   if (
-    mimetype.startsWith('text/') ||
+    mimetype?.startsWith('text/') ||
     mimetype === 'application/json' ||
     mimetype === 'text/csv'
   ) {
     return 'text';
   }
+  const ext = fileName?.split('.').pop()?.toLowerCase() ?? '';
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) return 'image';
+  if (ext === 'pdf') return 'pdf';
+  if (['txt', 'csv', 'json', 'md'].includes(ext)) return 'text';
   return 'none';
 }
 
@@ -168,6 +174,7 @@ export class AttachmentsService {
     const attachment = await this.getAttachmentOrThrow(attachmentId, organizationId);
     const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
     const fullPath = path.join(uploadsPath, attachment.storageKey);
+    await this.assertAttachmentFileExists(fullPath);
     return {
       path: fullPath,
       fileName: attachment.originalFileName,
@@ -223,7 +230,7 @@ export class AttachmentsService {
     | { kind: 'unsupported'; fileName: string | null; mimeType: string | null }
   > {
     const attachment = await this.getAttachmentOrThrow(attachmentId, organizationId);
-    const previewKind = isPreviewableMime(attachment.mimeType);
+    const previewKind = isPreviewableMime(attachment.mimeType, attachment.originalFileName);
     if (previewKind === 'none') {
       return {
         kind: 'unsupported',
@@ -232,9 +239,11 @@ export class AttachmentsService {
       };
     }
     const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
+    const fullPath = path.join(uploadsPath, attachment.storageKey);
+    await this.assertAttachmentFileExists(fullPath);
     return {
       kind: 'file',
-      path: path.join(uploadsPath, attachment.storageKey),
+      path: fullPath,
       fileName: attachment.originalFileName,
       mimeType: attachment.mimeType,
     };
@@ -251,6 +260,20 @@ export class AttachmentsService {
         attachment.uploadedBy,
         Number(attachment.fileSize),
       );
+    }
+  }
+
+  private async assertAttachmentFileExists(fullPath: string): Promise<void> {
+    try {
+      await fs.access(fullPath);
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException)?.code;
+      if (code === 'ENOENT') {
+        throw new NotFoundException(
+          'Attachment file is missing on the server. Re-upload the file.',
+        );
+      }
+      throw err;
     }
   }
 
