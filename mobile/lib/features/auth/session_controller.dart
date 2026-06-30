@@ -103,10 +103,6 @@ class SessionController extends Notifier<SessionState> {
       return;
     }
 
-    state = SessionState(
-      status: SessionStatus.needsWorkspace,
-      user: response.user,
-    );
     await _loadOrganizations(requireSelection: true, user: response.user);
   }
 
@@ -142,9 +138,49 @@ class SessionController extends Notifier<SessionState> {
     state = state.copyWith(organizations: organizations);
   }
 
+  Future<Organization> createWorkspace({
+    required String name,
+    required String slug,
+    String? logoUrl,
+  }) async {
+    final org = await _organizationsRepository.createOrganization(
+      name: name,
+      slug: slug,
+      logoUrl: logoUrl,
+    );
+    final organizations = await _organizationsRepository.fetchOrganizations();
+    await selectOrganization(org.id);
+    state = state.copyWith(organizations: organizations);
+    return org;
+  }
+
+  Future<Organization> updateWorkspace({
+    required String orgId,
+    String? name,
+    String? slug,
+    String? logoUrl,
+    bool clearLogo = false,
+  }) async {
+    final org = await _organizationsRepository.updateOrganization(
+      orgId,
+      name: name,
+      slug: slug,
+      logoUrl: logoUrl,
+      clearLogo: clearLogo,
+    );
+    final organizations = await _organizationsRepository.fetchOrganizations();
+    state = state.copyWith(organizations: organizations);
+    return org;
+  }
+
   Future<void> logout() async {
     await _authRepository.logout();
     state = const SessionState(status: SessionStatus.unauthenticated);
+  }
+
+  Future<void> updateUser(AuthUser user) async {
+    await _authStorage.writeUser(user);
+    state = state.copyWith(user: user);
   }
 }
 

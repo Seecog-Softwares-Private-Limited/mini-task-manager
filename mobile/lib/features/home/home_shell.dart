@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-
-import '../../core/router/app_router.dart';
+import '../workspaces/workspace_switcher_sheet.dart';
 import '../../core/theme/app_colors.dart';
 import '../auth/session_controller.dart';
 import '../notifications/notifications_providers.dart';
 import '../notifications/notifications_screen.dart';
+import '../profile/header_account_menu.dart';
 import '../profile/profile_screen.dart';
 import '../projects/create_project_sheet.dart';
 import '../projects/projects_providers.dart';
@@ -25,9 +24,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   int _index = 0;
 
   Future<void> _openWorkspaceSwitcher() async {
-    await ref.read(sessionControllerProvider.notifier).refreshOrganizations();
-    if (!mounted) return;
-    await context.push(AppRoutes.workspaces);
+    await showWorkspaceSwitcherSheet(context: context, ref: ref);
     ref.invalidate(projectsProvider);
   }
 
@@ -68,6 +65,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             tooltip: 'Switch workspace',
             onPressed: _openWorkspaceSwitcher,
             icon: const Icon(Icons.swap_horiz_rounded),
+          ),
+          HeaderAccountMenu(
+            onOpenProfileTab: () => setState(() => _index = 4),
           ),
         ],
       ),

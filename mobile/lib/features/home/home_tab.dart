@@ -7,9 +7,11 @@ import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../shared/widgets/app_widgets.dart';
+import '../../shared/widgets/workspace_avatar.dart';
 import '../auth/session_controller.dart';
 import '../projects/projects_providers.dart';
 import '../recurring/recurring_providers.dart';
+import '../workspaces/workspace_switcher_sheet.dart';
 
 class HomeTab extends ConsumerWidget {
   const HomeTab({
@@ -39,21 +41,38 @@ class HomeTab extends ConsumerWidget {
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [
           SurfaceCard(
-            onTap: () => context.push(AppRoutes.workspaces),
+            onTap: () => showWorkspaceSwitcherSheet(context: context, ref: ref),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                StatusChip(
-                  label: 'Workspace',
-                  color: AppColors.violet,
-                  background: AppColors.violet.withValues(alpha: 0.1),
+                Row(
+                  children: [
+                    WorkspaceAvatar(
+                      logoUrl: org?.logoUrl,
+                      name: org?.name ?? 'Workspace',
+                      size: 48,
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          StatusChip(
+                            label: 'Workspace',
+                            color: AppColors.violet,
+                            background: AppColors.violet.withValues(alpha: 0.1),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            org?.name ?? 'Your workspace',
+                            style: Theme.of(context).textTheme.headlineSmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                Text(
-                  org?.name ?? 'Your workspace',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: AppSpacing.xs),
                 Text(
                   session.user?.fullName != null
                       ? 'Welcome back, ${session.user!.fullName}.'
