@@ -20,7 +20,8 @@ class ThemeModeController extends Notifier<ThemeMode> {
     return switch (raw) {
       'dark' => ThemeMode.dark,
       'light' => ThemeMode.light,
-      _ => ThemeMode.system,
+      'system' => ThemeMode.system,
+      _ => ThemeMode.light,
     };
   }
 

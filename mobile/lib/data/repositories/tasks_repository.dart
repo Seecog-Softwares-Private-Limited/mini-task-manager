@@ -3,6 +3,8 @@ import 'package:dio/dio.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/api_exception.dart';
 import '../models/paginated_result.dart';
+import '../models/task_attachment.dart';
+import '../models/task_comment.dart';
 import '../models/task.dart';
 
 class TasksRepository {
@@ -99,6 +101,13 @@ class TasksRepository {
                 'id': s.id,
                 'title': s.title,
                 'completed': s.completed,
+                if (s.description != null) 'description': s.description,
+                if (s.assigneeId != null) 'assigneeId': s.assigneeId,
+                if (s.assigneeIds.isNotEmpty) 'assigneeIds': s.assigneeIds,
+                if (s.dueDate != null) 'dueDate': s.dueDate,
+                if (s.status != null) 'status': s.status,
+                if (s.priority != null) 'priority': s.priority,
+                if (s.statusId != null) 'statusId': s.statusId,
               },
             )
             .toList();
@@ -118,6 +127,47 @@ class TasksRepository {
     required String? statusId,
   }) async {
     return updateTask(taskId: taskId, statusId: statusId);
+  }
+
+  Future<List<TaskComment>> fetchComments(String taskId) async {
+    try {
+      final response = await _api.dio.get<List<dynamic>>('/tasks/$taskId/comments');
+      final list = response.data ?? const [];
+      return list
+          .whereType<Map<String, dynamic>>()
+          .map(TaskComment.fromJson)
+          .toList();
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<TaskComment> addComment({
+    required String taskId,
+    required String body,
+  }) async {
+    try {
+      final response = await _api.dio.post<Map<String, dynamic>>(
+        '/tasks/$taskId/comments',
+        data: {'body': body},
+      );
+      return TaskComment.fromJson(response.data ?? const {});
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<List<TaskAttachment>> fetchAttachments(String taskId) async {
+    try {
+      final response = await _api.dio.get<List<dynamic>>('/tasks/$taskId/attachments');
+      final list = response.data ?? const [];
+      return list
+          .whereType<Map<String, dynamic>>()
+          .map(TaskAttachment.fromJson)
+          .toList();
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
   }
 }
 
