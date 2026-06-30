@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import '../../core/api/api_client.dart';
 import '../../core/api/api_exception.dart';
 import '../models/project.dart';
+import '../models/project_member.dart';
 
 class ProjectsRepository {
   ProjectsRepository({required ApiClient apiClient}) : _api = apiClient;
@@ -45,6 +46,25 @@ class ProjectsRepository {
         options: _api.withOrgHeader(organizationId),
       );
       return Project.fromJson(response.data!);
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<List<ProjectMember>> fetchProjectMembers({
+    required String projectId,
+    required String organizationId,
+  }) async {
+    try {
+      final response = await _api.dio.get<List<dynamic>>(
+        '/projects/$projectId/members',
+        options: _api.withOrgHeader(organizationId),
+      );
+      final list = response.data ?? const [];
+      return list
+          .whereType<Map<String, dynamic>>()
+          .map(ProjectMember.fromJson)
+          .toList();
     } on DioException catch (error) {
       throw ApiException.fromDio(error);
     }

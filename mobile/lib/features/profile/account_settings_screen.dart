@@ -66,9 +66,9 @@ class AccountSettingsScreen extends ConsumerWidget {
                 const SizedBox(height: AppSpacing.sm),
                 SegmentedButton<ThemeMode>(
                   segments: const [
-                    ButtonSegment(value: ThemeMode.system, label: Text('Auto')),
                     ButtonSegment(value: ThemeMode.light, label: Text('Light')),
                     ButtonSegment(value: ThemeMode.dark, label: Text('Dark')),
+                    ButtonSegment(value: ThemeMode.system, label: Text('Auto')),
                   ],
                   selected: {themeMode},
                   onSelectionChanged: (selection) {
