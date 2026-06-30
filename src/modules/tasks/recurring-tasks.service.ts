@@ -519,8 +519,15 @@ export class RecurringTasksService {
     organizationId: string,
     projectId: string,
     validStatusIds: string[] = [],
+    options?: { sync?: boolean; calendarOnly?: boolean },
   ): Promise<{ tasks: import('./entities/task.entity').TaskEntity[]; overdueTaskIds: string[] }> {
-    await this.syncBoardTasks(organizationId, projectId);
+    if (options?.sync !== false) {
+      await this.syncBoardTasks(organizationId, projectId);
+    }
+    if (options?.calendarOnly) {
+      const tasks = await this.mergeBoardTasks(projectId, organizationId, []);
+      return { tasks, overdueTaskIds: [] };
+    }
     const today = nowYmd();
     const pending = await this.occurrencesRepository.findPendingByProject(organizationId, projectId);
     const templates = await this.templatesRepository.findByOrganization(organizationId, projectId);

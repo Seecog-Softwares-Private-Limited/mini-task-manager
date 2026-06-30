@@ -26,9 +26,14 @@ export class RecurringTasksController {
     @TenantId() organizationId: string,
     @Query('projectId') projectId: string,
     @Query('statusIds') statusIds?: string,
+    @Query('sync') sync?: string,
+    @Query('calendarOnly') calendarOnly?: string,
   ) {
     const validStatusIds = statusIds?.split(',').map((s) => s.trim()).filter(Boolean) ?? [];
-    const view = await this.recurringTasksService.getBoardView(organizationId, projectId, validStatusIds);
+    const view = await this.recurringTasksService.getBoardView(organizationId, projectId, validStatusIds, {
+      sync: sync !== 'false',
+      calendarOnly: calendarOnly === 'true',
+    });
     return {
       tasks: view.tasks.map((t) => this.toTaskResponse(t)),
       overdueTaskIds: view.overdueTaskIds,

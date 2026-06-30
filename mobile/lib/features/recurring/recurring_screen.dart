@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../projects/projects_providers.dart';
+import '../auth/session_controller.dart';
 import 'recurring_calendar_tab.dart';
 import 'recurring_providers.dart';
 import 'recurring_series_tab.dart';
@@ -14,10 +15,14 @@ class RecurringScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.watch(recurringProjectInitProvider);
+    final session = ref.watch(sessionControllerProvider);
     final projectsAsync = ref.watch(projectsProvider);
-    final selectedProjectId = ref.watch(recurringProjectIdProvider);
+    final selectedProjectId = ref.watch(recurringSelectedProjectIdProvider);
     final summaryAsync = ref.watch(recurringSummaryProvider);
+
+    if (session.status == SessionStatus.loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
     return DefaultTabController(
       length: 2,
@@ -30,8 +35,11 @@ class RecurringScreen extends ConsumerWidget {
                 if (projects.isEmpty) {
                   return const Text('No projects — create one in the web app.');
                 }
+                if (selectedProjectId == null) {
+                  return const LinearProgressIndicator();
+                }
                 return DropdownButtonFormField<String>(
-                  initialValue: selectedProjectId ?? projects.first.id,
+                  initialValue: selectedProjectId,
                   decoration: const InputDecoration(labelText: 'Project'),
                   items: [
                     for (final project in projects)

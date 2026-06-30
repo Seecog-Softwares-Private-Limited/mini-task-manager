@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/api/api_exception.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../shared/widgets/app_widgets.dart';
+import '../auth/session_controller.dart';
 import 'recurring_providers.dart';
 
 class RecurringSeriesTab extends ConsumerWidget {
@@ -12,15 +14,41 @@ class RecurringSeriesTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final projectId = ref.watch(recurringSelectedProjectIdProvider);
     final templatesAsync = ref.watch(recurringTemplatesProvider);
+
+    if (projectId == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
     return templatesAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, _) => EmptyState(
-        title: 'Series unavailable',
-        message: error.toString(),
-        icon: Icons.library_books_outlined,
-      ),
+      error: (error, _) {
+        final isNetwork = error is ApiException && error.isNetwork;
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                EmptyState(
+                  title: 'Series unavailable',
+                  message: error.toString(),
+                  icon: Icons.library_books_outlined,
+                ),
+                if (isNetwork) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  PrimaryButton(
+                    label: 'Retry',
+                    expand: false,
+                    onPressed: () => ref.invalidate(recurringTemplatesProvider),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
       data: (templates) {
         if (templates.isEmpty) {
           return const EmptyState(
@@ -84,9 +112,12 @@ class RecurringSeriesTab extends ConsumerWidget {
                         if (template.isPaused)
                           TextButton(
                             onPressed: () async {
-                              await ref
-                                  .read(recurringRepositoryProvider)
-                                  .resumeTemplate(template.id);
+                              final orgId = ref.read(sessionControllerProvider).orgId;
+                              if (orgId == null) return;
+                              await ref.read(recurringRepositoryProvider).resumeTemplate(
+                                    templateId: template.id,
+                                    organizationId: orgId,
+                                  );
                               ref.invalidate(recurringTemplatesProvider);
                             },
                             child: const Text('Resume'),
@@ -94,9 +125,12 @@ class RecurringSeriesTab extends ConsumerWidget {
                         else
                           TextButton(
                             onPressed: () async {
-                              await ref
-                                  .read(recurringRepositoryProvider)
-                                  .pauseTemplate(template.id);
+                              final orgId = ref.read(sessionControllerProvider).orgId;
+                              if (orgId == null) return;
+                              await ref.read(recurringRepositoryProvider).pauseTemplate(
+                                    templateId: template.id,
+                                    organizationId: orgId,
+                                  );
                               ref.invalidate(recurringTemplatesProvider);
                             },
                             child: const Text('Pause'),

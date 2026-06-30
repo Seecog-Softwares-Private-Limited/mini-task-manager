@@ -86,16 +86,21 @@ export function resolveTaskAssignees(
     }
 
     if (task.assignee && normalizeAssigneeUserId(task.assignee.id) === key) {
-      resolved.push({
-        id: task.assignee.id,
-        name: task.assignee.fullName ?? task.assignee.email ?? "User",
-        email: task.assignee.email,
-        avatarUrl: task.assignee.avatarUrl,
-      });
+      const isActive = members.some(
+        (m) => normalizeAssigneeUserId(m.userId) === key,
+      );
+      if (isActive) {
+        resolved.push({
+          id: task.assignee.id,
+          name: task.assignee.fullName ?? task.assignee.email ?? "User",
+          email: task.assignee.email,
+          avatarUrl: task.assignee.avatarUrl,
+        });
+      }
       continue;
     }
 
-    resolved.push({ id: rawId, name: "User" });
+    // Skip assignees who are no longer active workspace/project members.
   }
 
   return resolved;

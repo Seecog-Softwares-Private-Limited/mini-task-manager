@@ -88,12 +88,29 @@ class TasksRepository {
     required String taskId,
     String? title,
     String? statusId,
+    List<String>? assigneeIds,
+    String? priority,
+    String? dueDate,
+    bool clearDueDate = false,
+    List<String>? tags,
     List<TaskSubtask>? subtasks,
   }) async {
     try {
       final data = <String, dynamic>{};
       if (title != null) data['title'] = title.trim();
       if (statusId != null) data['statusId'] = statusId;
+      if (assigneeIds != null) data['assigneeIds'] = assigneeIds;
+      if (priority != null) data['priority'] = priority.toUpperCase();
+      if (clearDueDate) {
+        data['dueDate'] = null;
+      } else if (dueDate != null) {
+        data['dueDate'] = dueDate;
+      }
+      if (tags != null) {
+        data['tags'] = tags
+            .map((name) => {'name': name, 'color': '#8B5CF6'})
+            .toList();
+      }
       if (subtasks != null) {
         data['subtasks'] = subtasks
             .map(
