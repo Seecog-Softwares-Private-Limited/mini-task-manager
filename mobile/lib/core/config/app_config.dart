@@ -14,12 +14,22 @@ class AppConfig {
   final String appName;
   final String flavor;
 
+  static AppConfig fromApiBaseUrl(String apiBaseUrl) {
+    const flavor = String.fromEnvironment('FLAVOR', defaultValue: 'dev');
+    return AppConfig(
+      apiBaseUrl: apiBaseUrl,
+      appName: 'Mini Task Manager',
+      flavor: flavor,
+    );
+  }
+
+  @Deprecated('Use apiBaseUrlProvider via appConfigProvider')
   static AppConfig fromEnvironment() {
     const flavor = String.fromEnvironment('FLAVOR', defaultValue: 'dev');
     const override = String.fromEnvironment('API_BASE_URL');
 
     final baseUrl = override.isNotEmpty
-        ? _normalizeBaseUrl(override)
+        ? normalizeBaseUrl(override)
         : _defaultBaseUrlForFlavor(flavor);
 
     return AppConfig(
@@ -31,20 +41,19 @@ class AppConfig {
 
   static String _defaultBaseUrlForFlavor(String flavor) {
     if (flavor == 'prod') {
-      return 'https://your-production-host/api/v1';
+      return 'http://3.110.214.243:3000/api/v1';
     }
     if (flavor == 'staging') {
       return 'https://staging.your-host/api/v1';
     }
 
-    // Local dev: Android emulator uses 10.0.2.2 to reach host machine.
     if (!kIsWeb && Platform.isAndroid) {
       return 'http://10.0.2.2:3007/api/v1';
     }
     return 'http://localhost:3007/api/v1';
   }
 
-  static String _normalizeBaseUrl(String value) {
+  static String normalizeBaseUrl(String value) {
     var url = value.trim();
     if (url.endsWith('/')) {
       url = url.substring(0, url.length - 1);

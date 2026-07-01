@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../config/api_base_url_controller.dart';
 import '../config/app_config.dart';
 import '../config/storage_keys.dart';
 import '../messaging/app_messenger.dart';
@@ -117,7 +118,8 @@ class ApiClient {
 }
 
 final appConfigProvider = Provider<AppConfig>((ref) {
-  return AppConfig.fromEnvironment();
+  final apiBaseUrl = ref.watch(apiBaseUrlProvider);
+  return AppConfig.fromApiBaseUrl(apiBaseUrl);
 });
 
 final authStorageProvider = Provider<AuthStorage>((ref) => AuthStorage());

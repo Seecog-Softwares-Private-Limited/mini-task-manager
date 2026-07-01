@@ -82,3 +82,22 @@ final recurringBoardTasksProvider = FutureProvider<List<Task>>((ref) async {
     calendarOnly: true,
   );
 });
+
+final recurringTemplateHistoryProvider =
+    FutureProvider.family<List<RecurringOccurrence>, String>((ref, templateId) async {
+  final session = ref.watch(sessionControllerProvider);
+  if (session.status != SessionStatus.authenticated) {
+    throw StateError('Session not ready');
+  }
+
+  final orgId = session.orgId;
+  if (orgId == null || orgId.isEmpty) {
+    throw StateError('No workspace selected');
+  }
+
+  final repo = ref.watch(recurringRepositoryProvider);
+  return repo.fetchTemplateHistory(
+    templateId: templateId,
+    organizationId: orgId,
+  );
+});

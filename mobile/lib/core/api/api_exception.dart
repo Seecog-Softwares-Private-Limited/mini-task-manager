@@ -25,8 +25,10 @@ class ApiException extends Equatable implements Exception {
         error.type == DioExceptionType.connectionTimeout ||
         error.type == DioExceptionType.receiveTimeout ||
         error.type == DioExceptionType.sendTimeout) {
-      return const ApiException(
-        message: 'Network error. Check your connection and API URL.',
+      final target = error.requestOptions.uri.toString();
+      return ApiException(
+        message:
+            'Network error. Could not reach the server at $target. Open login → Server settings and use port 3000 (not 3007).',
         isNetwork: true,
       );
     }

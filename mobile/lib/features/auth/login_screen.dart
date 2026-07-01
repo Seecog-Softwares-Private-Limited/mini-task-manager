@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/api/api_connection_service.dart';
 import '../../core/api/api_exception.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/config/api_base_url_controller.dart';
+import '../../core/config/app_config.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -22,16 +25,76 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _serverUrlController = TextEditingController();
 
   bool _obscurePassword = true;
   bool _loading = false;
+  bool _showServerSettings = false;
+  bool _testingConnection = false;
   String? _error;
+  String? _serverStatus;
+  bool _serverStatusOk = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncServerField());
+  }
+
+  void _syncServerField() {
+    final apiUrl = ref.read(apiBaseUrlProvider);
+    _serverUrlController.text = _displayServerInput(apiUrl);
+  }
+
+  String _displayServerInput(String apiBaseUrl) {
+    if (apiBaseUrl.endsWith('/api/v1')) {
+      return apiBaseUrl.substring(0, apiBaseUrl.length - '/api/v1'.length);
+    }
+    return apiBaseUrl;
+  }
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _serverUrlController.dispose();
     super.dispose();
+  }
+
+  Future<void> _saveServerUrl() async {
+    final raw = _serverUrlController.text.trim();
+    if (raw.isEmpty) return;
+    await ref.read(apiBaseUrlProvider.notifier).setBaseUrl(raw);
+    if (!mounted) return;
+    setState(() {
+      _serverStatus = 'Saved: ${ref.read(apiBaseUrlProvider)}';
+      _serverStatusOk = true;
+      _error = null;
+    });
+  }
+
+  Future<void> _testConnection() async {
+    setState(() {
+      _testingConnection = true;
+      _serverStatus = null;
+    });
+    final candidate = AppConfig.normalizeBaseUrl(_serverUrlController.text.trim());
+    final result = await ApiConnectionService.test(candidate);
+    if (!mounted) return;
+    setState(() {
+      _testingConnection = false;
+      _serverStatus = result.message;
+      _serverStatusOk = result.ok;
+    });
+    if (result.ok) {
+      await ref.read(apiBaseUrlProvider.notifier).setBaseUrl(candidate);
+    }
+  }
+
+  Future<void> _useProductionServer() async {
+    _serverUrlController.text = 'http://3.110.214.243:3000';
+    await _saveServerUrl();
+    await _testConnection();
   }
 
   Future<void> _submit() async {
@@ -59,6 +122,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final config = ref.watch(appConfigProvider);
+    ref.listen(apiBaseUrlProvider, (previous, next) {
+      if (previous != next) {
+        _serverUrlController.text = _displayServerInput(next);
+      }
+    });
 
     return Scaffold(
       body: SafeArea(
@@ -170,6 +238,63 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     onPressed: _loading ? null : () => context.push(AppRoutes.forgotPassword),
                     child: const Text('Forgot password?'),
                   ),
+                  const SizedBox(height: AppSpacing.md),
+                  OutlinedButton.icon(
+                    onPressed: _loading
+                        ? null
+                        : () => setState(() => _showServerSettings = !_showServerSettings),
+                    icon: Icon(_showServerSettings
+                        ? Icons.expand_less_rounded
+                        : Icons.settings_ethernet_rounded),
+                    label: Text(_showServerSettings ? 'Hide server settings' : 'Server settings'),
+                  ),
+                  if (_showServerSettings) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    TextFormField(
+                      controller: _serverUrlController,
+                      decoration: const InputDecoration(
+                        labelText: 'Server URL',
+                        hintText: 'http://3.110.214.243:3000',
+                        helperText: 'Use port 3000 (web app). Port 3007 is not reachable on mobile.',
+                      ),
+                      keyboardType: TextInputType.url,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _testingConnection || _loading ? null : _testConnection,
+                            child: Text(_testingConnection ? 'Testing...' : 'Test connection'),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _loading ? null : _saveServerUrl,
+                            child: const Text('Save'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        onPressed: _loading || _testingConnection ? null : _useProductionServer,
+                        child: const Text('Use production server'),
+                      ),
+                    ),
+                    if (_serverStatus != null) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        _serverStatus!,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: _serverStatusOk ? AppColors.success : AppColors.danger,
+                            ),
+                      ),
+                    ],
+                  ],
                   const SizedBox(height: AppSpacing.lg),
                   Text(
                     'API: ${config.apiBaseUrl}',

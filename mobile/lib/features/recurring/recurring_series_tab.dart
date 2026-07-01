@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../auth/session_controller.dart';
+import 'recurring_planner_sheet.dart';
 import 'recurring_providers.dart';
 
 class RecurringSeriesTab extends ConsumerWidget {
@@ -75,69 +76,91 @@ class RecurringSeriesTab extends ConsumerWidget {
                   : '—';
 
               return SurfaceCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            template.title,
-                            style: Theme.of(context).textTheme.titleMedium,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => showRecurringPlannerSheet(
+                    context: context,
+                    ref: ref,
+                    template: template,
+                    projectId: projectId,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              template.title,
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
                           ),
-                        ),
-                        StatusChip(
-                          label: template.isPaused ? 'Paused' : template.repeatType,
-                          color: template.isPaused ? AppColors.warning : AppColors.violet,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      'Next: $nextLabel · ${template.completed}/${template.generatedCount} done',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                    if (template.completionHealth != null) ...[
+                          StatusChip(
+                            label: template.isPaused ? 'Paused' : template.repeatType,
+                            color: template.isPaused ? AppColors.warning : AppColors.violet,
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: AppSpacing.xs),
                       Text(
-                        'Health ${(template.completionHealth! * 100).round()}%',
-                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                              color: AppColors.sky,
+                        'Next: $nextLabel · ${template.completed}/${template.generatedCount} done',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      if (template.completionHealth != null) ...[
+                        const SizedBox(height: AppSpacing.xs),
+                        Text(
+                          'Health ${(template.completionHealth! * 100).round()}%',
+                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                color: AppColors.sky,
+                              ),
+                        ),
+                      ],
+                      const SizedBox(height: AppSpacing.sm),
+                      Row(
+                        children: [
+                          if (template.isPaused)
+                            TextButton(
+                              onPressed: () async {
+                                final orgId = ref.read(sessionControllerProvider).orgId;
+                                if (orgId == null) return;
+                                await ref.read(recurringRepositoryProvider).resumeTemplate(
+                                      templateId: template.id,
+                                      organizationId: orgId,
+                                    );
+                                ref.invalidate(recurringTemplatesProvider);
+                              },
+                              child: const Text('Resume'),
+                            )
+                          else
+                            TextButton(
+                              onPressed: () async {
+                                final orgId = ref.read(sessionControllerProvider).orgId;
+                                if (orgId == null) return;
+                                await ref.read(recurringRepositoryProvider).pauseTemplate(
+                                      templateId: template.id,
+                                      organizationId: orgId,
+                                    );
+                                ref.invalidate(recurringTemplatesProvider);
+                              },
+                              child: const Text('Pause'),
                             ),
+                          const Spacer(),
+                          Text(
+                            'Open planner',
+                            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            color: AppColors.primary,
+                            size: 20,
+                          ),
+                        ],
                       ),
                     ],
-                    const SizedBox(height: AppSpacing.sm),
-                    Row(
-                      children: [
-                        if (template.isPaused)
-                          TextButton(
-                            onPressed: () async {
-                              final orgId = ref.read(sessionControllerProvider).orgId;
-                              if (orgId == null) return;
-                              await ref.read(recurringRepositoryProvider).resumeTemplate(
-                                    templateId: template.id,
-                                    organizationId: orgId,
-                                  );
-                              ref.invalidate(recurringTemplatesProvider);
-                            },
-                            child: const Text('Resume'),
-                          )
-                        else
-                          TextButton(
-                            onPressed: () async {
-                              final orgId = ref.read(sessionControllerProvider).orgId;
-                              if (orgId == null) return;
-                              await ref.read(recurringRepositoryProvider).pauseTemplate(
-                                    templateId: template.id,
-                                    organizationId: orgId,
-                                  );
-                              ref.invalidate(recurringTemplatesProvider);
-                            },
-                            child: const Text('Pause'),
-                          ),
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
               );
             },

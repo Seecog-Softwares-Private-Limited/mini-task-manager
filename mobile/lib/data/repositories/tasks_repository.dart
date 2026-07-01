@@ -125,6 +125,8 @@ class TasksRepository {
                 if (s.status != null) 'status': s.status,
                 if (s.priority != null) 'priority': s.priority,
                 if (s.statusId != null) 'statusId': s.statusId,
+                if (s.completionRecord != null)
+                  'completionRecord': s.completionRecord!.toJson(),
               },
             )
             .toList();

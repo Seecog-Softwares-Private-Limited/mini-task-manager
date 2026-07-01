@@ -42,13 +42,102 @@ class AttachmentPickerUtils {
     return _fromXFile(photo);
   }
 
-  static Future<PendingAttachment> _fromXFile(XFile file) async {
-    final bytes = await file.readAsBytes();
+  static Future<PendingAttachment?> captureVideo({
+    Duration maxDuration = const Duration(seconds: 30),
+  }) async {
+    final picker = ImagePicker();
+    final video = await picker.pickVideo(
+      source: ImageSource.camera,
+      maxDuration: maxDuration,
+    );
+    if (video == null) return null;
+    final bytes = await video.readAsBytes();
+    var fileName = video.name.trim();
+    if (fileName.isEmpty) {
+      final stamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
+      fileName = 'video-$stamp.mp4';
+    }
     return PendingAttachment(
       clientId: generateClientId(),
-      fileName: file.name.isNotEmpty ? file.name : 'photo.jpg',
+      fileName: fileName,
       bytes: bytes,
-      mimeType: file.mimeType,
+      mimeType: video.mimeType ?? 'video/mp4',
+    );
+  }
+
+  static Future<PendingAttachment> _fromXFile(XFile file) async {
+    final bytes = await file.readAsBytes();
+    var fileName = file.name.trim();
+    if (fileName.isEmpty) {
+      final stamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
+      fileName = 'photo-$stamp.jpg';
+    }
+    return PendingAttachment(
+      clientId: generateClientId(),
+      fileName: fileName,
+      bytes: bytes,
+      mimeType: file.mimeType ?? 'image/jpeg',
+    );
+  }
+}
+
+class AttachmentUploadActions extends StatelessWidget {
+  const AttachmentUploadActions({
+    super.key,
+    required this.disabled,
+    required this.uploading,
+    required this.onPickAndUpload,
+    this.showGallery = true,
+    this.compact = false,
+  });
+
+  final bool disabled;
+  final bool uploading;
+  final Future<void> Function(Future<PendingAttachment?> Function() pick) onPickAndUpload;
+  final bool showGallery;
+  final bool compact;
+
+  Future<void> _handle(Future<PendingAttachment?> Function() pick) async {
+    if (disabled || uploading) return;
+    await onPickAndUpload(pick);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        _ActionChip(
+          icon: Icons.photo_camera_rounded,
+          label: 'Camera',
+          onTap: uploading || disabled
+              ? null
+              : () => _handle(AttachmentPickerUtils.capturePhoto),
+        ),
+        _ActionChip(
+          icon: Icons.attach_file_rounded,
+          label: 'File',
+          onTap: uploading || disabled
+              ? null
+              : () => _handle(AttachmentPickerUtils.pickFile),
+        ),
+        if (showGallery && !compact)
+          _ActionChip(
+            icon: Icons.photo_library_rounded,
+            label: 'Gallery',
+            onTap: uploading || disabled
+                ? null
+                : () => _handle(AttachmentPickerUtils.pickFromGallery),
+          ),
+        if (uploading)
+          const SizedBox(
+            width: 18,
+            height: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+      ],
     );
   }
 }

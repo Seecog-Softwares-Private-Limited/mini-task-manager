@@ -503,6 +503,7 @@ export class TasksService {
       priority?: string;
       status?: string;
       statusId?: string;
+      completionRecord?: Record<string, any>;
     }>,
   ): Array<{
     id: string;
@@ -515,6 +516,7 @@ export class TasksService {
     status: 'TODO' | 'IN_PROGRESS' | 'DONE';
     priority?: string;
     statusId?: string;
+    completionRecord?: Record<string, any>;
   }> {
     if (!subtasks?.length) return [];
     return subtasks
@@ -532,6 +534,9 @@ export class TasksService {
           dueDate: s.dueDate ? String(s.dueDate).slice(0, 10) : undefined,
           ...(s.priority ? { priority: s.priority } : {}),
           ...(s.statusId ? { statusId: s.statusId } : {}),
+          ...(s.completionRecord && typeof s.completionRecord === 'object'
+            ? { completionRecord: s.completionRecord }
+            : {}),
         };
       })
       .filter((s) => s.title.length > 0);

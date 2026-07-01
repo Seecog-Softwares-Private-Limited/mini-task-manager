@@ -6,6 +6,8 @@ import '../../core/api/api_client.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../data/models/pending_attachment.dart';
+import '../../data/models/subtask_completion_record.dart';
 import '../../data/models/project_member.dart';
 import '../../data/models/task.dart';
 import '../../data/models/task_attachment.dart';
@@ -17,7 +19,10 @@ import '../../shared/widgets/user_avatar.dart';
 import '../auth/session_controller.dart';
 import '../kanban/kanban_providers.dart';
 import '../projects/projects_providers.dart';
+import 'subtask_completion_sheet.dart';
+import 'subtask_completion_utils.dart';
 import 'subtask_detail_panel.dart';
+import 'attachment_picker_section.dart';
 import 'attachment_preview.dart';
 import 'assignee_picker_sheet.dart';
 
@@ -180,10 +185,93 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
 
   Future<void> _toggleSubtask(int index, bool? value) async {
     if (value == null) return;
+    final user = ref.read(sessionControllerProvider).user;
+    if (!isUserAssignedToTask(task: _task, members: _members, userId: user?.id)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Only assigned team members can complete this subtask.'),
+        ),
+      );
+      return;
+    }
+
+    if (value) {
+      if (isSubtaskDone(_subtasks[index])) return;
+      await _completeSubtaskAtIndex(index);
+      return;
+    }
+
     final updated = List<TaskSubtask>.from(_subtasks);
     final item = updated[index];
-    final resolvedStatus = value ? 'DONE' : (item.status ?? 'TODO');
-    updated[index] = item.copyWith(completed: value, status: resolvedStatus);
+    updated[index] = item.copyWith(
+      completed: false,
+      status: item.status == 'DONE' ? 'TODO' : item.status,
+      clearCompletionRecord: true,
+    );
+    setState(() => _subtasks = updated);
+    await _run(() => ref.read(tasksRepositoryProvider).updateTask(
+          taskId: _task.id,
+          subtasks: updated,
+        ));
+  }
+
+  Future<SubtaskCompletionRecord?> _requestSubtaskCompletion({
+    required String subtaskId,
+    required String subtaskTitle,
+    required String? subtaskPriority,
+  }) async {
+    final user = ref.read(sessionControllerProvider).user;
+    if (user == null) return null;
+    if (!isUserAssignedToTask(task: _task, members: _members, userId: user.id)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Only assigned team members can complete this subtask.'),
+          ),
+        );
+      }
+      return null;
+    }
+
+    final requireVideo =
+        isCriticalPriority(subtaskPriority) || isCriticalPriority(_task.priority);
+    final result = await showSubtaskCompletionSheet(
+      context: context,
+      subtaskTitle: subtaskTitle,
+      projectId: widget.projectId,
+      employee: user,
+      requireVideo: requireVideo,
+    );
+    if (result == null) return null;
+
+    final orgId = ref.read(sessionControllerProvider).orgId ?? '';
+    for (final file in result.attachments) {
+      await ref.read(attachmentsRepositoryProvider).uploadSubtaskAttachment(
+            subtaskId: subtaskId,
+            taskId: _task.id,
+            organizationId: orgId,
+            file: file,
+          );
+    }
+    return result.record;
+  }
+
+  Future<void> _completeSubtaskAtIndex(int index) async {
+    final item = _subtasks[index];
+    final record = await _requestSubtaskCompletion(
+      subtaskId: item.id,
+      subtaskTitle: item.title,
+      subtaskPriority: item.priority,
+    );
+    if (record == null) return;
+
+    final updated = List<TaskSubtask>.from(_subtasks);
+    updated[index] = item.copyWith(
+      completed: true,
+      status: 'DONE',
+      completionRecord: record,
+    );
     setState(() => _subtasks = updated);
     await _run(() => ref.read(tasksRepositoryProvider).updateTask(
           taskId: _task.id,
@@ -261,6 +349,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
   Widget build(BuildContext context) {
     final currentUserId = ref.watch(sessionControllerProvider).user?.id;
     final orgId = ref.watch(sessionControllerProvider).orgId ?? '';
+    final canCompleteSubtasks =
+        isUserAssignedToTask(task: _task, members: _members, userId: currentUserId);
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.78,
@@ -329,6 +419,14 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                 onAddTag: _addTag,
                 onRemoveTag: _removeTag,
                 onAssigneesChanged: (assigneeIds) => _patchTask(assigneeIds: assigneeIds),
+                attachments: _AttachmentsSection(
+                  loading: _loadingMeta,
+                  attachments: _attachments,
+                  organizationId: orgId,
+                  taskId: _task.id,
+                  disabled: _saving,
+                  onAttachmentsChanged: (items) => setState(() => _attachments = items),
+                ),
               ),
               if (_subtasks.isNotEmpty) ...[
                 const SizedBox(height: AppSpacing.lg),
@@ -343,6 +441,16 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                   ],
                 ),
                 const SizedBox(height: AppSpacing.sm),
+                if (!canCompleteSubtasks)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: Text(
+                      'Only assigned team members can complete checklist items.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.warning,
+                          ),
+                    ),
+                  ),
                 ...List.generate(_subtasks.length, (index) {
                   final item = _subtasks[index];
                   final expanded = _expandedSubtaskIndex == index;
@@ -358,7 +466,9 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                       children: [
                         CheckboxListTile(
                           value: item.completed,
-                          onChanged: _saving ? null : (v) => _toggleSubtask(index, v),
+                          onChanged: _saving || !canCompleteSubtasks
+                              ? null
+                              : (v) => _toggleSubtask(index, v),
                           title: Text(
                             item.title,
                             style: TextStyle(
@@ -396,6 +506,17 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                               taskId: _task.id,
                               organizationId: orgId,
                               saving: _savingSubtaskIndex == index,
+                              canComplete: canCompleteSubtasks,
+                              onRequestCompletion: ({
+                                required String subtaskId,
+                                required String subtaskTitle,
+                                required String? subtaskPriority,
+                              }) =>
+                                  _requestSubtaskCompletion(
+                                    subtaskId: subtaskId,
+                                    subtaskTitle: subtaskTitle,
+                                    subtaskPriority: subtaskPriority,
+                                  ),
                               onCancel: () {
                                 setState(() => _expandedSubtaskIndex = null);
                               },
@@ -407,12 +528,6 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                   );
                 }),
               ],
-              const SizedBox(height: AppSpacing.lg),
-              _AttachmentsSection(
-                loading: _loadingMeta,
-                attachments: _attachments,
-                organizationId: orgId,
-              ),
               const SizedBox(height: AppSpacing.lg),
               _CommentsSection(
                 loading: _loadingMeta,
@@ -443,6 +558,7 @@ class _TaskMetaSection extends StatefulWidget {
     required this.onAddTag,
     required this.onRemoveTag,
     required this.onAssigneesChanged,
+    this.attachments,
   });
 
   final Task task;
@@ -457,6 +573,7 @@ class _TaskMetaSection extends StatefulWidget {
   final ValueChanged<String> onAddTag;
   final ValueChanged<String> onRemoveTag;
   final ValueChanged<List<String>> onAssigneesChanged;
+  final Widget? attachments;
 
   @override
   State<_TaskMetaSection> createState() => _TaskMetaSectionState();
@@ -516,7 +633,11 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
         Text('Details', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: AppSpacing.sm),
         if (detailsText.isNotEmpty) Text(detailsText),
-        const SizedBox(height: AppSpacing.sm),
+        if (widget.attachments != null) ...[
+          const SizedBox(height: AppSpacing.lg),
+          widget.attachments!,
+        ],
+        const SizedBox(height: AppSpacing.md),
         _AssignedBySection(member: assignedBy),
         const SizedBox(height: AppSpacing.md),
         _AssignedToSection(
@@ -1172,36 +1293,86 @@ String _initials(String name) {
   return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
 }
 
-class _AttachmentsSection extends ConsumerWidget {
+class _AttachmentsSection extends ConsumerStatefulWidget {
   const _AttachmentsSection({
     required this.loading,
     required this.attachments,
     required this.organizationId,
+    required this.taskId,
+    required this.disabled,
+    required this.onAttachmentsChanged,
   });
 
   final bool loading;
   final List<TaskAttachment> attachments;
   final String organizationId;
+  final String taskId;
+  final bool disabled;
+  final ValueChanged<List<TaskAttachment>> onAttachmentsChanged;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_AttachmentsSection> createState() => _AttachmentsSectionState();
+}
+
+class _AttachmentsSectionState extends ConsumerState<_AttachmentsSection> {
+  bool _uploading = false;
+  String? _uploadError;
+
+  Future<void> _pickAndUpload(Future<PendingAttachment?> Function() pick) async {
+    final picked = await pick();
+    if (picked == null) return;
+
+    setState(() {
+      _uploading = true;
+      _uploadError = null;
+    });
+
+    try {
+      await ref.read(attachmentsRepositoryProvider).uploadTaskAttachment(
+            taskId: widget.taskId,
+            organizationId: widget.organizationId,
+            file: picked,
+          );
+      final items = await ref.read(tasksRepositoryProvider).fetchAttachments(widget.taskId);
+      if (!mounted) return;
+      widget.onAttachmentsChanged(items);
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() => _uploadError = error.message);
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Task attachments', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: AppSpacing.sm),
-        if (loading)
+        AttachmentUploadActions(
+          disabled: widget.disabled || widget.loading,
+          uploading: _uploading,
+          onPickAndUpload: _pickAndUpload,
+        ),
+        if (_uploadError != null) ...[
+          const SizedBox(height: AppSpacing.xs),
+          Text(_uploadError!, style: const TextStyle(color: AppColors.danger)),
+        ],
+        const SizedBox(height: AppSpacing.sm),
+        if (widget.loading)
           const LinearProgressIndicator(minHeight: 2)
-        else if (attachments.isEmpty)
+        else if (widget.attachments.isEmpty)
           Text('No task attachments yet', style: Theme.of(context).textTheme.bodySmall)
         else
-          ...attachments.take(6).map(
-                (item) => AttachmentListTile(
-                  attachment: item,
-                  organizationId: organizationId,
-                  source: AttachmentSource.task,
-                ),
-              ),
+          ...widget.attachments.map(
+            (item) => AttachmentListTile(
+              attachment: item,
+              organizationId: widget.organizationId,
+              source: AttachmentSource.task,
+            ),
+          ),
       ],
     );
   }

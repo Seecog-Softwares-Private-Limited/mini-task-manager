@@ -80,3 +80,20 @@ final projectBoardProvider =
     projectName: projectName,
   );
 });
+
+/// Lightweight cached statuses for task detail — avoids loading the full board.
+final projectWorkflowStatusesProvider =
+    FutureProvider.family<List<WorkflowStatus>, String>((ref, projectId) async {
+  ref.keepAlive();
+  final workflowsRepo = ref.watch(workflowsRepositoryProvider);
+  var workflows = await workflowsRepo.fetchByProject(projectId);
+  if (workflows.isEmpty) {
+    await workflowsRepo.createDefaultWorkflow(projectId);
+    workflows = await workflowsRepo.fetchByProject(projectId);
+  }
+  final workflow = workflows.firstWhere(
+    (item) => item.isDefault,
+    orElse: () => workflows.first,
+  );
+  return workflowsRepo.fetchStatuses(workflow.id);
+});
