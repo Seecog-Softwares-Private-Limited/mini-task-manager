@@ -70,6 +70,38 @@ class RecurringTemplate {
   }
 }
 
+class RecurringOccurrence {
+  const RecurringOccurrence({
+    required this.id,
+    required this.templateId,
+    required this.dueDate,
+    required this.state,
+    required this.sequenceNumber,
+    this.taskId,
+    this.completedAt,
+  });
+
+  final String id;
+  final String templateId;
+  final String dueDate;
+  final String state;
+  final int sequenceNumber;
+  final String? taskId;
+  final String? completedAt;
+
+  factory RecurringOccurrence.fromJson(Map<String, dynamic> json) {
+    return RecurringOccurrence(
+      id: json['id'] as String? ?? '',
+      templateId: json['templateId'] as String? ?? '',
+      dueDate: json['dueDate']?.toString() ?? '',
+      state: json['state'] as String? ?? 'PENDING',
+      sequenceNumber: json['sequenceNumber'] as int? ?? 0,
+      taskId: json['taskId'] as String?,
+      completedAt: json['completedAt']?.toString(),
+    );
+  }
+}
+
 class RecurringBoardData {
   const RecurringBoardData({
     required this.tasks,

@@ -112,4 +112,22 @@ class RecurringRepository {
       throw ApiException.fromDio(error);
     }
   }
+
+  Future<List<RecurringOccurrence>> fetchTemplateHistory({
+    required String templateId,
+    required String organizationId,
+  }) async {
+    try {
+      final response = await _api.dio.get<List<dynamic>>(
+        '/recurring-tasks/$templateId/history',
+        options: _api.withOrgHeader(organizationId),
+      );
+      return (response.data ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(RecurringOccurrence.fromJson)
+          .toList();
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
 }

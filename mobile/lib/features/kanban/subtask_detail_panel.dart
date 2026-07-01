@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../data/models/pending_attachment.dart';
+import '../../data/models/subtask_completion_record.dart';
 import '../../data/models/project_member.dart';
 import '../../data/models/task.dart';
 import '../../data/models/task_attachment.dart';
@@ -14,6 +16,14 @@ import 'attachment_preview.dart';
 import 'attachment_picker_section.dart';
 import 'kanban_providers.dart';
 import 'assignee_picker_sheet.dart';
+
+import 'subtask_completion_utils.dart';
+
+typedef SubtaskCompletionRequest = Future<SubtaskCompletionRecord?> Function({
+  required String subtaskId,
+  required String subtaskTitle,
+  required String? subtaskPriority,
+});
 
 const subtaskTitleMaxLength = 200;
 
@@ -34,6 +44,8 @@ class SubtaskDetailPanel extends ConsumerStatefulWidget {
     required this.taskId,
     required this.organizationId,
     required this.saving,
+    required this.canComplete,
+    required this.onRequestCompletion,
     required this.onCancel,
     required this.onSave,
   });
@@ -43,6 +55,8 @@ class SubtaskDetailPanel extends ConsumerStatefulWidget {
   final String taskId;
   final String organizationId;
   final bool saving;
+  final bool canComplete;
+  final SubtaskCompletionRequest onRequestCompletion;
   final VoidCallback onCancel;
   final ValueChanged<TaskSubtask> onSave;
 
@@ -61,6 +75,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
   bool _loadingAttachments = true;
   bool _uploadingAttachment = false;
   String? _attachmentError;
+  SubtaskCompletionRecord? _completionRecord;
 
   @override
   void initState() {
@@ -72,6 +87,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     _priority = (widget.subtask.priority ?? 'MEDIUM').toUpperCase();
     _dueDate = widget.subtask.dueDate;
     _assigneeIds = _storedAssigneeIds(widget.subtask);
+    _completionRecord = widget.subtask.completionRecord;
     _loadAttachments();
   }
 
@@ -108,8 +124,8 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     }
   }
 
-  Future<void> _uploadAttachment() async {
-    final picked = await AttachmentPickerUtils.pickFile();
+  Future<void> _pickAndUpload(Future<PendingAttachment?> Function() pick) async {
+    final picked = await pick();
     if (picked == null) return;
     setState(() {
       _uploadingAttachment = true;
@@ -220,9 +236,79 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     );
   }
 
-  void _handleSave() {
+  void _showNotAssigned() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Only assigned team members can complete this subtask.'),
+      ),
+    );
+  }
+
+  Future<void> _handleStatusChange(String value) async {
+    if (value == 'DONE' && _status != 'DONE') {
+      if (!widget.canComplete) {
+        _showNotAssigned();
+        return;
+      }
+      final record = await widget.onRequestCompletion(
+        subtaskId: widget.subtask.id,
+        subtaskTitle: _titleController.text.trim().isEmpty
+            ? widget.subtask.title
+            : _titleController.text.trim(),
+        subtaskPriority: _priority,
+      );
+      if (record == null) return;
+      if (!mounted) return;
+      setState(() {
+        _status = 'DONE';
+        _completionRecord = record;
+      });
+      widget.onSave(
+        widget.subtask.copyWith(
+          title: _titleController.text.trim().isEmpty
+              ? widget.subtask.title
+              : _titleController.text.trim(),
+          description: _descriptionController.text.trim().isEmpty
+              ? null
+              : _descriptionController.text,
+          status: 'DONE',
+          completed: true,
+          priority: _priority,
+          dueDate: _dueDate,
+          assigneeIds: _assigneeIds,
+          assigneeId: _assigneeIds.isNotEmpty ? _assigneeIds.first : null,
+          completionRecord: record,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _status = value;
+      if (value != 'DONE') _completionRecord = null;
+    });
+  }
+
+  Future<void> _handleSave() async {
     final title = _titleController.text.trim();
     if (title.isEmpty || title.length > subtaskTitleMaxLength) return;
+
+    final movingToDone = _status == 'DONE' && !isSubtaskDone(widget.subtask);
+    var record = _completionRecord ?? widget.subtask.completionRecord;
+    if (movingToDone && record == null) {
+      if (!widget.canComplete) {
+        _showNotAssigned();
+        return;
+      }
+      record = await widget.onRequestCompletion(
+        subtaskId: widget.subtask.id,
+        subtaskTitle: title,
+        subtaskPriority: _priority,
+      );
+      if (record == null) return;
+      _completionRecord = record;
+    }
+
     final completed = _status == 'DONE';
     widget.onSave(
       widget.subtask.copyWith(
@@ -236,6 +322,8 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
         dueDate: _dueDate,
         assigneeIds: _assigneeIds,
         assigneeId: _assigneeIds.isNotEmpty ? _assigneeIds.first : null,
+        completionRecord: completed ? record : null,
+        clearCompletionRecord: !completed,
       ),
     );
   }
@@ -318,16 +406,10 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
                 ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          OutlinedButton.icon(
-            onPressed: widget.saving || _uploadingAttachment ? null : _uploadAttachment,
-            icon: _uploadingAttachment
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.upload_rounded, size: 18),
-            label: const Text('Upload'),
+          AttachmentUploadActions(
+            disabled: widget.saving,
+            uploading: _uploadingAttachment,
+            onPickAndUpload: _pickAndUpload,
           ),
           if (_loadingAttachments)
             const Padding(
@@ -364,16 +446,17 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
                 child: _SubtaskDropdown<String>(
                   label: 'Status',
                   value: _status,
-                  enabled: !widget.saving,
+                  enabled: !widget.saving && (widget.canComplete || _status == 'DONE'),
                   items: _subtaskStatuses
                       .map(
                         (status) => DropdownMenuItem(
                           value: status,
+                          enabled: widget.canComplete || status != 'DONE',
                           child: Text(_labelForSubtaskStatus(status)),
                         ),
                       )
                       .toList(),
-                  onChanged: (value) => setState(() => _status = value),
+                  onChanged: _handleStatusChange,
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
@@ -439,6 +522,17 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
               ),
             ],
           ),
+          if (!widget.canComplete) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'Only assigned team members can mark this subtask as Done.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.warning),
+            ),
+          ],
+          if (_completionRecord != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            _CompletionRecordCard(record: _completionRecord!),
+          ],
           const SizedBox(height: AppSpacing.md),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
@@ -577,6 +671,77 @@ Color _priorityColor(String priority) {
     'CRITICAL' => AppColors.danger,
     _ => AppColors.sky,
   };
+}
+
+class _CompletionRecordCard extends StatelessWidget {
+  const _CompletionRecordCard({required this.record});
+
+  final SubtaskCompletionRecord record;
+
+  @override
+  Widget build(BuildContext context) {
+    final completedAt = DateTime.tryParse(record.completedAt);
+    final timestamp = completedAt == null
+        ? record.completedAt
+        : DateFormat('MMM d, yyyy · h:mm a').format(completedAt.toLocal());
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.successSoft.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.success.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Completion record',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          _row('Completed', timestamp),
+          _row('By', record.employeeName),
+          _row(
+            'Location',
+            '${record.latitude.toStringAsFixed(5)}, ${record.longitude.toStringAsFixed(5)}',
+          ),
+          _row(
+            'Geofence',
+            record.geofenceValid ? 'Validated on site' : 'Outside site',
+          ),
+          if (record.notes != null && record.notes!.isNotEmpty) _row('Notes', record.notes!),
+          if (record.beforePhotoFileNames.isNotEmpty)
+            _row('Before photos', '${record.beforePhotoFileNames.length} attached'),
+          if (record.afterPhotoFileNames.isNotEmpty)
+            _row('After photos', '${record.afterPhotoFileNames.length} attached'),
+          if (record.voiceNoteFileName != null) _row('Voice note', record.voiceNoteFileName!),
+          if (record.videoFileName != null) _row('Video', record.videoFileName!),
+        ],
+      ),
+    );
+  }
+
+  Widget _row(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: RichText(
+        text: TextSpan(
+          style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, height: 1.35),
+          children: [
+            TextSpan(
+              text: '$label: ',
+              style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textMuted),
+            ),
+            TextSpan(text: value),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 String _normalizeUserId(String id) =>

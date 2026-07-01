@@ -50,6 +50,7 @@ export class TaskEntity extends BaseEntity {
     status?: 'TODO' | 'IN_PROGRESS' | 'DONE';
     priority?: string;
     statusId?: string;
+    completionRecord?: Record<string, any>;
   }> | null;
 
   @Column({ name: 'reporter_id', type: 'binary', length: 16, transformer: uuidBinaryTransformer })

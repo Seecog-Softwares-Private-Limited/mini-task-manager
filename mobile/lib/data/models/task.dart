@@ -1,3 +1,5 @@
+import 'subtask_completion_record.dart';
+
 class TaskSubtask {
   const TaskSubtask({
     required this.id,
@@ -10,6 +12,7 @@ class TaskSubtask {
     this.status,
     this.priority,
     this.statusId,
+    this.completionRecord,
   });
 
   final String id;
@@ -22,8 +25,10 @@ class TaskSubtask {
   final String? status;
   final String? priority;
   final String? statusId;
+  final SubtaskCompletionRecord? completionRecord;
 
   factory TaskSubtask.fromJson(Map<String, dynamic> json) {
+    final rawRecord = json['completionRecord'];
     return TaskSubtask(
       id: json['id'] as String? ?? '',
       title: json['title'] as String? ?? '',
@@ -38,6 +43,9 @@ class TaskSubtask {
       status: json['status'] as String?,
       priority: json['priority'] as String?,
       statusId: json['statusId'] as String?,
+      completionRecord: rawRecord is Map<String, dynamic>
+          ? SubtaskCompletionRecord.fromJson(rawRecord)
+          : null,
     );
   }
 
@@ -52,6 +60,8 @@ class TaskSubtask {
     String? status,
     String? priority,
     String? statusId,
+    SubtaskCompletionRecord? completionRecord,
+    bool clearCompletionRecord = false,
   }) {
     return TaskSubtask(
       id: id ?? this.id,
@@ -64,6 +74,8 @@ class TaskSubtask {
       status: status ?? this.status,
       priority: priority ?? this.priority,
       statusId: statusId ?? this.statusId,
+      completionRecord:
+          clearCompletionRecord ? null : (completionRecord ?? this.completionRecord),
     );
   }
 }
