@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../preferences/app_preferences.dart';
 import 'api_url_resolver.dart';
@@ -12,9 +11,7 @@ class ApiBaseUrlController extends Notifier<String> {
   @override
   String build() {
     final prefs = ref.watch(sharedPreferencesProvider);
-    final resolved = ApiUrlResolver.resolve(prefs);
-    _persistIfNeeded(prefs, resolved);
-    return resolved;
+    return ApiUrlResolver.resolve(prefs);
   }
 
   Future<void> setBaseUrl(String raw) async {
@@ -30,9 +27,4 @@ class ApiBaseUrlController extends Notifier<String> {
     state = ApiUrlResolver.resolve(prefs);
   }
 
-  void _persistIfNeeded(SharedPreferences prefs, String resolved) {
-    final saved = prefs.getString(StorageKeys.apiBaseUrl);
-    if (saved == resolved) return;
-    Future.microtask(() => prefs.setString(StorageKeys.apiBaseUrl, resolved));
-  }
 }

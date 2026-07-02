@@ -890,7 +890,7 @@ class _SidebarDropdown<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<T>(
-      value: value,
+      initialValue: value,
       items: items,
       onChanged: enabled ? (next) { if (next != null) onChanged(next); } : null,
       decoration: InputDecoration(

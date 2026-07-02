@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 class ApiConnectionResult {
   const ApiConnectionResult({
@@ -70,6 +71,9 @@ class ApiConnectionService {
   }
 
   static String _hintForUrl(String url) {
+    if (kIsWeb) {
+      return 'For Flutter web use http://localhost:3007 (backend with CORS for :8090).';
+    }
     if (url.contains(':3007')) {
       return 'Port 3007 is usually local-only — try http://YOUR_SERVER:3000 instead.';
     }

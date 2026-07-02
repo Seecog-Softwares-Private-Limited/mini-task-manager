@@ -1,8 +1,8 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 
 class ApiException extends Equatable implements Exception {
   const ApiException({
@@ -28,7 +28,9 @@ class ApiException extends Equatable implements Exception {
       final target = error.requestOptions.uri.toString();
       return ApiException(
         message:
-            'Network error. Could not reach the server at $target. Open login → Server settings and use port 3000 (not 3007).',
+            kIsWeb
+                ? 'Network error. Could not reach $target. On web, use http://localhost:3007 in Server settings.'
+                : 'Network error. Could not reach the server at $target. Open login -> Server settings and use port 3000 (not 3007).',
         isNetwork: true,
       );
     }

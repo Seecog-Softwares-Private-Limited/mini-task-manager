@@ -9,18 +9,19 @@ import 'app_config.dart';
 /// Resolves the API base URL from saved settings, build-time defines, and flavor defaults.
 abstract final class ApiUrlResolver {
   static String resolve(SharedPreferences prefs) {
-    final saved = prefs.getString(StorageKeys.apiBaseUrl)?.trim();
-    if (saved != null && saved.isNotEmpty) {
-      return normalizeAndMigrate(saved);
-    }
-
+    // Build/run --dart-define wins over stale saved browser/device settings.
     const envOverride = String.fromEnvironment('API_BASE_URL');
     if (envOverride.isNotEmpty) {
-      return normalizeAndMigrate(envOverride);
+      return _preferLocalProxyOnWeb(normalizeAndMigrate(envOverride));
+    }
+
+    final saved = prefs.getString(StorageKeys.apiBaseUrl)?.trim();
+    if (saved != null && saved.isNotEmpty) {
+      return _preferLocalProxyOnWeb(normalizeAndMigrate(saved));
     }
 
     const flavor = String.fromEnvironment('FLAVOR', defaultValue: 'dev');
-    return normalizeAndMigrate(_defaultBaseUrlForFlavor(flavor));
+    return _preferLocalProxyOnWeb(normalizeAndMigrate(_defaultBaseUrlForFlavor(flavor)));
   }
 
   static String normalizeAndMigrate(String raw) {
@@ -46,9 +47,19 @@ abstract final class ApiUrlResolver {
     return url;
   }
 
+
+  static String _preferLocalProxyOnWeb(String url) {
+    if (!kIsWeb) return url;
+    final host = Uri.base.host;
+    if (host == 'localhost' || host == '127.0.0.1') {
+      return 'http://localhost:3007/api/v1';
+    }
+    return url;
+  }
+
   static String _defaultBaseUrlForFlavor(String flavor) {
     if (flavor == 'prod') {
-      return 'http://3.110.214.243:3000/api/v1';
+      return 'http://localhost:3007/api/v1';
     }
     if (flavor == 'staging') {
       return 'https://staging.your-host/api/v1';
