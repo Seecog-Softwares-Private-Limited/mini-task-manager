@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -92,7 +93,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _useProductionServer() async {
-    _serverUrlController.text = 'http://3.110.214.243:3000';
+    _serverUrlController.text = kIsWeb ? 'http://localhost:3007' : 'http://3.110.214.243:3000';
     await _saveServerUrl();
     await _testConnection();
   }
@@ -254,8 +255,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       controller: _serverUrlController,
                       decoration: const InputDecoration(
                         labelText: 'Server URL',
-                        hintText: 'http://3.110.214.243:3000',
-                        helperText: 'Use port 3000 (web app). Port 3007 is not reachable on mobile.',
+                        hintText: 'http://localhost:3007',
+                        helperText: 'Web: use localhost:3007. Mobile APK: use your server:3000.',
                       ),
                       keyboardType: TextInputType.url,
                     ),
