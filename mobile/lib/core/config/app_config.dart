@@ -39,9 +39,24 @@ class AppConfig {
     );
   }
 
+  /// Public AWS server IP.
+  static const productionHost = '3.110.214.243';
+
+  /// Next.js on port 3000 (works on Wi‑Fi / desktop; many mobile carriers block this port).
+  static const productionApiBaseUrl = 'http://$productionHost:3000/api/v1';
+
+  /// Port 80 via nginx (preferred for mobile — requires deploy/nginx-minitask.conf on the server).
+  static const productionApiBaseUrlPort80 = 'http://$productionHost/api/v1';
+
+  /// Tried in order when probing production connectivity from the mobile app.
+  static const productionApiCandidates = <String>[
+    productionApiBaseUrlPort80,
+    productionApiBaseUrl,
+  ];
+
   static String _defaultBaseUrlForFlavor(String flavor) {
     if (flavor == 'prod') {
-      return 'http://3.110.214.243:3000/api/v1';
+      return productionApiBaseUrl;
     }
     if (flavor == 'staging') {
       return 'https://staging.your-host/api/v1';

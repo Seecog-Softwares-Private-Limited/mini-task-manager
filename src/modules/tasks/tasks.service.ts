@@ -23,6 +23,7 @@ import {
   renderOfficeDocumentPreview,
   type OfficePreviewResult,
 } from '../../common/utils/office-document-preview.util';
+import { findExistingUploadPath } from '../../common/utils/upload-path.util';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -630,23 +631,13 @@ export class TasksService {
   }
 
   async getAttachmentFile(attachmentId: string, organizationId: string): Promise<{ path: string; fileName: string | null }> {
-    const attachment = await this.taskAttachmentsRepository.findById(attachmentId);
+    const normalizedId = formatUuid(attachmentId.trim()) ?? attachmentId.trim();
+    const attachment = await this.taskAttachmentsRepository.findById(normalizedId);
     if (!attachment) throw new NotFoundException('Attachment not found');
     const task = await this.tasksRepository.findByIdAndOrganization(attachment.taskId, organizationId);
     if (!task) throw new NotFoundException('Task not found');
     const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
-    const fullPath = path.join(uploadsPath, attachment.fileUrl);
-    try {
-      await fs.access(fullPath);
-    } catch (err) {
-      const code = (err as NodeJS.ErrnoException)?.code;
-      if (code === 'ENOENT') {
-        throw new NotFoundException(
-          'Attachment file is missing on the server. Re-upload the file.',
-        );
-      }
-      throw err;
-    }
+    const fullPath = await findExistingUploadPath(uploadsPath, attachment.fileUrl);
     return { path: fullPath, fileName: attachment.fileName };
   }
 
@@ -654,7 +645,9 @@ export class TasksService {
     attachmentId: string,
     organizationId: string,
   ): Promise<OfficePreviewResult> {
-    const attachment = await this.taskAttachmentsRepository.findById(attachmentId);
+    const attachment = await this.taskAttachmentsRepository.findById(
+      formatUuid(attachmentId.trim()) ?? attachmentId.trim(),
+    );
     if (!attachment) throw new NotFoundException('Attachment not found');
     const task = await this.tasksRepository.findByIdAndOrganization(attachment.taskId, organizationId);
     if (!task) throw new NotFoundException('Task not found');
@@ -662,7 +655,7 @@ export class TasksService {
       throw new BadRequestException('Preview is not available for this file type.');
     }
     const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
-    const fullPath = path.join(uploadsPath, attachment.fileUrl);
+    const fullPath = await findExistingUploadPath(uploadsPath, attachment.fileUrl);
     let buffer: Buffer;
     try {
       buffer = await fs.readFile(fullPath);
@@ -693,11 +686,17 @@ export class TasksService {
   ): Promise<void> {
     const task = await this.tasksRepository.findByIdAndOrganization(taskId, organizationId);
     if (!task) throw new NotFoundException('Task not found');
-    const attachment = await this.taskAttachmentsRepository.findById(attachmentId);
+    const attachment = await this.taskAttachmentsRepository.findById(
+      formatUuid(attachmentId.trim()) ?? attachmentId.trim(),
+    );
     if (!attachment || attachment.taskId !== taskId) throw new NotFoundException('Attachment not found');
     const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
-    const fullPath = path.join(uploadsPath, attachment.fileUrl);
-    await fs.unlink(fullPath).catch(() => {});
+    try {
+      const fullPath = await findExistingUploadPath(uploadsPath, attachment.fileUrl);
+      await fs.unlink(fullPath).catch(() => {});
+    } catch {
+      /* file already removed from disk */
+    }
     await this.taskAttachmentsRepository.delete(attachmentId);
     if (attachment.fileSizeBytes && attachment.uploadedBy) {
       await this.planLimitService.decrementStorageUsed(

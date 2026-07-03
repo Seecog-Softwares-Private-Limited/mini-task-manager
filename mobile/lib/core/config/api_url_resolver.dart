@@ -15,12 +15,18 @@ abstract final class ApiUrlResolver {
       return _preferLocalProxyOnWeb(normalizeAndMigrate(envOverride));
     }
 
+    const flavor = String.fromEnvironment('FLAVOR', defaultValue: 'dev');
+
     final saved = prefs.getString(StorageKeys.apiBaseUrl)?.trim();
     if (saved != null && saved.isNotEmpty) {
-      return _preferLocalProxyOnWeb(normalizeAndMigrate(saved));
+      final normalized = normalizeAndMigrate(saved);
+      // Stale localhost URLs from dev/debug installs must not break production APKs.
+      if (flavor == 'prod' && !kIsWeb && _isLocalDevUrl(normalized)) {
+        return _preferLocalProxyOnWeb(normalizeAndMigrate(_defaultBaseUrlForFlavor(flavor)));
+      }
+      return _preferLocalProxyOnWeb(normalized);
     }
 
-    const flavor = String.fromEnvironment('FLAVOR', defaultValue: 'dev');
     return _preferLocalProxyOnWeb(normalizeAndMigrate(_defaultBaseUrlForFlavor(flavor)));
   }
 
@@ -57,9 +63,19 @@ abstract final class ApiUrlResolver {
     return url;
   }
 
+  static bool _isLocalDevUrl(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return false;
+
+    return uri.host == 'localhost' ||
+        uri.host == '10.0.2.2' ||
+        uri.host.startsWith('127.') ||
+        RegExp(r'^192\.168\.|^10\.|^172\.(1[6-9]|2\d|3[01])\.').hasMatch(uri.host);
+  }
+
   static String _defaultBaseUrlForFlavor(String flavor) {
     if (flavor == 'prod') {
-      return 'http://localhost:3007/api/v1';
+      return AppConfig.productionApiBaseUrl;
     }
     if (flavor == 'staging') {
       return 'https://staging.your-host/api/v1';

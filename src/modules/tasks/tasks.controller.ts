@@ -37,6 +37,7 @@ import { PatchTaskDto } from './dto/patch-task.dto';
 import { UpdateTaskAssigneeDto } from './dto/update-task-assignee.dto';
 import { PaginationQueryDto } from '../../common/pagination';
 import { TaskResponseDto } from './dto/task-response.dto';
+import { TaskAttachmentResponseDto } from './dto/task-attachment-response.dto';
 import { TaskCommentEntity } from './entities/task-comment.entity';
 import { TaskEntity } from './entities/task.entity';
 import {
@@ -126,10 +127,11 @@ export class TasksController {
   async getAttachments(
     @Param('id') taskId: string,
     @TenantId() tenantId: string,
-  ) {
+  ): Promise<TaskAttachmentResponseDto[]> {
     const task = await this.tasksService.findByIdInOrganization(taskId, tenantId);
     if (!task) return [];
-    return this.tasksService.getAttachments(taskId);
+    const items = await this.tasksService.getAttachments(taskId);
+    return items.map(TaskAttachmentResponseDto.fromEntity);
   }
 
   @UseGuards(RolesGuard)

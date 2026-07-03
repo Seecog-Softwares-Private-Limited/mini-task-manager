@@ -26,6 +26,16 @@ import 'attachment_picker_section.dart';
 import 'attachment_preview.dart';
 import 'assignee_picker_sheet.dart';
 
+class _TaskAttachmentItem {
+  const _TaskAttachmentItem({
+    required this.attachment,
+    required this.source,
+  });
+
+  final TaskAttachment attachment;
+  final AttachmentSource source;
+}
+
 class TaskDetailSheet extends ConsumerStatefulWidget {
   const TaskDetailSheet({
     super.key,
@@ -56,7 +66,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
   int? _savingSubtaskIndex;
   String? _error;
   List<ProjectMember> _members = const [];
-  List<TaskAttachment> _attachments = const [];
+  List<_TaskAttachmentItem> _attachments = const [];
   List<TaskComment> _comments = const [];
 
   @override
@@ -75,6 +85,46 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     super.dispose();
   }
 
+  Future<List<_TaskAttachmentItem>> _loadTaskAttachments(
+    String orgId,
+    String taskId,
+  ) async {
+    final attachmentsRepo = ref.read(attachmentsRepositoryProvider);
+    final tasksRepo = ref.read(tasksRepositoryProvider);
+    final results = await Future.wait<List<TaskAttachment>>([
+      tasksRepo.fetchAttachments(taskId),
+      attachmentsRepo.fetchEntityAttachments(
+        entityType: 'TASK',
+        entityId: taskId,
+        organizationId: orgId,
+        taskId: taskId,
+      ),
+    ]);
+    final seen = <String>{};
+    final items = <_TaskAttachmentItem>[];
+    for (final attachment in results[0]) {
+      if (attachment.id.isEmpty || seen.contains(attachment.id)) continue;
+      seen.add(attachment.id);
+      items.add(
+        _TaskAttachmentItem(
+          attachment: attachment,
+          source: AttachmentSource.task,
+        ),
+      );
+    }
+    for (final attachment in results[1]) {
+      if (attachment.id.isEmpty || seen.contains(attachment.id)) continue;
+      seen.add(attachment.id);
+      items.add(
+        _TaskAttachmentItem(
+          attachment: attachment,
+          source: AttachmentSource.entity,
+        ),
+      );
+    }
+    return items;
+  }
+
   Future<void> _loadMeta() async {
     final orgId = ref.read(sessionControllerProvider).orgId;
     if (orgId == null || orgId.isEmpty) {
@@ -90,7 +140,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
           organizationId: orgId,
         ),
         tasksRepo.fetchTask(widget.task.id),
-        tasksRepo.fetchAttachments(widget.task.id),
+        _loadTaskAttachments(orgId, widget.task.id),
         tasksRepo.fetchComments(widget.task.id),
       ]);
       if (!mounted) return;
@@ -108,7 +158,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       setState(() {
         _members = members;
         _task = task;
-        _attachments = results[2] as List<TaskAttachment>;
+        _attachments = results[2] as List<_TaskAttachmentItem>;
         _comments = results[3] as List<TaskComment>;
         _loadingMeta = false;
       });
@@ -1304,11 +1354,11 @@ class _AttachmentsSection extends ConsumerStatefulWidget {
   });
 
   final bool loading;
-  final List<TaskAttachment> attachments;
+  final List<_TaskAttachmentItem> attachments;
   final String organizationId;
   final String taskId;
   final bool disabled;
-  final ValueChanged<List<TaskAttachment>> onAttachmentsChanged;
+  final ValueChanged<List<_TaskAttachmentItem>> onAttachmentsChanged;
 
   @override
   ConsumerState<_AttachmentsSection> createState() => _AttachmentsSectionState();
@@ -1334,8 +1384,31 @@ class _AttachmentsSectionState extends ConsumerState<_AttachmentsSection> {
             file: picked,
           );
       final items = await ref.read(tasksRepositoryProvider).fetchAttachments(widget.taskId);
+      final entityItems = await ref.read(attachmentsRepositoryProvider).fetchEntityAttachments(
+            entityType: 'TASK',
+            entityId: widget.taskId,
+            organizationId: widget.organizationId,
+            taskId: widget.taskId,
+          );
+      final seen = items.map((e) => e.id).toSet();
+      final merged = <_TaskAttachmentItem>[
+        ...items.map(
+          (attachment) => _TaskAttachmentItem(
+            attachment: attachment,
+            source: AttachmentSource.task,
+          ),
+        ),
+        ...entityItems
+            .where((attachment) => attachment.id.isNotEmpty && !seen.contains(attachment.id))
+            .map(
+              (attachment) => _TaskAttachmentItem(
+                attachment: attachment,
+                source: AttachmentSource.entity,
+              ),
+            ),
+      ];
       if (!mounted) return;
-      widget.onAttachmentsChanged(items);
+      widget.onAttachmentsChanged(merged);
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() => _uploadError = error.message);
@@ -1367,10 +1440,10 @@ class _AttachmentsSectionState extends ConsumerState<_AttachmentsSection> {
           Text('No task attachments yet', style: Theme.of(context).textTheme.bodySmall)
         else
           ...widget.attachments.map(
-            (item) => AttachmentListTile(
-              attachment: item,
+            (entry) => AttachmentListTile(
+              attachment: entry.attachment,
               organizationId: widget.organizationId,
-              source: AttachmentSource.task,
+              source: entry.source,
             ),
           ),
       ],
