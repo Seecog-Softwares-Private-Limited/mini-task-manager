@@ -80,7 +80,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _serverStatus = null;
     });
     final candidate = AppConfig.normalizeBaseUrl(_serverUrlController.text.trim());
-    final result = await ApiConnectionService.test(candidate);
+    final host = Uri.tryParse(candidate)?.host;
+    final isProductionHost = host == AppConfig.productionHost;
+
+    final result = isProductionHost
+        ? await ApiConnectionService.findFirstReachable([
+            candidate,
+            ...AppConfig.productionApiCandidates.where((url) => url != candidate),
+          ])
+        : await ApiConnectionService.test(candidate);
+
     if (!mounted) return;
     setState(() {
       _testingConnection = false;
@@ -88,14 +97,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _serverStatusOk = result.ok;
     });
     if (result.ok) {
-      await ref.read(apiBaseUrlProvider.notifier).setBaseUrl(candidate);
+      await ref.read(apiBaseUrlProvider.notifier).setBaseUrl(result.url);
+      _serverUrlController.text = _displayServerInput(result.url);
     }
   }
 
   Future<void> _useProductionServer() async {
-    _serverUrlController.text = kIsWeb ? 'http://localhost:3007' : 'http://3.110.214.243:3000';
-    await _saveServerUrl();
-    await _testConnection();
+    setState(() {
+      _testingConnection = true;
+      _serverStatus = null;
+    });
+    final result = kIsWeb
+        ? await ApiConnectionService.test('http://localhost:3007/api/v1')
+        : await ApiConnectionService.findFirstReachable(AppConfig.productionApiCandidates);
+    if (!mounted) return;
+    if (result.ok) {
+      _serverUrlController.text = _displayServerInput(result.url);
+      await ref.read(apiBaseUrlProvider.notifier).setBaseUrl(result.url);
+    }
+    setState(() {
+      _testingConnection = false;
+      _serverStatus = result.message;
+      _serverStatusOk = result.ok;
+    });
   }
 
   Future<void> _submit() async {
@@ -256,7 +280,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       decoration: const InputDecoration(
                         labelText: 'Server URL',
                         hintText: 'http://localhost:3007',
-                        helperText: 'Web: use localhost:3007. Mobile APK: use your server:3000.',
+                        helperText: kIsWeb
+                            ? 'Web: use http://localhost:3007'
+                            : 'Mobile: try port 80 (http://server) or :3000 on Wi‑Fi.',
                       ),
                       keyboardType: TextInputType.url,
                     ),

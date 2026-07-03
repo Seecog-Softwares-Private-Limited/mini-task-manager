@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'core/config/production_api_probe.dart';
 import 'core/messaging/app_messenger.dart';
 import 'core/preferences/app_preferences.dart';
 import 'core/router/app_router.dart';
@@ -32,6 +33,7 @@ class MiniTaskManagerApp extends ConsumerWidget {
 Future<void> bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
+  await ProductionApiProbe.ensureReachable(prefs);
   runApp(
     ProviderScope(
       overrides: [

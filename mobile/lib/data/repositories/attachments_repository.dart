@@ -131,7 +131,7 @@ class AttachmentsRepository {
     );
   }
 
-  /// Load attachment bytes for preview — tries entity and legacy task endpoints.
+  /// Load attachment bytes for preview.
   Future<Uint8List> fetchAttachmentContent({
     required String attachmentId,
     required String organizationId,
@@ -172,14 +172,31 @@ class AttachmentsRepository {
       try {
         return await attempt();
       } on ApiException catch (error) {
-        lastError = error;
+        lastError = _preferError(lastError, error);
         if (error.statusCode == 401 || error.statusCode == 403) {
           rethrow;
+        }
+        if (_isDefinitiveAttachmentError(error)) {
+          throw error;
         }
       }
     }
     throw lastError ??
         const ApiException(message: 'Could not load this attachment.');
+  }
+
+  bool _isDefinitiveAttachmentError(ApiException error) {
+    final message = error.message.toLowerCase();
+    return message.contains('missing on the server') ||
+        message.contains('file missing') ||
+        message.contains('re-upload');
+  }
+
+  ApiException _preferError(ApiException? current, ApiException next) {
+    if (current == null) return next;
+    if (_isDefinitiveAttachmentError(next)) return next;
+    if (_isDefinitiveAttachmentError(current)) return current;
+    return next;
   }
 
   Future<Uint8List> _fetchAttachmentBytes({

@@ -14,6 +14,24 @@ class ApiConnectionResult {
 }
 
 class ApiConnectionService {
+  /// Tries each candidate until one responds (used for production mobile fallback).
+  static Future<ApiConnectionResult> findFirstReachable(
+    Iterable<String> candidates,
+  ) async {
+    ApiConnectionResult? last;
+    for (final candidate in candidates) {
+      final result = await test(candidate);
+      last = result;
+      if (result.ok) return result;
+    }
+    return last ??
+        const ApiConnectionResult(
+          ok: false,
+          url: '',
+          message: 'No server URL candidates were provided.',
+        );
+  }
+
   static Future<ApiConnectionResult> test(String apiBaseUrl) async {
     final url = apiBaseUrl.trim();
     if (url.isEmpty) {
@@ -75,8 +93,11 @@ class ApiConnectionService {
       return 'For Flutter web use http://localhost:3007 (backend with CORS for :8090).';
     }
     if (url.contains(':3007')) {
-      return 'Port 3007 is usually local-only — try http://YOUR_SERVER:3000 instead.';
+      return 'Port 3007 is local-only — use port 3000 or port 80 on the server.';
     }
-    return 'Use the public web URL with port 3000, not the internal API port 3007.';
+    if (url.contains(':3000')) {
+      return 'Port 3000 is often blocked on mobile data. Try Wi‑Fi, or use port 80 (http://YOUR_SERVER without :3000).';
+    }
+    return 'Check the server is running and port 80/3000 is open in the AWS security group.';
   }
 }

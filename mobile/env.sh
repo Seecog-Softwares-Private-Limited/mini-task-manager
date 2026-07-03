@@ -2,7 +2,7 @@
 #   source mobile/env.sh
 
 export FLUTTER_ROOT="$HOME/development/flutter"
-export JAVA_HOME="${JAVA_HOME:-$HOME/development/jdk/Contents/Home}"
+export JAVA_HOME="${JAVA_HOME:-$(/usr/libexec/java_home 2>/dev/null || echo /Library/Java/JavaVirtualMachines/jdk-23.jdk/Contents/Home)}"
 export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
 
 export PATH="$FLUTTER_ROOT/bin:$PATH"

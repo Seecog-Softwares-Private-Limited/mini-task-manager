@@ -11,6 +11,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { Configuration } from '../../config/configuration';
 import { generateUuid } from '../../common/utils/uuid.util';
+import { findExistingUploadPath } from '../../common/utils/upload-path.util';
 import { TasksRepository } from '../tasks/repositories/tasks.repository';
 import { UsageService } from '../billing/usage.service';
 import { PlanLimitService } from '../../plans/plan-limit.service';
@@ -173,8 +174,7 @@ export class AttachmentsService {
   ): Promise<{ path: string; fileName: string | null; mimeType: string | null }> {
     const attachment = await this.getAttachmentOrThrow(attachmentId, organizationId);
     const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
-    const fullPath = path.join(uploadsPath, attachment.storageKey);
-    await this.assertAttachmentFileExists(fullPath);
+    const fullPath = await this.assertAttachmentFileExists(uploadsPath, attachment.storageKey);
     return {
       path: fullPath,
       fileName: attachment.originalFileName,
@@ -198,7 +198,7 @@ export class AttachmentsService {
       throw new BadRequestException('Preview is not available for this file type.');
     }
     const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
-    const fullPath = path.join(uploadsPath, attachment.storageKey);
+    const fullPath = await findExistingUploadPath(uploadsPath, attachment.storageKey);
     let buffer: Buffer;
     try {
       buffer = await fs.readFile(fullPath);
@@ -239,8 +239,7 @@ export class AttachmentsService {
       };
     }
     const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
-    const fullPath = path.join(uploadsPath, attachment.storageKey);
-    await this.assertAttachmentFileExists(fullPath);
+    const fullPath = await this.assertAttachmentFileExists(uploadsPath, attachment.storageKey);
     return {
       kind: 'file',
       path: fullPath,
@@ -252,8 +251,12 @@ export class AttachmentsService {
   async delete(attachmentId: string, organizationId: string, userId: string): Promise<void> {
     const attachment = await this.getAttachmentOrThrow(attachmentId, organizationId);
     const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
-    const fullPath = path.join(uploadsPath, attachment.storageKey);
-    await fs.unlink(fullPath).catch(() => {});
+    try {
+      const fullPath = await findExistingUploadPath(uploadsPath, attachment.storageKey);
+      await fs.unlink(fullPath).catch(() => {});
+    } catch {
+      /* file already removed from disk */
+    }
     await this.attachmentsRepository.softDelete(attachmentId);
     if (attachment.fileSize && attachment.uploadedBy) {
       await this.planLimitService.decrementStorageUsed(
@@ -263,18 +266,11 @@ export class AttachmentsService {
     }
   }
 
-  private async assertAttachmentFileExists(fullPath: string): Promise<void> {
-    try {
-      await fs.access(fullPath);
-    } catch (err) {
-      const code = (err as NodeJS.ErrnoException)?.code;
-      if (code === 'ENOENT') {
-        throw new NotFoundException(
-          'Attachment file is missing on the server. Re-upload the file.',
-        );
-      }
-      throw err;
-    }
+  private async assertAttachmentFileExists(
+    uploadsPath: string,
+    storageKey: string,
+  ): Promise<string> {
+    return findExistingUploadPath(uploadsPath, storageKey);
   }
 
   private async getAttachmentOrThrow(
