@@ -1,3 +1,4 @@
+import '../../data/models/organization.dart';
 import '../../data/models/project_member.dart';
 import '../../data/models/task.dart';
 
@@ -22,6 +23,56 @@ List<String> activeTaskAssigneeIds(Task task, List<ProjectMember> members) {
     }
   }
   return active;
+}
+
+bool isUserTaskReporter({
+  required Task task,
+  required String? userId,
+}) {
+  if (userId == null || userId.isEmpty) return false;
+  return normalizeUserId(task.reporterId) == normalizeUserId(userId);
+}
+
+bool canManageTaskSubtasks({
+  required Organization? org,
+  required String? userId,
+}) {
+  if (userId == null || userId.isEmpty) return false;
+  final role = org?.myRole?.toLowerCase();
+  if (role == 'owner' || role == 'admin') return true;
+  final ownerId = org?.ownerId;
+  if (ownerId != null && ownerId.isNotEmpty) {
+    return normalizeUserId(ownerId) == normalizeUserId(userId);
+  }
+  return false;
+}
+
+/// Owner/admin can edit task title and description (matches web `canEditAll` for workspace managers).
+bool canEditTaskTitleAndDescription({
+  required Organization? org,
+  required String? userId,
+}) =>
+    canManageTaskSubtasks(org: org, userId: userId);
+
+/// Matches web task-detail `canEditSubtasks`: owner/admin or task assignee.
+bool canEditTaskSubtasks({
+  required Organization? org,
+  required String? userId,
+  required Task task,
+}) {
+  if (userId == null || userId.isEmpty) return false;
+  if (canManageTaskSubtasks(org: org, userId: userId)) return true;
+  return isUserStoredAssigneeOnTask(task: task, userId: userId);
+}
+
+bool isUserStoredAssigneeOnTask({
+  required Task task,
+  required String? userId,
+}) {
+  if (userId == null || userId.isEmpty) return false;
+  final normalized = normalizeUserId(userId);
+  return storedTaskAssigneeIds(task)
+      .any((id) => normalizeUserId(id) == normalized);
 }
 
 bool isUserAssignedToTask({

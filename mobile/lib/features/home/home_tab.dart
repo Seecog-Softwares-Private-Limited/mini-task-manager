@@ -156,12 +156,20 @@ class HomeTab extends ConsumerWidget {
               if (projects.isEmpty) return const SizedBox.shrink();
               final project = projects.where((p) => p.id == lastProjectId).firstOrNull ??
                   projects.first;
-              return SecondaryButton(
-                label: 'Open ${project.name} board',
-                onPressed: () {
-                  ref.read(lastProjectIdProvider.notifier).setProjectId(project.id);
-                  context.push(AppRoutes.projectBoard(project.id));
-                },
+              return Row(
+                children: [
+                  Expanded(
+                    child: _QuickAction(
+                      icon: Icons.view_kanban_rounded,
+                      label: 'Tasks',
+                      color: AppColors.sky,
+                      onTap: () {
+                        ref.read(lastProjectIdProvider.notifier).setProjectId(project.id);
+                        context.push(AppRoutes.projectBoard(project.id));
+                      },
+                    ),
+                  ),
+                ],
               );
             },
             orElse: () => const SizedBox.shrink(),

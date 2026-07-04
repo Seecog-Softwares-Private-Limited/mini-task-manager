@@ -1,22 +1,39 @@
 import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/models/login_response.dart';
 import '../config/storage_keys.dart';
 
 class AuthStorage {
-  AuthStorage({FlutterSecureStorage? storage})
-      : _storage = storage ??
+  AuthStorage({
+    FlutterSecureStorage? storage,
+    SharedPreferences? preferences,
+  })  : _storage = storage ??
             const FlutterSecureStorage(
               aOptions: AndroidOptions(encryptedSharedPreferences: true),
-            );
+            ),
+        _preferences = preferences;
 
   final FlutterSecureStorage _storage;
+  final SharedPreferences? _preferences;
 
   Future<String?> readToken() => _storage.read(key: StorageKeys.token);
 
-  Future<String?> readOrgId() => _storage.read(key: StorageKeys.orgId);
+  Future<String?> readOrgId() async {
+    final secureOrgId = await _storage.read(key: StorageKeys.orgId);
+    if (secureOrgId != null && secureOrgId.isNotEmpty) {
+      return secureOrgId;
+    }
+
+    final prefsOrgId = _preferences?.getString(StorageKeys.orgId);
+    if (prefsOrgId != null && prefsOrgId.isNotEmpty) {
+      await _storage.write(key: StorageKeys.orgId, value: prefsOrgId);
+      return prefsOrgId;
+    }
+    return null;
+  }
 
   Future<AuthUser?> readUser() async {
     final raw = await _storage.read(key: StorageKeys.userJson);
@@ -40,9 +57,11 @@ class AuthStorage {
   Future<void> writeOrgId(String? orgId) async {
     if (orgId == null || orgId.isEmpty) {
       await _storage.delete(key: StorageKeys.orgId);
+      await _preferences?.remove(StorageKeys.orgId);
       return;
     }
     await _storage.write(key: StorageKeys.orgId, value: orgId);
+    await _preferences?.setString(StorageKeys.orgId, orgId);
   }
 
   Future<void> writeUser(AuthUser? user) async {
@@ -65,5 +84,6 @@ class AuthStorage {
     await _storage.delete(key: StorageKeys.token);
     await _storage.delete(key: StorageKeys.orgId);
     await _storage.delete(key: StorageKeys.userJson);
+    await _preferences?.remove(StorageKeys.orgId);
   }
 }

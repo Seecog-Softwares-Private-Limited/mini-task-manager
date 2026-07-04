@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/utils/client_id.dart';
 import '../../data/models/pending_attachment.dart';
+import 'attachment_file_meta.dart';
 
 class AttachmentPickerUtils {
   static Future<PendingAttachment?> pickFile() async {
@@ -52,11 +53,10 @@ class AttachmentPickerUtils {
     );
     if (video == null) return null;
     final bytes = await video.readAsBytes();
-    var fileName = video.name.trim();
-    if (fileName.isEmpty) {
-      final stamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
-      fileName = 'video-$stamp.mp4';
-    }
+    var fileName = sanitizeUploadFileName(
+      video.name.trim(),
+      mimeType: video.mimeType ?? 'video/mp4',
+    );
     return PendingAttachment(
       clientId: generateClientId(),
       fileName: fileName,
@@ -67,11 +67,10 @@ class AttachmentPickerUtils {
 
   static Future<PendingAttachment> _fromXFile(XFile file) async {
     final bytes = await file.readAsBytes();
-    var fileName = file.name.trim();
-    if (fileName.isEmpty) {
-      final stamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
-      fileName = 'photo-$stamp.jpg';
-    }
+    final fileName = sanitizeUploadFileName(
+      file.name,
+      mimeType: file.mimeType ?? 'image/jpeg',
+    );
     return PendingAttachment(
       clientId: generateClientId(),
       fileName: fileName,

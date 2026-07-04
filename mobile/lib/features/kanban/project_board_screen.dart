@@ -14,6 +14,7 @@ import '../../shared/widgets/app_widgets.dart';
 import '../auth/session_controller.dart';
 import 'create_task_sheet.dart';
 import 'kanban_providers.dart';
+import 'project_switcher.dart';
 import 'task_detail_sheet.dart';
 
 class ProjectBoardScreen extends ConsumerStatefulWidget {
@@ -68,7 +69,7 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
               ? error.message
               : 'Unable to load board.';
           return _BoardScaffold(
-            title: 'Board',
+            header: const _BoardTitleHeader(title: 'Board'),
             child: EmptyState(
               title: 'Board unavailable',
               message: message,
@@ -78,8 +79,11 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
         },
         data: (board) {
           if (board.statuses.isEmpty) {
-            return _BoardScaffold(
-              title: board.projectName,
+          return _BoardScaffold(
+            header: ProjectSwitcher(
+              selectedProjectId: widget.projectId,
+              subtitle: 'No workflow columns',
+            ),
               child: const EmptyState(
                 title: 'No workflow columns',
                 message: 'Create a workflow in the web app first.',
@@ -98,8 +102,11 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
           final overdueCount = board.tasks.where((t) => _isOverdue(t.dueDate)).length;
 
           return _BoardScaffold(
-            title: board.projectName,
-            subtitle: '$totalTasks tasks · ${board.statuses.length} columns',
+            header: ProjectSwitcher(
+              selectedProjectId: widget.projectId,
+              taskCount: totalTasks,
+              subtitle: '$totalTasks tasks · ${board.statuses.length} columns',
+            ),
             onRefresh: () async {
               ref.invalidate(projectBoardProvider(widget.projectId));
               await ref.read(projectBoardProvider(widget.projectId).future);
@@ -248,15 +255,13 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
 
 class _BoardScaffold extends StatelessWidget {
   const _BoardScaffold({
-    required this.title,
+    required this.header,
     required this.child,
-    this.subtitle,
     this.headerStats,
     this.onRefresh,
   });
 
-  final String title;
-  final String? subtitle;
+  final Widget header;
   final List<_HeaderStat>? headerStats;
   final Widget child;
   final Future<void> Function()? onRefresh;
@@ -300,31 +305,7 @@ class _BoardScaffold extends StatelessWidget {
                         onPressed: () => context.pop(),
                       ),
                       const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                            ),
-                            if (subtitle != null) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                subtitle!,
-                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                      fontSize: 13,
-                                    ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
+                      Expanded(child: header),
                       if (onRefresh != null)
                         _CircleIconButton(
                           icon: Icons.refresh_rounded,
@@ -351,6 +332,38 @@ class _BoardScaffold extends StatelessWidget {
         Expanded(
           child: child,
         ),
+      ],
+    );
+  }
+}
+
+class _BoardTitleHeader extends StatelessWidget {
+  const _BoardTitleHeader({required this.title, this.subtitle});
+
+  final String title;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+              ),
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: 2),
+          Text(
+            subtitle!,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 13),
+          ),
+        ],
       ],
     );
   }
@@ -813,7 +826,7 @@ class _CreateTaskFab extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         gradient: const LinearGradient(
-          colors: [AppColors.primary, AppColors.primaryDark],
+          colors: [AppColors.primary, AppColors.primaryGradientEnd],
         ),
         boxShadow: [
           BoxShadow(
