@@ -77,7 +77,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 gradient: const LinearGradient(
-                  colors: [AppColors.primary, AppColors.primaryDark],
+                  colors: [AppColors.primary, AppColors.primaryGradientEnd],
                 ),
                 boxShadow: [
                   BoxShadow(

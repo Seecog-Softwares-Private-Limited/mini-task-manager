@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../data/models/task_attachment.dart';
 import '../../data/repositories/attachments_repository.dart';
@@ -77,14 +78,77 @@ Future<void> _downloadAttachment({
   }
 }
 
-class AttachmentListTile extends ConsumerWidget {
-  const AttachmentListTile({
+const _attachmentTileSize = 84.0;
+
+class AttachmentGridEntry {
+  const AttachmentGridEntry({
+    required this.attachment,
+    this.source = AttachmentSource.entity,
+    this.index,
+    this.onDelete,
+  });
+
+  final TaskAttachment attachment;
+  final AttachmentSource source;
+  final int? index;
+  final VoidCallback? onDelete;
+}
+
+class AttachmentGrid extends ConsumerWidget {
+  const AttachmentGrid({
+    super.key,
+    required this.items,
+    required this.organizationId,
+    this.enabled = true,
+  });
+
+  final List<AttachmentGridEntry> items;
+  final String organizationId;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '${items.length} ${items.length == 1 ? 'File' : 'Files'}',
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: AppColors.textMuted,
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
+          children: items.map((entry) {
+            return AttachmentGridTile(
+              attachment: entry.attachment,
+              organizationId: organizationId,
+              source: entry.source,
+              index: entry.index,
+              enabled: enabled,
+              onDelete: entry.onDelete,
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+}
+
+class AttachmentGridTile extends ConsumerWidget {
+  const AttachmentGridTile({
     super.key,
     required this.attachment,
     required this.organizationId,
     this.source = AttachmentSource.entity,
     this.onDelete,
     this.enabled = true,
+    this.index,
   });
 
   final TaskAttachment attachment;
@@ -92,52 +156,172 @@ class AttachmentListTile extends ConsumerWidget {
   final AttachmentSource source;
   final VoidCallback? onDelete;
   final bool enabled;
+  final int? index;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(iconForAttachment(attachment)),
-      title: Text(
-        attachment.fileName,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: attachment.fileSizeBytes == null
-          ? null
-          : Text(formatFileSize(attachment.fileSizeBytes!)),
-      onTap: enabled
-          ? () => previewTaskAttachment(
-                context: context,
-                ref: ref,
+    final displayName = displayNameForAttachment(attachment, index: index);
+    final preview = () => previewTaskAttachment(
+          context: context,
+          ref: ref,
+          attachment: attachment,
+          organizationId: organizationId,
+          source: source,
+        );
+
+    return SizedBox(
+      width: _attachmentTileSize,
+      height: _attachmentTileSize,
+      child: Material(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: 0.45)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: enabled ? preview : null,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              _AttachmentThumbnail(
                 attachment: attachment,
                 organizationId: organizationId,
                 source: source,
-              )
-          : null,
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.visibility_outlined),
-            tooltip: 'Preview',
-            onPressed: enabled
-                ? () => previewTaskAttachment(
-                      context: context,
-                      ref: ref,
-                      attachment: attachment,
-                      organizationId: organizationId,
-                      source: source,
-                    )
-                : null,
+                size: _attachmentTileSize,
+                expand: true,
+              ),
+              if (onDelete != null)
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: Material(
+                    color: Colors.black.withValues(alpha: 0.55),
+                    shape: const CircleBorder(),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: enabled ? onDelete : null,
+                      child: const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: Icon(Icons.close_rounded, size: 14, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ),
+              if (!isImageAttachment(attachment))
+                Positioned(
+                  left: 6,
+                  right: 6,
+                  bottom: 6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.62),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: Colors.white,
+                            fontSize: 9,
+                          ),
+                    ),
+                  ),
+                ),
+            ],
           ),
-          if (onDelete != null)
-            IconButton(
-              icon: const Icon(Icons.delete_outline_rounded),
-              tooltip: 'Delete',
-              onPressed: enabled ? onDelete : null,
-            ),
-        ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AttachmentThumbnail extends ConsumerStatefulWidget {
+  const _AttachmentThumbnail({
+    required this.attachment,
+    required this.organizationId,
+    required this.source,
+    this.size = 44,
+    this.expand = false,
+  });
+
+  final TaskAttachment attachment;
+  final String organizationId;
+  final AttachmentSource source;
+  final double size;
+  final bool expand;
+
+  @override
+  ConsumerState<_AttachmentThumbnail> createState() => _AttachmentThumbnailState();
+}
+
+class _AttachmentThumbnailState extends ConsumerState<_AttachmentThumbnail> {
+  Uint8List? _bytes;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (isImageAttachment(widget.attachment)) {
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    try {
+      final orgId = widget.organizationId.trim().isNotEmpty
+          ? widget.organizationId.trim()
+          : (ref.read(sessionControllerProvider).orgId ?? '');
+      if (orgId.isEmpty || widget.attachment.id.trim().isEmpty) return;
+      final bytes = await ref.read(attachmentsRepositoryProvider).fetchAttachmentContent(
+            attachmentId: widget.attachment.id,
+            organizationId: orgId,
+            source: widget.source,
+          );
+      if (!mounted) return;
+      setState(() => _bytes = bytes);
+    } catch (_) {
+      if (mounted) setState(() => _failed = true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final borderRadius = BorderRadius.circular(widget.expand ? 0 : 8);
+
+    if (_bytes != null) {
+      return ClipRRect(
+        borderRadius: borderRadius,
+        child: Image.memory(
+          _bytes!,
+          width: widget.expand ? double.infinity : widget.size,
+          height: widget.expand ? double.infinity : widget.size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _iconFallback(context),
+        ),
+      );
+    }
+    return _iconFallback(context);
+  }
+
+  Widget _iconFallback(BuildContext context) {
+    final borderRadius = BorderRadius.circular(widget.expand ? 0 : 8);
+    return Container(
+      width: widget.expand ? double.infinity : widget.size,
+      height: widget.expand ? double.infinity : widget.size,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: borderRadius,
+        border: widget.expand
+            ? null
+            : Border.all(color: Theme.of(context).dividerColor.withValues(alpha: 0.4)),
+      ),
+      child: Icon(
+        _failed ? Icons.broken_image_outlined : iconForAttachment(widget.attachment),
+        size: widget.expand ? 28 : 22,
+        color: AppColors.textMuted,
       ),
     );
   }
@@ -288,7 +472,7 @@ class _AttachmentPreviewDialogState extends ConsumerState<_AttachmentPreviewDial
           mainAxisSize: MainAxisSize.min,
           children: [
             _PreviewHeader(
-              fileName: widget.attachment.fileName,
+              fileName: displayNameForAttachment(widget.attachment),
               onDownload: widget.onDownload,
               onClose: () => Navigator.of(context).pop(),
             ),

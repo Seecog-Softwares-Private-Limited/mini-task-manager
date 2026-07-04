@@ -427,13 +427,16 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
               ),
             )
           else
-            ..._attachments.map(
-              (item) => AttachmentListTile(
-                attachment: item,
-                organizationId: widget.organizationId,
-                enabled: !widget.saving,
-                onDelete: () => _deleteAttachment(item.id),
-              ),
+            AttachmentGrid(
+              organizationId: widget.organizationId,
+              enabled: !widget.saving,
+              items: _attachments.asMap().entries.map(
+                (entry) => AttachmentGridEntry(
+                  attachment: entry.value,
+                  index: entry.key + 1,
+                  onDelete: () => _deleteAttachment(entry.value.id),
+                ),
+              ).toList(),
             ),
           if (_attachmentError != null) ...[
             const SizedBox(height: AppSpacing.xs),

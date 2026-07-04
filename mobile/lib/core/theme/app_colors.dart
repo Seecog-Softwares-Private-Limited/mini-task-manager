@@ -1,10 +1,19 @@
 import 'package:flutter/material.dart';
 
 abstract final class AppColors {
-  static const primary = Color(0xFF6366F1);
-  static const primaryDark = Color(0xFF4F46E5);
+  /// Website `--primary` / `--gradient-start`: hsl(239 84% 67%)
+  static const primary = Color(0xFF6467F2);
+  /// Website `--gradient-end`: hsl(280 72% 60%)
+  static const primaryGradientEnd = Color(0xFFB150E2);
+  static const primaryDark = Color(0xFFB150E2);
   static const violet = Color(0xFF7C3AED);
   static const sky = Color(0xFF0284C7);
+
+  static const primaryGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [primary, primaryGradientEnd],
+  );
 
   static const background = Color(0xFFF8FAFC);
   static const surface = Color(0xFFFFFFFF);

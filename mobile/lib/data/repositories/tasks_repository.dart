@@ -87,6 +87,7 @@ class TasksRepository {
   Future<Task> updateTask({
     required String taskId,
     String? title,
+    String? description,
     String? statusId,
     List<String>? assigneeIds,
     String? priority,
@@ -98,6 +99,7 @@ class TasksRepository {
     try {
       final data = <String, dynamic>{};
       if (title != null) data['title'] = title.trim();
+      if (description != null) data['description'] = description.trim();
       if (statusId != null) data['statusId'] = statusId;
       if (assigneeIds != null) data['assigneeIds'] = assigneeIds;
       if (priority != null) data['priority'] = priority.toUpperCase();

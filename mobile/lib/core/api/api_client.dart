@@ -6,6 +6,7 @@ import '../config/app_config.dart';
 import '../config/storage_keys.dart';
 import '../messaging/app_messenger.dart';
 import '../auth/auth_storage.dart';
+import '../preferences/app_preferences.dart';
 
 typedef SessionExpiredCallback = void Function();
 
@@ -122,7 +123,9 @@ final appConfigProvider = Provider<AppConfig>((ref) {
   return AppConfig.fromApiBaseUrl(apiBaseUrl);
 });
 
-final authStorageProvider = Provider<AuthStorage>((ref) => AuthStorage());
+final authStorageProvider = Provider<AuthStorage>((ref) {
+  return AuthStorage(preferences: ref.watch(sharedPreferencesProvider));
+});
 
 final sessionExpiredTickProvider = StateProvider<int>((ref) => 0);
 

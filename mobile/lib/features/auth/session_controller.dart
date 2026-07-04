@@ -75,17 +75,55 @@ class SessionController extends Notifier<SessionState> {
     }
 
     final user = await _authStorage.readUser();
-    final orgId = await _authRepository.readOrgId();
-    if (orgId != null && orgId.isNotEmpty) {
+    final storedOrgId = await _authRepository.readOrgId();
+
+    List<Organization> organizations = const [];
+    try {
+      organizations = await _organizationsRepository.fetchOrganizations();
+    } catch (_) {
+      if (storedOrgId != null && storedOrgId.isNotEmpty) {
+        state = SessionState(
+          status: SessionStatus.authenticated,
+          user: user,
+          orgId: storedOrgId,
+        );
+        return;
+      }
+      state = const SessionState(status: SessionStatus.unauthenticated);
+      return;
+    }
+
+    if (storedOrgId != null && storedOrgId.isNotEmpty) {
+      final stillMember = organizations.any((org) => org.id == storedOrgId);
+      if (stillMember) {
+        state = SessionState(
+          status: SessionStatus.authenticated,
+          user: user,
+          orgId: storedOrgId,
+          organizations: organizations,
+        );
+        return;
+      }
+      await _authStorage.writeOrgId(null);
+    }
+
+    if (organizations.length == 1) {
+      final org = organizations.first;
+      await _authStorage.writeOrgId(org.id);
       state = SessionState(
         status: SessionStatus.authenticated,
         user: user,
-        orgId: orgId,
+        orgId: org.id,
+        organizations: organizations,
       );
       return;
     }
 
-    await _loadOrganizations(requireSelection: true, user: user);
+    state = SessionState(
+      status: SessionStatus.needsWorkspace,
+      user: user,
+      organizations: organizations,
+    );
   }
 
   Future<void> login({
@@ -95,10 +133,12 @@ class SessionController extends Notifier<SessionState> {
     final response = await _authRepository.login(email: email, password: password);
 
     if (response.organizationId != null && response.organizationId!.isNotEmpty) {
+      final organizations = await _organizationsRepository.fetchOrganizations();
       state = SessionState(
         status: SessionStatus.authenticated,
         user: response.user,
         orgId: response.organizationId,
+        organizations: organizations,
       );
       return;
     }

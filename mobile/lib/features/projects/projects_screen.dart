@@ -143,7 +143,7 @@ class _CreateProjectBanner extends StatelessWidget {
                   height: 44,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [AppColors.primary, AppColors.primaryDark],
+                      colors: [AppColors.primary, AppColors.primaryGradientEnd],
                     ),
                     borderRadius: BorderRadius.circular(12),
                   ),
