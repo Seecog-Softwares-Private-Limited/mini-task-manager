@@ -20,6 +20,8 @@ interface SubtaskDueDatePickerProps {
   onChange: (date?: string) => void;
   disabled?: boolean;
   completed?: boolean;
+  /** `row` for compact checklist rows; `field` for expanded subtask editor. */
+  variant?: "row" | "field";
 }
 
 function parseDueDateLocal(value?: string): Date | null {
@@ -49,9 +51,9 @@ function isOverdue(value?: string, completed?: boolean): boolean {
   return current < today;
 }
 
-function formatDateLabel(value?: string): string {
+function formatDateLabel(value?: string, variant: "row" | "field" = "field"): string {
   const date = parseDueDateLocal(value);
-  if (!date) return "Due";
+  if (!date) return variant === "row" ? "" : "Due";
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
@@ -60,8 +62,11 @@ export function SubtaskDueDatePicker({
   onChange,
   disabled,
   completed,
+  variant = "field",
 }: SubtaskDueDatePickerProps) {
   const overdue = isOverdue(value, completed);
+  const dateLabel = formatDateLabel(value, variant);
+  const rowAssigned = variant === "row" && Boolean(value);
 
   return (
     <DropdownMenu modal={false}>
@@ -71,15 +76,29 @@ export function SubtaskDueDatePicker({
           variant="ghost"
           disabled={disabled}
           className={cn(
-            "h-8 rounded-full px-3 text-[11px] font-semibold shadow-sm ring-1 ring-border/25 transition-[background-color,box-shadow] hover:ring-border/40",
-            value
-              ? "bg-background/90 text-foreground"
-              : "bg-muted/35 text-muted-foreground ring-dashed ring-muted-foreground/30",
-            overdue && "bg-destructive/10 text-destructive ring-destructive/30"
+            variant === "row"
+              ? cn(
+                  "h-7 w-7 shrink-0 rounded-full p-0 shadow-sm transition-[background-color,box-shadow,color]",
+                  rowAssigned
+                    ? overdue
+                      ? "border border-destructive/35 bg-destructive/10 text-destructive hover:bg-destructive/15"
+                      : "border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 dark:border-rose-500/35 dark:bg-rose-500/10 dark:text-rose-400"
+                    : "border border-border/60 bg-background text-muted-foreground hover:bg-muted/30"
+                )
+              : cn(
+                  "h-8 rounded-full px-3 text-[11px] font-semibold shadow-sm ring-1 ring-border/25 transition-[background-color,box-shadow] hover:ring-border/40",
+                  value
+                    ? "bg-background/90 text-foreground"
+                    : "bg-muted/35 text-muted-foreground ring-dashed ring-muted-foreground/30",
+                  overdue && "bg-destructive/10 text-destructive ring-destructive/30"
+                )
           )}
+          aria-label={value ? `Due date ${dateLabel}` : "Set due date"}
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
         >
-          <CalendarDays className="mr-1 h-3.5 w-3.5" />
-          {formatDateLabel(value)}
+          <CalendarDays className="h-3.5 w-3.5 shrink-0" />
+          {variant === "field" && dateLabel ? <span className="ml-1">{dateLabel}</span> : null}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -116,4 +135,3 @@ export function SubtaskDueDatePicker({
     </DropdownMenu>
   );
 }
-

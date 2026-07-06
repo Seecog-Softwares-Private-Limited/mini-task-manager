@@ -1,5 +1,6 @@
 import { apiClient } from "@/services/api/client";
 import { config } from "@/config/env";
+import { formatAttachmentDisplayName, inferMimeTypeFromFileName } from "@/lib/attachment-file-meta";
 import type { EntityAttachment, EntityAttachmentType } from "@/types/api";
 
 interface EntityAttachmentResponse {
@@ -23,6 +24,8 @@ interface EntityAttachmentResponse {
 }
 
 function toEntityAttachment(r: EntityAttachmentResponse): EntityAttachment {
+  const rawName = r.originalFileName ?? "file";
+  const mimeType = r.mimeType ?? inferMimeTypeFromFileName(rawName);
   return {
     id: r.id,
     workspaceId: r.workspaceId,
@@ -30,9 +33,9 @@ function toEntityAttachment(r: EntityAttachmentResponse): EntityAttachment {
     taskId: r.taskId,
     entityType: r.entityType,
     entityId: r.entityId,
-    originalFileName: r.originalFileName ?? "file",
+    originalFileName: formatAttachmentDisplayName(rawName, { mimeType }),
     storedFileName: r.storedFileName,
-    mimeType: r.mimeType ?? "",
+    mimeType,
     fileExtension: r.fileExtension,
     fileSize: Number(r.fileSize ?? 0),
     storageProvider: r.storageProvider,

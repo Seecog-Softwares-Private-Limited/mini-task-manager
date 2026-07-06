@@ -1,6 +1,6 @@
 import { apiClient } from "@/services/api/client";
 import { config } from "@/config/env";
-import { ensurePreviewBlob, inferMimeTypeFromFileName } from "@/lib/attachment-file-meta";
+import { ensurePreviewBlob, formatAttachmentDisplayName, inferMimeTypeFromFileName } from "@/lib/attachment-file-meta";
 import type { TaskAttachment } from "@/types/api";
 
 /** Backend returns fileUrl (relative path); we expose a download URL. */
@@ -15,13 +15,15 @@ export interface TaskAttachmentResponse {
 }
 
 function toAttachment(r: TaskAttachmentResponse): TaskAttachment {
-  const fileName = r.fileName ?? "file";
+  const rawName = r.fileName ?? "file";
+  const mimeType = inferMimeTypeFromFileName(rawName);
+  const fileName = formatAttachmentDisplayName(rawName, { mimeType });
   return {
     id: r.id,
     taskId: r.taskId,
     fileName,
     fileSize: Number(r.fileSizeBytes ?? 0),
-    mimeType: inferMimeTypeFromFileName(fileName),
+    mimeType,
     url: `${config.apiBaseUrl}/tasks/attachments/${r.id}/file`,
     uploadedBy: r.uploadedBy,
     uploadedAt: r.uploadedAt,

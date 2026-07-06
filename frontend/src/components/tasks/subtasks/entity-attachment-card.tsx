@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   formatFileSize,
+  formatAttachmentDisplayName,
   getAttachmentFileIcon,
   isImageMime,
 } from "@/lib/attachment-file-meta";
@@ -41,6 +42,7 @@ export function EntityAttachmentCard({
   disabled,
 }: EntityAttachmentCardProps) {
   const { Icon, label } = getAttachmentFileIcon(item.mimeType, item.fileName);
+  const displayName = formatAttachmentDisplayName(item.fileName, { mimeType: item.mimeType });
   const showThumb = isImageMime(item.mimeType) && item.localPreviewUrl;
 
   return (
@@ -62,7 +64,7 @@ export function EntityAttachmentCard({
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-xs font-medium text-foreground">{item.fileName}</p>
+        <p className="truncate text-xs font-medium text-foreground">{displayName}</p>
         <p className="text-[11px] text-muted-foreground">
           {formatFileSize(item.fileSize)}
           {item.status === "uploading" && (

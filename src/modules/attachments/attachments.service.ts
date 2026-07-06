@@ -12,6 +12,7 @@ import * as path from 'path';
 import { Configuration } from '../../config/configuration';
 import { generateUuid } from '../../common/utils/uuid.util';
 import { findExistingUploadPath } from '../../common/utils/upload-path.util';
+import { resolveAttachmentDisplayName } from '../../common/utils/attachment-display-name.util';
 import { TasksRepository } from '../tasks/repositories/tasks.repository';
 import { UsageService } from '../billing/usage.service';
 import { PlanLimitService } from '../../plans/plan-limit.service';
@@ -147,13 +148,14 @@ export class AttachmentsService {
     const fullPath = path.join(uploadsPath, storageKey);
     await fs.writeFile(fullPath, file.buffer);
 
+    const displayName = resolveAttachmentDisplayName(file.originalname, file.mimetype);
     const attachment = await this.attachmentsRepository.create({
       workspaceId: organizationId,
       projectId: context.projectId,
       taskId: context.taskId,
       entityType,
       entityId,
-      originalFileName: file.originalname || null,
+      originalFileName: displayName,
       storedFileName,
       mimeType: file.mimetype || null,
       fileExtension: ext.replace(/^\./, '') || null,
