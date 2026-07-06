@@ -24,6 +24,7 @@ import {
   type OfficePreviewResult,
 } from '../../common/utils/office-document-preview.util';
 import { findExistingUploadPath } from '../../common/utils/upload-path.util';
+import { resolveAttachmentDisplayName } from '../../common/utils/attachment-display-name.util';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -619,10 +620,11 @@ export class TasksService {
     const relativePath = path.join('task-attachments', taskId, `${generateUuid()}-${base}${ext}`);
     const fullPath = path.join(uploadsPath, relativePath);
     await fs.writeFile(fullPath, file.buffer);
+    const displayName = resolveAttachmentDisplayName(file.originalname, file.mimetype);
     const attachment = await this.taskAttachmentsRepository.create({
       taskId,
       fileUrl: relativePath.replace(/\\/g, '/'),
-      fileName: file.originalname || null,
+      fileName: displayName,
       fileSizeBytes: file.size,
       uploadedBy: userId,
     });

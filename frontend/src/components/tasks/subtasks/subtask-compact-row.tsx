@@ -1,25 +1,15 @@
 "use client";
 
-import { Paperclip, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-selector";
+import { SubtaskDueDatePicker } from "@/components/tasks/subtask-due-date-picker";
 import { SubtaskStatusSelector } from "@/components/tasks/subtask-status-selector";
 import type { SubtaskStatus } from "@/lib/subtask-status";
 import type { OrgMember } from "@/types/api";
 import { getSubtaskAssigneeIds } from "@/lib/subtask-assignees";
 import { UserAvatar } from "@/components/ui/user-avatar";
-
-function formatCompactDueDate(value?: string): string {
-  if (!value) return "";
-  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (!match) return "";
-  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-  if (Number.isNaN(date.getTime())) return "";
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = date.toLocaleDateString(undefined, { month: "short" });
-  return `Due ${day} ${month}`;
-}
 
 type MemberHint = { id: string; name: string; email?: string; avatarUrl?: string };
 
@@ -30,7 +20,6 @@ interface SubtaskCompactRowProps {
   dueDate?: string;
   assigneeId?: string;
   assigneeIds?: string[];
-  attachmentCount: number;
   projectId: string;
   organizationId?: string;
   prefetchedOrgMembers?: OrgMember[];
@@ -44,6 +33,7 @@ interface SubtaskCompactRowProps {
   onRowClick: () => void;
   onDelete: () => void;
   onAssigneeChange?: (assigneeIds: string[]) => void;
+  onDueDateChange?: (dueDate?: string) => void;
 }
 
 export function SubtaskCompactRow({
@@ -53,7 +43,6 @@ export function SubtaskCompactRow({
   dueDate,
   assigneeId,
   assigneeIds,
-  attachmentCount,
   projectId,
   organizationId,
   prefetchedOrgMembers,
@@ -66,8 +55,8 @@ export function SubtaskCompactRow({
   onRowClick,
   onDelete,
   onAssigneeChange,
+  onDueDateChange,
 }: SubtaskCompactRowProps) {
-  const dueLabel = formatCompactDueDate(dueDate);
   const resolvedAssigneeIds = getSubtaskAssigneeIds({ assigneeId, assigneeIds });
   const assigneeMembers = resolvedAssigneeIds
     .map((id) => knownMembers?.find((m) => m.id === id) ?? { id, name: "User" })
@@ -109,11 +98,6 @@ export function SubtaskCompactRow({
         >
           {title || "Untitled subtask"}
         </span>
-        {dueLabel ? (
-          <span className="hidden shrink-0 text-[11px] font-medium text-muted-foreground sm:inline">
-            {dueLabel}
-          </span>
-        ) : null}
       </button>
       <div
         className="flex shrink-0 items-center gap-1"
@@ -176,20 +160,15 @@ export function SubtaskCompactRow({
             )}
           </div>
         )}
-        <span
-          className="inline-flex h-7 w-9 shrink-0 items-center justify-center"
-          aria-hidden={attachmentCount === 0}
-        >
-          {attachmentCount > 0 ? (
-            <span
-              className="inline-flex items-center gap-0.5 rounded-full bg-muted/40 px-2 py-1 text-[11px] font-medium text-muted-foreground"
-              title={`${attachmentCount} attachment${attachmentCount === 1 ? "" : "s"}`}
-            >
-              <Paperclip className="h-3 w-3" />
-              {attachmentCount}
-            </span>
-          ) : null}
-        </span>
+        {onDueDateChange ? (
+          <SubtaskDueDatePicker
+            value={dueDate}
+            completed={completed}
+            onChange={onDueDateChange}
+            disabled={editDisabled}
+            variant="row"
+          />
+        ) : null}
         <Button
           type="button"
           variant="ghost"

@@ -11,7 +11,6 @@ import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-sel
 import {
   processSubtaskComposerPaste,
   SubtaskComposerAttachments,
-  SubtaskRowAttachmentPreview,
 } from "@/components/tasks/create-task/subtask-composer-attachments";
 import type {
   FieldErrors,
@@ -20,7 +19,8 @@ import type {
   UseFormRegister,
   UseFormSetValue,
 } from "react-hook-form";
-import { CalendarDays, Check, Pencil, Plus, Trash2 } from "lucide-react";
+import { SubtaskDueDatePicker } from "@/components/tasks/subtask-due-date-picker";
+import { Check, Pencil, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { generateClientId } from "@/lib/generate-client-id";
 import {
@@ -70,15 +70,6 @@ interface SubtasksEditorProps {
     items: PendingSubtaskAttachment[]
   ) => void;
   hideQuickAdd?: boolean;
-}
-
-function formatCompactDueDate(value?: string): string {
-  if (!value) return "";
-  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (!match) return "";
-  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 export function SubtasksEditor({
@@ -387,15 +378,12 @@ export function SubtasksEditor({
                 disabled={disabled}
               />
             </div>
-            <div className="flex min-w-[120px] flex-1 items-center gap-1.5">
-              <CalendarDays className="h-3.5 w-3.5 shrink-0 text-muted-foreground/70" aria-hidden />
-              <Input
-                type="date"
+            <div className="flex min-w-[120px] flex-1 items-center">
+              <SubtaskDueDatePicker
                 value={draftDueDate}
-                onChange={(e) => setDraftDueDate(e.target.value)}
+                onChange={setDraftDueDate}
                 disabled={disabled}
-                className="h-8 flex-1 rounded-md border-border/55 bg-background px-2 text-xs shadow-sm transition-all duration-200"
-                aria-label="Subtask due date"
+                variant="field"
               />
             </div>
           </div>
@@ -450,9 +438,7 @@ export function SubtasksEditor({
                 return member ? { id, ...member } : null;
               })
               .filter(Boolean);
-            const dueLabel = formatCompactDueDate(value?.dueDate);
             const completed = resolveSubtaskStatus(value ?? { completed: false }) === "DONE";
-            const rowAttachments = pendingAttachmentsBySubtask[key] ?? [];
             const isEditingThis = composerOpen && editingIndex === index;
 
             return (
@@ -503,13 +489,18 @@ export function SubtasksEditor({
                     </div>
                   ) : null}
 
-                  {dueLabel ? (
-                    <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
-                      {dueLabel}
-                    </span>
-                  ) : null}
-
-                  <SubtaskRowAttachmentPreview attachments={rowAttachments} />
+                  <SubtaskDueDatePicker
+                    value={value?.dueDate}
+                    completed={completed}
+                    disabled={disabled || (composerOpen && editingIndex !== index)}
+                    variant="row"
+                    onChange={(dueDate) => {
+                      setValue(`subtasks.${index}.dueDate`, dueDate, {
+                        shouldDirty: true,
+                        shouldTouch: true,
+                      });
+                    }}
+                  />
 
                   <Button
                     type="button"

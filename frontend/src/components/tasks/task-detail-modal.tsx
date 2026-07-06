@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import dynamic from "next/dynamic";
-import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Dialog,
   DialogContent,
@@ -70,7 +70,6 @@ import {
   type SubtaskDraft,
 } from "@/components/tasks/subtasks/subtask-detail-panel";
 import { resolveSubtaskPriority } from "@/components/tasks/subtask-priority-selector";
-import { fetchEntityAttachments } from "@/services/api/entity-attachments.api";
 import { CommentInputWithMentions } from "@/components/tasks/comment-input-with-mentions";
 import {
   normalizeDescriptionHtml,
@@ -581,23 +580,6 @@ export function TaskDetailModal({
     void queryClient.invalidateQueries({ queryKey: ["entity-attachments", "SUBTASK"] });
     void queryClient.invalidateQueries({ queryKey: ["task-attachments", taskId] });
   }, [open, taskId, queryClient]);
-
-  const subtaskAttachmentQueries = useQueries({
-    queries: checklist.map((item) => ({
-      queryKey: ["entity-attachments", "SUBTASK", item.id],
-      queryFn: () => fetchEntityAttachments("SUBTASK", item.id, taskId ?? undefined),
-      enabled: Boolean(taskId && item.id),
-      staleTime: 30_000,
-    })),
-  });
-
-  const attachmentCountBySubtaskId = React.useMemo(() => {
-    const map = new Map<string, number>();
-    checklist.forEach((item, index) => {
-      map.set(item.id, subtaskAttachmentQueries[index]?.data?.length ?? 0);
-    });
-    return map;
-  }, [checklist, subtaskAttachmentQueries]);
 
   const checklistStats = React.useMemo(() => {
     const total = checklist.length;
@@ -1403,7 +1385,6 @@ export function TaskDetailModal({
                               dueDate={item.dueDate}
                               assigneeId={item.assigneeId}
                               assigneeIds={item.assigneeIds}
-                              attachmentCount={attachmentCountBySubtaskId.get(item.id) ?? 0}
                               projectId={projectId}
                               organizationId={organizationId}
                               prefetchedOrgMembers={orgMembers}
@@ -1432,6 +1413,13 @@ export function TaskDetailModal({
                                     i.id === item.id
                                       ? withSubtaskAssignees(i, nextAssigneeIds)
                                       : i
+                                  )
+                                );
+                              }}
+                              onDueDateChange={(dueDate) => {
+                                updateSubtasksMutation.mutate(
+                                  checklist.map((i) =>
+                                    i.id === item.id ? { ...i, dueDate } : i
                                   )
                                 );
                               }}

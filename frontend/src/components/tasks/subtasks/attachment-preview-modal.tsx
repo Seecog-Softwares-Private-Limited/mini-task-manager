@@ -31,6 +31,8 @@ import {
 } from "@/lib/attachment-document-preview";
 import {
   ensurePreviewBlob,
+  formatAttachmentDisplayName,
+  friendlyAttachmentLoadError,
   inferMimeTypeFromFileName,
   isImageMime,
   isPdfMime,
@@ -70,10 +72,33 @@ async function fetchPreviewBlob(
   if (!target.id) {
     throw new Error("No attachment available to preview");
   }
-  if (target.source === "task") {
-    return fetchAttachmentBlob(target.id, fileName);
+
+  const id = target.id;
+  const attempts: Array<() => Promise<Blob>> =
+    target.source === "task"
+      ? [
+          () => fetchAttachmentBlob(id, fileName),
+          () => fetchEntityAttachmentBlob(id),
+        ]
+      : target.source === "entity"
+        ? [
+            () => fetchEntityAttachmentBlob(id),
+            () => fetchAttachmentBlob(id, fileName),
+          ]
+        : [
+            () => fetchEntityAttachmentBlob(id),
+            () => fetchAttachmentBlob(id, fileName),
+          ];
+
+  let lastError: unknown;
+  for (const attempt of attempts) {
+    try {
+      return await attempt();
+    } catch (error) {
+      lastError = error;
+    }
   }
-  return fetchEntityAttachmentBlob(target.id);
+  throw lastError ?? new Error("Could not load this attachment.");
 }
 
 async function tryFetchRenderedOfficePreview(
@@ -106,8 +131,11 @@ export function AttachmentPreviewModal({ target, onClose }: AttachmentPreviewMod
   const [zoom, setZoom] = React.useState(1);
 
   const open = Boolean(target);
-  const fileName = target?.fileName ?? "file";
-  const resolvedMime = target?.mimeType || inferMimeTypeFromFileName(fileName);
+  const rawFileName = target?.fileName ?? "file";
+  const fileName = formatAttachmentDisplayName(rawFileName, {
+    mimeType: target?.mimeType || inferMimeTypeFromFileName(rawFileName),
+  });
+  const resolvedMime = target?.mimeType || inferMimeTypeFromFileName(rawFileName);
   const isImage = isImageMime(resolvedMime, fileName);
   const isPdf = isPdfMime(resolvedMime, fileName);
   const isText = isTextPreviewMime(resolvedMime, fileName);
@@ -165,7 +193,7 @@ export function AttachmentPreviewModal({ target, onClose }: AttachmentPreviewMod
           try {
             rawBlob = await fetchPreviewBlob(target, fileName);
           } catch (blobErr) {
-            finishUnsupported(parseApiError(blobErr));
+            finishUnsupported(friendlyAttachmentLoadError(parseApiError(blobErr)));
             return;
           }
           if (cancelled) return;
@@ -218,7 +246,9 @@ export function AttachmentPreviewModal({ target, onClose }: AttachmentPreviewMod
         finishUnsupported("Preview is not available for this file type.");
       } catch (err) {
         finishUnsupported(
-          parseApiError(err) || officePreviewFallbackMessage(fileName, resolvedMime)
+          friendlyAttachmentLoadError(
+            parseApiError(err) || officePreviewFallbackMessage(fileName, resolvedMime)
+          )
         );
       } finally {
         if (!cancelled) setLoading(false);
