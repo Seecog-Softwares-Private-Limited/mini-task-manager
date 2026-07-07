@@ -1,0 +1,4 @@
+
+module record_ios.Swift {
+  header "record_ios-Swift.h"
+}

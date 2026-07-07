@@ -1,0 +1,86 @@
+{
+  "" : {
+    "const-values" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/record_ios-primary.swiftconstvalues",
+    "dependencies" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/record_ios-primary.d",
+    "diagnostics" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/record_ios-primary.dia",
+    "emit-module-dependencies" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/record_ios-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/record_ios-primary-emit-module.dia",
+    "pch" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/record_ios-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/record_ios-primary.swiftdeps"
+  },
+  "/Users/vinikdhariwal/.pub-cache/hosted/pub.dev/record_ios-2.1.1/ios/record_ios/Sources/record_ios/InputHelper.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/InputHelper.o",
+    "llvm-bc" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/InputHelper.bc",
+    "object" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/InputHelper.o"
+  },
+  "/Users/vinikdhariwal/.pub-cache/hosted/pub.dev/record_ios-2.1.1/ios/record_ios/Sources/record_ios/RecordConfig.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/RecordConfig.o",
+    "llvm-bc" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/RecordConfig.bc",
+    "object" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/RecordConfig.o"
+  },
+  "/Users/vinikdhariwal/.pub-cache/hosted/pub.dev/record_ios-2.1.1/ios/record_ios/Sources/record_ios/RecordIosPlugin.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/RecordIosPlugin.o",
+    "llvm-bc" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/RecordIosPlugin.bc",
+    "object" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/RecordIosPlugin.o"
+  },
+  "/Users/vinikdhariwal/.pub-cache/hosted/pub.dev/record_ios-2.1.1/ios/record_ios/Sources/record_ios/Recorder.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/Recorder.o",
+    "llvm-bc" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/Recorder.bc",
+    "object" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/Recorder.o"
+  },
+  "/Users/vinikdhariwal/.pub-cache/hosted/pub.dev/record_ios-2.1.1/ios/record_ios/Sources/record_ios/StreamHandlers.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/StreamHandlers.o",
+    "llvm-bc" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/StreamHandlers.bc",
+    "object" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/StreamHandlers.o"
+  },
+  "/Users/vinikdhariwal/.pub-cache/hosted/pub.dev/record_ios-2.1.1/ios/record_ios/Sources/record_ios/delegate/AudioStreamProcessor.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/AudioStreamProcessor.o",
+    "llvm-bc" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/AudioStreamProcessor.bc",
+    "object" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/AudioStreamProcessor.o"
+  },
+  "/Users/vinikdhariwal/.pub-cache/hosted/pub.dev/record_ios-2.1.1/ios/record_ios/Sources/record_ios/delegate/RecorderDelegateProtocols.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/RecorderDelegateProtocols.o",
+    "llvm-bc" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/RecorderDelegateProtocols.bc",
+    "object" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/RecorderDelegateProtocols.o"
+  },
+  "/Users/vinikdhariwal/.pub-cache/hosted/pub.dev/record_ios-2.1.1/ios/record_ios/Sources/record_ios/delegate/RecorderFileDelegate.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/RecorderFileDelegate.o",
+    "llvm-bc" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/RecorderFileDelegate.bc",
+    "object" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/RecorderFileDelegate.o"
+  },
+  "/Users/vinikdhariwal/.pub-cache/hosted/pub.dev/record_ios-2.1.1/ios/record_ios/Sources/record_ios/delegate/RecorderStreamDelegate.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/RecorderStreamDelegate.o",
+    "llvm-bc" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/RecorderStreamDelegate.bc",
+    "object" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/RecorderStreamDelegate.o"
+  },
+  "/Users/vinikdhariwal/.pub-cache/hosted/pub.dev/record_ios-2.1.1/ios/record_ios/Sources/record_ios/encoder/AacAdtsEncoder.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/AacAdtsEncoder.o",
+    "llvm-bc" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/AacAdtsEncoder.bc",
+    "object" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/AacAdtsEncoder.o"
+  },
+  "/Users/vinikdhariwal/.pub-cache/hosted/pub.dev/record_ios-2.1.1/ios/record_ios/Sources/record_ios/encoder/EncoderProtocol.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/EncoderProtocol.o",
+    "llvm-bc" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/EncoderProtocol.bc",
+    "object" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/EncoderProtocol.o"
+  },
+  "/Users/vinikdhariwal/.pub-cache/hosted/pub.dev/record_ios-2.1.1/ios/record_ios/Sources/record_ios/encoder/Pcm16BitsEncoder.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/Pcm16BitsEncoder.o",
+    "llvm-bc" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/Pcm16BitsEncoder.bc",
+    "object" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/Pcm16BitsEncoder.o"
+  },
+  "/Users/vinikdhariwal/.pub-cache/hosted/pub.dev/record_ios-2.1.1/ios/record_ios/Sources/record_ios/extension/NSLockExtension.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/NSLockExtension.o",
+    "llvm-bc" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/NSLockExtension.bc",
+    "object" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/NSLockExtension.o"
+  },
+  "/Users/vinikdhariwal/.pub-cache/hosted/pub.dev/record_ios-2.1.1/ios/record_ios/Sources/record_ios/extension/RecorderFormatExtension.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/RecorderFormatExtension.o",
+    "llvm-bc" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/RecorderFormatExtension.bc",
+    "object" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/RecorderFormatExtension.o"
+  },
+  "/Users/vinikdhariwal/.pub-cache/hosted/pub.dev/record_ios-2.1.1/ios/record_ios/Sources/record_ios/extension/RecorderSessionExtension.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/RecorderSessionExtension.o",
+    "llvm-bc" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/RecorderSessionExtension.bc",
+    "object" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/Objects-normal/arm64/RecorderSessionExtension.o"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "version": 0,
+  "use-external-names": false,
+  "case-sensitive": false,
+  "roots": [{
+    "type": "directory",
+    "name": "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Release-iphoneos/record_ios/record_ios.framework/Modules",
+    "contents": [{
+      "type": "file",
+      "name": "module.modulemap",
+      "external-contents": "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/unextended-module.modulemap",
+    }]
+    },
+    {
+    "type": "directory",
+    "name": "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Release-iphoneos/record_ios/record_ios.framework/Headers",
+    "contents": [{
+      "type": "file",
+      "name": "record_ios-Swift.h",
+      "external-contents": "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/record_ios.build/unextended-interface-header.h",
+    }]
+  }]
+}

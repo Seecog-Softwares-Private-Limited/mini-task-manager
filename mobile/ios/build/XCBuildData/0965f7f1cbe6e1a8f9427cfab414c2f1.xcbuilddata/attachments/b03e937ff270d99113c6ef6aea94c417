@@ -1,0 +1,4 @@
+
+module DKPhotoGallery.Swift {
+  header "DKPhotoGallery-Swift.h"
+}

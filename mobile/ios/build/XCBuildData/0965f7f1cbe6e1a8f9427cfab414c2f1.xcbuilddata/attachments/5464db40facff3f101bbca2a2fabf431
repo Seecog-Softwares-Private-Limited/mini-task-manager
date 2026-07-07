@@ -1,0 +1,31 @@
+{
+  "" : {
+    "const-values" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/pdfx.build/Objects-normal/arm64/pdfx-primary.swiftconstvalues",
+    "dependencies" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/pdfx.build/Objects-normal/arm64/pdfx-primary.d",
+    "diagnostics" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/pdfx.build/Objects-normal/arm64/pdfx-primary.dia",
+    "emit-module-dependencies" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/pdfx.build/Objects-normal/arm64/pdfx-primary-emit-module.d",
+    "emit-module-diagnostics" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/pdfx.build/Objects-normal/arm64/pdfx-primary-emit-module.dia",
+    "pch" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/pdfx.build/Objects-normal/arm64/pdfx-primary-Bridging-header.pch",
+    "swift-dependencies" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/pdfx.build/Objects-normal/arm64/pdfx-primary.swiftdeps"
+  },
+  "/Users/vinikdhariwal/.pub-cache/hosted/pub.dev/pdfx-2.9.2/ios/Classes/Document.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/pdfx.build/Objects-normal/arm64/Document.o",
+    "llvm-bc" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/pdfx.build/Objects-normal/arm64/Document.bc",
+    "object" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/pdfx.build/Objects-normal/arm64/Document.o"
+  },
+  "/Users/vinikdhariwal/.pub-cache/hosted/pub.dev/pdfx-2.9.2/ios/Classes/Hooks.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/pdfx.build/Objects-normal/arm64/Hooks.o",
+    "llvm-bc" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/pdfx.build/Objects-normal/arm64/Hooks.bc",
+    "object" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/pdfx.build/Objects-normal/arm64/Hooks.o"
+  },
+  "/Users/vinikdhariwal/.pub-cache/hosted/pub.dev/pdfx-2.9.2/ios/Classes/Resources.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/pdfx.build/Objects-normal/arm64/Resources.o",
+    "llvm-bc" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/pdfx.build/Objects-normal/arm64/Resources.bc",
+    "object" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/pdfx.build/Objects-normal/arm64/Resources.o"
+  },
+  "/Users/vinikdhariwal/.pub-cache/hosted/pub.dev/pdfx-2.9.2/ios/Classes/SwiftPdfxPlugin.swift" : {
+    "index-unit-output-path" : "/Pods.build/Release-iphoneos/pdfx.build/Objects-normal/arm64/SwiftPdfxPlugin.o",
+    "llvm-bc" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/pdfx.build/Objects-normal/arm64/SwiftPdfxPlugin.bc",
+    "object" : "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/pdfx.build/Objects-normal/arm64/SwiftPdfxPlugin.o"
+  }
+}

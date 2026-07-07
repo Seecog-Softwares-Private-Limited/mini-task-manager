@@ -20,17 +20,24 @@ class ApiException extends Equatable implements Exception {
   factory ApiException.fromDio(DioException error) {
     final status = error.response?.statusCode;
     final data = error.response?.data;
+    final path = error.requestOptions.path;
+    final isAuthAttempt = path.contains('/auth/login') ||
+        path.contains('/auth/signup') ||
+        path.contains('/auth/forgot-password') ||
+        path.contains('/auth/reset-password');
 
     if (error.type == DioExceptionType.connectionError ||
         error.type == DioExceptionType.connectionTimeout ||
         error.type == DioExceptionType.receiveTimeout ||
         error.type == DioExceptionType.sendTimeout) {
       final target = error.requestOptions.uri.toString();
+      final isLocal = target.contains('localhost') || target.contains('127.0.0.1');
       return ApiException(
-        message:
-            kIsWeb
-                ? 'Network error. Could not reach $target. On web, use http://localhost:3007 in Server settings.'
-                : 'Network error. Could not reach the server at $target. Open login -> Server settings and use port 3000 (not 3007).',
+        message: kIsWeb
+            ? 'Network error. Could not reach $target. On web, use http://localhost:3007 in Server settings.'
+            : isLocal
+                ? 'Network error. Could not reach $target. Start local API with: node app.js — or tap "Use production server" below.'
+                : 'Network error. Could not reach $target. Open Server settings → Test connection.',
         isNetwork: true,
       );
     }
@@ -45,10 +52,19 @@ class ApiException extends Equatable implements Exception {
 
     final message = _extractMessage(data) ??
         _extractMessageFromBytes(data) ??
+        (isAuthAttempt ? _friendlyAuthMessage(status) : null) ??
         _friendlyHttpMessage(status) ??
         'Something went wrong. Please try again.';
 
     return ApiException(message: message, statusCode: status);
+  }
+
+  static String? _friendlyAuthMessage(int? status) {
+    return switch (status) {
+      401 => 'Invalid email or password.',
+      403 => 'You do not have permission to sign in.',
+      _ => null,
+    };
   }
 
   static String? _friendlyHttpMessage(int? status) {

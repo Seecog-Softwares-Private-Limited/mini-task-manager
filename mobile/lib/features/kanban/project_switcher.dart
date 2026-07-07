@@ -208,7 +208,7 @@ class ProjectSwitcher extends ConsumerWidget {
     }
 
     ref.read(lastProjectIdProvider.notifier).setProjectId(selectedId);
-    context.go(AppRoutes.projectBoard(selectedId));
+    context.pushReplacement(AppRoutes.projectBoard(selectedId));
   }
 
   @override

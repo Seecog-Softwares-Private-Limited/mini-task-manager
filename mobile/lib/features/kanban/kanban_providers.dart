@@ -10,18 +10,26 @@ import '../auth/session_controller.dart';
 import '../projects/projects_providers.dart';
 
 class ProjectBoardData {
-  const ProjectBoardData({
+  ProjectBoardData({
     required this.statuses,
     required this.tasks,
     required this.projectName,
-  });
+    required Map<String, List<Task>> tasksByStatus,
+    required this.overdueCount,
+  }) : _tasksByStatus = tasksByStatus;
 
   final List<WorkflowStatus> statuses;
   final List<Task> tasks;
   final String projectName;
+  final int overdueCount;
+  final Map<String, List<Task>> _tasksByStatus;
 
   List<Task> tasksForStatus(String statusId) {
-    return tasks.where((task) => task.statusId == statusId).toList();
+    return _tasksByStatus[statusId] ?? const [];
+  }
+
+  int countForStatus(String statusId) {
+    return _tasksByStatus[statusId]?.length ?? 0;
   }
 }
 
@@ -38,16 +46,17 @@ final workflowsRepositoryProvider = Provider<WorkflowsRepository>((ref) {
 });
 
 final projectBoardProvider =
-    FutureProvider.autoDispose.family<ProjectBoardData, String>((ref, projectId) async {
-  final session = ref.watch(sessionControllerProvider);
-  final orgId = session.orgId;
+    FutureProvider.family<ProjectBoardData, String>((ref, projectId) async {
+  ref.keepAlive();
+  final orgId = ref.watch(
+    sessionControllerProvider.select((session) => session.orgId),
+  );
   if (orgId == null || orgId.isEmpty) {
     throw StateError('No workspace selected');
   }
 
   final workflowsRepo = ref.watch(workflowsRepositoryProvider);
   final tasksRepo = ref.watch(tasksRepositoryProvider);
-  final projectsRepo = ref.watch(projectsRepositoryProvider);
 
   var workflows = await workflowsRepo.fetchByProject(projectId);
   if (workflows.isEmpty) {
@@ -64,20 +73,39 @@ final projectBoardProvider =
     projectId: projectId,
     organizationId: orgId,
   );
+  final tasks = tasksResult.data;
 
-  final projects = await projectsRepo.fetchProjects(organizationId: orgId);
-  String projectName = 'Project board';
-  for (final project in projects) {
-    if (project.id == projectId) {
-      projectName = project.name;
-      break;
+  var projectName = 'Project board';
+  final cachedProjects = ref.read(projectsProvider).valueOrNull;
+  if (cachedProjects != null) {
+    for (final project in cachedProjects) {
+      if (project.id == projectId) {
+        projectName = project.name;
+        break;
+      }
+    }
+  }
+
+  final tasksByStatus = <String, List<Task>>{
+    for (final status in statuses) status.id: <Task>[],
+  };
+  var overdueCount = 0;
+  for (final task in tasks) {
+    final statusId = task.statusId;
+    if (statusId != null && statusId.isNotEmpty) {
+      tasksByStatus.putIfAbsent(statusId, () => []).add(task);
+    }
+    if (_isTaskOverdue(task.dueDate)) {
+      overdueCount++;
     }
   }
 
   return ProjectBoardData(
     statuses: statuses,
-    tasks: tasksResult.data,
+    tasks: tasks,
     projectName: projectName,
+    tasksByStatus: tasksByStatus,
+    overdueCount: overdueCount,
   );
 });
 
@@ -97,3 +125,14 @@ final projectWorkflowStatusesProvider =
   );
   return workflowsRepo.fetchStatuses(workflow.id);
 });
+
+bool _isTaskOverdue(String? dueDate) {
+  if (dueDate == null || dueDate.isEmpty) return false;
+  final parsed = DateTime.tryParse(dueDate);
+  if (parsed == null) return false;
+  final local = parsed.toLocal();
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final due = DateTime(local.year, local.month, local.day);
+  return due.isBefore(today);
+}

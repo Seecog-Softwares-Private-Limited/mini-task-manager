@@ -22,6 +22,25 @@ class HomeShell extends ConsumerStatefulWidget {
 
 class _HomeShellState extends ConsumerState<HomeShell> {
   int _index = 0;
+  final Set<int> _mountedTabs = {0};
+  bool _enableUnreadBadge = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Defer notification fetch so the first tab paints quickly.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() => _enableUnreadBadge = true);
+    });
+  }
+
+  void _selectTab(int value) {
+    setState(() {
+      _mountedTabs.add(value);
+      _index = value;
+    });
+  }
 
   Future<void> _openWorkspaceSwitcher() async {
     await showWorkspaceSwitcherSheet(context: context, ref: ref);
@@ -36,19 +55,29 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    final session = ref.watch(sessionControllerProvider);
-    final orgId = session.orgId;
-    final unread = ref.watch(unreadNotificationsCountProvider);
+    final orgId = ref.watch(
+      sessionControllerProvider.select((session) => session.orgId),
+    );
+    final unread = _enableUnreadBadge ? ref.watch(unreadNotificationsCountProvider) : 0;
     final onProjectsTab = _index == 1;
     final canCreateProject = onProjectsTab && orgId != null && orgId.isNotEmpty;
 
-    final pages = [
-      HomeTab(orgId: orgId, onNavigateTab: (index) => setState(() => _index = index)),
-      ProjectsScreen(orgId: orgId),
-      const RecurringScreen(),
-      const NotificationsScreen(),
-      const ProfileScreen(),
-    ];
+    final pages = List<Widget>.generate(5, (index) {
+      if (!_mountedTabs.contains(index)) {
+        return const SizedBox.shrink();
+      }
+      return switch (index) {
+        0 => HomeTab(
+            key: ValueKey('home-$orgId'),
+            orgId: orgId,
+            onNavigateTab: _selectTab,
+          ),
+        1 => ProjectsScreen(key: ValueKey('projects-$orgId'), orgId: orgId),
+        2 => const RecurringScreen(),
+        3 => const NotificationsScreen(),
+        _ => const ProfileScreen(),
+      };
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -67,7 +96,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             icon: const Icon(Icons.swap_horiz_rounded),
           ),
           HeaderAccountMenu(
-            onOpenProfileTab: () => setState(() => _index = 4),
+            onOpenProfileTab: () => _selectTab(4),
           ),
         ],
       ),
@@ -100,7 +129,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           : null,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (value) => setState(() => _index = value),
+        onDestinationSelected: _selectTab,
         destinations: [
           const NavigationDestination(
             icon: Icon(Icons.home_outlined),

@@ -8,7 +8,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/config/api_base_url_controller.dart';
+import '../../core/config/api_reachability_probe.dart';
 import '../../core/config/app_config.dart';
+import '../../core/preferences/app_preferences.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -39,7 +41,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _syncServerField());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _reprobeApiUrl();
+      _syncServerField();
+    });
+  }
+
+  Future<void> _reprobeApiUrl() async {
+    final prefs = ref.read(sharedPreferencesProvider);
+    final switched = await ApiReachabilityProbe.ensureReachable(prefs);
+    if (switched != null) {
+      ref.invalidate(apiBaseUrlProvider);
+    }
   }
 
   void _syncServerField() {
@@ -48,10 +61,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   String _displayServerInput(String apiBaseUrl) {
-    if (apiBaseUrl.endsWith('/api/v1')) {
-      return apiBaseUrl.substring(0, apiBaseUrl.length - '/api/v1'.length);
-    }
-    return apiBaseUrl;
+    final origin = AppConfig.parseApiOrigin(apiBaseUrl);
+    if (origin == null) return apiBaseUrl;
+    return origin.toString().replaceAll(RegExp(r'/$'), '');
   }
 
   @override
@@ -135,10 +147,52 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             email: _emailController.text,
             password: _passwordController.text,
           );
+      if (!mounted) return;
+
+      final status = ref.read(sessionControllerProvider).status;
+      if (status == SessionStatus.authenticated) {
+        context.go(AppRoutes.home);
+      } else if (status == SessionStatus.needsWorkspace) {
+        context.go(AppRoutes.workspaces);
+      }
     } on ApiException catch (error) {
+      if (error.isNetwork) {
+        final before = ref.read(apiBaseUrlProvider);
+        await _reprobeApiUrl();
+        _syncServerField();
+        final after = ref.read(apiBaseUrlProvider);
+        if (after != before && mounted) {
+          try {
+            await ref.read(sessionControllerProvider.notifier).login(
+                  email: _emailController.text,
+                  password: _passwordController.text,
+                );
+            if (!mounted) return;
+            final status = ref.read(sessionControllerProvider).status;
+            if (status == SessionStatus.authenticated) {
+              context.go(AppRoutes.home);
+              return;
+            }
+            if (status == SessionStatus.needsWorkspace) {
+              context.go(AppRoutes.workspaces);
+              return;
+            }
+          } on ApiException catch (retryError) {
+            setState(() => _error = retryError.message);
+            return;
+          } catch (retryError) {
+            setState(() => _error = 'Unable to sign in. Please try again.');
+            debugPrint('Login retry failed: $retryError');
+            return;
+          }
+        }
+      }
       setState(() => _error = error.message);
-    } catch (_) {
+    } on FormatException catch (error) {
+      setState(() => _error = 'Unexpected server response. ${error.message}');
+    } catch (error) {
       setState(() => _error = 'Unable to sign in. Please try again.');
+      debugPrint('Login failed: $error');
     } finally {
       if (mounted) setState(() => _loading = false);
     }

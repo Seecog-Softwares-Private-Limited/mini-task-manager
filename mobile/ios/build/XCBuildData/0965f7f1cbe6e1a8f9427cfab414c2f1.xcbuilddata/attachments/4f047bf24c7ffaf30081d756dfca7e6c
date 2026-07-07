@@ -1,0 +1,4 @@
+
+module pdfx.__Swift {
+  exclude header "pdfx-Swift.h"
+}

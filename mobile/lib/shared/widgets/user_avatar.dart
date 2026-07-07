@@ -26,42 +26,52 @@ class UserAvatar extends ConsumerWidget {
   final double size;
   final bool showOnlineIndicator;
 
+  Widget _initialsAvatar(String initials) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: [AppColors.primary, AppColors.violet],
+        ),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        initials,
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
+          fontSize: size * 0.34,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final config = ref.watch(appConfigProvider);
     final name = user?.fullName ?? user?.email ?? '?';
     final initials = workspaceInitials(name);
     final imageUrl = resolveUserAvatarUrl(config.apiBaseUrl, user?.avatarUrl);
+    final cacheSize = (size * MediaQuery.devicePixelRatioOf(context)).round();
 
-    Widget avatar = Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: imageUrl.isEmpty
-            ? const LinearGradient(
-                colors: [AppColors.primary, AppColors.violet],
-              )
-            : null,
-        image: imageUrl.isNotEmpty
-            ? DecorationImage(
-                image: NetworkImage(imageUrl),
-                fit: BoxFit.cover,
-              )
-            : null,
-      ),
-      alignment: Alignment.center,
-      child: imageUrl.isEmpty
-          ? Text(
-              initials,
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: size * 0.34,
-              ),
-            )
-          : null,
-    );
+    final Widget avatar;
+    if (imageUrl.isEmpty) {
+      avatar = _initialsAvatar(initials);
+    } else {
+      avatar = ClipOval(
+        child: Image.network(
+          imageUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          cacheWidth: cacheSize,
+          cacheHeight: cacheSize,
+          errorBuilder: (_, __, ___) => _initialsAvatar(initials),
+        ),
+      );
+    }
 
     if (!showOnlineIndicator) return avatar;
 

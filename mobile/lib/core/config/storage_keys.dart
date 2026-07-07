@@ -5,4 +5,5 @@ abstract final class StorageKeys {
   static const orgHeader = 'X-Organization-Id';
   static const userJson = 'mini_tm_user_json';
   static const apiBaseUrl = 'mini_tm_api_base_url';
+  static const lastReachableApiUrl = 'mini_tm_last_reachable_api_url';
 }

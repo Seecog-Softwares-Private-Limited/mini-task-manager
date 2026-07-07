@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import '../../core/utils/html_plain_text.dart';
 import 'subtask_completion_record.dart';
 
 class TaskSubtask {
@@ -30,19 +33,16 @@ class TaskSubtask {
   factory TaskSubtask.fromJson(Map<String, dynamic> json) {
     final rawRecord = json['completionRecord'];
     return TaskSubtask(
-      id: json['id'] as String? ?? '',
-      title: json['title'] as String? ?? '',
+      id: json['id']?.toString() ?? '',
+      title: stripHtmlToPlainText(json['title']?.toString()),
       completed: json['completed'] as bool? ?? false,
-      description: json['description'] as String?,
-      assigneeId: json['assigneeId'] as String?,
-      assigneeIds: (json['assigneeIds'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          const [],
-      dueDate: json['dueDate'] as String?,
-      status: json['status'] as String?,
-      priority: json['priority'] as String?,
-      statusId: json['statusId'] as String?,
+      description: _nullableString(json['description']),
+      assigneeId: _nullableString(json['assigneeId']),
+      assigneeIds: _parseStringList(json['assigneeIds']),
+      dueDate: _nullableDateString(json['dueDate']),
+      status: _nullableString(json['status']),
+      priority: _nullableString(json['priority']),
+      statusId: _nullableString(json['statusId']),
       completionRecord: rawRecord is Map<String, dynamic>
           ? SubtaskCompletionRecord.fromJson(rawRecord)
           : null,
@@ -120,32 +120,25 @@ class Task {
   int get completedSubtasks => subtasks.where((s) => s.completed).length;
 
   factory Task.fromJson(Map<String, dynamic> json) {
-    final rawSubtasks = json['subtasks'];
     return Task(
-      id: json['id'] as String,
-      projectId: json['projectId'] as String,
-      organizationId: json['organizationId'] as String,
-      title: json['title'] as String,
-      description: json['description'] as String?,
-      statusId: json['statusId'] as String?,
-      priority: json['priority'] as String? ?? 'medium',
-      assigneeId: json['assigneeId'] as String?,
-      assigneeIds: (json['assigneeIds'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          const [],
+      id: _asString(json['id']),
+      projectId: _asString(json['projectId']),
+      organizationId: _asString(json['organizationId']),
+      title: stripHtmlToPlainText(_asString(json['title'])),
+      description: _nullableString(json['description']),
+      statusId: _nullableString(json['statusId']),
+      priority: _asString(json['priority'], fallback: 'medium'),
+      assigneeId: _nullableString(json['assigneeId']),
+      assigneeIds: _parseStringList(json['assigneeIds']),
       tags: _parseTags(json['tags']),
-      reporterId: json['reporterId'] as String,
-      dueDate: json['dueDate'] as String?,
-      loggedMinutes: json['loggedMinutes'] as int? ?? 0,
-      subtasks: rawSubtasks is List
-          ? rawSubtasks
-              .whereType<Map<String, dynamic>>()
-              .map(TaskSubtask.fromJson)
-              .toList()
-          : const [],
-      createdAt: json['createdAt'] as String? ?? '',
-      updatedAt: json['updatedAt'] as String? ?? '',
+      reporterId: _asString(json['reporterId']),
+      dueDate: _nullableDateString(json['dueDate']),
+      loggedMinutes: json['loggedMinutes'] is int
+          ? json['loggedMinutes'] as int
+          : int.tryParse('${json['loggedMinutes']}') ?? 0,
+      subtasks: _parseSubtasks(json['subtasks']),
+      createdAt: _nullableDateString(json['createdAt']) ?? '',
+      updatedAt: _nullableDateString(json['updatedAt']) ?? '',
     );
   }
 
@@ -193,4 +186,56 @@ List<String> _parseTags(dynamic rawTags) {
       })
       .where((tag) => tag.isNotEmpty)
       .toList();
+}
+
+String _asString(dynamic value, {String fallback = ''}) {
+  if (value == null) return fallback;
+  return value.toString();
+}
+
+String? _nullableString(dynamic value) {
+  if (value == null) return null;
+  final text = value.toString().trim();
+  return text.isEmpty ? null : text;
+}
+
+String? _nullableDateString(dynamic value) {
+  if (value == null) return null;
+  if (value is String) return value;
+  if (value is DateTime) return value.toIso8601String();
+  return value.toString();
+}
+
+List<String> _parseStringList(dynamic raw) {
+  if (raw is! List) return const [];
+  return raw.map((item) => item.toString()).where((item) => item.isNotEmpty).toList();
+}
+
+List<TaskSubtask> _parseSubtasks(dynamic rawSubtasks) {
+  final items = <Map<String, dynamic>>[];
+
+  void addItem(dynamic item) {
+    if (item is Map<String, dynamic>) {
+      items.add(item);
+    }
+  }
+
+  if (rawSubtasks is List) {
+    for (final item in rawSubtasks) {
+      addItem(item);
+    }
+  } else if (rawSubtasks is String && rawSubtasks.trim().isNotEmpty) {
+    try {
+      final decoded = jsonDecode(rawSubtasks);
+      if (decoded is List) {
+        for (final item in decoded) {
+          addItem(item);
+        }
+      }
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  return items.map(TaskSubtask.fromJson).toList();
 }

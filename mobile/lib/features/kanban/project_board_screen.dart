@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/preferences/app_preferences.dart';
+import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../data/models/task.dart';
@@ -99,7 +99,7 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
           }
 
           final totalTasks = board.tasks.length;
-          final overdueCount = board.tasks.where((t) => _isOverdue(t.dueDate)).length;
+          final overdueCount = board.overdueCount;
 
           return _BoardScaffold(
             header: ProjectSwitcher(
@@ -139,7 +139,7 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
                   selectedIndex: _selectedColumn,
                   taskCounts: {
                     for (final status in board.statuses)
-                      status.id: board.tasksForStatus(status.id).length,
+                      status.id: board.countForStatus(status.id),
                   },
                   colorForStatus: (status) => _parseColor(status.color),
                   onSelect: _selectColumn,
@@ -302,7 +302,7 @@ class _BoardScaffold extends StatelessWidget {
                     children: [
                       _CircleIconButton(
                         icon: Icons.arrow_back_rounded,
-                        onPressed: () => context.pop(),
+                        onPressed: () => AppRoutes.leaveProjectBoard(context),
                       ),
                       const SizedBox(width: AppSpacing.sm),
                       Expanded(child: header),
@@ -383,13 +383,14 @@ class _CircleIconButton extends StatelessWidget {
           ? Colors.white.withValues(alpha: 0.08)
           : AppColors.surface,
       shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         customBorder: const CircleBorder(),
         onTap: onPressed,
         child: SizedBox(
-          width: 40,
-          height: 40,
-          child: Icon(icon, size: 20),
+          width: 44,
+          height: 44,
+          child: Icon(icon, size: 22),
         ),
       ),
     );
@@ -594,9 +595,11 @@ class _ColumnPage extends StatelessWidget {
             separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
             itemBuilder: (context, index) {
               final task = tasks[index];
-              return _PremiumTaskCard(
-                task: task,
-                onTap: () => onOpenTask(task),
+              return RepaintBoundary(
+                child: _PremiumTaskCard(
+                  task: task,
+                  onTap: () => onOpenTask(task),
+                ),
               );
             },
           );
@@ -667,16 +670,24 @@ class _PremiumTaskCard extends StatelessWidget {
         ? Colors.white.withValues(alpha: 0.08)
         : AppColors.border.withValues(alpha: 0.75);
 
+    final title = task.title.trim().isEmpty ? 'Untitled task' : task.title;
+    final titleColor = isDark ? Colors.white : AppColors.textPrimary;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
-        child: Ink(
+        child: Container(
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1E293B) : AppColors.surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: borderColor),
+            border: Border(
+              left: BorderSide(color: priority.color, width: 4),
+              top: BorderSide(color: borderColor),
+              right: BorderSide(color: borderColor),
+              bottom: BorderSide(color: borderColor),
+            ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
@@ -685,90 +696,90 @@ class _PremiumTaskCard extends StatelessWidget {
               ),
             ],
           ),
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  width: 4,
-                  color: priority.color,
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.sm, AppSpacing.xs, AppSpacing.sm),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          task.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                height: 1.3,
-                                fontWeight: FontWeight.w600,
-                              ),
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Wrap(
-                          spacing: AppSpacing.xs,
-                          runSpacing: AppSpacing.xs,
-                          children: [
-                            _MetaPill(
-                              icon: priority.icon,
-                              label: priority.label,
-                              color: priority.color,
-                              background: priority.background,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.sm,
+                    AppSpacing.sm,
+                    AppSpacing.xs,
+                    AppSpacing.sm,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              height: 1.3,
+                              fontWeight: FontWeight.w600,
+                              color: titleColor,
                             ),
-                            if (dueMeta != null)
-                              _MetaPill(
-                                icon: dueMeta.icon,
-                                label: dueMeta.label,
-                                color: dueMeta.color,
-                                background: dueMeta.background,
-                              ),
-                          ],
-                        ),
-                        if (subtaskProgress != null) ...[
-                          const SizedBox(height: AppSpacing.sm),
-                          Row(
-                            children: [
-                              const Icon(Icons.checklist_rounded, size: 14, color: AppColors.violet),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(999),
-                                  child: LinearProgressIndicator(
-                                    value: subtaskProgress,
-                                    minHeight: 5,
-                                    backgroundColor: AppColors.violet.withValues(alpha: 0.12),
-                                    color: AppColors.violet,
-                                  ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      Wrap(
+                        spacing: AppSpacing.xs,
+                        runSpacing: AppSpacing.xs,
+                        children: [
+                          _MetaPill(
+                            icon: priority.icon,
+                            label: priority.label,
+                            color: priority.color,
+                            background: priority.background,
+                          ),
+                          if (dueMeta != null)
+                            _MetaPill(
+                              icon: dueMeta.icon,
+                              label: dueMeta.label,
+                              color: dueMeta.color,
+                              background: dueMeta.background,
+                            ),
+                        ],
+                      ),
+                      if (subtaskProgress != null) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        Row(
+                          children: [
+                            const Icon(Icons.checklist_rounded, size: 14, color: AppColors.violet),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(999),
+                                child: LinearProgressIndicator(
+                                  value: subtaskProgress,
+                                  minHeight: 5,
+                                  backgroundColor: AppColors.violet.withValues(alpha: 0.12),
+                                  color: AppColors.violet,
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '${task.completedSubtasks}/${task.subtasks.length}',
-                                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                                      color: AppColors.violet,
-                                      fontSize: 11,
-                                    ),
-                              ),
-                            ],
-                          ),
-                        ],
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${task.completedSubtasks}/${task.subtasks.length}',
+                              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                    color: AppColors.violet,
+                                    fontSize: 11,
+                                  ),
+                            ),
+                          ],
+                        ),
                       ],
-                    ),
+                    ],
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.only(right: AppSpacing.xs),
-                  child: Icon(
-                    Icons.chevron_right_rounded,
-                    color: AppColors.textMuted.withValues(alpha: 0.7),
-                  ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(right: AppSpacing.xs, top: AppSpacing.sm),
+                child: Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.textMuted.withValues(alpha: 0.7),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -990,15 +1001,4 @@ _DueMeta? _dueMeta(String? dueDate) {
             : const Color(0xFFE0F2FE),
     icon: overdue ? Icons.event_busy_rounded : Icons.calendar_today_rounded,
   );
-}
-
-bool _isOverdue(String? dueDate) {
-  if (dueDate == null || dueDate.isEmpty) return false;
-  final parsed = DateTime.tryParse(dueDate);
-  if (parsed == null) return false;
-  final local = parsed.toLocal();
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
-  final due = DateTime(local.year, local.month, local.day);
-  return due.isBefore(today);
 }

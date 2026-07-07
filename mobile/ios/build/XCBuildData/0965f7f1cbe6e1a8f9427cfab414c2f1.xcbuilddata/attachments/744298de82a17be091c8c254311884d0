@@ -1,0 +1,4 @@
+
+module SwiftyGif.Swift {
+  header "SwiftyGif-Swift.h"
+}
