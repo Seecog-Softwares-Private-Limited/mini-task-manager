@@ -69,6 +69,7 @@ type SmtpConfig = Configuration['smtp'];
 export class EmailService implements OnModuleInit {
   private readonly logger = new Logger(EmailService.name);
   private transporter!: nodemailer.Transporter;
+  private fallbackTransporter?: nodemailer.Transporter;
   private smtp!: SmtpConfig;
   private readonly nodeEnv: string;
 
@@ -207,16 +208,46 @@ export class EmailService implements OnModuleInit {
 
   private initTransport(): void {
     this.smtp = this.configService.get('smtp', { infer: true })!;
-    const { host, port, user, pass } = this.smtp;
-    const isGmail = host.includes('gmail.com');
+    const { host, port, user, pass, provider } = this.smtp;
 
-    this.transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465,
-      ...(port === 587 ? { requireTLS: true } : {}),
-      ...(user ? { auth: { user, pass } } : {}),
-      ...(isGmail
+    this.transporter = this.createTransport(
+      { host, port, user, pass },
+      provider,
+    );
+
+    const mode =
+      provider === 'mailhog'
+        ? ' (MailHog — view at http://localhost:8025)'
+        : provider === 'ses'
+          ? ` (Amazon SES${this.smtp.region ? `, ${this.smtp.region}` : ''})`
+          : user
+            ? ' (authenticated)'
+            : ' (no SMTP auth — suitable for local MailHog)';
+    this.logger.log(`Email transport configured: ${host}:${port}${mode}`);
+
+    const fallback = this.smtp.fallback;
+    if (fallback?.host) {
+      this.fallbackTransporter = this.createTransport(fallback, 'gmail');
+      this.logger.log(
+        `SMTP fallback configured: ${fallback.host}:${fallback.port} (used when primary send fails)`,
+      );
+    }
+  }
+
+  private createTransport(
+    smtp: { host: string; port: number; user?: string; pass?: string },
+    providerHint?: string,
+  ): nodemailer.Transporter {
+    const isGmail = providerHint === 'gmail' || smtp.host.includes('gmail.com');
+    const isSes = smtp.host.includes('amazonaws.com');
+
+    return nodemailer.createTransport({
+      host: smtp.host,
+      port: smtp.port,
+      secure: smtp.port === 465,
+      ...(smtp.port === 587 ? { requireTLS: true } : {}),
+      ...(smtp.user ? { auth: { user: smtp.user, pass: smtp.pass } } : {}),
+      ...(isGmail || isSes
         ? {
             connectionTimeout: 10000,
             greetingTimeout: 10000,
@@ -227,14 +258,6 @@ export class EmailService implements OnModuleInit {
         rejectUnauthorized: this.nodeEnv === 'production',
       },
     });
-
-    const mode =
-      host === 'localhost' && port === 1025
-        ? ' (MailHog — view at http://localhost:8025)'
-        : user
-          ? ' (authenticated)'
-          : ' (no SMTP auth — suitable for local MailHog)';
-    this.logger.log(`Email transport configured: ${host}:${port}${mode}`);
   }
 
   private formatFromAddress(): string {
@@ -251,42 +274,87 @@ export class EmailService implements OnModuleInit {
   }): Promise<void> {
     const { kind, to, subject, html, text } = params;
     const from = this.formatFromAddress();
+    const replyTo = this.resolveReplyTo();
+    const mail = {
+      from,
+      to,
+      subject,
+      html,
+      text,
+      ...(replyTo ? { replyTo } : {}),
+      headers: {
+        'X-Mailer': 'Mini Task Manager',
+        'X-Priority': '3',
+      },
+    };
 
     this.logger.log(`Sending ${kind} email to ${to} via ${this.smtp.host}:${this.smtp.port}`);
 
     try {
-      const replyTo = this.smtp.user?.trim() || undefined;
-      const info = await this.transporter.sendMail({
-        from,
-        to,
-        subject,
-        html,
-        text,
-        ...(replyTo ? { replyTo } : {}),
-        headers: {
-          'X-Mailer': 'Mini Task Manager',
-          'X-Priority': '3',
-        },
-      });
+      const info = await this.transporter.sendMail(mail);
       this.logger.log(
         `${kind} email sent to ${to} (messageId=${info.messageId ?? 'n/a'}, response=${info.response ?? 'n/a'})`,
       );
+      return;
     } catch (err) {
       const detail = this.formatError(err);
       this.logger.error(
         `Failed to send ${kind} email to ${to} via ${this.smtp.host}:${this.smtp.port}: ${detail}`,
         err instanceof Error ? err.stack : undefined,
       );
+
+      if (this.fallbackTransporter && this.smtp.fallback) {
+        const fallbackFrom = this.smtp.fallback.from.includes('<')
+          ? this.smtp.fallback.from
+          : `"Mini Task Manager" <${this.smtp.fallback.from}>`;
+        this.logger.warn(
+          `Retrying ${kind} email to ${to} via fallback SMTP ${this.smtp.fallback.host}:${this.smtp.fallback.port}`,
+        );
+        try {
+          const info = await this.fallbackTransporter.sendMail({
+            ...mail,
+            from: fallbackFrom,
+            ...(this.smtp.fallback.user?.includes('@')
+              ? { replyTo: this.smtp.fallback.user }
+              : {}),
+          });
+          this.logger.log(
+            `${kind} email sent to ${to} via fallback (messageId=${info.messageId ?? 'n/a'}, response=${info.response ?? 'n/a'})`,
+          );
+          return;
+        } catch (fallbackErr) {
+          const fallbackDetail = this.formatError(fallbackErr);
+          this.logger.error(
+            `Fallback SMTP also failed for ${to}: ${fallbackDetail}`,
+            fallbackErr instanceof Error ? fallbackErr.stack : undefined,
+          );
+        }
+      }
+
       throw new ServiceUnavailableException(this.userFacingEmailError(detail));
     }
   }
 
-  private userFacingEmailError(detail: string): string {
-    const isGmail = this.smtp.host.includes('gmail.com');
-    const badCredentials =
-      /535|BadCredentials|Username and Password not accepted|Invalid login/i.test(detail);
+  private resolveReplyTo(): string | undefined {
+    const user = this.smtp.user?.trim();
+    if (user?.includes('@')) return user;
 
-    if (isGmail && badCredentials) {
+    const from = this.smtp.from.trim();
+    const bracketMatch = from.match(/<([^>]+)>/);
+    if (bracketMatch?.[1]?.includes('@')) return bracketMatch[1];
+
+    if (from.includes('@')) return from.replace(/^["']|["']$/g, '');
+    return undefined;
+  }
+
+  private userFacingEmailError(detail: string): string {
+    const { provider } = this.smtp;
+    const badCredentials =
+      /535|BadCredentials|Username and Password not accepted|Invalid login|Authentication Credentials Invalid/i.test(
+        detail,
+      );
+
+    if (provider === 'gmail' && badCredentials) {
       return (
         'Gmail rejected the SMTP credentials. Use a Google App Password (not your normal Gmail password): ' +
         'Google Account → Security → 2-Step Verification → App passwords. ' +
@@ -294,7 +362,25 @@ export class EmailService implements OnModuleInit {
       );
     }
 
-    if (this.smtp.host === 'localhost' && this.smtp.port === 1025) {
+    if (provider === 'ses' && badCredentials) {
+      return (
+        'Amazon SES rejected the SMTP credentials. In AWS Console → SES → SMTP settings, create SMTP credentials ' +
+        '(not IAM access keys). Set SMTP_USER and SMTP_PASS in properties.env, then restart the API.'
+      );
+    }
+
+    if (
+      provider === 'ses' &&
+      /not verified|Email address is not verified|sandbox|554|553 Mail from|Message rejected/i.test(detail)
+    ) {
+      return (
+        'Amazon SES rejected the message. If your account is in the SES sandbox, you can only send to ' +
+        'verified recipient addresses — verify the recipient in SES (Verified identities) or request production access. ' +
+        'Also ensure SMTP_FROM matches your verified sender identity.'
+      );
+    }
+
+    if (provider === 'mailhog') {
       return (
         'Could not send email. MailHog is not running. Start it with: docker compose up -d mailhog ' +
         'then open http://localhost:8025 to view captured mail.'

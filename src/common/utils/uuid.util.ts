@@ -28,3 +28,13 @@ export function formatUuid(value: string | Buffer | null | undefined): string | 
   }
   return undefined;
 }
+
+/** Compare assignee/user IDs reliably across dashed UUIDs, casing, and Buffer-backed values. */
+export function normalizeUserIdForCompare(
+  id: string | Buffer | null | undefined,
+): string | null {
+  const formatted = formatUuid(id);
+  if (formatted) return formatted.toLowerCase();
+  const trimmed = String(id ?? '').trim().toLowerCase();
+  return trimmed.length > 0 ? trimmed : null;
+}

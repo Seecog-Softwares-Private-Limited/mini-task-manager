@@ -1,6 +1,7 @@
 const DEFAULT_JWT_SECRET = 'change-me-in-production';
 import { join } from 'path';
 import { resolveFrontendPublicUrl } from '../common/utils/frontend-url.util';
+import { resolveSmtpHost, resolveSmtpPort, resolveSmtpProvider } from './smtp.config';
 
 export const configuration = () => {
   const nodeEnv = process.env.NODE_ENV || 'development';
@@ -16,8 +17,8 @@ export const configuration = () => {
 
   const frontendUrl = resolveFrontendPublicUrl();
 
-  const smtpHost = process.env.SMTP_HOST || 'localhost';
-  const smtpPort = parseInt(process.env.SMTP_PORT || '1025', 10);
+  const smtpHost = resolveSmtpHost();
+  const smtpPort = resolveSmtpPort(smtpHost);
 
   return {
     nodeEnv,
@@ -30,8 +31,19 @@ export const configuration = () => {
       user: process.env.SMTP_USER || '',
       pass: process.env.SMTP_PASS || '',
       from: process.env.SMTP_FROM || 'noreply@minitaskmanager.local',
+      provider: resolveSmtpProvider(smtpHost, smtpPort),
+      region: process.env.AWS_SES_REGION?.trim() || undefined,
       /** When true (default), verify SMTP on startup and log failures. */
       verifyOnStartup: String(process.env.SMTP_VERIFY_ON_STARTUP ?? 'true').toLowerCase() !== 'false',
+      fallback: process.env.SMTP_FALLBACK_HOST?.trim()
+        ? {
+            host: process.env.SMTP_FALLBACK_HOST.trim(),
+            port: parseInt(process.env.SMTP_FALLBACK_PORT || '587', 10),
+            user: process.env.SMTP_FALLBACK_USER || '',
+            pass: process.env.SMTP_FALLBACK_PASS || '',
+            from: process.env.SMTP_FALLBACK_FROM || process.env.SMTP_FROM || 'noreply@minitaskmanager.local',
+          }
+        : undefined,
     },
     uploadsPath: process.env.UPLOADS_PATH || join(process.cwd(), 'uploads'),
     jwt: {
