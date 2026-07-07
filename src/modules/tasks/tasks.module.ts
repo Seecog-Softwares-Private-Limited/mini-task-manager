@@ -20,6 +20,7 @@ import { TaskCommentsRepository } from './repositories/task-comments.repository'
 import { TaskAttachmentsRepository } from './repositories/task-attachments.repository';
 import { RecurringTaskTemplatesRepository } from './repositories/recurring-task-templates.repository';
 import { RecurringTaskOccurrencesRepository } from './repositories/recurring-task-occurrences.repository';
+import { TaskNotificationsService } from './task-notifications.service';
 import { TasksService } from './tasks.service';
 import { TasksController } from './tasks.controller';
 import { RecurringTasksController } from './recurring-tasks.controller';
@@ -62,6 +63,7 @@ import { OrgEventsModule } from '../org-events/org-events.module';
     RecurringTaskOccurrencesRepository,
     TaskTimeEntriesRepository,
     TasksService,
+    TaskNotificationsService,
     RecurringTasksService,
     RecurringTasksCron,
     TimeTrackingService,

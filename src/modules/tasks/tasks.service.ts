@@ -15,6 +15,7 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { PatchTaskDto } from './dto/patch-task.dto';
 import { RecurringTasksService } from './recurring-tasks.service';
 import { OrgEventsService } from '../org-events/org-events.service';
+import { TaskNotificationsService } from './task-notifications.service';
 import { PaginationQueryDto, PaginatedResult, paginate } from '../../common/pagination';
 import { formatUuid, generateUuid } from '../../common/utils/uuid.util';
 import { Configuration } from '../../config/configuration';
@@ -101,6 +102,8 @@ export class TasksService {
     private readonly recurringTasksService: RecurringTasksService,
     @Inject(forwardRef(() => OrgEventsService))
     private readonly orgEventsService: OrgEventsService,
+    @Inject(forwardRef(() => TaskNotificationsService))
+    private readonly taskNotifications: TaskNotificationsService,
   ) {}
 
   async findById(id: string): Promise<TaskEntity | null> {
@@ -245,7 +248,9 @@ export class TasksService {
         title: task.title,
       })
       .catch(() => {});
-    return (await this.tasksRepository.findById(task.id)) ?? task;
+    const finalTask = (await this.tasksRepository.findById(task.id)) ?? task;
+    this.taskNotifications.scheduleOnCreate(finalTask, reporterId);
+    return finalTask;
   }
 
   async update(
@@ -353,7 +358,11 @@ export class TasksService {
       const done = await this.isDoneStatus(task.projectId, organizationId, nextStatusId);
       await this.recurringTasksService.syncOccurrenceCompletionFromTaskStatus(taskId, done);
     }
-    return this.tasksRepository.findById(taskId);
+    const after = await this.tasksRepository.findById(taskId);
+    if (after && userId) {
+      this.taskNotifications.scheduleOnUpdate(task, after, userId);
+    }
+    return after;
   }
 
   private async isDoneStatus(
