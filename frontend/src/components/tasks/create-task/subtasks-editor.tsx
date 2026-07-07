@@ -96,7 +96,7 @@ export function SubtasksEditor({
   const [draftTitle, setDraftTitle] = useState("");
   const [draftDescription, setDraftDescription] = useState("");
   const [draftAssigneeIds, setDraftAssigneeIds] = useState<string[]>([]);
-  const [draftDueDate, setDraftDueDate] = useState("");
+  const [draftDueDate, setDraftDueDate] = useState<string | undefined>(undefined);
   const [draftPriority, setDraftPriority] = useState<SubtaskPriority>("MEDIUM");
   const [pasteFlash, setPasteFlash] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<{
@@ -180,7 +180,7 @@ export function SubtasksEditor({
     setDraftTitle("");
     setDraftDescription("");
     setDraftAssigneeIds([]);
-    setDraftDueDate("");
+    setDraftDueDate(undefined);
     setDraftPriority("MEDIUM");
     setComposerOpen(true);
     requestAnimationFrame(() => titleInputRef.current?.focus());
@@ -194,7 +194,7 @@ export function SubtasksEditor({
     setDraftTitle(value?.title ?? "");
     setDraftDescription(value?.description ?? "");
     setDraftAssigneeIds(getSubtaskAssigneeIds(value ?? {}));
-    setDraftDueDate(value?.dueDate ?? "");
+    setDraftDueDate(value?.dueDate);
     setDraftPriority(resolveSubtaskPriority(value?.priority));
     setComposerOpen(true);
     requestAnimationFrame(() => titleInputRef.current?.focus());
@@ -210,7 +210,7 @@ export function SubtasksEditor({
     setDraftTitle("");
     setDraftDescription("");
     setDraftAssigneeIds([]);
-    setDraftDueDate("");
+    setDraftDueDate(undefined);
     setDraftPriority("MEDIUM");
     setPasteFlash(false);
   }
@@ -235,7 +235,7 @@ export function SubtasksEditor({
         shouldDirty: true,
         shouldTouch: true,
       });
-      setValue(`subtasks.${editingIndex}.dueDate`, draftDueDate || undefined, {
+      setValue(`subtasks.${editingIndex}.dueDate`, draftDueDate, {
         shouldDirty: true,
         shouldTouch: true,
       });
@@ -254,7 +254,7 @@ export function SubtasksEditor({
             title,
             completed: false,
             description: description ? description : undefined,
-            dueDate: draftDueDate || undefined,
+            dueDate: draftDueDate,
             status: "TODO",
             priority: draftPriority,
           },
@@ -269,7 +269,7 @@ export function SubtasksEditor({
     setDraftTitle("");
     setDraftDescription("");
     setDraftAssigneeIds([]);
-    setDraftDueDate("");
+    setDraftDueDate(undefined);
     setDraftPriority("MEDIUM");
   }
 

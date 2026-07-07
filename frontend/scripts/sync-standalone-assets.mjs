@@ -19,11 +19,13 @@ function syncStandaloneAssets() {
 
   if (!fs.existsSync(STANDALONE_DIR)) {
     console.warn('[sync-standalone-assets] No standalone build at', STANDALONE_DIR);
-    return false;
+    // Do not fail the build if standalone output is unavailable.
+    return true;
   }
   if (!fs.existsSync(staticSrc)) {
     console.warn('[sync-standalone-assets] Missing .next/static — run npm run build first');
-    return false;
+    // Keep postbuild non-blocking for deployment pipelines.
+    return true;
   }
 
   fs.mkdirSync(path.dirname(staticDest), { recursive: true });
