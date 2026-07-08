@@ -26,6 +26,10 @@ dependencies:
   package_info_plus: ^8.1.2
   record: ^7.1.1
   web: ^1.1.0
+  path_provider: ^2.1.5
+  open_filex: ^4.7.0
+  pdfx: ^2.8.0
+  flutter_svg: ^2.0.17
 
 dev_dependencies:
   flutter_test:

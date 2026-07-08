@@ -1,0 +1,23 @@
+{
+  "version": 0,
+  "use-external-names": false,
+  "case-sensitive": false,
+  "roots": [{
+    "type": "directory",
+    "name": "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Release-iphoneos/pdfx/pdfx.framework/Modules",
+    "contents": [{
+      "type": "file",
+      "name": "module.modulemap",
+      "external-contents": "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/pdfx.build/unextended-module.modulemap",
+    }]
+    },
+    {
+    "type": "directory",
+    "name": "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Release-iphoneos/pdfx/pdfx.framework/Headers",
+    "contents": [{
+      "type": "file",
+      "name": "pdfx-Swift.h",
+      "external-contents": "/Users/vinikdhariwal/Downloads/SeeCog/mini-task-manager/mobile/ios/build/Pods.build/Release-iphoneos/pdfx.build/unextended-interface-header.h",
+    }]
+  }]
+}

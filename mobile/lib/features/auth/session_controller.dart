@@ -52,6 +52,8 @@ class SessionController extends Notifier<SessionState> {
   late AuthRepository _authRepository;
   late OrganizationsRepository _organizationsRepository;
   late AuthStorage _authStorage;
+  int _operationGeneration = 0;
+  bool _restoreScheduled = false;
 
   @override
   SessionState build() {
@@ -60,27 +62,43 @@ class SessionController extends Notifier<SessionState> {
     _authStorage = ref.read(authStorageProvider);
 
     ref.listen<int>(sessionExpiredTickProvider, (_, __) {
+      _operationGeneration++;
       state = const SessionState(status: SessionStatus.unauthenticated);
     });
 
-    Future.microtask(restoreSession);
+    if (!_restoreScheduled) {
+      _restoreScheduled = true;
+      Future.microtask(restoreSession);
+    }
     return const SessionState(status: SessionStatus.loading);
   }
 
+  bool _isStale(int generation) => generation != _operationGeneration;
+
   Future<void> restoreSession() async {
+    final generation = _operationGeneration;
     final token = await _authRepository.readToken();
+    if (_isStale(generation)) return;
+
     if (token == null || token.isEmpty) {
-      state = const SessionState(status: SessionStatus.unauthenticated);
+      if (state.status != SessionStatus.authenticated &&
+          state.status != SessionStatus.needsWorkspace) {
+        state = const SessionState(status: SessionStatus.unauthenticated);
+      }
       return;
     }
 
     final user = await _authStorage.readUser();
+    if (_isStale(generation)) return;
+
     final storedOrgId = await _authRepository.readOrgId();
+    if (_isStale(generation)) return;
 
     List<Organization> organizations = const [];
     try {
       organizations = await _organizationsRepository.fetchOrganizations();
     } catch (_) {
+      if (_isStale(generation)) return;
       if (storedOrgId != null && storedOrgId.isNotEmpty) {
         state = SessionState(
           status: SessionStatus.authenticated,
@@ -89,9 +107,14 @@ class SessionController extends Notifier<SessionState> {
         );
         return;
       }
-      state = const SessionState(status: SessionStatus.unauthenticated);
+      if (state.status != SessionStatus.authenticated &&
+          state.status != SessionStatus.needsWorkspace) {
+        state = const SessionState(status: SessionStatus.unauthenticated);
+      }
       return;
     }
+
+    if (_isStale(generation)) return;
 
     if (storedOrgId != null && storedOrgId.isNotEmpty) {
       final stillMember = organizations.any((org) => org.id == storedOrgId);
@@ -105,11 +128,13 @@ class SessionController extends Notifier<SessionState> {
         return;
       }
       await _authStorage.writeOrgId(null);
+      if (_isStale(generation)) return;
     }
 
     if (organizations.length == 1) {
       final org = organizations.first;
       await _authStorage.writeOrgId(org.id);
+      if (_isStale(generation)) return;
       state = SessionState(
         status: SessionStatus.authenticated,
         user: user,
@@ -130,10 +155,14 @@ class SessionController extends Notifier<SessionState> {
     required String email,
     required String password,
   }) async {
+    final generation = ++_operationGeneration;
+
     final response = await _authRepository.login(email: email, password: password);
+    if (_isStale(generation)) return;
 
     if (response.organizationId != null && response.organizationId!.isNotEmpty) {
       final organizations = await _organizationsRepository.fetchOrganizations();
+      if (_isStale(generation)) return;
       state = SessionState(
         status: SessionStatus.authenticated,
         user: response.user,
@@ -143,14 +172,21 @@ class SessionController extends Notifier<SessionState> {
       return;
     }
 
-    await _loadOrganizations(requireSelection: true, user: response.user);
+    await _loadOrganizations(
+      requireSelection: true,
+      user: response.user,
+      generation: generation,
+    );
   }
 
   Future<void> _loadOrganizations({
     required bool requireSelection,
     AuthUser? user,
+    required int generation,
   }) async {
     final organizations = await _organizationsRepository.fetchOrganizations();
+    if (_isStale(generation)) return;
+
     if (organizations.length == 1) {
       await selectOrganization(organizations.first.id, user: user);
       return;

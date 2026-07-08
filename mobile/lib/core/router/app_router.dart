@@ -16,6 +16,15 @@ abstract final class AppRoutes {
   static const workspaces = '/workspaces';
   static const home = '/';
   static String projectBoard(String projectId) => '/projects/$projectId/board';
+
+  /// Leaves the kanban board, returning to the previous screen or home.
+  static void leaveProjectBoard(BuildContext context) {
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    context.go(home);
+  }
 }
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -74,13 +83,15 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.home,
         builder: (context, state) => const HomeShell(),
-      ),
-      GoRoute(
-        path: '/projects/:projectId/board',
-        builder: (context, state) {
-          final projectId = state.pathParameters['projectId']!;
-          return ProjectBoardScreen(projectId: projectId);
-        },
+        routes: [
+          GoRoute(
+            path: 'projects/:projectId/board',
+            builder: (context, state) {
+              final projectId = state.pathParameters['projectId']!;
+              return ProjectBoardScreen(projectId: projectId);
+            },
+          ),
+        ],
       ),
     ],
   );

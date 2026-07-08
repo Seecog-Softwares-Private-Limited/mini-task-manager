@@ -1,0 +1,72 @@
+Target dependency graph (29 targets)
+Target 'Pods-RunnerTests' in project 'Pods'
+➜ Explicit dependency on target 'Pods-Runner' in project 'Pods'
+Target 'Pods-Runner' in project 'Pods'
+➜ Explicit dependency on target 'DKImagePickerController' in project 'Pods'
+➜ Explicit dependency on target 'DKPhotoGallery' in project 'Pods'
+➜ Explicit dependency on target 'Flutter' in project 'Pods'
+➜ Explicit dependency on target 'SDWebImage' in project 'Pods'
+➜ Explicit dependency on target 'SwiftyGif' in project 'Pods'
+➜ Explicit dependency on target 'device_info_plus' in project 'Pods'
+➜ Explicit dependency on target 'file_picker' in project 'Pods'
+➜ Explicit dependency on target 'flutter_secure_storage' in project 'Pods'
+➜ Explicit dependency on target 'geolocator_apple' in project 'Pods'
+➜ Explicit dependency on target 'image_picker_ios' in project 'Pods'
+➜ Explicit dependency on target 'open_filex' in project 'Pods'
+➜ Explicit dependency on target 'package_info_plus' in project 'Pods'
+➜ Explicit dependency on target 'pdfx' in project 'Pods'
+➜ Explicit dependency on target 'record_ios' in project 'Pods'
+➜ Explicit dependency on target 'shared_preferences_foundation' in project 'Pods'
+Target 'shared_preferences_foundation' in project 'Pods'
+➜ Explicit dependency on target 'Flutter' in project 'Pods'
+➜ Explicit dependency on target 'shared_preferences_foundation-shared_preferences_foundation_privacy' in project 'Pods'
+Target 'shared_preferences_foundation-shared_preferences_foundation_privacy' in project 'Pods' (no dependencies)
+Target 'record_ios' in project 'Pods'
+➜ Explicit dependency on target 'Flutter' in project 'Pods'
+➜ Explicit dependency on target 'record_ios-record_ios_privacy' in project 'Pods'
+Target 'record_ios-record_ios_privacy' in project 'Pods' (no dependencies)
+Target 'pdfx' in project 'Pods'
+➜ Explicit dependency on target 'Flutter' in project 'Pods'
+Target 'package_info_plus' in project 'Pods'
+➜ Explicit dependency on target 'Flutter' in project 'Pods'
+➜ Explicit dependency on target 'package_info_plus-package_info_plus_privacy' in project 'Pods'
+Target 'package_info_plus-package_info_plus_privacy' in project 'Pods' (no dependencies)
+Target 'open_filex' in project 'Pods'
+➜ Explicit dependency on target 'Flutter' in project 'Pods'
+Target 'image_picker_ios' in project 'Pods'
+➜ Explicit dependency on target 'Flutter' in project 'Pods'
+➜ Explicit dependency on target 'image_picker_ios-image_picker_ios_privacy' in project 'Pods'
+Target 'image_picker_ios-image_picker_ios_privacy' in project 'Pods' (no dependencies)
+Target 'geolocator_apple' in project 'Pods'
+➜ Explicit dependency on target 'Flutter' in project 'Pods'
+➜ Explicit dependency on target 'geolocator_apple-geolocator_apple_privacy' in project 'Pods'
+Target 'geolocator_apple-geolocator_apple_privacy' in project 'Pods' (no dependencies)
+Target 'flutter_secure_storage' in project 'Pods'
+➜ Explicit dependency on target 'Flutter' in project 'Pods'
+➜ Explicit dependency on target 'flutter_secure_storage-flutter_secure_storage' in project 'Pods'
+Target 'flutter_secure_storage-flutter_secure_storage' in project 'Pods' (no dependencies)
+Target 'file_picker' in project 'Pods'
+➜ Explicit dependency on target 'DKImagePickerController' in project 'Pods'
+➜ Explicit dependency on target 'Flutter' in project 'Pods'
+➜ Explicit dependency on target 'file_picker-file_picker_ios_privacy' in project 'Pods'
+Target 'file_picker-file_picker_ios_privacy' in project 'Pods' (no dependencies)
+Target 'device_info_plus' in project 'Pods'
+➜ Explicit dependency on target 'Flutter' in project 'Pods'
+➜ Explicit dependency on target 'device_info_plus-device_info_plus_privacy' in project 'Pods'
+Target 'device_info_plus-device_info_plus_privacy' in project 'Pods' (no dependencies)
+Target 'Flutter' in project 'Pods' (no dependencies)
+Target 'DKImagePickerController' in project 'Pods'
+➜ Explicit dependency on target 'DKImagePickerController-DKImagePickerController' in project 'Pods'
+➜ Explicit dependency on target 'DKPhotoGallery' in project 'Pods'
+Target 'DKPhotoGallery' in project 'Pods'
+➜ Explicit dependency on target 'DKPhotoGallery-DKPhotoGallery' in project 'Pods'
+➜ Explicit dependency on target 'SDWebImage' in project 'Pods'
+➜ Explicit dependency on target 'SwiftyGif' in project 'Pods'
+Target 'SwiftyGif' in project 'Pods'
+➜ Explicit dependency on target 'SwiftyGif-SwiftyGif' in project 'Pods'
+Target 'SwiftyGif-SwiftyGif' in project 'Pods' (no dependencies)
+Target 'SDWebImage' in project 'Pods'
+➜ Explicit dependency on target 'SDWebImage-SDWebImage' in project 'Pods'
+Target 'SDWebImage-SDWebImage' in project 'Pods' (no dependencies)
+Target 'DKPhotoGallery-DKPhotoGallery' in project 'Pods' (no dependencies)
+Target 'DKImagePickerController-DKImagePickerController' in project 'Pods' (no dependencies)

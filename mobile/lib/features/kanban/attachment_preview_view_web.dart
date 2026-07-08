@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'dart:ui_web' as ui_web;
 
 import 'package:flutter/material.dart';
@@ -45,5 +46,29 @@ Widget buildBlobUrlPreview({
     width: double.infinity,
     height: height,
     child: HtmlElementView(viewType: viewType),
+  );
+}
+
+Widget buildPdfBytesPreview({
+  required Uint8List bytes,
+  required double height,
+}) {
+  return buildBlobUrlPreview(
+    blobUrl: '',
+    mimeType: 'application/pdf',
+    fileName: 'preview.pdf',
+    height: height,
+  );
+}
+
+Widget buildSvgBytesPreview({
+  required Uint8List bytes,
+  required double height,
+}) {
+  return buildBlobUrlPreview(
+    blobUrl: '',
+    mimeType: 'image/svg+xml',
+    fileName: 'preview.svg',
+    height: height,
   );
 }

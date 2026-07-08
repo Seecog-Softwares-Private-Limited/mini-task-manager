@@ -63,7 +63,6 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
   late FocusNode _descriptionFocusNode;
   late Task _task;
   final _commentController = TextEditingController();
-  final _newSubtaskController = TextEditingController();
   late List<TaskSubtask> _subtasks;
   int? _expandedSubtaskIndex;
   bool _isEditingTitle = false;
@@ -90,12 +89,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     _titleFocusNode.addListener(_onTitleFocusChange);
     _descriptionFocusNode.addListener(_onDescriptionFocusChange);
     _subtasks = List.of(widget.task.subtasks);
-    _newSubtaskController.addListener(_onNewSubtaskChanged);
     _loadMeta();
-  }
-
-  void _onNewSubtaskChanged() {
-    if (mounted) setState(() {});
   }
 
   void _onTitleFocusChange() {
@@ -121,9 +115,6 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     _titleController.dispose();
     _descriptionController.dispose();
     _commentController.dispose();
-    _newSubtaskController
-      ..removeListener(_onNewSubtaskChanged)
-      ..dispose();
     super.dispose();
   }
 
@@ -439,10 +430,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       ),
       ..._subtasks,
     ];
-    setState(() {
-      _subtasks = updated;
-      _newSubtaskController.clear();
-    });
+    setState(() => _subtasks = updated);
     await _run(() => ref.read(tasksRepositoryProvider).updateTask(
           taskId: _task.id,
           subtasks: updated,
@@ -532,8 +520,9 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUserId = ref.watch(sessionControllerProvider).user?.id;
-    final orgId = ref.watch(sessionControllerProvider).orgId ?? '';
+    final session = ref.watch(sessionControllerProvider);
+    final currentUserId = session.user?.id;
+    final orgId = session.orgId ?? '';
     final org = ref.watch(selectedOrgProvider);
     final canEditTitleAndDescription = canEditTaskTitleAndDescription(
       org: org,
@@ -550,9 +539,6 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     final checklistTotal = _subtasks.length;
     final checklistPercent =
         checklistTotal == 0 ? 0 : ((checklistDone / checklistTotal) * 100).round();
-    final newSubtaskTitle = _newSubtaskController.text.trim();
-    final canSubmitSubtask =
-        canEditSubtasks && newSubtaskTitle.isNotEmpty && !_saving && _savingSubtaskIndex == null;
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.78,
@@ -754,46 +740,10 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                 ],
                 const SizedBox(height: AppSpacing.md),
                 if (canEditSubtasks) ...[
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _newSubtaskController,
-                          enabled: !_saving && _savingSubtaskIndex == null,
-                          maxLength: subtaskTitleMaxLength,
-                          decoration: InputDecoration(
-                            hintText: 'Add an item…',
-                            counterText: '',
-                            prefixIcon: Icon(
-                              Icons.add_rounded,
-                              color: AppColors.textMuted.withValues(alpha: 0.7),
-                            ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 14,
-                            ),
-                          ),
-                          onSubmitted: (value) {
-                            if (value.trim().isNotEmpty) _appendSubtask(value);
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      PrimaryButton(
-                        label: 'Add',
-                        expand: false,
-                        height: 44,
-                        borderRadius: 12,
-                        loading: _saving,
-                        onPressed: canSubmitSubtask
-                            ? () => _appendSubtask(_newSubtaskController.text)
-                            : null,
-                      ),
-                    ],
+                  _NewSubtaskComposer(
+                    enabled: !_saving && _savingSubtaskIndex == null,
+                    loading: _saving,
+                    onSubmit: _appendSubtask,
                   ),
                   const SizedBox(height: AppSpacing.sm),
                 ],
@@ -1942,6 +1892,85 @@ class _CommentsSection extends StatelessWidget {
                 ),
               ),
       ],
+    );
+  }
+}
+
+class _NewSubtaskComposer extends StatefulWidget {
+  const _NewSubtaskComposer({
+    required this.enabled,
+    required this.loading,
+    required this.onSubmit,
+  });
+
+  final bool enabled;
+  final bool loading;
+  final Future<void> Function(String title) onSubmit;
+
+  @override
+  State<_NewSubtaskComposer> createState() => _NewSubtaskComposerState();
+}
+
+class _NewSubtaskComposerState extends State<_NewSubtaskComposer> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final title = _controller.text.trim();
+    if (title.isEmpty || !widget.enabled || widget.loading) return;
+    await widget.onSubmit(title);
+    if (mounted) _controller.clear();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: _controller,
+      builder: (context, value, _) {
+        final canSubmit = widget.enabled && !widget.loading && value.text.trim().isNotEmpty;
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _controller,
+                enabled: widget.enabled,
+                maxLength: subtaskTitleMaxLength,
+                decoration: InputDecoration(
+                  hintText: 'Add an item…',
+                  counterText: '',
+                  prefixIcon: Icon(
+                    Icons.add_rounded,
+                    color: AppColors.textMuted.withValues(alpha: 0.7),
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 14,
+                  ),
+                ),
+                onSubmitted: (_) => _submit(),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            PrimaryButton(
+              label: 'Add',
+              expand: false,
+              height: 44,
+              borderRadius: 12,
+              loading: widget.loading,
+              onPressed: canSubmit ? _submit : null,
+            ),
+          ],
+        );
+      },
     );
   }
 }

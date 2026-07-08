@@ -20,7 +20,6 @@ class ApiBaseUrlController extends Notifier<String> {
     await prefs.setString(StorageKeys.apiBaseUrl, normalized);
     state = normalized;
   }
-
   Future<void> resetToDefault() async {
     final prefs = ref.read(sharedPreferencesProvider);
     await prefs.remove(StorageKeys.apiBaseUrl);

@@ -19,9 +19,9 @@ abstract final class ApiUrlResolver {
 
     final saved = prefs.getString(StorageKeys.apiBaseUrl)?.trim();
     if (saved != null && saved.isNotEmpty) {
-      final normalized = normalizeAndMigrate(saved);
+      final normalized = _repairSavedUrl(prefs, saved);
       // Stale localhost URLs from dev/debug installs must not break production APKs.
-      if (flavor == 'prod' && !kIsWeb && _isLocalDevUrl(normalized)) {
+      if (flavor == 'prod' && !kIsWeb && isLocalDevUrl(normalized)) {
         return _preferLocalProxyOnWeb(normalizeAndMigrate(_defaultBaseUrlForFlavor(flavor)));
       }
       return _preferLocalProxyOnWeb(normalized);
@@ -31,28 +31,49 @@ abstract final class ApiUrlResolver {
   }
 
   static String normalizeAndMigrate(String raw) {
-    return _migrateUnreachableBackendPort(AppConfig.normalizeBaseUrl(raw));
+    return _migrateUnreachableBackendPort(normalizeBaseUrl(raw));
+  }
+
+  static String normalizeBaseUrl(String raw) {
+    return AppConfig.normalizeBaseUrl(raw);
   }
 
   /// Nest often listens on :3007 locally, but production exposes the API via the web app on :3000.
   static String _migrateUnreachableBackendPort(String url) {
-    final uri = Uri.tryParse(url);
-    if (uri == null) return url;
+    final origin = AppConfig.parseApiOrigin(url);
+    if (origin == null) return url;
 
-    final isLocalHost = uri.host == 'localhost' ||
-        uri.host == '10.0.2.2' ||
-        uri.host.startsWith('127.') ||
-        RegExp(r'^192\.168\.|^10\.|^172\.(1[6-9]|2\d|3[01])\.').hasMatch(uri.host);
+    final isLocalHost = origin.host == 'localhost' ||
+        origin.host == '10.0.2.2' ||
+        origin.host.startsWith('127.') ||
+        RegExp(r'^192\.168\.|^10\.|^172\.(1[6-9]|2\d|3[01])\.').hasMatch(origin.host);
 
-    if (uri.port == 3007 && !isLocalHost) {
-      final migrated = uri.replace(port: 3000);
-      var next = migrated.toString();
-      if (next.endsWith('/')) next = next.substring(0, next.length - 1);
-      return next;
+    if (origin.hasPort && origin.port == 3007 && !isLocalHost) {
+      return AppConfig.normalizeBaseUrl(
+        Uri(
+          scheme: origin.scheme,
+          host: origin.host,
+          port: 3000,
+        ).toString(),
+      );
     }
-    return url;
+    return AppConfig.normalizeBaseUrl(url);
   }
 
+  static String _repairSavedUrl(SharedPreferences prefs, String saved) {
+    try {
+      final normalized = normalizeAndMigrate(saved);
+      if (normalized != saved) {
+        prefs.setString(StorageKeys.apiBaseUrl, normalized);
+      }
+      return normalized;
+    } catch (_) {
+      prefs.remove(StorageKeys.apiBaseUrl);
+      return normalizeAndMigrate(_defaultBaseUrlForFlavor(
+        const String.fromEnvironment('FLAVOR', defaultValue: 'dev'),
+      ));
+    }
+  }
 
   static String _preferLocalProxyOnWeb(String url) {
     if (!kIsWeb) return url;
@@ -63,7 +84,7 @@ abstract final class ApiUrlResolver {
     return url;
   }
 
-  static bool _isLocalDevUrl(String url) {
+  static bool isLocalDevUrl(String url) {
     final uri = Uri.tryParse(url);
     if (uri == null) return false;
 

@@ -92,8 +92,8 @@ class ApiConnectionService {
     if (kIsWeb) {
       return 'For Flutter web use http://localhost:3007 (backend with CORS for :8090).';
     }
-    if (url.contains(':3007')) {
-      return 'Port 3007 is local-only — use port 3000 or port 80 on the server.';
+    if (url.contains('localhost') || url.contains('127.0.0.1')) {
+      return 'Start backend from repo root: node app.js (default API port 3007).';
     }
     if (url.contains(':3000')) {
       return 'Port 3000 is often blocked on mobile data. Try Wi‑Fi, or use port 80 (http://YOUR_SERVER without :3000).';

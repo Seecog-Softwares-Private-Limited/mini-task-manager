@@ -43,6 +43,8 @@ source env.sh
 ./run-chrome.sh       # web on http://localhost:8090
 # or
 ./run-android.sh
+# or (requires Xcode)
+./run-ios.sh
 ```
 
 ### Chrome (fastest without Xcode)
@@ -63,8 +65,25 @@ flutter run -d emulator --dart-define=FLAVOR=dev
 ### iOS Simulator (requires full Xcode from App Store)
 
 ```bash
-flutter run --dart-define=API_BASE_URL=http://localhost:3007
+cd mobile
+source env.sh
+./run-ios.sh
+# or
+flutter run -d ios --dart-define=FLAVOR=dev
 ```
+
+Physical device: set your Apple Team in Xcode (`ios/Runner.xcworkspace` → Signing & Capabilities).
+
+### iOS production build (TestFlight)
+
+```bash
+cd mobile
+source env.sh
+chmod +x build-ipa-prod.sh
+./build-ipa-prod.sh
+```
+
+Then open `ios/Runner.xcworkspace` → Product → Archive → Distribute to App Store Connect.
 
 ## Project structure
 
@@ -112,37 +131,29 @@ mobile/lib/
 - Plan-limit **403 snackbars** from API interceptor
 - Session restore on launch, 401 auto-logout
 - Premium SaaS theme aligned with web (indigo/violet palette)
+- **Task attachments** — upload, image/PDF/SVG preview, open/download on iOS and Android
+- **Task comments** — fetch and post on task detail
 
 ## Not yet implemented
 
-- Push notifications (FCM + backend device registration)
+- Push notifications (FCM/APNs + backend device registration)
 - Full offline sync for tasks/boards (projects only are cached today)
-- Attachments, comments, and other web-only task features
 
 ## API reference
 
 - `docs/BACKEND-FRONTEND-MAPPING.md`
 - OpenAPI: `{API_ORIGIN}/api/v1/openapi.yaml`
 
-## iOS HTTP (local dev)
+## iOS HTTP (production server)
 
-If loading `http://` fails on iOS, allow local networking in `ios/Runner/Info.plist`:
-
-```xml
-<key>NSAppTransportSecurity</key>
-<dict>
-  <key>NSAllowsLocalNetworking</key>
-  <true/>
-</dict>
-```
+Production API uses HTTP on `3.110.214.243`. ATS exceptions are configured in `ios/Runner/Info.plist` (same intent as Android `network_security_config.xml`). Prefer HTTPS long-term.
 
 ## Build release
 
 ```bash
-flutter build appbundle --dart-define=FLAVOR=prod --dart-define=API_BASE_URL=https://your-api-host
-flutter build ipa --dart-define=FLAVOR=prod --dart-define=API_BASE_URL=https://your-api-host
+# Android
+./build-apk-prod.sh
+
+# iOS
+./build-ipa-prod.sh
 ```
-
-## Relation to `app/` (Expo WebView)
-
-The existing `app/` folder is a WebView wrapper around the Next.js site. This `mobile/` app is the **native** client and will replace it for production mobile UX over time.

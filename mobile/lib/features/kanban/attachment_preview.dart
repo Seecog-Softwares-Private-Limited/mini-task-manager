@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -71,9 +72,9 @@ Future<void> _downloadAttachment({
     );
   } on ApiException catch (e) {
     messenger?.showSnackBar(SnackBar(content: Text(e.message)));
-  } on UnsupportedError {
+  } on UnsupportedError catch (e) {
     messenger?.showSnackBar(
-      const SnackBar(content: Text('Open the app in a browser to download attachments.')),
+      SnackBar(content: Text(e.message ?? 'Could not open attachment.')),
     );
   }
 }
@@ -399,10 +400,37 @@ class _AttachmentPreviewDialogState extends ConsumerState<_AttachmentPreviewDial
       switch (_kind) {
         case AttachmentPreviewKind.image:
           if (isSvgMime(_mimeType, widget.attachment.fileName)) {
-            final url = createAttachmentBlobUrl(bytes, _mimeType);
+            if (kIsWeb) {
+              final url = createAttachmentBlobUrl(bytes, _mimeType);
+              if (url == null) {
+                setState(() {
+                  _error = 'SVG preview is available in the browser app.';
+                  _loading = false;
+                });
+                return;
+              }
+              setState(() {
+                _blobUrl = url;
+                _loading = false;
+              });
+            } else {
+              setState(() {
+                _bytes = bytes;
+                _loading = false;
+              });
+            }
+          } else {
+            setState(() {
+              _bytes = bytes;
+              _loading = false;
+            });
+          }
+        case AttachmentPreviewKind.pdf:
+          if (kIsWeb) {
+            final url = createAttachmentBlobUrl(bytes, 'application/pdf');
             if (url == null) {
               setState(() {
-                _error = 'SVG preview is available in the browser app.';
+                _error = 'PDF preview is available in the browser app.';
                 _loading = false;
               });
               return;
@@ -417,19 +445,6 @@ class _AttachmentPreviewDialogState extends ConsumerState<_AttachmentPreviewDial
               _loading = false;
             });
           }
-        case AttachmentPreviewKind.pdf:
-          final url = createAttachmentBlobUrl(bytes, 'application/pdf');
-          if (url == null) {
-            setState(() {
-              _error = 'PDF preview is available in the browser app.';
-              _loading = false;
-            });
-            return;
-          }
-          setState(() {
-            _blobUrl = url;
-            _loading = false;
-          });
         case AttachmentPreviewKind.text:
           setState(() {
             _textContent = _decodeText(bytes);
@@ -504,6 +519,16 @@ class _AttachmentPreviewDialogState extends ConsumerState<_AttachmentPreviewDial
   Widget _buildPreviewBody(double previewHeight) {
     if (_kind == AttachmentPreviewKind.text && _textContent != null) {
       return _TextPreviewBody(content: _textContent!);
+    }
+
+    if (_bytes != null && _kind == AttachmentPreviewKind.pdf) {
+      return buildPdfBytesPreview(bytes: _bytes!, height: previewHeight);
+    }
+
+    if (_bytes != null &&
+        _kind == AttachmentPreviewKind.image &&
+        isSvgMime(_mimeType, widget.attachment.fileName)) {
+      return buildSvgBytesPreview(bytes: _bytes!, height: previewHeight);
     }
 
     if (_blobUrl != null) {

@@ -69,13 +69,49 @@ class AppConfig {
   }
 
   static String normalizeBaseUrl(String value) {
-    var url = value.trim();
-    if (url.endsWith('/')) {
-      url = url.substring(0, url.length - 1);
+    final origin = parseApiOrigin(value);
+    if (origin == null) {
+      throw ArgumentError('Invalid API server URL: $value');
     }
-    if (!url.endsWith('/api/v1')) {
-      url = '$url/api/v1';
+    return '${origin.toString().replaceAll(RegExp(r'/$'), '')}/api/v1';
+  }
+
+  /// Fixes common typos (e.g. `http:/host` → `http://host`) and returns the server origin.
+  static Uri? parseApiOrigin(String value) {
+    var raw = value.trim();
+    if (raw.isEmpty) return null;
+
+    // http:/example.com → http://example.com
+    raw = raw.replaceFirst(RegExp(r'^(https?):/(?!/)'), r'$1://');
+    if (!raw.contains('://')) {
+      raw = 'http://$raw';
     }
-    return url;
+
+    if (raw.endsWith('/api/v1')) {
+      raw = raw.substring(0, raw.length - '/api/v1'.length);
+    }
+    while (raw.endsWith('/')) {
+      raw = raw.substring(0, raw.length - 1);
+    }
+
+    final uri = Uri.tryParse(raw);
+    if (uri == null || uri.host.isEmpty) return null;
+
+    final scheme = uri.scheme.isEmpty ? 'http' : uri.scheme;
+    if (scheme != 'http' && scheme != 'https') return null;
+
+    return Uri(
+      scheme: scheme,
+      host: uri.host,
+      port: uri.hasPort ? uri.port : null,
+    );
+  }
+
+  static bool isValidApiBaseUrl(String value) {
+    try {
+      return parseApiOrigin(value) != null;
+    } catch (_) {
+      return false;
+    }
   }
 }
