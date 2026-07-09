@@ -1,17 +1,29 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { Configuration } from '../../config/configuration';
 
 /**
- * Rate limiting is disabled application-wide (no ThrottlerGuard in AppModule).
- * This module is kept only so @SkipThrottle decorators remain valid if throttling is re-enabled later.
+ * Registers global rate limiting asynchronously.
+ * Throttling limits are resolved from ConfigService, which can be overridden in tests.
  */
 @Module({
   imports: [
-    ThrottlerModule.forRoot({
-      throttlers: [
-        { name: 'auth', limit: 1_000_000, ttl: 60_000 },
-        { name: 'default', limit: 1_000_000, ttl: 60_000 },
-      ],
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<Configuration>) => {
+        const auth = config.get('throttle.auth', { infer: true })!;
+        const general = config.get('throttle.general', { infer: true })!;
+        return {
+          throttlers: [
+            { name: 'auth', limit: auth.limit, ttl: auth.ttl },
+            { name: 'default', limit: general.limit, ttl: general.ttl },
+          ],
+          getTracker: (req: { ip?: string; user?: { userId: string } }) =>
+            req.user?.userId ?? req.ip ?? 'unknown',
+        };
+      },
     }),
   ],
 })

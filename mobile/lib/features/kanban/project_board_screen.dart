@@ -414,7 +414,6 @@ class _HeaderStat extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      height: 72,
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.sm),
       decoration: BoxDecoration(
         color: isDark
@@ -442,6 +441,7 @@ class _HeaderStat extends StatelessWidget {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   value,
@@ -682,12 +682,7 @@ class _PremiumTaskCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1E293B) : AppColors.surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border(
-              left: BorderSide(color: priority.color, width: 4),
-              top: BorderSide(color: borderColor),
-              right: BorderSide(color: borderColor),
-              bottom: BorderSide(color: borderColor),
-            ),
+            border: Border.all(color: borderColor),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
@@ -696,88 +691,107 @@ class _PremiumTaskCard extends StatelessWidget {
               ),
             ],
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Stack(
             children: [
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.sm,
-                    AppSpacing.sm,
-                    AppSpacing.xs,
-                    AppSpacing.sm,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              height: 1.3,
-                              fontWeight: FontWeight.w600,
-                              color: titleColor,
-                            ),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Wrap(
-                        spacing: AppSpacing.xs,
-                        runSpacing: AppSpacing.xs,
-                        children: [
-                          _MetaPill(
-                            icon: priority.icon,
-                            label: priority.label,
-                            color: priority.color,
-                            background: priority.background,
-                          ),
-                          if (dueMeta != null)
-                            _MetaPill(
-                              icon: dueMeta.icon,
-                              label: dueMeta.label,
-                              color: dueMeta.color,
-                              background: dueMeta.background,
-                            ),
-                        ],
-                      ),
-                      if (subtaskProgress != null) ...[
-                        const SizedBox(height: AppSpacing.sm),
-                        Row(
-                          children: [
-                            const Icon(Icons.checklist_rounded, size: 14, color: AppColors.violet),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(999),
-                                child: LinearProgressIndicator(
-                                  value: subtaskProgress,
-                                  minHeight: 5,
-                                  backgroundColor: AppColors.violet.withValues(alpha: 0.12),
-                                  color: AppColors.violet,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '${task.completedSubtasks}/${task.subtasks.length}',
-                              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                                    color: AppColors.violet,
-                                    fontSize: 11,
-                                  ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                child: Container(
+                  width: 4,
+                  decoration: BoxDecoration(
+                    color: priority.color,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      bottomLeft: Radius.circular(16),
+                    ),
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.only(right: AppSpacing.xs, top: AppSpacing.sm),
-                child: Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.textMuted.withValues(alpha: 0.7),
-                ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.sm + 4,
+                        AppSpacing.sm,
+                        AppSpacing.xs,
+                        AppSpacing.sm,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  height: 1.3,
+                                  fontWeight: FontWeight.w600,
+                                  color: titleColor,
+                                ),
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          Wrap(
+                            spacing: AppSpacing.xs,
+                            runSpacing: AppSpacing.xs,
+                            children: [
+                              _MetaPill(
+                                icon: priority.icon,
+                                label: priority.label,
+                                color: priority.color,
+                                background: priority.background,
+                              ),
+                              if (dueMeta != null)
+                                _MetaPill(
+                                  icon: dueMeta.icon,
+                                  label: dueMeta.label,
+                                  color: dueMeta.color,
+                                  background: dueMeta.background,
+                                ),
+                            ],
+                          ),
+                          if (subtaskProgress != null) ...[
+                            const SizedBox(height: AppSpacing.sm),
+                            Row(
+                              children: [
+                                const Icon(Icons.checklist_rounded, size: 14, color: AppColors.violet),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(999),
+                                    child: LinearProgressIndicator(
+                                      value: subtaskProgress,
+                                      minHeight: 5,
+                                      backgroundColor: AppColors.violet.withValues(alpha: 0.12),
+                                      color: AppColors.violet,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '${task.completedSubtasks}/${task.subtasks.length}',
+                                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                        color: AppColors.violet,
+                                        fontSize: 11,
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(right: AppSpacing.xs, top: AppSpacing.sm),
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      color: AppColors.textMuted.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

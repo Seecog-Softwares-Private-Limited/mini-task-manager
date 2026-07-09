@@ -14,10 +14,19 @@ class AttachmentPickerUtils {
     final file = result.files.first;
     if (file.name.isEmpty) return null;
 
+    // On web, accessing file.path throws UnsupportedError.
+    // Safely attempt to read it; fall back to null (bytes will be used).
+    String? filePath;
+    try {
+      filePath = file.path;
+    } catch (_) {
+      filePath = null;
+    }
+
     return PendingAttachment(
       clientId: generateClientId(),
       fileName: file.name,
-      path: file.path,
+      path: filePath,
       bytes: file.bytes,
       mimeType: file.extension,
     );
