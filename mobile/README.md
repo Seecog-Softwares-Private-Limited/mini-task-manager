@@ -76,6 +76,20 @@ Physical device: set your Apple Team in Xcode (`ios/Runner.xcworkspace` → Sign
 
 ### iOS production build (TestFlight)
 
+**Always open Xcode via the workspace script** (never double-click `Runner.xcodeproj`):
+
+```bash
+cd mobile
+chmod +x open-xcode.sh
+./open-xcode.sh
+```
+
+If Xcode still shows linker/script errors after pod changes:
+
+```bash
+./open-xcode.sh --clean-derived-data
+```
+
 ```bash
 cd mobile
 source env.sh

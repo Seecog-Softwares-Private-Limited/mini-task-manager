@@ -45,12 +45,14 @@ class TaskDetailSheet extends ConsumerStatefulWidget {
     required this.statuses,
     required this.projectId,
     required this.onUpdated,
+    this.onDeleted,
   });
 
   final Task task;
   final List<WorkflowStatus> statuses;
   final String projectId;
   final VoidCallback onUpdated;
+  final VoidCallback? onDeleted;
 
   @override
   ConsumerState<TaskDetailSheet> createState() => _TaskDetailSheetState();
@@ -68,6 +70,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
   bool _isEditingTitle = false;
   bool _isEditingDescription = false;
   bool _saving = false;
+  bool _deleting = false;
   bool _loadingMeta = true;
   bool _postingComment = false;
   int? _savingSubtaskIndex;
@@ -319,14 +322,29 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     await _patchTask(tags: next);
   }
 
+  void _openSubtaskEditor(int index) {
+    setState(() => _expandedSubtaskIndex = index);
+  }
+
+  void _toggleSubtaskExpanded(int index) {
+    setState(() {
+      _expandedSubtaskIndex = _expandedSubtaskIndex == index ? null : index;
+    });
+  }
+
+  bool _canEditSubtasks() {
+    final org = ref.read(selectedOrgProvider);
+    final userId = ref.read(sessionControllerProvider).user?.id;
+    return canEditTaskSubtasks(org: org, userId: userId, task: _task);
+  }
+
   Future<void> _toggleSubtask(int index, bool? value) async {
     if (value == null) return;
-    final user = ref.read(sessionControllerProvider).user;
-    if (!isUserAssignedToTask(task: _task, members: _members, userId: user?.id)) {
+    if (!_canEditSubtasks()) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Only assigned team members can complete this subtask.'),
+          content: Text('You do not have permission to update this subtask.'),
         ),
       );
       return;
@@ -357,19 +375,19 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     required String subtaskTitle,
     required String? subtaskPriority,
   }) async {
-    final user = ref.read(sessionControllerProvider).user;
-    if (user == null) return null;
-    if (!isUserAssignedToTask(task: _task, members: _members, userId: user.id)) {
+    if (!_canEditSubtasks()) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Only assigned team members can complete this subtask.'),
+            content: Text('You do not have permission to complete this subtask.'),
           ),
         );
       }
       return null;
     }
 
+    final user = ref.read(sessionControllerProvider).user;
+    if (user == null) return null;
     final requireVideo =
         isCriticalPriority(subtaskPriority) || isCriticalPriority(_task.priority);
     final result = await showSubtaskCompletionSheet(
@@ -518,6 +536,59 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     }
   }
 
+  Future<void> _deleteTask() async {
+    if (_deleting || _saving) return;
+    setState(() {
+      _deleting = true;
+      _error = null;
+    });
+    try {
+      await ref.read(tasksRepositoryProvider).deleteTask(_task.id);
+      if (!mounted) return;
+      widget.onDeleted?.call();
+      widget.onUpdated();
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Task deleted')),
+      );
+    } on ApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
+
+  Future<void> _confirmDeleteTask() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete task'),
+          content: Text(
+            'Permanently delete "${_task.title.trim().isEmpty ? 'this task' : _task.title}"? '
+            'This cannot be undone.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.danger,
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed == true && mounted) {
+      await _deleteTask();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(sessionControllerProvider);
@@ -527,14 +598,26 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     final canEditTitleAndDescription = canEditTaskTitleAndDescription(
       org: org,
       userId: currentUserId,
+      task: _task,
+      members: _members,
     );
     final canEditSubtasks = canEditTaskSubtasks(
       org: org,
       userId: currentUserId,
       task: _task,
     );
-    final canCompleteSubtasks =
-        isUserAssignedToTask(task: _task, members: _members, userId: currentUserId);
+    final canEditWorkflowFields = canEditTaskWorkflowFields(
+      org: org,
+      userId: currentUserId,
+      task: _task,
+      members: _members,
+    );
+    final canCompleteSubtasks = canEditSubtasks;
+    final canDelete = canDeleteTask(
+      org: org,
+      userId: currentUserId,
+      task: _task,
+    );
     final checklistDone = _subtasks.where((s) => s.completed).length;
     final checklistTotal = _subtasks.length;
     final checklistPercent =
@@ -652,6 +735,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                 members: _members,
                 saving: _saving,
                 canEditDetails: canEditTitleAndDescription,
+                canEditWorkflowFields: canEditWorkflowFields,
                 isEditingDescription: _isEditingDescription,
                 descriptionController: _descriptionController,
                 descriptionFocusNode: _descriptionFocusNode,
@@ -766,7 +850,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                     child: Text(
-                      'Only assigned team members can complete checklist items.',
+                      'You can view checklist items but cannot edit them.',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: AppColors.warning,
                           ),
@@ -787,41 +871,61 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                     ),
                     child: Column(
                       children: [
-                        CheckboxListTile(
-                          value: item.completed,
-                          onChanged: _saving ||
-                                  !canCompleteSubtasks ||
-                                  item.title.trim().isEmpty
-                              ? null
-                              : (v) => _toggleSubtask(index, v),
-                          title: Text(
-                            displayTitle,
-                            style: TextStyle(
-                              color: item.title.trim().isEmpty
-                                  ? AppColors.textMuted
-                                  : null,
-                              fontStyle: item.title.trim().isEmpty
-                                  ? FontStyle.italic
-                                  : null,
-                              decoration: item.completed
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                            ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
                           ),
-                          secondary: IconButton(
-                            icon: Icon(
-                              expanded
-                                  ? Icons.keyboard_arrow_up_rounded
-                                  : Icons.keyboard_arrow_down_rounded,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _expandedSubtaskIndex = expanded ? null : index;
-                              });
-                            },
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Checkbox(
+                                value: item.completed,
+                                onChanged: _saving ||
+                                        !canCompleteSubtasks ||
+                                        item.title.trim().isEmpty
+                                    ? null
+                                    : (value) => _toggleSubtask(index, value),
+                                materialTapTargetSize:
+                                    MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              Expanded(
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(8),
+                                  onTap: () => _openSubtaskEditor(index),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
+                                      horizontal: 4,
+                                    ),
+                                    child: Text(
+                                      displayTitle,
+                                      style: TextStyle(
+                                        color: item.title.trim().isEmpty
+                                            ? AppColors.textMuted
+                                            : null,
+                                        fontStyle: item.title.trim().isEmpty
+                                            ? FontStyle.italic
+                                            : null,
+                                        decoration: item.completed
+                                            ? TextDecoration.lineThrough
+                                            : null,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                icon: Icon(
+                                  expanded
+                                      ? Icons.keyboard_arrow_up_rounded
+                                      : Icons.keyboard_arrow_down_rounded,
+                                ),
+                                onPressed: () => _toggleSubtaskExpanded(index),
+                              ),
+                            ],
                           ),
-                          controlAffinity: ListTileControlAffinity.leading,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                         ),
                         if (expanded)
                           Padding(
@@ -857,6 +961,25 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                   );
                 }),
               ],
+              if (canDelete) ...[
+                const SizedBox(height: AppSpacing.lg),
+                OutlinedButton.icon(
+                  onPressed: _saving || _deleting ? null : _confirmDeleteTask,
+                  icon: _deleting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.delete_outline_rounded),
+                  label: Text(_deleting ? 'Deleting…' : 'Delete task'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.danger,
+                    side: BorderSide(color: AppColors.danger.withValues(alpha: 0.45)),
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                ),
+              ],
               const SizedBox(height: AppSpacing.lg),
               _CommentsSection(
                 loading: _loadingMeta,
@@ -881,6 +1004,7 @@ class _TaskMetaSection extends StatefulWidget {
     required this.members,
     required this.saving,
     required this.canEditDetails,
+    required this.canEditWorkflowFields,
     required this.isEditingDescription,
     required this.descriptionController,
     required this.descriptionFocusNode,
@@ -902,6 +1026,7 @@ class _TaskMetaSection extends StatefulWidget {
   final List<ProjectMember> members;
   final bool saving;
   final bool canEditDetails;
+  final bool canEditWorkflowFields;
   final bool isEditingDescription;
   final TextEditingController descriptionController;
   final FocusNode descriptionFocusNode;
@@ -1074,6 +1199,7 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
           selectedAssigneeIds: _activeAssigneeIds(widget.task, widget.members),
           currentUserId: widget.currentUserId,
           saving: widget.saving,
+          enabled: widget.canEditDetails,
           onAssigneesChanged: widget.onAssigneesChanged,
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -1091,7 +1217,7 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
         Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: widget.saving ? null : widget.onPickDueDate,
+            onTap: widget.saving || !widget.canEditDetails ? null : widget.onPickDueDate,
             borderRadius: BorderRadius.circular(14),
             child: Container(
               width: double.infinity,
@@ -1139,7 +1265,7 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
                 ),
               ),
               TextButton(
-                onPressed: widget.saving ? null : widget.onClearDueDate,
+                onPressed: widget.saving || !widget.canEditDetails ? null : widget.onClearDueDate,
                 child: const Text('Clear'),
               ),
             ],
@@ -1167,7 +1293,7 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
         const SizedBox(height: AppSpacing.xs),
         _SidebarDropdown<String>(
           value: selectedStatus?.id,
-          enabled: !widget.saving && widget.statuses.isNotEmpty,
+          enabled: !widget.saving && widget.statuses.isNotEmpty && widget.canEditWorkflowFields,
           hint: 'Select status',
           items: widget.statuses
               .map(
@@ -1199,7 +1325,7 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
         const SizedBox(height: AppSpacing.xs),
         _SidebarDropdown<String>(
           value: selectedPriority.$1,
-          enabled: !widget.saving,
+          enabled: !widget.saving && widget.canEditWorkflowFields,
           hint: 'Select priority',
           items: _TaskMetaSection.priorities
               .map(
@@ -1235,7 +1361,9 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
                 .map(
                   (tag) => InputChip(
                     label: Text(tag),
-                    onDeleted: widget.saving ? null : () => widget.onRemoveTag(tag),
+                    onDeleted: widget.saving || !widget.canEditDetails
+                        ? null
+                        : () => widget.onRemoveTag(tag),
                   ),
                 )
                 .toList(),
@@ -1247,7 +1375,7 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
             Expanded(
               child: TextField(
                 controller: _tagController,
-                enabled: !widget.saving,
+                enabled: !widget.saving && widget.canEditDetails,
                 decoration: InputDecoration(
                   hintText: 'Add a tag',
                   border: OutlineInputBorder(
@@ -1266,7 +1394,7 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
             ),
             const SizedBox(width: AppSpacing.sm),
             IconButton.filled(
-              onPressed: widget.saving
+              onPressed: widget.saving || !widget.canEditDetails
                   ? null
                   : () {
                       widget.onAddTag(_tagController.text);
@@ -1394,6 +1522,7 @@ class _AssignedToSection extends ConsumerWidget {
     required this.selectedAssigneeIds,
     required this.currentUserId,
     required this.saving,
+    required this.enabled,
     required this.onAssigneesChanged,
   });
 
@@ -1402,6 +1531,7 @@ class _AssignedToSection extends ConsumerWidget {
   final List<String> selectedAssigneeIds;
   final String? currentUserId;
   final bool saving;
+  final bool enabled;
   final ValueChanged<List<String>> onAssigneesChanged;
 
   void _openMembersSheet(BuildContext context, WidgetRef ref) {
@@ -1411,7 +1541,7 @@ class _AssignedToSection extends ConsumerWidget {
       members: allMembers,
       selectedAssigneeIds: selectedAssigneeIds,
       sessionUser: ref.read(sessionControllerProvider).user,
-      enabled: !saving,
+      enabled: enabled && !saving,
       title: 'Assign members',
       showDoneButton: true,
       onSelectionChanged: onAssigneesChanged,
@@ -1435,7 +1565,7 @@ class _AssignedToSection extends ConsumerWidget {
         Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: allMembers.isEmpty ? null : () => _openMembersSheet(context, ref),
+            onTap: !enabled || allMembers.isEmpty ? null : () => _openMembersSheet(context, ref),
             borderRadius: BorderRadius.circular(14),
             child: Container(
               width: double.infinity,

@@ -150,6 +150,14 @@ class TasksRepository {
     return updateTask(taskId: taskId, statusId: statusId);
   }
 
+  Future<void> deleteTask(String taskId) async {
+    try {
+      await _api.dio.delete<void>('/tasks/$taskId');
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
   Future<List<TaskComment>> fetchComments(String taskId) async {
     try {
       final response = await _api.dio.get<List<dynamic>>('/tasks/$taskId/comments');

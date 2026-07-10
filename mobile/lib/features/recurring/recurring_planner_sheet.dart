@@ -279,6 +279,12 @@ class _RecurringPlannerSheetState extends ConsumerState<_RecurringPlannerSheet> 
               ref.invalidate(recurringTemplatesProvider);
               ref.invalidate(recurringSummaryProvider);
             },
+            onDeleted: () {
+              ref.invalidate(recurringBoardTasksProvider);
+              ref.invalidate(recurringTemplateHistoryProvider(template.id));
+              ref.invalidate(recurringTemplatesProvider);
+              ref.invalidate(recurringSummaryProvider);
+            },
           );
         },
       );

@@ -98,6 +98,9 @@ class Task {
     this.tags = const [],
     this.dueDate,
     this.subtasks = const [],
+    this.recurringTemplateId,
+    this.recurrenceType,
+    this.recurrenceSequence,
   });
 
   final String id;
@@ -114,6 +117,9 @@ class Task {
   final String? dueDate;
   final int loggedMinutes;
   final List<TaskSubtask> subtasks;
+  final String? recurringTemplateId;
+  final String? recurrenceType;
+  final int? recurrenceSequence;
   final String createdAt;
   final String updatedAt;
 
@@ -137,6 +143,11 @@ class Task {
           ? json['loggedMinutes'] as int
           : int.tryParse('${json['loggedMinutes']}') ?? 0,
       subtasks: _parseSubtasks(json['subtasks']),
+      recurringTemplateId: _nullableString(json['recurringTemplateId']),
+      recurrenceType: _nullableString(json['recurrenceType']),
+      recurrenceSequence: json['recurrenceSequence'] is int
+          ? json['recurrenceSequence'] as int
+          : int.tryParse('${json['recurrenceSequence']}'),
       createdAt: _nullableDateString(json['createdAt']) ?? '',
       updatedAt: _nullableDateString(json['updatedAt']) ?? '',
     );
@@ -167,6 +178,9 @@ class Task {
       dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
       loggedMinutes: loggedMinutes,
       subtasks: subtasks ?? this.subtasks,
+      recurringTemplateId: recurringTemplateId,
+      recurrenceType: recurrenceType,
+      recurrenceSequence: recurrenceSequence,
       createdAt: createdAt,
       updatedAt: updatedAt,
     );
