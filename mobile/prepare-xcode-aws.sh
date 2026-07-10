@@ -11,6 +11,7 @@ PROD_URL="${API_BASE_URL:-http://3.110.214.243:3000}"
 echo "Configuring iOS build for AWS API → ${PROD_URL}/api/v1"
 flutter pub get
 bash "$ROOT/scripts/write-xcode-env-local.sh"
+bash "$ROOT/ios/prepare_flutter_for_xcode.sh"
 flutter build ios --simulator --no-codesign \
   --dart-define=FLAVOR=prod \
   --dart-define=API_BASE_URL="$PROD_URL"

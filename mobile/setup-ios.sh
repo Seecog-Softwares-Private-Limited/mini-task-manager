@@ -26,6 +26,7 @@ flutter config --no-enable-swift-package-manager
 
 flutter pub get
 bash "$ROOT/scripts/write-xcode-env-local.sh"
+bash "$ROOT/ios/prepare_flutter_for_xcode.sh"
 cd ios
 pod install
 cd ..

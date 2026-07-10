@@ -417,11 +417,11 @@ export class TasksService {
   ): Promise<void> {
     const membership = await this.organizationsService.getMembership(organizationId, userId);
     const role = membership?.role?.toLowerCase() ?? '';
-    if (role === 'owner') return;
+    if (role === 'owner' || role === 'admin') return;
 
     if (isTaskReporter(task, userId)) return;
 
-    throw new ForbiddenException('Only the workspace owner or task creator can delete this task');
+    throw new ForbiddenException('Only the workspace owner, admin, or task creator can delete this task');
   }
 
   private async assertCanUpdateTask(

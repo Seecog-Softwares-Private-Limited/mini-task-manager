@@ -238,6 +238,7 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
           statuses: board.statuses,
           projectId: widget.projectId,
           onUpdated: () => ref.invalidate(projectBoardProvider(widget.projectId)),
+          onDeleted: () => ref.invalidate(projectBoardProvider(widget.projectId)),
         );
       },
     );
