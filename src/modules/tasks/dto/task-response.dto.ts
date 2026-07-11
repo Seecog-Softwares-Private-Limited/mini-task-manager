@@ -16,6 +16,8 @@ export class TaskSubtaskResponseDto {
   status?: string;
   priority?: string;
   statusId?: string;
+  reporterId?: string;
+  createdAt?: string;
 }
 
 export class TaskResponseDto {

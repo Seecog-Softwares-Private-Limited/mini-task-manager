@@ -322,10 +322,6 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     await _patchTask(tags: next);
   }
 
-  void _openSubtaskEditor(int index) {
-    setState(() => _expandedSubtaskIndex = index);
-  }
-
   void _toggleSubtaskExpanded(int index) {
     setState(() {
       _expandedSubtaskIndex = _expandedSubtaskIndex == index ? null : index;
@@ -891,38 +887,52 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                                 visualDensity: VisualDensity.compact,
                               ),
                               Expanded(
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(8),
-                                  onTap: () => _openSubtaskEditor(index),
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 12,
-                                      horizontal: 4,
-                                    ),
-                                    child: Text(
-                                      displayTitle,
-                                      style: TextStyle(
-                                        color: item.title.trim().isEmpty
-                                            ? AppColors.textMuted
-                                            : null,
-                                        fontStyle: item.title.trim().isEmpty
-                                            ? FontStyle.italic
-                                            : null,
-                                        decoration: item.completed
-                                            ? TextDecoration.lineThrough
-                                            : null,
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(8),
+                                    onTap: () {
+                                      FocusManager.instance.primaryFocus
+                                          ?.unfocus();
+                                      _toggleSubtaskExpanded(index);
+                                    },
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 12,
+                                        horizontal: 4,
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              displayTitle,
+                                              style: TextStyle(
+                                                color: item.title.trim().isEmpty
+                                                    ? AppColors.textMuted
+                                                    : null,
+                                                fontStyle:
+                                                    item.title.trim().isEmpty
+                                                        ? FontStyle.italic
+                                                        : null,
+                                                decoration: item.completed
+                                                    ? TextDecoration.lineThrough
+                                                    : null,
+                                              ),
+                                            ),
+                                          ),
+                                          Icon(
+                                            expanded
+                                                ? Icons
+                                                    .keyboard_arrow_up_rounded
+                                                : Icons
+                                                    .keyboard_arrow_down_rounded,
+                                            color: AppColors.textMuted,
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              IconButton(
-                                icon: Icon(
-                                  expanded
-                                      ? Icons.keyboard_arrow_up_rounded
-                                      : Icons.keyboard_arrow_down_rounded,
-                                ),
-                                onPressed: () => _toggleSubtaskExpanded(index),
                               ),
                             ],
                           ),
@@ -940,6 +950,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                               members: _members,
                               taskId: _task.id,
                               organizationId: orgId,
+                              fallbackReporterId: _task.reporterId,
+                              fallbackCreatedAt: _task.createdAt,
                               saving: _savingSubtaskIndex == index,
                               canComplete: canCompleteSubtasks,
                               onRequestCompletion: ({

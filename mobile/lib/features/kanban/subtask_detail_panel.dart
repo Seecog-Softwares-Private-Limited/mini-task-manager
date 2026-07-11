@@ -2,15 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/api/api_client.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/utils/workspace_logo.dart';
 import '../../data/models/pending_attachment.dart';
 import '../../data/models/subtask_completion_record.dart';
 import '../../data/models/project_member.dart';
 import '../../data/models/task.dart';
 import '../../data/models/task_attachment.dart';
 import '../../shared/widgets/app_widgets.dart';
+import '../../shared/widgets/user_avatar.dart';
 import '../auth/session_controller.dart';
 import 'attachment_preview.dart';
 import 'attachment_picker_section.dart';
@@ -48,12 +51,16 @@ class SubtaskDetailPanel extends ConsumerStatefulWidget {
     required this.onRequestCompletion,
     required this.onCancel,
     required this.onSave,
+    this.fallbackReporterId,
+    this.fallbackCreatedAt,
   });
 
   final TaskSubtask subtask;
   final List<ProjectMember> members;
   final String taskId;
   final String organizationId;
+  final String? fallbackReporterId;
+  final String? fallbackCreatedAt;
   final bool saving;
   final bool canComplete;
   final SubtaskCompletionRequest onRequestCompletion;
@@ -538,8 +545,14 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
           ],
           const SizedBox(height: AppSpacing.md),
           Row(
-            mainAxisAlignment: MainAxisAlignment.end,
             children: [
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: _buildReporterBadge(context),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
               TextButton(
                 onPressed: widget.saving ? null : _handleCancel,
                 child: const Text('Cancel'),
@@ -558,6 +571,179 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildReporterBadge(BuildContext context) {
+    final reporterId =
+        (widget.subtask.reporterId != null &&
+                widget.subtask.reporterId!.trim().isNotEmpty)
+            ? widget.subtask.reporterId
+            : widget.fallbackReporterId;
+    final createdAtRaw =
+        (widget.subtask.createdAt != null &&
+                widget.subtask.createdAt!.trim().isNotEmpty)
+            ? widget.subtask.createdAt
+            : widget.fallbackCreatedAt;
+    final hasReporter = reporterId != null && reporterId.trim().isNotEmpty;
+    final hasDate = createdAtRaw != null && createdAtRaw.trim().isNotEmpty;
+    if (!hasReporter && !hasDate) return const SizedBox.shrink();
+
+    String name = 'Unknown';
+    String? avatarUrl;
+    if (hasReporter) {
+      final normalized = _normalizeUserId(reporterId);
+      ProjectMember? match;
+      for (final member in widget.members) {
+        if (_normalizeUserId(member.userId) == normalized) {
+          match = member;
+          break;
+        }
+      }
+      final memberUser = match?.user;
+      if (memberUser != null) {
+        name = memberUser.fullName.trim().isNotEmpty
+            ? memberUser.fullName
+            : memberUser.email;
+        avatarUrl = memberUser.avatarUrl;
+      } else {
+        final currentUser = ref.read(sessionControllerProvider).user;
+        if (currentUser != null &&
+            _normalizeUserId(currentUser.id) == normalized) {
+          name = currentUser.fullName.trim().isNotEmpty
+              ? currentUser.fullName
+              : currentUser.email;
+          avatarUrl = currentUser.avatarUrl;
+        }
+      }
+    }
+
+    String? dateLabel;
+    if (hasDate) {
+      final parsed = DateTime.tryParse(createdAtRaw);
+      dateLabel = parsed == null
+          ? createdAtRaw
+          : DateFormat('MMM d, yyyy · h:mm a').format(parsed.toLocal());
+    }
+
+    final apiBaseUrl = ref.watch(appConfigProvider).apiBaseUrl;
+    final imageUrl = resolveUserAvatarUrl(apiBaseUrl, avatarUrl);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(6, 5, 12, 5),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.primary.withValues(alpha: 0.10),
+            AppColors.violet.withValues(alpha: 0.10),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _ReporterAvatar(name: name, imageUrl: imageUrl, size: 26),
+          const SizedBox(width: 7),
+          Flexible(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 9.5,
+                        height: 1.15,
+                        color: AppColors.textPrimary,
+                      ),
+                ),
+                if (dateLabel != null) ...[
+                  const SizedBox(height: 1),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.schedule_rounded,
+                        size: 8.5,
+                        color: AppColors.textMuted,
+                      ),
+                      const SizedBox(width: 2),
+                      Flexible(
+                        child: Text(
+                          dateLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: AppColors.textMuted,
+                                    fontSize: 8.5,
+                                    height: 1.15,
+                                  ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReporterAvatar extends StatelessWidget {
+  const _ReporterAvatar({
+    required this.name,
+    required this.imageUrl,
+    required this.size,
+  });
+
+  final String name;
+  final String imageUrl;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    if (imageUrl.isNotEmpty) {
+      return ClipOval(
+        child: Image.network(
+          imageUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _initials(),
+        ),
+      );
+    }
+    return _initials();
+  }
+
+  Widget _initials() {
+    return Container(
+      width: size,
+      height: size,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: [AppColors.primary, AppColors.violet],
+        ),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        workspaceInitials(name),
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
+          fontSize: size * 0.36,
+        ),
       ),
     );
   }

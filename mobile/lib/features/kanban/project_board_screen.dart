@@ -683,12 +683,7 @@ class _PremiumTaskCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1E293B) : AppColors.surface,
             borderRadius: BorderRadius.circular(16),
-            border: Border(
-              left: BorderSide(color: priority.color, width: 4),
-              top: BorderSide(color: borderColor),
-              right: BorderSide(color: borderColor),
-              bottom: BorderSide(color: borderColor),
-            ),
+            border: Border.all(color: borderColor),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
@@ -697,9 +692,12 @@ class _PremiumTaskCard extends StatelessWidget {
               ),
             ],
           ),
-          child: Row(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Container(width: 4, color: priority.color),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(
@@ -781,6 +779,7 @@ class _PremiumTaskCard extends StatelessWidget {
                 ),
               ),
             ],
+          ),
           ),
         ),
       ),

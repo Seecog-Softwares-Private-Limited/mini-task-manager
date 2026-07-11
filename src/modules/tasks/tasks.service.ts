@@ -191,7 +191,9 @@ export class TasksService {
         ? [dto.assigneeId]
         : [];
 
-    const normalizedSubtasks = this.normalizeSubtasks(dto.subtasks);
+    const normalizedSubtasks = this.normalizeSubtasks(dto.subtasks, {
+      currentUserId: reporterId,
+    });
     const tags = this.normalizeTags(dto.tags);
 
     const statusId = await this.resolveInitialStatusId(
@@ -306,7 +308,10 @@ export class TasksService {
       patch.tags = normalized.length ? normalized : null;
     }
     if (dto.subtasks !== undefined) {
-      const normalized = this.normalizeSubtasks(dto.subtasks);
+      const normalized = this.normalizeSubtasks(dto.subtasks, {
+        existing: task.subtasks,
+        currentUserId: userId,
+      });
       patch.subtasks = normalized.length ? normalized : null;
     }
     const nextStatusId = dto.statusId !== undefined ? dto.statusId ?? null : task.statusId;
@@ -515,7 +520,13 @@ export class TasksService {
       status?: string;
       statusId?: string;
       completionRecord?: Record<string, any>;
+      reporterId?: string;
+      createdAt?: string;
     }>,
+    context?: {
+      existing?: Array<{ id?: string; reporterId?: string; createdAt?: string }> | null;
+      currentUserId?: string;
+    },
   ): Array<{
     id: string;
     title: string;
@@ -528,13 +539,27 @@ export class TasksService {
     priority?: string;
     statusId?: string;
     completionRecord?: Record<string, any>;
+    reporterId?: string;
+    createdAt?: string;
   }> {
     if (!subtasks?.length) return [];
+    const existingById = new Map(
+      (context?.existing ?? [])
+        .filter((s) => !!s?.id)
+        .map((s) => [String(s.id), s] as const),
+    );
+    const nowIso = new Date().toISOString();
     return subtasks
       .map((s) => {
         const description = s.description?.trim();
         const status = this.normalizeSubtaskStatus(s);
         const assignees = this.normalizeSubtaskAssignees(s);
+        const prior = s.id ? existingById.get(String(s.id)) : undefined;
+        // Reporter/createdAt are set once (on creation) and preserved thereafter,
+        // so clients that omit them on save do not wipe the audit trail.
+        const reporterId =
+          prior?.reporterId ?? s.reporterId ?? context?.currentUserId ?? undefined;
+        const createdAt = prior?.createdAt ?? s.createdAt ?? nowIso;
         return {
           id: s.id ?? generateUuid(),
           title: s.title?.trim() ?? '',
@@ -548,6 +573,8 @@ export class TasksService {
           ...(s.completionRecord && typeof s.completionRecord === 'object'
             ? { completionRecord: s.completionRecord }
             : {}),
+          ...(reporterId ? { reporterId } : {}),
+          createdAt,
         };
       })
       .filter((s) => s.title.length > 0);
