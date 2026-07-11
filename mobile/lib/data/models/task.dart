@@ -16,6 +16,8 @@ class TaskSubtask {
     this.priority,
     this.statusId,
     this.completionRecord,
+    this.reporterId,
+    this.createdAt,
   });
 
   final String id;
@@ -29,6 +31,8 @@ class TaskSubtask {
   final String? priority;
   final String? statusId;
   final SubtaskCompletionRecord? completionRecord;
+  final String? reporterId;
+  final String? createdAt;
 
   factory TaskSubtask.fromJson(Map<String, dynamic> json) {
     final rawRecord = json['completionRecord'];
@@ -46,6 +50,8 @@ class TaskSubtask {
       completionRecord: rawRecord is Map<String, dynamic>
           ? SubtaskCompletionRecord.fromJson(rawRecord)
           : null,
+      reporterId: _nullableString(json['reporterId']),
+      createdAt: _nullableString(json['createdAt']),
     );
   }
 
@@ -62,6 +68,8 @@ class TaskSubtask {
     String? statusId,
     SubtaskCompletionRecord? completionRecord,
     bool clearCompletionRecord = false,
+    String? reporterId,
+    String? createdAt,
   }) {
     return TaskSubtask(
       id: id ?? this.id,
@@ -76,6 +84,8 @@ class TaskSubtask {
       statusId: statusId ?? this.statusId,
       completionRecord:
           clearCompletionRecord ? null : (completionRecord ?? this.completionRecord),
+      reporterId: reporterId ?? this.reporterId,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 }

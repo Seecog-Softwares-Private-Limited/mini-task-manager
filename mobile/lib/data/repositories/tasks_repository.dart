@@ -129,6 +129,8 @@ class TasksRepository {
                 if (s.statusId != null) 'statusId': s.statusId,
                 if (s.completionRecord != null)
                   'completionRecord': s.completionRecord!.toJson(),
+                if (s.reporterId != null) 'reporterId': s.reporterId,
+                if (s.createdAt != null) 'createdAt': s.createdAt,
               },
             )
             .toList();
