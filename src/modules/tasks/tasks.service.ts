@@ -522,6 +522,7 @@ export class TasksService {
       completionRecord?: Record<string, any>;
       reporterId?: string;
       createdAt?: string;
+      note?: string;
     }>,
     context?: {
       existing?: Array<{ id?: string; reporterId?: string; createdAt?: string }> | null;
@@ -541,6 +542,7 @@ export class TasksService {
     completionRecord?: Record<string, any>;
     reporterId?: string;
     createdAt?: string;
+    note?: string;
   }> {
     if (!subtasks?.length) return [];
     const existingById = new Map(
@@ -575,6 +577,9 @@ export class TasksService {
             : {}),
           ...(reporterId ? { reporterId } : {}),
           createdAt,
+          ...(typeof s.note === 'string' && s.note.trim().length
+            ? { note: s.note.trim().slice(0, 2000) }
+            : {}),
         };
       })
       .filter((s) => s.title.length > 0);

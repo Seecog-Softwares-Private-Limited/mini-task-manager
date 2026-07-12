@@ -26,6 +26,26 @@ class RecurringRepository {
     }
   }
 
+  Future<RecurringAnalytics> fetchAnalytics({
+    required String organizationId,
+    String? projectId,
+    int days = 30,
+  }) async {
+    try {
+      final response = await _api.dio.get<Map<String, dynamic>>(
+        '/recurring-tasks/analytics',
+        queryParameters: {
+          'days': days,
+          if (projectId != null) 'projectId': projectId,
+        },
+        options: _api.withOrgHeader(organizationId),
+      );
+      return RecurringAnalytics.fromJson(response.data ?? const {});
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
   Future<List<RecurringTemplate>> fetchTemplates({
     required String organizationId,
     String? projectId,
@@ -106,6 +126,45 @@ class RecurringRepository {
     try {
       await _api.dio.post<void>(
         '/recurring-tasks/$templateId/resume',
+        options: _api.withOrgHeader(organizationId),
+      );
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  /// Completes a recurring occurrence via the series-aware endpoint.
+  /// [action] is one of ONLY_THIS, THIS_AND_PREVIOUS_PENDING, STOP_SERIES_PERMANENTLY.
+  Future<void> completeRecurringTask({
+    required String taskId,
+    required String organizationId,
+    String action = 'ONLY_THIS',
+    String? doneStatusId,
+  }) async {
+    try {
+      await _api.dio.post<void>(
+        '/recurring-tasks/tasks/$taskId/complete',
+        data: {
+          'action': action,
+          if (doneStatusId != null) 'doneStatusId': doneStatusId,
+        },
+        options: _api.withOrgHeader(organizationId),
+      );
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  /// Skips the next pending occurrence for a series (owner/admin only).
+  Future<void> skipNextOccurrence({
+    required String templateId,
+    required String organizationId,
+    int steps = 1,
+  }) async {
+    try {
+      await _api.dio.post<void>(
+        '/recurring-tasks/$templateId/skip-next',
+        data: {'steps': steps},
         options: _api.withOrgHeader(organizationId),
       );
     } on DioException catch (error) {
