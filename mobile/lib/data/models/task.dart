@@ -113,6 +113,7 @@ class Task {
     this.assigneeIds = const [],
     this.tags = const [],
     this.dueDate,
+    this.completedAt,
     this.subtasks = const [],
     this.recurringTemplateId,
     this.recurrenceType,
@@ -131,6 +132,7 @@ class Task {
   final List<String> tags;
   final String reporterId;
   final String? dueDate;
+  final String? completedAt;
   final int loggedMinutes;
   final List<TaskSubtask> subtasks;
   final String? recurringTemplateId;
@@ -155,6 +157,7 @@ class Task {
       tags: _parseTags(json['tags']),
       reporterId: _asString(json['reporterId']),
       dueDate: _nullableDateString(json['dueDate']),
+      completedAt: _nullableDateString(json['completedAt']),
       loggedMinutes: json['loggedMinutes'] is int
           ? json['loggedMinutes'] as int
           : int.tryParse('${json['loggedMinutes']}') ?? 0,
@@ -192,6 +195,7 @@ class Task {
       tags: tags ?? this.tags,
       reporterId: reporterId,
       dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
+      completedAt: completedAt,
       loggedMinutes: loggedMinutes,
       subtasks: subtasks ?? this.subtasks,
       recurringTemplateId: recurringTemplateId,

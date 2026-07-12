@@ -11,7 +11,11 @@ import '../../core/theme/app_spacing.dart';
 import '../../data/models/task.dart';
 import '../../data/models/workflow.dart';
 import '../../shared/widgets/app_widgets.dart';
+import '../../data/models/project.dart';
 import '../auth/session_controller.dart';
+import '../projects/project_actions.dart';
+import '../projects/project_settings_sheet.dart';
+import '../projects/projects_providers.dart';
 import 'create_task_sheet.dart';
 import 'kanban_providers.dart';
 import 'project_switcher.dart';
@@ -50,6 +54,83 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
       index,
       duration: const Duration(milliseconds: 280),
       curve: Curves.easeOutCubic,
+    );
+  }
+
+  Project? _currentProject() {
+    final projects = ref.watch(projectsProvider).valueOrNull ?? const <Project>[];
+    for (final project in projects) {
+      if (project.id == widget.projectId) return project;
+    }
+    return null;
+  }
+
+  /// Owner/admin-only Edit / Archive / Delete menu for the current project.
+  Widget? _buildActionsMenu(String? orgId) {
+    if (orgId == null || orgId.isEmpty || !canManageProjects(ref)) return null;
+    final project = _currentProject();
+    if (project == null) return null;
+
+    return _CircleIconButton(
+      icon: Icons.more_vert_rounded,
+      onPressed: () async {
+        final action = await showModalBottomSheet<String>(
+          context: context,
+          builder: (_) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.edit_outlined),
+                  title: const Text('Edit project'),
+                  onTap: () => Navigator.of(context).pop('edit'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.archive_outlined),
+                  title: const Text('Archive project'),
+                  onTap: () => Navigator.of(context).pop('archive'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete_outline_rounded,
+                      color: AppColors.danger),
+                  title: const Text('Delete project',
+                      style: TextStyle(color: AppColors.danger)),
+                  onTap: () => Navigator.of(context).pop('delete'),
+                ),
+              ],
+            ),
+          ),
+        );
+        if (!mounted || action == null) return;
+        switch (action) {
+          case 'edit':
+            await showProjectSettingsSheet(
+              context: context,
+              ref: ref,
+              organizationId: orgId,
+              project: project,
+              onSaved: (_) =>
+                  ref.invalidate(projectBoardProvider(widget.projectId)),
+            );
+          case 'archive':
+            await setProjectArchived(
+              context: context,
+              ref: ref,
+              organizationId: orgId,
+              project: project,
+              archived: true,
+            );
+            if (mounted) AppRoutes.leaveProjectBoard(context);
+          case 'delete':
+            final deleted = await confirmDeleteProject(
+              context: context,
+              ref: ref,
+              organizationId: orgId,
+              project: project,
+            );
+            if (deleted && mounted) AppRoutes.leaveProjectBoard(context);
+        }
+      },
     );
   }
 
@@ -111,6 +192,7 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
               ref.invalidate(projectBoardProvider(widget.projectId));
               await ref.read(projectBoardProvider(widget.projectId).future);
             },
+            trailing: _buildActionsMenu(orgId),
             headerStats: [
               _HeaderStat(
                 icon: Icons.task_alt_rounded,
@@ -260,12 +342,14 @@ class _BoardScaffold extends StatelessWidget {
     required this.child,
     this.headerStats,
     this.onRefresh,
+    this.trailing,
   });
 
   final Widget header;
   final List<_HeaderStat>? headerStats;
   final Widget child;
   final Future<void> Function()? onRefresh;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -312,6 +396,10 @@ class _BoardScaffold extends StatelessWidget {
                           icon: Icons.refresh_rounded,
                           onPressed: () => onRefresh!(),
                         ),
+                      if (trailing != null) ...[
+                        const SizedBox(width: AppSpacing.xs),
+                        trailing!,
+                      ],
                     ],
                   ),
                   if (headerStats != null) ...[

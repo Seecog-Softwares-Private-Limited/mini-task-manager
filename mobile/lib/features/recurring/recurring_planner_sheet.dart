@@ -122,10 +122,10 @@ class _RecurringPlannerSheetState extends ConsumerState<_RecurringPlannerSheet> 
                         color: AppColors.textMuted,
                       ),
                 ),
-                if (template.completionHealth != null) ...[
+                if (template.successRate != null) ...[
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    'Health ${(template.completionHealth! * 100).round()}%',
+                    'Success ${template.successRate}%',
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                           color: AppColors.sky,
                         ),
@@ -330,7 +330,8 @@ class _OccurrenceTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: Row(
             children: [
-              Icon(Icons.event_repeat_rounded, color: AppColors.violet, size: 20),
+              const Icon(Icons.event_repeat_rounded,
+                  color: AppColors.violet, size: 20),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Column(
@@ -361,7 +362,8 @@ class _OccurrenceTile extends StatelessWidget {
                 ),
               ] else if (onOpen != null) ...[
                 const SizedBox(width: AppSpacing.xs),
-                Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+                const Icon(Icons.chevron_right_rounded,
+                    color: AppColors.textMuted),
               ],
             ],
           ),
