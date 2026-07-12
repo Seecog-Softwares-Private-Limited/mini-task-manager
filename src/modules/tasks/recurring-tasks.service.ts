@@ -724,6 +724,144 @@ export class RecurringTasksService {
     };
   }
 
+  /**
+   * Habit-style analytics for recurring series over a trailing window.
+   * Success rate, streaks and on-time rate are computed from occurrence
+   * states (the canonical source), ignoring not-yet-due future runs.
+   */
+  async getAnalytics(organizationId: string, projectId?: string, days = 30) {
+    const rangeDays = Math.min(Math.max(Math.floor(days) || 30, 1), 365);
+    const templates = await this.templatesRepository.findByOrganization(organizationId, projectId);
+
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const windowStart = new Date(todayStart);
+    windowStart.setDate(windowStart.getDate() - (rangeDays - 1));
+
+    const habits: Array<{
+      templateId: string;
+      title: string;
+      repeatType: string;
+      isPaused: boolean;
+      total: number;
+      completed: number;
+      missed: number;
+      skipped: number;
+      successRate: number;
+      currentStreak: number;
+      longestStreak: number;
+      onTimeRate: number;
+      recentRuns: string[];
+    }> = [];
+
+    let ovTotal = 0;
+    let ovCompleted = 0;
+    let ovMissed = 0;
+    let ovSkipped = 0;
+    let ovBestStreak = 0;
+
+    for (const tpl of templates) {
+      const history = await this.occurrencesRepository.findByTemplate(tpl.id);
+
+      // Resolved runs are those whose due date has passed (or already
+      // completed/skipped). Future PENDING runs are excluded from rates.
+      const resolved = history
+        .filter((o) => {
+          const due = new Date(o.dueDate);
+          if (o.state === 'COMPLETED' || o.state === 'SKIPPED') return due >= windowStart;
+          // PENDING counts as "missed" only once its due date is in the past.
+          return due >= windowStart && due < todayStart;
+        })
+        .sort((a, b) => a.sequenceNumber - b.sequenceNumber);
+
+      let completed = 0;
+      let missed = 0;
+      let skipped = 0;
+      let onTime = 0;
+      let currentStreak = 0;
+      let longestStreak = 0;
+      let runningStreak = 0;
+      const recentRuns: string[] = [];
+
+      for (const o of resolved) {
+        let label: 'completed' | 'missed' | 'skipped';
+        if (o.state === 'COMPLETED') {
+          label = 'completed';
+          completed += 1;
+          const dueEnd = new Date(o.dueDate);
+          dueEnd.setHours(23, 59, 59, 999);
+          if (o.completedAt && new Date(o.completedAt) <= dueEnd) onTime += 1;
+          runningStreak += 1;
+          if (runningStreak > longestStreak) longestStreak = runningStreak;
+        } else if (o.state === 'SKIPPED') {
+          label = 'skipped';
+          skipped += 1;
+          // Skips are intentional pauses; they neither extend nor break a streak.
+        } else {
+          label = 'missed';
+          missed += 1;
+          runningStreak = 0;
+        }
+        recentRuns.push(label);
+      }
+
+      // Current streak: trailing consecutive completed (skips are transparent).
+      for (let i = resolved.length - 1; i >= 0; i -= 1) {
+        const st = resolved[i].state;
+        if (st === 'COMPLETED') currentStreak += 1;
+        else if (st === 'SKIPPED') continue;
+        else break;
+      }
+
+      const denominator = completed + missed;
+      const successRate = denominator > 0 ? Math.round((completed / denominator) * 100) : 0;
+      const onTimeRate = completed > 0 ? Math.round((onTime / completed) * 100) : 0;
+
+      ovTotal += completed + missed + skipped;
+      ovCompleted += completed;
+      ovMissed += missed;
+      ovSkipped += skipped;
+      if (currentStreak > ovBestStreak) ovBestStreak = currentStreak;
+
+      habits.push({
+        templateId: tpl.id,
+        title: tpl.title,
+        repeatType: tpl.repeatType,
+        isPaused: tpl.isPaused,
+        total: completed + missed + skipped,
+        completed,
+        missed,
+        skipped,
+        successRate,
+        currentStreak,
+        longestStreak,
+        onTimeRate,
+        recentRuns: recentRuns.slice(-14),
+      });
+    }
+
+    // Surface the most consistent habits first.
+    habits.sort((a, b) => b.successRate - a.successRate || b.completed - a.completed);
+
+    const ovDenominator = ovCompleted + ovMissed;
+    const overallSuccessRate =
+      ovDenominator > 0 ? Math.round((ovCompleted / ovDenominator) * 100) : 0;
+
+    return {
+      rangeDays,
+      overall: {
+        habits: templates.length,
+        totalRuns: ovTotal,
+        completed: ovCompleted,
+        missed: ovMissed,
+        skipped: ovSkipped,
+        successRate: overallSuccessRate,
+        bestStreak: ovBestStreak,
+      },
+      habits,
+    };
+  }
+
   async listTemplates(organizationId: string, query: RecurringTasksQueryDto) {
     const templates = await this.templatesRepository.findByOrganization(organizationId, query.projectId);
     const now = new Date();

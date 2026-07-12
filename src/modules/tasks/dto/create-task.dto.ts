@@ -5,6 +5,7 @@ import {
   IsDateString,
   IsIn,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -82,6 +83,26 @@ class CreateTaskSubtaskDto {
   @IsString()
   @MaxLength(10000)
   description?: string;
+
+  /** Audit fields; accepted so clients may echo them back on save. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  reporterId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  createdAt?: string;
+
+  @IsOptional()
+  @IsObject()
+  completionRecord?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  note?: string;
 }
 
 class CreateTaskTagDto {

@@ -102,6 +102,119 @@ class RecurringOccurrence {
   }
 }
 
+/// Aggregate + per-habit success analytics for a trailing window.
+class RecurringAnalytics {
+  const RecurringAnalytics({
+    required this.rangeDays,
+    required this.overall,
+    required this.habits,
+  });
+
+  final int rangeDays;
+  final RecurringAnalyticsOverall overall;
+  final List<RecurringHabitStat> habits;
+
+  factory RecurringAnalytics.fromJson(Map<String, dynamic> json) {
+    final rawHabits = json['habits'] as List<dynamic>? ?? const [];
+    return RecurringAnalytics(
+      rangeDays: json['rangeDays'] as int? ?? 30,
+      overall: RecurringAnalyticsOverall.fromJson(
+        (json['overall'] as Map<String, dynamic>?) ?? const {},
+      ),
+      habits: rawHabits
+          .whereType<Map<String, dynamic>>()
+          .map(RecurringHabitStat.fromJson)
+          .toList(),
+    );
+  }
+}
+
+class RecurringAnalyticsOverall {
+  const RecurringAnalyticsOverall({
+    required this.habits,
+    required this.totalRuns,
+    required this.completed,
+    required this.missed,
+    required this.skipped,
+    required this.successRate,
+    required this.bestStreak,
+  });
+
+  final int habits;
+  final int totalRuns;
+  final int completed;
+  final int missed;
+  final int skipped;
+  final int successRate;
+  final int bestStreak;
+
+  factory RecurringAnalyticsOverall.fromJson(Map<String, dynamic> json) {
+    return RecurringAnalyticsOverall(
+      habits: json['habits'] as int? ?? 0,
+      totalRuns: json['totalRuns'] as int? ?? 0,
+      completed: json['completed'] as int? ?? 0,
+      missed: json['missed'] as int? ?? 0,
+      skipped: json['skipped'] as int? ?? 0,
+      successRate: json['successRate'] as int? ?? 0,
+      bestStreak: json['bestStreak'] as int? ?? 0,
+    );
+  }
+}
+
+class RecurringHabitStat {
+  const RecurringHabitStat({
+    required this.templateId,
+    required this.title,
+    required this.repeatType,
+    required this.isPaused,
+    required this.total,
+    required this.completed,
+    required this.missed,
+    required this.skipped,
+    required this.successRate,
+    required this.currentStreak,
+    required this.longestStreak,
+    required this.onTimeRate,
+    required this.recentRuns,
+  });
+
+  final String templateId;
+  final String title;
+  final String repeatType;
+  final bool isPaused;
+  final int total;
+  final int completed;
+  final int missed;
+  final int skipped;
+  final int successRate;
+  final int currentStreak;
+  final int longestStreak;
+  final int onTimeRate;
+
+  /// Oldest→newest run outcomes: 'completed' | 'missed' | 'skipped'.
+  final List<String> recentRuns;
+
+  factory RecurringHabitStat.fromJson(Map<String, dynamic> json) {
+    return RecurringHabitStat(
+      templateId: json['templateId'] as String? ?? '',
+      title: json['title'] as String? ?? 'Untitled',
+      repeatType: json['repeatType'] as String? ?? 'WEEKLY',
+      isPaused: parseJsonBool(json['isPaused']),
+      total: json['total'] as int? ?? 0,
+      completed: json['completed'] as int? ?? 0,
+      missed: json['missed'] as int? ?? 0,
+      skipped: json['skipped'] as int? ?? 0,
+      successRate: json['successRate'] as int? ?? 0,
+      currentStreak: json['currentStreak'] as int? ?? 0,
+      longestStreak: json['longestStreak'] as int? ?? 0,
+      onTimeRate: json['onTimeRate'] as int? ?? 0,
+      recentRuns: (json['recentRuns'] as List<dynamic>? ?? const [])
+          .map((e) => e.toString())
+          .toList(),
+    );
+  }
+}
+
 class RecurringBoardData {
   const RecurringBoardData({
     required this.tasks,
