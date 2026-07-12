@@ -74,6 +74,52 @@ export class TasksController {
     return this.toResponse(task);
   }
 
+  @Get('home')
+  async homeDashboard(
+    @TenantId() tenantId: string,
+    @CurrentUserId() userId: string,
+  ) {
+    const dashboard = await this.tasksService.getHomeDashboard(userId, tenantId);
+    return {
+      counts: dashboard.counts,
+      weeklyTrend: dashboard.weeklyTrend,
+      overdueTasks: dashboard.overdueTasks.map((t) => this.toResponse(t)),
+      dueTodayTasks: dashboard.dueTodayTasks.map((t) => this.toResponse(t)),
+    };
+  }
+
+  @Get('my')
+  async myTasks(
+    @TenantId() tenantId: string,
+    @CurrentUserId() userId: string,
+    @Query('filter') filter?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const allowed = ['overdue', 'today', 'week', 'completed', 'open', 'all'];
+    const safeFilter = (allowed.includes(filter ?? '') ? filter : 'open') as
+      | 'overdue'
+      | 'today'
+      | 'week'
+      | 'completed'
+      | 'open'
+      | 'all';
+    const parsedPage = page ? parseInt(page, 10) : 1;
+    const parsedLimit = limit ? parseInt(limit, 10) : 20;
+    const result = await this.tasksService.getMyTasks(
+      userId,
+      tenantId,
+      safeFilter,
+      Number.isFinite(parsedPage) ? parsedPage : 1,
+      Number.isFinite(parsedLimit) ? parsedLimit : 20,
+    );
+    return {
+      data: result.data.map((t) => this.toResponse(t)),
+      meta: result.meta,
+      counts: result.counts,
+    };
+  }
+
   @Get('project/:projectId')
   async findByProject(
     @Param('projectId') projectId: string,

@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/api_exception.dart';
+import '../models/home_dashboard.dart';
+import '../models/my_tasks.dart';
 import '../models/paginated_result.dart';
 import '../models/task_attachment.dart';
 import '../models/task_comment.dart';
@@ -11,6 +13,38 @@ class TasksRepository {
   TasksRepository({required ApiClient apiClient}) : _api = apiClient;
 
   final ApiClient _api;
+
+  Future<HomeDashboard> fetchHomeDashboard({
+    required String organizationId,
+  }) async {
+    try {
+      final response = await _api.dio.get<Map<String, dynamic>>(
+        '/tasks/home',
+        options: _api.withOrgHeader(organizationId),
+      );
+      return HomeDashboard.fromJson(response.data ?? const {});
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<MyTasksResult> fetchMyTasks({
+    required String organizationId,
+    required String filter,
+    int page = 1,
+    int limit = 50,
+  }) async {
+    try {
+      final response = await _api.dio.get<Map<String, dynamic>>(
+        '/tasks/my',
+        queryParameters: {'filter': filter, 'page': page, 'limit': limit},
+        options: _api.withOrgHeader(organizationId),
+      );
+      return MyTasksResult.fromJson(response.data ?? const {});
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
 
   Future<PaginatedResult<Task>> fetchByProject({
     required String projectId,

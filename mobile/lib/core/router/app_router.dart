@@ -7,6 +7,8 @@ import '../../features/auth/forgot_password_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/session_controller.dart';
 import '../../features/home/home_shell.dart';
+import '../../features/home/my_work_providers.dart';
+import '../../features/home/my_work_screen.dart';
 import '../../features/kanban/project_board_screen.dart';
 import '../../features/workspaces/workspace_picker_screen.dart';
 
@@ -16,6 +18,7 @@ abstract final class AppRoutes {
   static const workspaces = '/workspaces';
   static const home = '/';
   static String projectBoard(String projectId) => '/projects/$projectId/board';
+  static String myWork([String filter = 'open']) => '/my-work?filter=$filter';
 
   /// Leaves the kanban board, returning to the previous screen or home.
   static void leaveProjectBoard(BuildContext context) {
@@ -89,6 +92,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) {
               final projectId = state.pathParameters['projectId']!;
               return ProjectBoardScreen(projectId: projectId);
+            },
+          ),
+          GoRoute(
+            path: 'my-work',
+            builder: (context, state) {
+              final filter =
+                  MyWorkFilterX.fromWire(state.uri.queryParameters['filter']);
+              return MyWorkScreen(initialFilter: filter);
             },
           ),
         ],

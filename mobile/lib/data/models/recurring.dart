@@ -36,9 +36,17 @@ class RecurringTemplate {
     required this.generatedCount,
     required this.upcoming,
     required this.completed,
+    required this.missed,
     this.completionHealth,
     this.subtaskCount,
     this.priority,
+    this.startDueDate,
+    this.endType,
+    this.endDate,
+    this.endAfterOccurrences,
+    this.interval,
+    this.weeklyDays = const [],
+    this.rawRuleConfig,
   });
 
   final String id;
@@ -49,11 +57,35 @@ class RecurringTemplate {
   final int generatedCount;
   final int upcoming;
   final int completed;
+  final int missed;
   final double? completionHealth;
   final int? subtaskCount;
   final String? priority;
 
+  // Recurrence detail (for lossless editing).
+  final String? startDueDate;
+  final String? endType;
+  final String? endDate;
+  final int? endAfterOccurrences;
+  final int? interval;
+  final List<int> weeklyDays;
+
+  /// Full recurrence rule as stored by the backend. Used to preserve advanced
+  /// settings (monthlyMode, nthWeek, dueTime, skipWeekends, completionRule,
+  /// createDaysBeforeDue) when editing, since updateTemplate replaces ruleConfig.
+  final Map<String, dynamic>? rawRuleConfig;
+
+  /// Missed-aware success rate (0-100), or null when there is nothing resolved
+  /// yet. Prefer this over [completionHealth] for display.
+  int? get successRate {
+    final resolved = completed + missed;
+    if (resolved <= 0) return null;
+    return ((completed / resolved) * 100).round();
+  }
+
   factory RecurringTemplate.fromJson(Map<String, dynamic> json) {
+    final rule = json['ruleConfig'] as Map<String, dynamic>?;
+    final rawWeekly = rule?['weeklyDays'] as List<dynamic>?;
     return RecurringTemplate(
       id: json['id'] as String,
       title: json['title'] as String,
@@ -63,9 +95,22 @@ class RecurringTemplate {
       generatedCount: json['generatedCount'] as int? ?? 0,
       upcoming: json['upcoming'] as int? ?? 0,
       completed: json['completed'] as int? ?? 0,
+      missed: json['missed'] as int? ?? 0,
       completionHealth: (json['completionHealth'] as num?)?.toDouble(),
       subtaskCount: json['subtaskCount'] as int?,
       priority: json['priority'] as String?,
+      startDueDate: json['startDueDate']?.toString(),
+      endType: json['endType'] as String?,
+      endDate: json['endDate']?.toString(),
+      endAfterOccurrences: (json['endAfterOccurrences'] as num?)?.toInt(),
+      interval: (rule?['interval'] as num?)?.toInt(),
+      weeklyDays: rawWeekly == null
+          ? const []
+          : rawWeekly
+              .map((e) => (e as num?)?.toInt())
+              .whereType<int>()
+              .toList(),
+      rawRuleConfig: rule,
     );
   }
 }
