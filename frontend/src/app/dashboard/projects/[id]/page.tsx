@@ -125,6 +125,7 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
         assigneeId: data.assigneeIds?.[0] || undefined,
         storyPoints: data.storyPoints,
         dueDate: data.dueDate,
+        dueTime: data.dueDate ? data.dueTime || undefined : undefined,
         subtasks: data.subtasks
           .map((s) => ({
             id: s.id,

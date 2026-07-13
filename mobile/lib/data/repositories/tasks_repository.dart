@@ -58,6 +58,7 @@ class TasksRepository {
     String? statusId,
     String priority = 'MEDIUM',
     String? dueDate,
+    String? dueTime,
     List<CreateTaskSubtaskInput>? subtasks,
   }) async {
     try {
@@ -70,6 +71,11 @@ class TasksRepository {
         if (description != null && description.trim().isNotEmpty)
           'description': description.trim(),
         if (dueDate != null && dueDate.isNotEmpty) 'dueDate': dueDate,
+        if (dueDate != null &&
+            dueDate.isNotEmpty &&
+            dueTime != null &&
+            dueTime.isNotEmpty)
+          'dueTime': dueTime,
         if (subtasks != null && subtasks.isNotEmpty)
           'subtasks': subtasks.map((s) => s.toJson()).toList(),
       };
@@ -93,6 +99,8 @@ class TasksRepository {
     String? priority,
     String? dueDate,
     bool clearDueDate = false,
+    String? dueTime,
+    bool clearDueTime = false,
     List<String>? tags,
     List<TaskSubtask>? subtasks,
   }) async {
@@ -105,8 +113,14 @@ class TasksRepository {
       if (priority != null) data['priority'] = priority.toUpperCase();
       if (clearDueDate) {
         data['dueDate'] = null;
+        data['dueTime'] = null;
       } else if (dueDate != null) {
         data['dueDate'] = dueDate;
+      }
+      if (clearDueTime) {
+        data['dueTime'] = null;
+      } else if (dueTime != null) {
+        data['dueTime'] = dueTime;
       }
       if (tags != null) {
         data['tags'] = tags
@@ -124,6 +138,7 @@ class TasksRepository {
                 if (s.assigneeId != null) 'assigneeId': s.assigneeId,
                 if (s.assigneeIds.isNotEmpty) 'assigneeIds': s.assigneeIds,
                 if (s.dueDate != null) 'dueDate': s.dueDate,
+                if (s.dueTime != null) 'dueTime': s.dueTime,
                 if (s.status != null) 'status': s.status,
                 if (s.priority != null) 'priority': s.priority,
                 if (s.statusId != null) 'statusId': s.statusId,

@@ -23,6 +23,7 @@ import '../kanban/kanban_providers.dart';
 import '../projects/projects_providers.dart';
 import 'subtask_completion_sheet.dart';
 import 'subtask_completion_utils.dart';
+import 'subtask_compact_row.dart';
 import 'subtask_detail_panel.dart';
 import 'attachment_picker_section.dart';
 import 'attachment_preview.dart';
@@ -45,12 +46,14 @@ class TaskDetailSheet extends ConsumerStatefulWidget {
     required this.statuses,
     required this.projectId,
     required this.onUpdated,
+    this.onDeleted,
   });
 
   final Task task;
   final List<WorkflowStatus> statuses;
   final String projectId;
   final VoidCallback onUpdated;
+  final VoidCallback? onDeleted;
 
   @override
   ConsumerState<TaskDetailSheet> createState() => _TaskDetailSheetState();
@@ -68,6 +71,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
   bool _isEditingTitle = false;
   bool _isEditingDescription = false;
   bool _saving = false;
+  bool _deleting = false;
   bool _loadingMeta = true;
   bool _postingComment = false;
   int? _savingSubtaskIndex;
@@ -268,6 +272,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     String? priority,
     String? dueDate,
     bool clearDueDate = false,
+    String? dueTime,
+    bool clearDueTime = false,
     List<String>? tags,
     List<String>? assigneeIds,
     List<TaskSubtask>? subtasks,
@@ -280,6 +286,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
           priority: priority,
           dueDate: dueDate,
           clearDueDate: clearDueDate,
+          dueTime: dueTime,
+          clearDueTime: clearDueTime,
           tags: tags,
           assigneeIds: assigneeIds,
           subtasks: subtasks,
@@ -297,12 +305,36 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     if (picked == null) return;
     final formatted = DateFormat('yyyy-MM-dd').format(picked);
     if (formatted == _task.dueDate) return;
+    // Date only — do not prompt for time; keep existing dueTime if any.
     await _patchTask(dueDate: formatted);
+  }
+
+  Future<void> _pickDueTime() async {
+    if (_task.dueDate == null) return;
+    final parts = (_task.dueTime ?? '09:00').split(':');
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(
+        hour: int.tryParse(parts[0]) ?? 9,
+        minute: parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0,
+      ),
+      helpText: 'Due time (optional)',
+    );
+    if (time == null || !mounted) return;
+    await _patchTask(
+      dueTime:
+          '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
+    );
   }
 
   Future<void> _clearDueDate() async {
     if (_task.dueDate == null) return;
-    await _patchTask(clearDueDate: true);
+    await _patchTask(clearDueDate: true, clearDueTime: true);
+  }
+
+  Future<void> _clearDueTime() async {
+    if (_task.dueTime == null) return;
+    await _patchTask(clearDueTime: true);
   }
 
   Future<void> _addTag(String rawName) async {
@@ -319,14 +351,25 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     await _patchTask(tags: next);
   }
 
+  void _toggleSubtaskExpanded(int index) {
+    setState(() {
+      _expandedSubtaskIndex = _expandedSubtaskIndex == index ? null : index;
+    });
+  }
+
+  bool _canEditSubtasks() {
+    final org = ref.read(selectedOrgProvider);
+    final userId = ref.read(sessionControllerProvider).user?.id;
+    return canEditTaskSubtasks(org: org, userId: userId, task: _task);
+  }
+
   Future<void> _toggleSubtask(int index, bool? value) async {
     if (value == null) return;
-    final user = ref.read(sessionControllerProvider).user;
-    if (!isUserAssignedToTask(task: _task, members: _members, userId: user?.id)) {
+    if (!_canEditSubtasks()) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Only assigned team members can complete this subtask.'),
+          content: Text('You do not have permission to update this subtask.'),
         ),
       );
       return;
@@ -357,19 +400,19 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     required String subtaskTitle,
     required String? subtaskPriority,
   }) async {
-    final user = ref.read(sessionControllerProvider).user;
-    if (user == null) return null;
-    if (!isUserAssignedToTask(task: _task, members: _members, userId: user.id)) {
+    if (!_canEditSubtasks()) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Only assigned team members can complete this subtask.'),
+            content: Text('You do not have permission to complete this subtask.'),
           ),
         );
       }
       return null;
     }
 
+    final user = ref.read(sessionControllerProvider).user;
+    if (user == null) return null;
     final requireVideo =
         isCriticalPriority(subtaskPriority) || isCriticalPriority(_task.priority);
     final result = await showSubtaskCompletionSheet(
@@ -449,6 +492,19 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     });
   }
 
+  Future<void> _quickUpdateSubtaskAssignees(
+    int index,
+    List<String> assigneeIds,
+  ) async {
+    if (_saving || _savingSubtaskIndex != null) return;
+    final item = _subtasks[index];
+    final draft = item.copyWith(
+      assigneeIds: assigneeIds,
+      assigneeId: assigneeIds.isNotEmpty ? assigneeIds.first : null,
+    );
+    await _saveSubtask(index, draft);
+  }
+
   Future<void> _saveSubtask(int index, TaskSubtask draft) async {
     final updated = List<TaskSubtask>.from(_subtasks);
     updated[index] = draft;
@@ -518,6 +574,59 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     }
   }
 
+  Future<void> _deleteTask() async {
+    if (_deleting || _saving) return;
+    setState(() {
+      _deleting = true;
+      _error = null;
+    });
+    try {
+      await ref.read(tasksRepositoryProvider).deleteTask(_task.id);
+      if (!mounted) return;
+      widget.onDeleted?.call();
+      widget.onUpdated();
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Task deleted')),
+      );
+    } on ApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
+
+  Future<void> _confirmDeleteTask() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Delete task'),
+          content: Text(
+            'Permanently delete "${_task.title.trim().isEmpty ? 'this task' : _task.title}"? '
+            'This cannot be undone.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.danger,
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed == true && mounted) {
+      await _deleteTask();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(sessionControllerProvider);
@@ -527,14 +636,26 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     final canEditTitleAndDescription = canEditTaskTitleAndDescription(
       org: org,
       userId: currentUserId,
+      task: _task,
+      members: _members,
     );
     final canEditSubtasks = canEditTaskSubtasks(
       org: org,
       userId: currentUserId,
       task: _task,
     );
-    final canCompleteSubtasks =
-        isUserAssignedToTask(task: _task, members: _members, userId: currentUserId);
+    final canEditWorkflowFields = canEditTaskWorkflowFields(
+      org: org,
+      userId: currentUserId,
+      task: _task,
+      members: _members,
+    );
+    final canCompleteSubtasks = canEditSubtasks;
+    final canDelete = canDeleteTask(
+      org: org,
+      userId: currentUserId,
+      task: _task,
+    );
     final checklistDone = _subtasks.where((s) => s.completed).length;
     final checklistTotal = _subtasks.length;
     final checklistPercent =
@@ -652,6 +773,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                 members: _members,
                 saving: _saving,
                 canEditDetails: canEditTitleAndDescription,
+                canEditWorkflowFields: canEditWorkflowFields,
                 isEditingDescription: _isEditingDescription,
                 descriptionController: _descriptionController,
                 descriptionFocusNode: _descriptionFocusNode,
@@ -660,7 +782,9 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                 onStatusChanged: (statusId) => _patchTask(statusId: statusId),
                 onPriorityChanged: (priority) => _patchTask(priority: priority),
                 onPickDueDate: _pickDueDate,
+                onPickDueTime: _pickDueTime,
                 onClearDueDate: _clearDueDate,
+                onClearDueTime: _clearDueTime,
                 onAddTag: _addTag,
                 onRemoveTag: _removeTag,
                 onAssigneesChanged: (assigneeIds) => _patchTask(assigneeIds: assigneeIds),
@@ -766,7 +890,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                     child: Text(
-                      'Only assigned team members can complete checklist items.',
+                      'You can view checklist items but cannot edit them.',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: AppColors.warning,
                           ),
@@ -775,87 +899,81 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                 ...List.generate(_subtasks.length, (index) {
                   final item = _subtasks[index];
                   final expanded = _expandedSubtaskIndex == index;
-                  final displayTitle =
-                      item.title.trim().isEmpty ? 'New subtask' : item.title;
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: expanded ? AppColors.primary : AppColors.border,
+                  return Column(
+                    key: ValueKey('subtask-row-${item.id}'),
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SubtaskCompactRow(
+                        subtask: item,
+                        members: _members,
+                        expanded: expanded,
+                        enabled: !_saving && _savingSubtaskIndex == null,
+                        canComplete: canCompleteSubtasks,
+                        onToggleComplete: (value) => _toggleSubtask(index, value),
+                        onExpand: () {
+                          FocusManager.instance.primaryFocus?.unfocus();
+                          _toggleSubtaskExpanded(index);
+                        },
+                        onAssigneesChanged: (ids) =>
+                            _quickUpdateSubtaskAssignees(index, ids),
                       ),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      children: [
-                        CheckboxListTile(
-                          value: item.completed,
-                          onChanged: _saving ||
-                                  !canCompleteSubtasks ||
-                                  item.title.trim().isEmpty
-                              ? null
-                              : (v) => _toggleSubtask(index, v),
-                          title: Text(
-                            displayTitle,
-                            style: TextStyle(
-                              color: item.title.trim().isEmpty
-                                  ? AppColors.textMuted
-                                  : null,
-                              fontStyle: item.title.trim().isEmpty
-                                  ? FontStyle.italic
-                                  : null,
-                              decoration: item.completed
-                                  ? TextDecoration.lineThrough
-                                  : null,
+                      if (expanded)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                          child: Material(
+                            color: AppColors.surface,
+                            elevation: 1,
+                            shadowColor: Colors.black.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(12),
+                            child: Padding(
+                              padding: const EdgeInsets.all(AppSpacing.sm),
+                              child: SubtaskDetailPanel(
+                                subtask: item,
+                                members: _members,
+                                taskId: _task.id,
+                                organizationId: orgId,
+                                fallbackReporterId: _task.reporterId,
+                                fallbackCreatedAt: _task.createdAt,
+                                saving: _savingSubtaskIndex == index,
+                                canComplete: canCompleteSubtasks,
+                                onRequestCompletion: ({
+                                  required String subtaskId,
+                                  required String subtaskTitle,
+                                  required String? subtaskPriority,
+                                }) =>
+                                    _requestSubtaskCompletion(
+                                      subtaskId: subtaskId,
+                                      subtaskTitle: subtaskTitle,
+                                      subtaskPriority: subtaskPriority,
+                                    ),
+                                onCancel: () => _cancelSubtaskEdit(index),
+                                onSave: (draft) => _saveSubtask(index, draft),
+                              ),
                             ),
                           ),
-                          secondary: IconButton(
-                            icon: Icon(
-                              expanded
-                                  ? Icons.keyboard_arrow_up_rounded
-                                  : Icons.keyboard_arrow_down_rounded,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _expandedSubtaskIndex = expanded ? null : index;
-                              });
-                            },
-                          ),
-                          controlAffinity: ListTileControlAffinity.leading,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                         ),
-                        if (expanded)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(
-                              AppSpacing.sm,
-                              0,
-                              AppSpacing.sm,
-                              AppSpacing.sm,
-                            ),
-                            child: SubtaskDetailPanel(
-                              subtask: item,
-                              members: _members,
-                              taskId: _task.id,
-                              organizationId: orgId,
-                              saving: _savingSubtaskIndex == index,
-                              canComplete: canCompleteSubtasks,
-                              onRequestCompletion: ({
-                                required String subtaskId,
-                                required String subtaskTitle,
-                                required String? subtaskPriority,
-                              }) =>
-                                  _requestSubtaskCompletion(
-                                    subtaskId: subtaskId,
-                                    subtaskTitle: subtaskTitle,
-                                    subtaskPriority: subtaskPriority,
-                                  ),
-                              onCancel: () => _cancelSubtaskEdit(index),
-                              onSave: (draft) => _saveSubtask(index, draft),
-                            ),
-                          ),
-                      ],
-                    ),
+                    ],
                   );
                 }),
+              ],
+              if (canDelete) ...[
+                const SizedBox(height: AppSpacing.lg),
+                OutlinedButton.icon(
+                  onPressed: _saving || _deleting ? null : _confirmDeleteTask,
+                  icon: _deleting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.delete_outline_rounded),
+                  label: Text(_deleting ? 'Deleting…' : 'Delete task'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.danger,
+                    side: BorderSide(color: AppColors.danger.withValues(alpha: 0.45)),
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                ),
               ],
               const SizedBox(height: AppSpacing.lg),
               _CommentsSection(
@@ -881,6 +999,7 @@ class _TaskMetaSection extends StatefulWidget {
     required this.members,
     required this.saving,
     required this.canEditDetails,
+    required this.canEditWorkflowFields,
     required this.isEditingDescription,
     required this.descriptionController,
     required this.descriptionFocusNode,
@@ -889,7 +1008,9 @@ class _TaskMetaSection extends StatefulWidget {
     required this.onStatusChanged,
     required this.onPriorityChanged,
     required this.onPickDueDate,
+    required this.onPickDueTime,
     required this.onClearDueDate,
+    required this.onClearDueTime,
     required this.onAddTag,
     required this.onRemoveTag,
     required this.onAssigneesChanged,
@@ -902,6 +1023,7 @@ class _TaskMetaSection extends StatefulWidget {
   final List<ProjectMember> members;
   final bool saving;
   final bool canEditDetails;
+  final bool canEditWorkflowFields;
   final bool isEditingDescription;
   final TextEditingController descriptionController;
   final FocusNode descriptionFocusNode;
@@ -910,7 +1032,9 @@ class _TaskMetaSection extends StatefulWidget {
   final ValueChanged<String> onStatusChanged;
   final ValueChanged<String> onPriorityChanged;
   final VoidCallback onPickDueDate;
+  final VoidCallback onPickDueTime;
   final VoidCallback onClearDueDate;
+  final VoidCallback onClearDueTime;
   final ValueChanged<String> onAddTag;
   final ValueChanged<String> onRemoveTag;
   final ValueChanged<List<String>> onAssigneesChanged;
@@ -966,7 +1090,8 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
     final priorityValue = widget.task.priority.toUpperCase();
     final selectedPriority = _TaskMetaSection.findPriority(priorityValue);
     final dueDate = _parseDueDate(widget.task.dueDate);
-    final isOverdue = dueDate != null && _isDueDateOverdue(dueDate);
+    final isOverdue =
+        dueDate != null && _isDueDateOverdue(dueDate, widget.task.dueTime);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1074,6 +1199,7 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
           selectedAssigneeIds: _activeAssigneeIds(widget.task, widget.members),
           currentUserId: widget.currentUserId,
           saving: widget.saving,
+          enabled: widget.canEditDetails,
           onAssigneesChanged: widget.onAssigneesChanged,
         ),
         const SizedBox(height: AppSpacing.lg),
@@ -1086,45 +1212,70 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
               ),
         ),
         const SizedBox(height: AppSpacing.md),
-        _FieldLabel(text: 'Due date'),
+        _FieldLabel(text: 'Due date & time'),
         const SizedBox(height: AppSpacing.xs),
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: widget.saving ? null : widget.onPickDueDate,
-            borderRadius: BorderRadius.circular(14),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: isOverdue ? AppColors.danger.withValues(alpha: 0.35) : AppColors.border,
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed:
+                    widget.saving || !widget.canEditDetails ? null : widget.onPickDueDate,
+                icon: Icon(
+                  Icons.calendar_today_rounded,
+                  size: 18,
+                  color: isOverdue ? AppColors.danger : AppColors.textMuted,
                 ),
-                borderRadius: BorderRadius.circular(14),
-                color: isOverdue ? AppColors.dangerSoft.withValues(alpha: 0.35) : null,
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.calendar_today_rounded,
-                    size: 18,
-                    color: AppColors.textMuted,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: isOverdue ? AppColors.danger : null,
+                  side: BorderSide(
+                    color: isOverdue
+                        ? AppColors.danger.withValues(alpha: 0.45)
+                        : AppColors.border,
                   ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Text(
-                      dueDate == null
-                          ? 'No date selected'
-                          : DateFormat('MMM d, yyyy').format(dueDate),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: dueDate == null ? AppColors.textMuted : null,
-                          ),
-                    ),
-                  ),
-                ],
+                  backgroundColor:
+                      isOverdue ? AppColors.dangerSoft.withValues(alpha: 0.35) : null,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  alignment: Alignment.centerLeft,
+                ),
+                label: Text(
+                  dueDate == null
+                      ? 'Date'
+                      : DateFormat('MMM d, yyyy').format(dueDate),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ),
-          ),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: widget.saving ||
+                        !widget.canEditDetails ||
+                        dueDate == null
+                    ? null
+                    : widget.onPickDueTime,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.schedule_rounded, size: 18),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        (widget.task.dueTime == null ||
+                                widget.task.dueTime!.isEmpty)
+                            ? 'Time'
+                            : widget.task.dueTime!,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
         if (dueDate != null) ...[
           const SizedBox(height: AppSpacing.xs),
@@ -1132,14 +1283,26 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
             children: [
               Expanded(
                 child: Text(
-                  DateFormat('EEE, MMM d, yyyy').format(dueDate),
+                  [
+                    DateFormat('EEE, MMM d, yyyy').format(dueDate),
+                    if (widget.task.dueTime != null &&
+                        widget.task.dueTime!.isNotEmpty)
+                      widget.task.dueTime!,
+                  ].join(' · '),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppColors.textMuted,
                       ),
                 ),
               ),
+              if (widget.task.dueTime != null && widget.task.dueTime!.isNotEmpty)
+                TextButton(
+                  onPressed:
+                      widget.saving || !widget.canEditDetails ? null : widget.onClearDueTime,
+                  child: const Text('Clear time'),
+                ),
               TextButton(
-                onPressed: widget.saving ? null : widget.onClearDueDate,
+                onPressed:
+                    widget.saving || !widget.canEditDetails ? null : widget.onClearDueDate,
                 child: const Text('Clear'),
               ),
             ],
@@ -1167,7 +1330,7 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
         const SizedBox(height: AppSpacing.xs),
         _SidebarDropdown<String>(
           value: selectedStatus?.id,
-          enabled: !widget.saving && widget.statuses.isNotEmpty,
+          enabled: !widget.saving && widget.statuses.isNotEmpty && widget.canEditWorkflowFields,
           hint: 'Select status',
           items: widget.statuses
               .map(
@@ -1199,7 +1362,7 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
         const SizedBox(height: AppSpacing.xs),
         _SidebarDropdown<String>(
           value: selectedPriority.$1,
-          enabled: !widget.saving,
+          enabled: !widget.saving && widget.canEditWorkflowFields,
           hint: 'Select priority',
           items: _TaskMetaSection.priorities
               .map(
@@ -1235,7 +1398,9 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
                 .map(
                   (tag) => InputChip(
                     label: Text(tag),
-                    onDeleted: widget.saving ? null : () => widget.onRemoveTag(tag),
+                    onDeleted: widget.saving || !widget.canEditDetails
+                        ? null
+                        : () => widget.onRemoveTag(tag),
                   ),
                 )
                 .toList(),
@@ -1247,7 +1412,7 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
             Expanded(
               child: TextField(
                 controller: _tagController,
-                enabled: !widget.saving,
+                enabled: !widget.saving && widget.canEditDetails,
                 decoration: InputDecoration(
                   hintText: 'Add a tag',
                   border: OutlineInputBorder(
@@ -1266,7 +1431,7 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
             ),
             const SizedBox(width: AppSpacing.sm),
             IconButton.filled(
-              onPressed: widget.saving
+              onPressed: widget.saving || !widget.canEditDetails
                   ? null
                   : () {
                       widget.onAddTag(_tagController.text);
@@ -1394,6 +1559,7 @@ class _AssignedToSection extends ConsumerWidget {
     required this.selectedAssigneeIds,
     required this.currentUserId,
     required this.saving,
+    required this.enabled,
     required this.onAssigneesChanged,
   });
 
@@ -1402,6 +1568,7 @@ class _AssignedToSection extends ConsumerWidget {
   final List<String> selectedAssigneeIds;
   final String? currentUserId;
   final bool saving;
+  final bool enabled;
   final ValueChanged<List<String>> onAssigneesChanged;
 
   void _openMembersSheet(BuildContext context, WidgetRef ref) {
@@ -1411,7 +1578,7 @@ class _AssignedToSection extends ConsumerWidget {
       members: allMembers,
       selectedAssigneeIds: selectedAssigneeIds,
       sessionUser: ref.read(sessionControllerProvider).user,
-      enabled: !saving,
+      enabled: enabled && !saving,
       title: 'Assign members',
       showDoneButton: true,
       onSelectionChanged: onAssigneesChanged,
@@ -1435,7 +1602,7 @@ class _AssignedToSection extends ConsumerWidget {
         Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: allMembers.isEmpty ? null : () => _openMembersSheet(context, ref),
+            onTap: !enabled || allMembers.isEmpty ? null : () => _openMembersSheet(context, ref),
             borderRadius: BorderRadius.circular(14),
             child: Container(
               width: double.infinity,
@@ -1607,8 +1774,15 @@ DateTime? _parseDueDate(String? raw) {
   return DateTime.tryParse(raw);
 }
 
-bool _isDueDateOverdue(DateTime dueDate) {
+bool _isDueDateOverdue(DateTime dueDate, [String? dueTime]) {
   final now = DateTime.now();
+  if (dueTime != null && dueTime.isNotEmpty) {
+    final parts = dueTime.split(':');
+    final hour = int.tryParse(parts[0]) ?? 0;
+    final minute = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
+    final due = DateTime(dueDate.year, dueDate.month, dueDate.day, hour, minute);
+    return due.isBefore(now);
+  }
   final today = DateTime(now.year, now.month, now.day);
   final due = DateTime(dueDate.year, dueDate.month, dueDate.day);
   return due.isBefore(today);
@@ -1761,30 +1935,7 @@ class _AttachmentsSectionState extends ConsumerState<_AttachmentsSection> {
             organizationId: widget.organizationId,
             file: picked,
           );
-      final items = await ref.read(tasksRepositoryProvider).fetchAttachments(widget.taskId);
-      final entityItems = await ref.read(attachmentsRepositoryProvider).fetchEntityAttachments(
-            entityType: 'TASK',
-            entityId: widget.taskId,
-            organizationId: widget.organizationId,
-            taskId: widget.taskId,
-          );
-      final seen = items.map((e) => e.id).toSet();
-      final merged = <_TaskAttachmentItem>[
-        ...items.map(
-          (attachment) => _TaskAttachmentItem(
-            attachment: attachment,
-            source: AttachmentSource.task,
-          ),
-        ),
-        ...entityItems
-            .where((attachment) => attachment.id.isNotEmpty && !seen.contains(attachment.id))
-            .map(
-              (attachment) => _TaskAttachmentItem(
-                attachment: attachment,
-                source: AttachmentSource.entity,
-              ),
-            ),
-      ];
+      final merged = await _reloadAttachments();
       if (!mounted) return;
       widget.onAttachmentsChanged(merged);
     } on ApiException catch (error) {
@@ -1792,6 +1943,68 @@ class _AttachmentsSectionState extends ConsumerState<_AttachmentsSection> {
       setState(() => _uploadError = error.message);
     } finally {
       if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  Future<List<_TaskAttachmentItem>> _reloadAttachments() async {
+    final items =
+        await ref.read(tasksRepositoryProvider).fetchAttachments(widget.taskId);
+    final entityItems =
+        await ref.read(attachmentsRepositoryProvider).fetchEntityAttachments(
+              entityType: 'TASK',
+              entityId: widget.taskId,
+              organizationId: widget.organizationId,
+              taskId: widget.taskId,
+            );
+    final seen = items.map((e) => e.id).toSet();
+    return <_TaskAttachmentItem>[
+      ...items.map(
+        (attachment) => _TaskAttachmentItem(
+          attachment: attachment,
+          source: AttachmentSource.task,
+        ),
+      ),
+      ...entityItems
+          .where(
+            (attachment) =>
+                attachment.id.isNotEmpty && !seen.contains(attachment.id),
+          )
+          .map(
+            (attachment) => _TaskAttachmentItem(
+              attachment: attachment,
+              source: AttachmentSource.entity,
+            ),
+          ),
+    ];
+  }
+
+  Future<void> _deleteAttachment(_TaskAttachmentItem item) async {
+    if (widget.disabled || widget.loading || item.attachment.id.isEmpty) return;
+
+    setState(() => _uploadError = null);
+    final repo = ref.read(attachmentsRepositoryProvider);
+    try {
+      if (item.source == AttachmentSource.task) {
+        await repo.deleteTaskAttachment(
+          taskId: widget.taskId,
+          attachmentId: item.attachment.id,
+          organizationId: widget.organizationId,
+        );
+      } else {
+        await repo.deleteAttachment(
+          attachmentId: item.attachment.id,
+          organizationId: widget.organizationId,
+        );
+      }
+      if (!mounted) return;
+      widget.onAttachmentsChanged(
+        widget.attachments
+            .where((entry) => entry.attachment.id != item.attachment.id)
+            .toList(),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() => _uploadError = error.message);
     }
   }
 
@@ -1825,6 +2038,9 @@ class _AttachmentsSectionState extends ConsumerState<_AttachmentsSection> {
                 attachment: entry.value.attachment,
                 source: entry.value.source,
                 index: entry.key + 1,
+                onDelete: widget.disabled
+                    ? null
+                    : () => _deleteAttachment(entry.value),
               ),
             ).toList(),
           ),

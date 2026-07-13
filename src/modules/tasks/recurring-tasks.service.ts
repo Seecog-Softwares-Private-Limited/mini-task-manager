@@ -140,6 +140,7 @@ export class RecurringTasksService {
     subtasks?: CreateTaskDto['subtasks'];
     tags?: Array<{ name: string; color: string }> | null;
     dueDate?: string | null;
+    dueTime?: string | null;
     recurrence: TaskRecurrenceDto;
   }): Promise<void> {
     const repeat = params.recurrence.repeat ?? 'NONE';
@@ -148,6 +149,16 @@ export class RecurringTasksService {
     const dueDate = params.dueDate ?? nowYmd();
     const nextDueDate = computeNextRecurringDueDate(dueDate, dueDate, params.recurrence);
     const templateSubtasks = normalizeTemplateSubtasks(params.subtasks);
+    const recurrenceForRule: TaskRecurrenceDto = { ...params.recurrence };
+    const ruleTimeRaw =
+      typeof recurrenceForRule.dueTime === 'string' ? recurrenceForRule.dueTime.trim() : '';
+    if (!/^([01]\d|2[0-3]):[0-5]\d/.test(ruleTimeRaw) && params.dueTime) {
+      const taskTime = String(params.dueTime).trim();
+      if (/^([01]\d|2[0-3]):[0-5]\d/.test(taskTime)) {
+        recurrenceForRule.dueTime = taskTime.slice(0, 5);
+        recurrenceForRule.dueLogic = recurrenceForRule.dueLogic ?? 'DUE_TIME';
+      }
+    }
     const template = await this.templatesRepository.create({
       organizationId: params.organizationId,
       projectId: params.projectId,
@@ -162,16 +173,16 @@ export class RecurringTasksService {
       templateSubtasks,
       tags: params.tags?.length ? params.tags : null,
       repeatType: repeat,
-      ruleConfig: params.recurrence as unknown as Record<string, unknown>,
-      createDaysBeforeDue: params.recurrence.createDaysBeforeDue ?? 0,
+      ruleConfig: recurrenceForRule as unknown as Record<string, unknown>,
+      createDaysBeforeDue: recurrenceForRule.createDaysBeforeDue ?? 0,
       startDueDate: dueDate as unknown as Date,
       nextDueDate: nextDueDate as unknown as Date,
       lastGeneratedDueDate: dueDate as unknown as Date,
       lastSequence: 1,
       generatedCount: 1,
-      endType: params.recurrence.endType ?? 'NEVER',
-      endDate: params.recurrence.endDate ? (params.recurrence.endDate as unknown as Date) : null,
-      endAfterOccurrences: params.recurrence.endAfterOccurrences ?? null,
+      endType: recurrenceForRule.endType ?? 'NEVER',
+      endDate: recurrenceForRule.endDate ? (recurrenceForRule.endDate as unknown as Date) : null,
+      endAfterOccurrences: recurrenceForRule.endAfterOccurrences ?? null,
       isPaused: false,
       stoppedAt: null,
     });
@@ -658,6 +669,10 @@ export class RecurringTasksService {
     }
 
     const dueYmd = String(occurrence.dueDate).slice(0, 10);
+    const rule = (template.ruleConfig ?? {}) as Record<string, unknown>;
+    const ruleTimeRaw = typeof rule.dueTime === 'string' ? rule.dueTime.trim() : '';
+    const dueTime =
+      /^([01]\d|2[0-3]):[0-5]\d/.test(ruleTimeRaw) ? ruleTimeRaw.slice(0, 5) : undefined;
     try {
       const createdTask = await this.tasksService.create(
         projectCtx.projectId,
@@ -673,6 +688,7 @@ export class RecurringTasksService {
           assigneeId: template.assigneeId ?? undefined,
           assigneeIds: template.assigneeIds ?? undefined,
           dueDate: dueYmd,
+          dueTime,
           storyPoints: template.storyPoints ?? undefined,
           tags: template.tags ?? undefined,
           subtasks: cloneTemplateSubtasksForOccurrence(template.templateSubtasks, dueYmd),

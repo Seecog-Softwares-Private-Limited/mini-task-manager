@@ -31,6 +31,7 @@ export interface CreateTaskPayload {
   tags?: Array<{ name: string; color: string }>;
   storyPoints?: number;
   dueDate?: string;
+  dueTime?: string;
   recurrence?: TaskRecurrenceConfig;
 }
 
@@ -55,6 +56,10 @@ export function serializeSubtasksForApi(subtasks: TaskSubtask[]): TaskSubtask[] 
       const match = String(s.dueDate).match(/^(\d{4}-\d{2}-\d{2})/);
       if (match) item.dueDate = match[1];
     }
+    if (s.dueTime) {
+      const match = String(s.dueTime).match(/^([01]\d|2[0-3]):[0-5]\d/);
+      if (match) item.dueTime = match[0];
+    }
     if (s.priority) {
       item.priority = s.priority;
     }
@@ -70,6 +75,14 @@ export async function createTask(payload: CreateTaskPayload): Promise<Task> {
     else delete body.dueDate;
   } else {
     delete body.dueDate;
+    delete body.dueTime;
+  }
+  if (body.dueTime) {
+    const match = String(body.dueTime).match(/^([01]\d|2[0-3]):[0-5]\d/);
+    if (match && body.dueDate) body.dueTime = match[0];
+    else delete body.dueTime;
+  } else {
+    delete body.dueTime;
   }
   if (body.storyPoints === undefined || body.storyPoints === null) {
     delete body.storyPoints;
@@ -123,6 +136,7 @@ export interface UpdateTaskPayload {
   assigneeId?: string | null;
   assigneeIds?: string[];
   dueDate?: string | null;
+  dueTime?: string | null;
   storyPoints?: number | null;
   tags?: Array<{ name: string; color: string }>;
   subtasks?: TaskSubtask[];
@@ -141,6 +155,7 @@ export async function updateTask(
   if (payload.assigneeId !== undefined) body.assigneeId = payload.assigneeId;
   if (payload.assigneeIds !== undefined) body.assigneeIds = payload.assigneeIds;
   if (payload.dueDate !== undefined) body.dueDate = payload.dueDate;
+  if (payload.dueTime !== undefined) body.dueTime = payload.dueTime;
   if (payload.priority !== undefined) body.priority = payload.priority;
   if (payload.storyPoints !== undefined) body.storyPoints = payload.storyPoints;
   if (payload.tags !== undefined) body.tags = payload.tags;

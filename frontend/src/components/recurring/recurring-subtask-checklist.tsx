@@ -17,15 +17,18 @@ import {
   getOccurrenceSubtaskProgress,
 } from "@/lib/recurring-subtask-utils";
 import { resolveSubtaskStatus, subtaskWithCompleted } from "@/lib/subtask-status";
+import { getSubtaskRowClassName, getSubtaskRowStyle } from "@/lib/subtask-row-style";
 import { EXEC_PLANNER } from "@/lib/executive-planner-theme";
 import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-selector";
-import { withSubtaskAssignees } from "@/lib/subtask-assignees";
+import { getSubtaskAssigneeIds, withSubtaskAssignees } from "@/lib/subtask-assignees";
 import {
   SubtaskPrioritySelector,
   type SubtaskPriority,
 } from "@/components/tasks/subtask-priority-selector";
 import type { Task, TaskSubtask } from "@/types/api";
-import { CalendarDays, Check, ListChecks, Plus } from "lucide-react";
+import { CalendarDays, Check, ListChecks, Plus, Trash2 } from "lucide-react";
+import { UserAvatar } from "@/components/ui/user-avatar";
+import { formatRunTime } from "@/lib/recurrence-preview";
 
 interface RecurringSubtaskChecklistProps {
   task: Task | undefined;
@@ -165,6 +168,11 @@ export function RecurringSubtaskChecklist({
     resetComposer();
   }
 
+  function deleteSubtask(subtaskId: string) {
+    if (readOnly || !task) return;
+    updateMutation.mutate(subtasks.filter((s) => s.id !== subtaskId));
+  }
+
   return (
     <section>
       <div className="mb-2 flex items-center justify-between gap-2">
@@ -204,13 +212,22 @@ export function RecurringSubtaskChecklist({
           <ul className="space-y-1.5" aria-label="Occurrence subtasks">
             {subtasks.map((s) => {
               const done = s.completed || resolveSubtaskStatus(s) === "DONE";
+              const rowInput = {
+                status: resolveSubtaskStatus(s),
+                completed: done,
+                dueDate: s.dueDate,
+                dueTime: s.dueTime,
+              };
+              const assigneeIds = getSubtaskAssigneeIds(s);
+              const timeLabel = formatRunTime(s.dueTime);
               return (
                 <li
                   key={s.id}
                   className={cn(
-                    "flex items-start gap-2.5 rounded-lg border border-border/35 bg-background/70 px-2.5 py-2 transition-all duration-200",
-                    done && "opacity-80 bg-emerald-500/5"
+                    "group flex items-start gap-2.5 rounded-lg border px-2.5 py-2 transition-all duration-200",
+                    getSubtaskRowClassName(rowInput)
                   )}
+                  style={getSubtaskRowStyle(rowInput)}
                 >
                   <input
                     type="checkbox"
@@ -220,14 +237,47 @@ export function RecurringSubtaskChecklist({
                     className="mt-0.5 h-4 w-4 shrink-0 rounded border-input accent-primary transition-transform duration-150 checked:scale-105"
                     aria-label={`Mark "${s.title}" ${done ? "incomplete" : "complete"}`}
                   />
-                  <span
-                    className={cn(
-                      "min-w-0 flex-1 text-sm leading-snug transition-all duration-300",
-                      done && "text-muted-foreground line-through decoration-emerald-500/40"
+                  <div className="min-w-0 flex-1">
+                    <span
+                      className={cn(
+                        "block text-sm leading-snug transition-all duration-300",
+                        done && "text-muted-foreground line-through decoration-emerald-500/40"
+                      )}
+                    >
+                      {s.title}
+                    </span>
+                    {(s.dueDate || timeLabel) && (
+                      <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                        {[s.dueDate, timeLabel].filter(Boolean).join(" · ")}
+                      </span>
                     )}
-                  >
-                    {s.title}
-                  </span>
+                  </div>
+                  {assigneeIds.length > 0 ? (
+                    <div className="flex shrink-0 -space-x-1.5 pt-0.5">
+                      {assigneeIds.slice(0, 2).map((id) => (
+                        <UserAvatar
+                          key={id}
+                          userId={id}
+                          name="User"
+                          className="h-6 w-6 border border-background ring-1 ring-border/50"
+                          fallbackClassName="text-[8px]"
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                  {!readOnly ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0 text-muted-foreground/70 hover:bg-destructive/10 hover:text-destructive"
+                      disabled={updateMutation.isPending}
+                      onClick={() => deleteSubtask(s.id)}
+                      aria-label={`Delete "${s.title}"`}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  ) : null}
                 </li>
               );
             })}

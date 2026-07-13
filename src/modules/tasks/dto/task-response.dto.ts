@@ -33,6 +33,8 @@ export class TaskResponseDto {
   parentTaskId?: string;
   storyPoints?: number;
   dueDate?: Date;
+  /** Optional local time HH:mm when dueDate is set. */
+  dueTime?: string | null;
   completedAt?: Date | null;
   estimatedMinutes?: number;
   loggedMinutes!: number;

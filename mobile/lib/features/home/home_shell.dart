@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../workspaces/workspace_switcher_sheet.dart';
 import '../../core/theme/app_colors.dart';
@@ -6,12 +7,13 @@ import '../auth/session_controller.dart';
 import '../notifications/notifications_providers.dart';
 import '../notifications/notifications_screen.dart';
 import '../profile/header_account_menu.dart';
-import '../profile/profile_screen.dart';
 import '../projects/create_project_sheet.dart';
 import '../projects/projects_providers.dart';
 import '../projects/projects_screen.dart';
 import '../recurring/recurring_screen.dart';
 import 'home_tab.dart';
+import 'my_work_providers.dart';
+import 'my_work_screen.dart';
 
 class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({super.key});
@@ -35,7 +37,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     });
   }
 
-  void _selectTab(int value) {
+  void _selectTab(int value, {MyWorkFilter? tasksFilter}) {
+    if (value != _index) HapticFeedback.selectionClick();
+    if (value == 1 && tasksFilter != null) {
+      ref.read(myWorkFilterProvider.notifier).state = tasksFilter;
+    }
     setState(() {
       _mountedTabs.add(value);
       _index = value;
@@ -59,7 +65,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       sessionControllerProvider.select((session) => session.orgId),
     );
     final unread = _enableUnreadBadge ? ref.watch(unreadNotificationsCountProvider) : 0;
-    final onProjectsTab = _index == 1;
+    final unreadLabel = unread > 99 ? '99+' : '$unread';
+    final onProjectsTab = _index == 2;
     final canCreateProject = onProjectsTab && orgId != null && orgId.isNotEmpty;
 
     final pages = List<Widget>.generate(5, (index) {
@@ -72,10 +79,14 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             orgId: orgId,
             onNavigateTab: _selectTab,
           ),
-        1 => ProjectsScreen(key: ValueKey('projects-$orgId'), orgId: orgId),
-        2 => const RecurringScreen(),
-        3 => const NotificationsScreen(),
-        _ => const ProfileScreen(),
+        1 => MyWorkScreen(
+            key: ValueKey('tasks-$orgId'),
+            initialFilter: MyWorkFilter.open,
+            embedded: true,
+          ),
+        2 => ProjectsScreen(key: ValueKey('projects-$orgId'), orgId: orgId),
+        3 => const RecurringScreen(),
+        _ => const NotificationsScreen(),
       };
     });
 
@@ -95,9 +106,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             onPressed: _openWorkspaceSwitcher,
             icon: const Icon(Icons.swap_horiz_rounded),
           ),
-          HeaderAccountMenu(
-            onOpenProfileTab: () => _selectTab(4),
-          ),
+          const HeaderAccountMenu(),
         ],
       ),
       body: IndexedStack(index: _index, children: pages),
@@ -137,6 +146,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             label: 'Home',
           ),
           const NavigationDestination(
+            icon: Icon(Icons.checklist_rounded),
+            selectedIcon: Icon(Icons.checklist_rtl_rounded),
+            label: 'Tasks',
+          ),
+          const NavigationDestination(
             icon: Icon(Icons.folder_outlined),
             selectedIcon: Icon(Icons.folder_rounded),
             label: 'Projects',
@@ -149,20 +163,15 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           NavigationDestination(
             icon: Badge(
               isLabelVisible: unread > 0,
-              label: Text('$unread'),
+              label: Text(unreadLabel),
               child: const Icon(Icons.notifications_outlined),
             ),
             selectedIcon: Badge(
               isLabelVisible: unread > 0,
-              label: Text('$unread'),
+              label: Text(unreadLabel),
               child: const Icon(Icons.notifications_rounded),
             ),
             label: 'Alerts',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.person_outline_rounded),
-            selectedIcon: Icon(Icons.person_rounded),
-            label: 'Profile',
           ),
         ],
       ),
@@ -172,10 +181,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   String _titleForIndex(int index) {
     return switch (index) {
       0 => 'Home',
-      1 => 'Projects',
-      2 => 'Recurring planner',
-      3 => 'Notifications',
-      _ => 'Profile',
+      1 => 'Tasks',
+      2 => 'Projects',
+      3 => 'Planner',
+      _ => 'Alerts',
     };
   }
 }

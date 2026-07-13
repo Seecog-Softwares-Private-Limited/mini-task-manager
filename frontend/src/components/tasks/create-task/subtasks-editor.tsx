@@ -28,6 +28,7 @@ import {
   subtaskWithCompleted,
   type SubtaskStatus,
 } from "@/lib/subtask-status";
+import { getSubtaskRowClassName, getSubtaskRowStyle } from "@/lib/subtask-row-style";
 import {
   SubtaskPrioritySelector,
   resolveSubtaskPriority,
@@ -97,6 +98,7 @@ export function SubtasksEditor({
   const [draftDescription, setDraftDescription] = useState("");
   const [draftAssigneeIds, setDraftAssigneeIds] = useState<string[]>([]);
   const [draftDueDate, setDraftDueDate] = useState<string | undefined>(undefined);
+  const [draftDueTime, setDraftDueTime] = useState<string | undefined>(undefined);
   const [draftPriority, setDraftPriority] = useState<SubtaskPriority>("MEDIUM");
   const [pasteFlash, setPasteFlash] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<{
@@ -181,6 +183,7 @@ export function SubtasksEditor({
     setDraftDescription("");
     setDraftAssigneeIds([]);
     setDraftDueDate(undefined);
+    setDraftDueTime(undefined);
     setDraftPriority("MEDIUM");
     setComposerOpen(true);
     requestAnimationFrame(() => titleInputRef.current?.focus());
@@ -195,6 +198,7 @@ export function SubtasksEditor({
     setDraftDescription(value?.description ?? "");
     setDraftAssigneeIds(getSubtaskAssigneeIds(value ?? {}));
     setDraftDueDate(value?.dueDate);
+    setDraftDueTime(value?.dueTime);
     setDraftPriority(resolveSubtaskPriority(value?.priority));
     setComposerOpen(true);
     requestAnimationFrame(() => titleInputRef.current?.focus());
@@ -211,6 +215,7 @@ export function SubtasksEditor({
     setDraftDescription("");
     setDraftAssigneeIds([]);
     setDraftDueDate(undefined);
+    setDraftDueTime(undefined);
     setDraftPriority("MEDIUM");
     setPasteFlash(false);
   }
@@ -239,6 +244,10 @@ export function SubtasksEditor({
         shouldDirty: true,
         shouldTouch: true,
       });
+      setValue(`subtasks.${editingIndex}.dueTime`, draftDueTime, {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
       setValue(`subtasks.${editingIndex}.priority`, draftPriority, {
         shouldDirty: true,
         shouldTouch: true,
@@ -255,6 +264,7 @@ export function SubtasksEditor({
             completed: false,
             description: description ? description : undefined,
             dueDate: draftDueDate,
+            dueTime: draftDueTime,
             status: "TODO",
             priority: draftPriority,
           },
@@ -270,6 +280,7 @@ export function SubtasksEditor({
     setDraftDescription("");
     setDraftAssigneeIds([]);
     setDraftDueDate(undefined);
+    setDraftDueTime(undefined);
     setDraftPriority("MEDIUM");
   }
 
@@ -381,7 +392,11 @@ export function SubtasksEditor({
             <div className="flex min-w-[120px] flex-1 items-center">
               <SubtaskDueDatePicker
                 value={draftDueDate}
-                onChange={setDraftDueDate}
+                dueTime={draftDueTime}
+                onChange={(date, time) => {
+                  setDraftDueDate(date);
+                  setDraftDueTime(time);
+                }}
                 disabled={disabled}
                 variant="field"
               />
@@ -440,15 +455,23 @@ export function SubtasksEditor({
               .filter(Boolean);
             const completed = resolveSubtaskStatus(value ?? { completed: false }) === "DONE";
             const isEditingThis = composerOpen && editingIndex === index;
+            const rowInput = {
+              status: resolveSubtaskStatus(value ?? { completed: false }),
+              completed,
+              dueDate: value?.dueDate,
+              dueTime: value?.dueTime,
+              expanded: isEditingThis,
+            };
 
             return (
               <li key={field.id}>
                 <div
                   className={cn(
-                    "group flex items-center gap-1.5 rounded-md border border-border/45 bg-background/80 px-1.5 py-1 transition-all duration-200 hover:border-border/70 hover:bg-muted/20",
-                    isEditingThis && "border-violet-500/25 bg-violet-500/[0.04]",
-                    completed && "opacity-75"
+                    "group flex items-center gap-1.5 rounded-lg border px-2 py-1.5 transition-all duration-200",
+                    getSubtaskRowClassName(rowInput),
+                    isEditingThis && "ring-1 ring-primary/15"
                   )}
+                  style={getSubtaskRowStyle(rowInput)}
                 >
                   <button
                     type="button"
@@ -491,11 +514,16 @@ export function SubtasksEditor({
 
                   <SubtaskDueDatePicker
                     value={value?.dueDate}
+                    dueTime={value?.dueTime}
                     completed={completed}
                     disabled={disabled || (composerOpen && editingIndex !== index)}
                     variant="row"
-                    onChange={(dueDate) => {
+                    onChange={(dueDate, dueTime) => {
                       setValue(`subtasks.${index}.dueDate`, dueDate, {
+                        shouldDirty: true,
+                        shouldTouch: true,
+                      });
+                      setValue(`subtasks.${index}.dueTime`, dueTime, {
                         shouldDirty: true,
                         shouldTouch: true,
                       });

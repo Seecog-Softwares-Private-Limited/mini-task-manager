@@ -320,6 +320,7 @@ export class TasksController {
       parentTaskId: t.parentTaskId ? formatUuid(t.parentTaskId as string | Buffer) : undefined,
       storyPoints: t.storyPoints ?? undefined,
       dueDate: t.dueDate ?? undefined,
+      dueTime: t.dueTime ?? undefined,
       completedAt: t.completedAt ?? undefined,
       estimatedMinutes: t.estimatedMinutes ?? undefined,
       loggedMinutes: t.loggedMinutes,

@@ -7,6 +7,8 @@ const config: Config = {
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/modules/**/*.{js,ts,jsx,tsx,mdx}",
+    // Status/theme helpers live here — without this, classes in lib/*.ts are purged.
+    "./src/lib/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {

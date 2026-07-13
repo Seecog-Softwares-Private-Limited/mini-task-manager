@@ -88,6 +88,8 @@ export interface Task {
   parentTaskId?: string;
   storyPoints?: number;
   dueDate?: string;
+  /** Optional local time HH:mm when dueDate is set. */
+  dueTime?: string;
   estimatedMinutes?: number;
   loggedMinutes: number;
   sprintId?: string;

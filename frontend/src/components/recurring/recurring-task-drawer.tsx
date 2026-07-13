@@ -249,7 +249,15 @@ export function RecurringTaskDrawer({
               {task?.dueDate ? (
                 <div className="flex items-center gap-2 border-t border-border/35 pt-2 text-xs text-muted-foreground">
                   <Clock className="h-3.5 w-3.5" />
-                  Due {new Date(task.dueDate).toLocaleString()}
+                  Due{" "}
+                  {new Date(task.dueDate).toLocaleDateString(undefined, {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                  {task.dueTime
+                    ? ` · ${String(task.dueTime).slice(0, 5)}`
+                    : ""}
                 </div>
               ) : null}
             </div>

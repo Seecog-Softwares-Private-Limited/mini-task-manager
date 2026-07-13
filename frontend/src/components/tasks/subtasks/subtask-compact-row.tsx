@@ -7,6 +7,7 @@ import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-sel
 import { SubtaskDueDatePicker } from "@/components/tasks/subtask-due-date-picker";
 import { SubtaskStatusSelector } from "@/components/tasks/subtask-status-selector";
 import type { SubtaskStatus } from "@/lib/subtask-status";
+import { getSubtaskRowClassName, getSubtaskRowStyle } from "@/lib/subtask-row-style";
 import type { OrgMember } from "@/types/api";
 import { getSubtaskAssigneeIds } from "@/lib/subtask-assignees";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -18,6 +19,7 @@ interface SubtaskCompactRowProps {
   completed: boolean;
   status?: SubtaskStatus | string;
   dueDate?: string;
+  dueTime?: string;
   assigneeId?: string;
   assigneeIds?: string[];
   projectId: string;
@@ -33,7 +35,7 @@ interface SubtaskCompactRowProps {
   onRowClick: () => void;
   onDelete: () => void;
   onAssigneeChange?: (assigneeIds: string[]) => void;
-  onDueDateChange?: (dueDate?: string) => void;
+  onDueDateChange?: (dueDate?: string, dueTime?: string) => void;
 }
 
 export function SubtaskCompactRow({
@@ -41,6 +43,7 @@ export function SubtaskCompactRow({
   completed,
   status,
   dueDate,
+  dueTime,
   assigneeId,
   assigneeIds,
   projectId,
@@ -62,13 +65,15 @@ export function SubtaskCompactRow({
     .map((id) => knownMembers?.find((m) => m.id === id) ?? { id, name: "User" })
     .filter(Boolean);
 
+  const rowInput = { status, completed, dueDate, dueTime, expanded };
+
   return (
     <div
       className={cn(
-        "group flex items-center gap-2 rounded-xl border border-border/50 bg-background/60 px-3 py-2.5 shadow-sm transition-all",
-        expanded && "border-primary/30 bg-primary/[0.03] ring-1 ring-primary/15",
-        completed && "opacity-75"
+        "group flex items-center gap-2.5 rounded-lg border px-3 py-2",
+        getSubtaskRowClassName(rowInput)
       )}
+      style={getSubtaskRowStyle(rowInput)}
     >
       <input
         type="checkbox"
@@ -79,7 +84,7 @@ export function SubtaskCompactRow({
           onToggleComplete();
         }}
         onClick={(e) => e.stopPropagation()}
-        className="h-4 w-4 shrink-0 rounded border-input accent-primary"
+        className="h-3.5 w-3.5 shrink-0 rounded-[4px] border-input/80 accent-primary"
         aria-label={`Mark "${title}" complete`}
       />
       <button
@@ -87,20 +92,20 @@ export function SubtaskCompactRow({
         onClick={onRowClick}
         className={cn(
           "flex min-w-0 flex-1 items-center gap-2 text-left",
-          "rounded-md px-1 py-0.5 transition-colors hover:bg-muted/30"
+          "rounded-md px-0.5 py-0.5 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
         )}
       >
         <span
           className={cn(
-            "min-w-0 flex-1 truncate text-sm font-medium",
-            completed && "text-muted-foreground line-through"
+            "min-w-0 flex-1 truncate text-[13px] font-medium tracking-tight text-foreground/90",
+            completed && "text-muted-foreground/80 line-through decoration-muted-foreground/40"
           )}
         >
           {title || "Untitled subtask"}
         </span>
       </button>
       <div
-        className="flex shrink-0 items-center gap-1"
+        className="flex shrink-0 items-center gap-2"
         onClick={(e) => e.stopPropagation()}
       >
         {onStatusChange ? (
@@ -163,6 +168,7 @@ export function SubtaskCompactRow({
         {onDueDateChange ? (
           <SubtaskDueDatePicker
             value={dueDate}
+            dueTime={dueTime}
             completed={completed}
             onChange={onDueDateChange}
             disabled={editDisabled}
@@ -173,9 +179,12 @@ export function SubtaskCompactRow({
           type="button"
           variant="ghost"
           size="icon"
-          className="h-8 w-8 shrink-0 text-muted-foreground opacity-60 hover:text-destructive group-hover:opacity-100"
+          className="h-7 w-7 shrink-0 text-muted-foreground opacity-60 hover:text-destructive group-hover:opacity-100"
           disabled={editDisabled}
-          onClick={onDelete}
+          onClick={(e) => {
+            e.currentTarget.blur();
+            onDelete();
+          }}
           aria-label="Remove subtask"
         >
           <Trash2 className="h-3.5 w-3.5" />

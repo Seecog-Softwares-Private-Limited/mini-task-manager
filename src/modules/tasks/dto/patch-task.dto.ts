@@ -1,4 +1,5 @@
 import {
+  Allow,
   IsArray,
   IsBoolean,
   IsString,
@@ -74,6 +75,13 @@ class PatchTaskSubtaskDto {
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'subtask dueDate must be YYYY-MM-DD' })
   dueDate?: string;
 
+  /** Optional time of day (HH:mm). Cleared when dueDate is cleared. */
+  @IsOptional()
+  @Transform(emptyStrToUndef)
+  @ValidateIf((_o, v) => v != null && v !== '')
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'dueTime must be HH:mm' })
+  dueTime?: string;
+
   @IsOptional()
   @Transform(({ value }) => (typeof value === 'string' ? value.toUpperCase() : value))
   @IsIn(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'])
@@ -145,6 +153,15 @@ export class PatchTaskDto {
   @ValidateIf((_o, v) => v !== null && v !== undefined && v !== '')
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'dueDate must be YYYY-MM-DD' })
   dueDate?: string | null;
+
+  /** Optional HH:mm. Cleared when dueDate is cleared. Send null to clear. */
+  @Allow()
+  @IsOptional()
+  @Transform(emptyStrToNull)
+  @ValidateIf((_o, v) => v !== null && v !== undefined && v !== '')
+  @IsString()
+  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'dueTime must be HH:mm' })
+  dueTime?: string | null;
 
   @IsOptional()
   @Transform(({ value }) => (typeof value === 'string' ? value.toUpperCase() : value))

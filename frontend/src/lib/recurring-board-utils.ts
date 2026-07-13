@@ -54,9 +54,14 @@ export function formatRecurringScheduleLine(
   template?: RecurringTemplateSummary
 ): string | null {
   const due = formatShortDate(task.dueDate);
+  const timeMatch =
+    typeof task.dueTime === "string"
+      ? task.dueTime.trim().match(/^([01]\d|2[0-3]):([0-5]\d)/)
+      : null;
+  const dueWithTime = due && timeMatch ? `${due} · ${timeMatch[0]}` : due;
   const next = formatShortDate(template?.nextDueDate);
-  if (due && next && due !== next) return `Due ${due} · Next ${next}`;
-  if (due) return `Due ${due}`;
+  if (dueWithTime && next && due !== next) return `Due ${dueWithTime} · Next ${next}`;
+  if (dueWithTime) return `Due ${dueWithTime}`;
   if (next) return `Next ${next}`;
   return null;
 }
