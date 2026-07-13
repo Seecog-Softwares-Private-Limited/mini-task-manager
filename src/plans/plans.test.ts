@@ -12,6 +12,7 @@ import { UsersService } from '../modules/users/users.service';
 import { OrganizationsService } from '../modules/organizations/organizations.service';
 import { LimitExceededException } from './limit-exceeded.exception';
 import { PLANS } from '../config/plans.config';
+import { PlanConfigurationsService } from './plan-configurations.service';
 
 export interface TestResult {
   name: string;
@@ -62,6 +63,9 @@ export async function runAllPlanTests(app: INestApplicationContext): Promise<Tes
   const usersRepo = app.get(UsersRepository);
   const usersService = app.get(UsersService);
   const orgsService = app.get(OrganizationsService);
+  const planConfigsService = app.get(PlanConfigurationsService);
+  const silverConfig = await planConfigsService.getByPlanName('silver');
+  const expectedSilverPrice = silverConfig.priceMonthlyInr;
 
   const run = async (name: string, fn: () => Promise<void>) => {
     try {
@@ -125,7 +129,7 @@ export async function runAllPlanTests(app: INestApplicationContext): Promise<Tes
       };
       if (body.limitType !== 'workspace') throw new Error('Wrong limitType');
       if (body.currentPlan !== 'free') throw new Error('Wrong plan');
-      if (!body.upgradeTo.some((o) => o.plan === 'silver' && o.price === 500)) {
+      if (!body.upgradeTo.some((o) => o.plan === 'silver' && o.price === expectedSilverPrice)) {
         throw new Error('Missing silver upgrade option');
       }
     }

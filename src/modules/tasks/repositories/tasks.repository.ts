@@ -81,31 +81,6 @@ export class TasksRepository {
     return this.repo.count({ where: { organizationId } });
   }
 
-  /**
-   * Loads the working set for the per-user home dashboard: every open task
-   * plus anything completed since [sinceCompleted]. Assignee matching and date
-   * bucketing happen in the service (assignee_ids is JSON and format-sensitive),
-   * so this stays a cheap, bounded org-scoped fetch.
-   */
-  async findForHomeDashboard(
-    organizationId: string,
-    sinceCompleted: Date,
-  ): Promise<TaskEntity[]> {
-    return this.repo
-      .createQueryBuilder('task')
-      .leftJoinAndSelect('task.assignee', 'assignee')
-      .where('task.organization_id = :organizationId', {
-        organizationId: uuidBinaryTransformer.to(organizationId),
-      })
-      .andWhere('(task.completed_at IS NULL OR task.completed_at >= :since)', {
-        since: sinceCompleted,
-      })
-      .orderBy('task.dueDate', 'ASC')
-      .addOrderBy('task.createdAt', 'DESC')
-      .take(3000)
-      .getMany();
-  }
-
   async create(data: Partial<TaskEntity>): Promise<TaskEntity> {
     const id = data.id ?? generateUuid();
     const payload = { ...data, id };

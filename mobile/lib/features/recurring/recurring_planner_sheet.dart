@@ -122,10 +122,10 @@ class _RecurringPlannerSheetState extends ConsumerState<_RecurringPlannerSheet> 
                         color: AppColors.textMuted,
                       ),
                 ),
-                if (template.successRate != null) ...[
+                if (template.completionHealth != null) ...[
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    'Success ${template.successRate}%',
+                    'Health ${(template.completionHealth! * 100).round()}%',
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                           color: AppColors.sky,
                         ),
@@ -279,12 +279,6 @@ class _RecurringPlannerSheetState extends ConsumerState<_RecurringPlannerSheet> 
               ref.invalidate(recurringTemplatesProvider);
               ref.invalidate(recurringSummaryProvider);
             },
-            onDeleted: () {
-              ref.invalidate(recurringBoardTasksProvider);
-              ref.invalidate(recurringTemplateHistoryProvider(template.id));
-              ref.invalidate(recurringTemplatesProvider);
-              ref.invalidate(recurringSummaryProvider);
-            },
           );
         },
       );
@@ -330,8 +324,7 @@ class _OccurrenceTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: Row(
             children: [
-              const Icon(Icons.event_repeat_rounded,
-                  color: AppColors.violet, size: 20),
+              Icon(Icons.event_repeat_rounded, color: AppColors.violet, size: 20),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
                 child: Column(
@@ -362,8 +355,7 @@ class _OccurrenceTile extends StatelessWidget {
                 ),
               ] else if (onOpen != null) ...[
                 const SizedBox(width: AppSpacing.xs),
-                const Icon(Icons.chevron_right_rounded,
-                    color: AppColors.textMuted),
+                Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
               ],
             ],
           ),

@@ -11,8 +11,6 @@ import '../../core/utils/html_plain_text.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../../data/models/project.dart';
 import 'create_project_sheet.dart';
-import 'project_actions.dart';
-import 'project_settings_sheet.dart';
 import 'projects_providers.dart';
 
 class ProjectsScreen extends ConsumerWidget {
@@ -80,77 +78,31 @@ class ProjectsScreen extends ConsumerWidget {
           );
         }
 
-        final canManage = canManageProjects(ref);
-        final archivedAsync = ref.watch(archivedProjectsProvider);
-        final archived = archivedAsync.valueOrNull ?? const <Project>[];
-
         return RefreshIndicator(
           onRefresh: () async {
             ref.invalidate(projectsProvider);
-            ref.invalidate(archivedProjectsProvider);
             await ref.read(projectsProvider.future);
           },
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md, AppSpacing.sm, AppSpacing.md, 88),
-            children: [
-              _CreateProjectBanner(
-                onTap: () => _openCreateProject(context, ref),
-              ),
-              for (final project in projects) ...[
-                const SizedBox(height: AppSpacing.sm),
-                _PremiumProjectCard(
-                  project: project,
-                  isDark: isDark,
-                  canManage: canManage,
-                  onTap: () {
-                    ref
-                        .read(lastProjectIdProvider.notifier)
-                        .setProjectId(project.id);
-                    context.push(AppRoutes.projectBoard(project.id));
-                  },
-                  onEdit: () => showProjectSettingsSheet(
-                    context: context,
-                    ref: ref,
-                    organizationId: orgId!,
-                    project: project,
-                  ),
-                  onArchive: () => setProjectArchived(
-                    context: context,
-                    ref: ref,
-                    organizationId: orgId!,
-                    project: project,
-                    archived: true,
-                  ),
-                  onDelete: () => confirmDeleteProject(
-                    context: context,
-                    ref: ref,
-                    organizationId: orgId!,
-                    project: project,
-                  ),
-                ),
-              ],
-              if (archived.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.md),
-                _ArchivedSection(
-                  projects: archived,
-                  canManage: canManage,
-                  onUnarchive: (project) => setProjectArchived(
-                    context: context,
-                    ref: ref,
-                    organizationId: orgId!,
-                    project: project,
-                    archived: false,
-                  ),
-                  onDelete: (project) => confirmDeleteProject(
-                    context: context,
-                    ref: ref,
-                    organizationId: orgId!,
-                    project: project,
-                  ),
-                ),
-              ],
-            ],
+          child: ListView.separated(
+            padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, 88),
+            itemCount: projects.length + 1,
+            separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return _CreateProjectBanner(
+                  onTap: () => _openCreateProject(context, ref),
+                );
+              }
+              final project = projects[index - 1];
+              return _PremiumProjectCard(
+                project: project,
+                isDark: isDark,
+                onTap: () {
+                  ref.read(lastProjectIdProvider.notifier).setProjectId(project.id);
+                  context.push(AppRoutes.projectBoard(project.id));
+                },
+              );
+            },
           ),
         );
       },
@@ -233,19 +185,11 @@ class _PremiumProjectCard extends StatelessWidget {
     required this.project,
     required this.isDark,
     required this.onTap,
-    this.canManage = false,
-    this.onEdit,
-    this.onArchive,
-    this.onDelete,
   });
 
   final Project project;
   final bool isDark;
   final VoidCallback onTap;
-  final bool canManage;
-  final VoidCallback? onEdit;
-  final VoidCallback? onArchive;
-  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -342,159 +286,14 @@ class _PremiumProjectCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: AppSpacing.xs),
-                if (canManage)
-                  _ProjectActionsMenu(
-                    onOpen: onTap,
-                    onEdit: onEdit,
-                    onArchive: onArchive,
-                    onDelete: onDelete,
-                  )
-                else
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: AppColors.textMuted.withValues(alpha: 0.7),
-                  ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: AppColors.textMuted.withValues(alpha: 0.7),
+                ),
               ],
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _ProjectActionsMenu extends StatelessWidget {
-  const _ProjectActionsMenu({
-    this.onOpen,
-    this.onEdit,
-    this.onArchive,
-    this.onDelete,
-  });
-
-  final VoidCallback? onOpen;
-  final VoidCallback? onEdit;
-  final VoidCallback? onArchive;
-  final VoidCallback? onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    return PopupMenuButton<String>(
-      icon: Icon(
-        Icons.more_vert_rounded,
-        color: AppColors.textMuted.withValues(alpha: 0.9),
-      ),
-      tooltip: 'Project actions',
-      onSelected: (value) {
-        switch (value) {
-          case 'open':
-            onOpen?.call();
-          case 'edit':
-            onEdit?.call();
-          case 'archive':
-            onArchive?.call();
-          case 'delete':
-            onDelete?.call();
-        }
-      },
-      itemBuilder: (context) => [
-        const PopupMenuItem(
-          value: 'open',
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.open_in_new_rounded),
-            title: Text('Open'),
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'edit',
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.edit_outlined),
-            title: Text('Edit'),
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'archive',
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.archive_outlined),
-            title: Text('Archive'),
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'delete',
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.delete_outline_rounded, color: AppColors.danger),
-            title: Text('Delete', style: TextStyle(color: AppColors.danger)),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ArchivedSection extends StatelessWidget {
-  const _ArchivedSection({
-    required this.projects,
-    required this.canManage,
-    required this.onUnarchive,
-    required this.onDelete,
-  });
-
-  final List<Project> projects;
-  final bool canManage;
-  final ValueChanged<Project> onUnarchive;
-  final ValueChanged<Project> onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: ExpansionTile(
-        tilePadding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-        childrenPadding: EdgeInsets.zero,
-        leading: const Icon(Icons.inventory_2_outlined,
-            color: AppColors.textMuted),
-        title: Text(
-          'Archived (${projects.length})',
-          style: Theme.of(context)
-              .textTheme
-              .titleSmall
-              ?.copyWith(color: AppColors.textSecondary),
-        ),
-        children: [
-          for (final project in projects)
-            ListTile(
-              contentPadding:
-                  const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-              leading: const Icon(Icons.folder_off_outlined,
-                  color: AppColors.textMuted),
-              title: Text(
-                project.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              trailing: canManage
-                  ? Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          tooltip: 'Restore',
-                          icon: const Icon(Icons.unarchive_outlined),
-                          onPressed: () => onUnarchive(project),
-                        ),
-                        IconButton(
-                          tooltip: 'Delete',
-                          icon: const Icon(Icons.delete_outline_rounded,
-                              color: AppColors.danger),
-                          onPressed: () => onDelete(project),
-                        ),
-                      ],
-                    )
-                  : null,
-            ),
-        ],
       ),
     );
   }
