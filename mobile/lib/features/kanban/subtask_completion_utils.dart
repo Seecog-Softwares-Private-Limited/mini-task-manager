@@ -33,8 +33,7 @@ bool isUserTaskReporter({
   return normalizeUserId(task.reporterId) == normalizeUserId(userId);
 }
 
-/// True when the user is a workspace owner or admin.
-bool isOwnerOrAdmin({
+bool canManageTaskSubtasks({
   required Organization? org,
   required String? userId,
 }) {
@@ -48,69 +47,22 @@ bool isOwnerOrAdmin({
   return false;
 }
 
-bool canManageTaskSubtasks({
-  required Organization? org,
-  required String? userId,
-}) =>
-    isOwnerOrAdmin(org: org, userId: userId);
-
-/// Owner/admin can edit every task field on any task.
-bool canFullyEditTask({
-  required Organization? org,
-  required String? userId,
-  required Task task,
-  required List<ProjectMember> members,
-}) {
-  if (isOwnerOrAdmin(org: org, userId: userId)) return true;
-  return isUserTaskReporter(task: task, userId: userId) &&
-      isUserAssignedToTask(task: task, members: members, userId: userId);
-}
-
 /// Owner/admin can edit task title and description (matches web `canEditAll` for workspace managers).
 bool canEditTaskTitleAndDescription({
   required Organization? org,
   required String? userId,
-  required Task task,
-  required List<ProjectMember> members,
 }) =>
-    canFullyEditTask(
-      org: org,
-      userId: userId,
-      task: task,
-      members: members,
-    );
+    canManageTaskSubtasks(org: org, userId: userId);
 
-/// Owner/admin or task assignee can add/edit subtasks.
+/// Matches web task-detail `canEditSubtasks`: owner/admin or task assignee.
 bool canEditTaskSubtasks({
   required Organization? org,
   required String? userId,
   required Task task,
 }) {
   if (userId == null || userId.isEmpty) return false;
-  if (isOwnerOrAdmin(org: org, userId: userId)) return true;
+  if (canManageTaskSubtasks(org: org, userId: userId)) return true;
   return isUserStoredAssigneeOnTask(task: task, userId: userId);
-}
-
-/// Owner/admin can delete any task; task creator can delete their own task.
-bool canDeleteTask({
-  required Organization? org,
-  required String? userId,
-  required Task task,
-}) {
-  if (isOwnerOrAdmin(org: org, userId: userId)) return true;
-  return isUserTaskReporter(task: task, userId: userId);
-}
-
-/// Owner/admin or active assignee can update status/priority-style workflow fields.
-bool canEditTaskWorkflowFields({
-  required Organization? org,
-  required String? userId,
-  required Task task,
-  required List<ProjectMember> members,
-}) {
-  if (userId == null || userId.isEmpty) return false;
-  if (isOwnerOrAdmin(org: org, userId: userId)) return true;
-  return isUserAssignedToTask(task: task, members: members, userId: userId);
 }
 
 bool isUserStoredAssigneeOnTask({

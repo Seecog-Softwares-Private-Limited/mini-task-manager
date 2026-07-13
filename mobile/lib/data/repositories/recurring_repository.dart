@@ -26,26 +26,6 @@ class RecurringRepository {
     }
   }
 
-  Future<RecurringAnalytics> fetchAnalytics({
-    required String organizationId,
-    String? projectId,
-    int days = 30,
-  }) async {
-    try {
-      final response = await _api.dio.get<Map<String, dynamic>>(
-        '/recurring-tasks/analytics',
-        queryParameters: {
-          'days': days,
-          if (projectId != null) 'projectId': projectId,
-        },
-        options: _api.withOrgHeader(organizationId),
-      );
-      return RecurringAnalytics.fromJson(response.data ?? const {});
-    } on DioException catch (error) {
-      throw ApiException.fromDio(error);
-    }
-  }
-
   Future<List<RecurringTemplate>> fetchTemplates({
     required String organizationId,
     String? projectId,
@@ -105,105 +85,6 @@ class RecurringRepository {
     }
   }
 
-  /// Creates a new recurring series by creating a task with a recurrence
-  /// payload (backend attaches the recurring template).
-  Future<void> createRecurringSeries({
-    required String organizationId,
-    required String projectId,
-    required String title,
-    required String startDueDate,
-    required Map<String, dynamic> recurrence,
-    String? statusId,
-    String priority = 'MEDIUM',
-    String? description,
-    List<String> assigneeIds = const [],
-    List<Map<String, dynamic>> subtasks = const [],
-  }) async {
-    try {
-      await _api.dio.post<Map<String, dynamic>>(
-        '/tasks',
-        data: {
-          'projectId': projectId,
-          'organizationId': organizationId,
-          'title': title.trim(),
-          'priority': priority.toUpperCase(),
-          'dueDate': startDueDate,
-          if (statusId != null && statusId.isNotEmpty) 'statusId': statusId,
-          if (description != null && description.trim().isNotEmpty)
-            'description': description.trim(),
-          if (assigneeIds.isNotEmpty) 'assigneeIds': assigneeIds,
-          if (subtasks.isNotEmpty) 'subtasks': subtasks,
-          'recurrence': recurrence,
-        },
-        options: _api.withOrgHeader(organizationId),
-      );
-    } on DioException catch (error) {
-      throw ApiException.fromDio(error);
-    }
-  }
-
-  Future<void> updateTemplate({
-    required String templateId,
-    required String organizationId,
-    String? title,
-    Map<String, dynamic>? recurrence,
-  }) async {
-    try {
-      await _api.dio.patch<Map<String, dynamic>>(
-        '/recurring-tasks/$templateId',
-        data: {
-          if (title != null) 'title': title.trim(),
-          if (recurrence != null) 'recurrence': recurrence,
-        },
-        options: _api.withOrgHeader(organizationId),
-      );
-    } on DioException catch (error) {
-      throw ApiException.fromDio(error);
-    }
-  }
-
-  Future<void> duplicateTemplate({
-    required String templateId,
-    required String organizationId,
-  }) async {
-    try {
-      await _api.dio.post<Map<String, dynamic>>(
-        '/recurring-tasks/$templateId/duplicate',
-        options: _api.withOrgHeader(organizationId),
-      );
-    } on DioException catch (error) {
-      throw ApiException.fromDio(error);
-    }
-  }
-
-  Future<void> archiveTemplate({
-    required String templateId,
-    required String organizationId,
-  }) async {
-    try {
-      await _api.dio.post<Map<String, dynamic>>(
-        '/recurring-tasks/$templateId/archive',
-        options: _api.withOrgHeader(organizationId),
-      );
-    } on DioException catch (error) {
-      throw ApiException.fromDio(error);
-    }
-  }
-
-  Future<void> deleteSeries({
-    required String templateId,
-    required String organizationId,
-  }) async {
-    try {
-      await _api.dio.delete<Map<String, dynamic>>(
-        '/recurring-tasks/$templateId',
-        options: _api.withOrgHeader(organizationId),
-      );
-    } on DioException catch (error) {
-      throw ApiException.fromDio(error);
-    }
-  }
-
   Future<void> pauseTemplate({
     required String templateId,
     required String organizationId,
@@ -225,45 +106,6 @@ class RecurringRepository {
     try {
       await _api.dio.post<void>(
         '/recurring-tasks/$templateId/resume',
-        options: _api.withOrgHeader(organizationId),
-      );
-    } on DioException catch (error) {
-      throw ApiException.fromDio(error);
-    }
-  }
-
-  /// Completes a recurring occurrence via the series-aware endpoint.
-  /// [action] is one of ONLY_THIS, THIS_AND_PREVIOUS_PENDING, STOP_SERIES_PERMANENTLY.
-  Future<void> completeRecurringTask({
-    required String taskId,
-    required String organizationId,
-    String action = 'ONLY_THIS',
-    String? doneStatusId,
-  }) async {
-    try {
-      await _api.dio.post<void>(
-        '/recurring-tasks/tasks/$taskId/complete',
-        data: {
-          'action': action,
-          if (doneStatusId != null) 'doneStatusId': doneStatusId,
-        },
-        options: _api.withOrgHeader(organizationId),
-      );
-    } on DioException catch (error) {
-      throw ApiException.fromDio(error);
-    }
-  }
-
-  /// Skips the next pending occurrence for a series (owner/admin only).
-  Future<void> skipNextOccurrence({
-    required String templateId,
-    required String organizationId,
-    int steps = 1,
-  }) async {
-    try {
-      await _api.dio.post<void>(
-        '/recurring-tasks/$templateId/skip-next',
-        data: {'steps': steps},
         options: _api.withOrgHeader(organizationId),
       );
     } on DioException catch (error) {

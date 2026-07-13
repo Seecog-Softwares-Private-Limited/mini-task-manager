@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../workspaces/workspace_switcher_sheet.dart';
 import '../../core/theme/app_colors.dart';
@@ -37,7 +36,6 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   }
 
   void _selectTab(int value) {
-    if (value != _index) HapticFeedback.selectionClick();
     setState(() {
       _mountedTabs.add(value);
       _index = value;
@@ -61,7 +59,6 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       sessionControllerProvider.select((session) => session.orgId),
     );
     final unread = _enableUnreadBadge ? ref.watch(unreadNotificationsCountProvider) : 0;
-    final unreadLabel = unread > 99 ? '99+' : '$unread';
     final onProjectsTab = _index == 1;
     final canCreateProject = onProjectsTab && orgId != null && orgId.isNotEmpty;
 
@@ -152,12 +149,12 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           NavigationDestination(
             icon: Badge(
               isLabelVisible: unread > 0,
-              label: Text(unreadLabel),
+              label: Text('$unread'),
               child: const Icon(Icons.notifications_outlined),
             ),
             selectedIcon: Badge(
               isLabelVisible: unread > 0,
-              label: Text(unreadLabel),
+              label: Text('$unread'),
               child: const Icon(Icons.notifications_rounded),
             ),
             label: 'Alerts',
@@ -176,7 +173,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     return switch (index) {
       0 => 'Home',
       1 => 'Projects',
-      2 => 'Planner',
+      2 => 'Recurring planner',
       3 => 'Notifications',
       _ => 'Profile',
     };

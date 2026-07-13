@@ -51,10 +51,6 @@ export class TaskEntity extends BaseEntity {
     priority?: string;
     statusId?: string;
     completionRecord?: Record<string, any>;
-    reporterId?: string;
-    createdAt?: string;
-    /** Free-text reflection note (e.g. why this item was/wasn't done on a recurring run). */
-    note?: string;
   }> | null;
 
   @Column({ name: 'reporter_id', type: 'binary', length: 16, transformer: uuidBinaryTransformer })

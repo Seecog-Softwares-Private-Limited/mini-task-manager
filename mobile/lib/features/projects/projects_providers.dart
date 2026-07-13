@@ -10,19 +10,6 @@ final projectsRepositoryProvider = Provider<ProjectsRepository>((ref) {
   return ProjectsRepository(apiClient: ref.watch(apiClientProvider));
 });
 
-/// Archived projects only, for the "Archived" section on the projects screen.
-final archivedProjectsProvider =
-    FutureProvider.autoDispose<List<Project>>((ref) async {
-  final session = ref.watch(sessionControllerProvider);
-  final orgId = session.orgId;
-  if (orgId == null || orgId.isEmpty) return const [];
-
-  final repository = ref.watch(projectsRepositoryProvider);
-  final projects =
-      await repository.fetchProjects(organizationId: orgId, includeArchived: true);
-  return projects.where((p) => p.isArchived).toList();
-});
-
 final projectsProvider = FutureProvider.autoDispose<List<Project>>((ref) async {
   final session = ref.watch(sessionControllerProvider);
   final orgId = session.orgId;

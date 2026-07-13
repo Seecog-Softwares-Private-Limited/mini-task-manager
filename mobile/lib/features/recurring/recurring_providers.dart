@@ -14,35 +14,6 @@ final recurringRepositoryProvider = Provider<RecurringRepository>((ref) {
 
 final recurringProjectIdProvider = StateProvider<String?>((ref) => null);
 
-/// Set by the summary KPIs to ask the calendar tab to jump to a given day.
-/// The calendar consumes and resets it once handled.
-final recurringJumpToDateProvider = StateProvider<DateTime?>((ref) => null);
-
-/// Trailing window (in days) used by the Insights analytics tab.
-final recurringAnalyticsRangeProvider = StateProvider<int>((ref) => 30);
-
-final recurringAnalyticsProvider =
-    FutureProvider<RecurringAnalytics>((ref) async {
-  final session = ref.watch(sessionControllerProvider);
-  if (session.status != SessionStatus.authenticated) {
-    throw StateError('Session not ready');
-  }
-
-  final orgId = session.orgId;
-  if (orgId == null || orgId.isEmpty) {
-    throw StateError('No workspace selected');
-  }
-
-  final projectId = ref.watch(recurringSelectedProjectIdProvider);
-  final days = ref.watch(recurringAnalyticsRangeProvider);
-  final repo = ref.watch(recurringRepositoryProvider);
-  return repo.fetchAnalytics(
-    organizationId: orgId,
-    projectId: projectId,
-    days: days,
-  );
-});
-
 /// Resolves the active project immediately from cache/selection (no async init).
 final recurringSelectedProjectIdProvider = Provider<String?>((ref) {
   final selected = ref.watch(recurringProjectIdProvider);

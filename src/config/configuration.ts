@@ -53,11 +53,11 @@ export const configuration = () => {
     throttle: {
       auth: {
         ttl: parseInt(process.env.THROTTLE_AUTH_TTL_MS || '60000', 10),
-        limit: parseInt(process.env.THROTTLE_AUTH_LIMIT || '10', 10),
+        limit: parseInt(process.env.THROTTLE_AUTH_LIMIT || '1000000', 10),
       },
       general: {
         ttl: parseInt(process.env.THROTTLE_GENERAL_TTL_MS || '60000', 10),
-        limit: parseInt(process.env.THROTTLE_GENERAL_LIMIT || '100', 10),
+        limit: parseInt(process.env.THROTTLE_GENERAL_LIMIT || '1000000', 10),
       },
     },
   database: {

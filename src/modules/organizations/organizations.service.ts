@@ -75,11 +75,12 @@ export class OrganizationsService {
     await this.planLimitService.assertWorkspaceLimit(ownerId);
 
     const orgId = generateUuid();
+    let orgEntity: OrganizationEntity;
     try {
-      return await this.dataSource.transaction(async (manager) => {
+      orgEntity = await this.dataSource.transaction(async (manager) => {
         const orgRepo = manager.getRepository(OrganizationEntity);
         const memberRepo = manager.getRepository(OrganizationMemberEntity);
-        const orgEntity = orgRepo.create({
+        const entity = orgRepo.create({
           id: orgId,
           name: dto.name,
           slug: dto.slug,
@@ -87,7 +88,7 @@ export class OrganizationsService {
           logoUrl: dto.logoUrl ?? null,
           isArchived: false,
         });
-        await orgRepo.save(orgEntity);
+        await orgRepo.save(entity);
         const memberEntity = memberRepo.create({
           id: generateUuid(),
           organizationId: orgId,
@@ -96,8 +97,7 @@ export class OrganizationsService {
           status: 'ACTIVE',
         });
         await memberRepo.save(memberEntity);
-        await this.unifiedBillingService.ensureFreeSubscription(orgId);
-        return orgEntity;
+        return entity;
       });
     } catch (err) {
       const driverError = err instanceof QueryFailedError ? (err as QueryFailedError).driverError : null;
@@ -110,6 +110,10 @@ export class OrganizationsService {
       }
       throw err;
     }
+
+    // Provision free subscription outside transaction to avoid connection lock deadlocks
+    await this.unifiedBillingService.ensureFreeSubscription(orgId);
+    return orgEntity;
   }
 
   async getMembers(organizationId: string): Promise<OrganizationMemberEntity[]> {

@@ -11,11 +11,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../data/models/task.dart';
 import '../../data/models/workflow.dart';
 import '../../shared/widgets/app_widgets.dart';
-import '../../data/models/project.dart';
 import '../auth/session_controller.dart';
-import '../projects/project_actions.dart';
-import '../projects/project_settings_sheet.dart';
-import '../projects/projects_providers.dart';
 import 'create_task_sheet.dart';
 import 'kanban_providers.dart';
 import 'project_switcher.dart';
@@ -54,83 +50,6 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
       index,
       duration: const Duration(milliseconds: 280),
       curve: Curves.easeOutCubic,
-    );
-  }
-
-  Project? _currentProject() {
-    final projects = ref.watch(projectsProvider).valueOrNull ?? const <Project>[];
-    for (final project in projects) {
-      if (project.id == widget.projectId) return project;
-    }
-    return null;
-  }
-
-  /// Owner/admin-only Edit / Archive / Delete menu for the current project.
-  Widget? _buildActionsMenu(String? orgId) {
-    if (orgId == null || orgId.isEmpty || !canManageProjects(ref)) return null;
-    final project = _currentProject();
-    if (project == null) return null;
-
-    return _CircleIconButton(
-      icon: Icons.more_vert_rounded,
-      onPressed: () async {
-        final action = await showModalBottomSheet<String>(
-          context: context,
-          builder: (_) => SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.edit_outlined),
-                  title: const Text('Edit project'),
-                  onTap: () => Navigator.of(context).pop('edit'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.archive_outlined),
-                  title: const Text('Archive project'),
-                  onTap: () => Navigator.of(context).pop('archive'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.delete_outline_rounded,
-                      color: AppColors.danger),
-                  title: const Text('Delete project',
-                      style: TextStyle(color: AppColors.danger)),
-                  onTap: () => Navigator.of(context).pop('delete'),
-                ),
-              ],
-            ),
-          ),
-        );
-        if (!mounted || action == null) return;
-        switch (action) {
-          case 'edit':
-            await showProjectSettingsSheet(
-              context: context,
-              ref: ref,
-              organizationId: orgId,
-              project: project,
-              onSaved: (_) =>
-                  ref.invalidate(projectBoardProvider(widget.projectId)),
-            );
-          case 'archive':
-            await setProjectArchived(
-              context: context,
-              ref: ref,
-              organizationId: orgId,
-              project: project,
-              archived: true,
-            );
-            if (mounted) AppRoutes.leaveProjectBoard(context);
-          case 'delete':
-            final deleted = await confirmDeleteProject(
-              context: context,
-              ref: ref,
-              organizationId: orgId,
-              project: project,
-            );
-            if (deleted && mounted) AppRoutes.leaveProjectBoard(context);
-        }
-      },
     );
   }
 
@@ -192,7 +111,6 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
               ref.invalidate(projectBoardProvider(widget.projectId));
               await ref.read(projectBoardProvider(widget.projectId).future);
             },
-            trailing: _buildActionsMenu(orgId),
             headerStats: [
               _HeaderStat(
                 icon: Icons.task_alt_rounded,
@@ -320,7 +238,6 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
           statuses: board.statuses,
           projectId: widget.projectId,
           onUpdated: () => ref.invalidate(projectBoardProvider(widget.projectId)),
-          onDeleted: () => ref.invalidate(projectBoardProvider(widget.projectId)),
         );
       },
     );
@@ -342,14 +259,12 @@ class _BoardScaffold extends StatelessWidget {
     required this.child,
     this.headerStats,
     this.onRefresh,
-    this.trailing,
   });
 
   final Widget header;
   final List<_HeaderStat>? headerStats;
   final Widget child;
   final Future<void> Function()? onRefresh;
-  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -396,10 +311,6 @@ class _BoardScaffold extends StatelessWidget {
                           icon: Icons.refresh_rounded,
                           onPressed: () => onRefresh!(),
                         ),
-                      if (trailing != null) ...[
-                        const SizedBox(width: AppSpacing.xs),
-                        trailing!,
-                      ],
                     ],
                   ),
                   if (headerStats != null) ...[
@@ -503,7 +414,6 @@ class _HeaderStat extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      height: 72,
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.sm),
       decoration: BoxDecoration(
         color: isDark
@@ -531,6 +441,7 @@ class _HeaderStat extends StatelessWidget {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   value,
@@ -780,94 +691,109 @@ class _PremiumTaskCard extends StatelessWidget {
               ),
             ],
           ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Stack(
             children: [
-              Container(width: 4, color: priority.color),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.sm,
-                    AppSpacing.sm,
-                    AppSpacing.xs,
-                    AppSpacing.sm,
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                child: Container(
+                  width: 4,
+                  decoration: BoxDecoration(
+                    color: priority.color,
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(16),
+                      bottomLeft: Radius.circular(16),
+                    ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              height: 1.3,
-                              fontWeight: FontWeight.w600,
-                              color: titleColor,
-                            ),
+                ),
+              ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.sm + 4,
+                        AppSpacing.sm,
+                        AppSpacing.xs,
+                        AppSpacing.sm,
                       ),
-                      const SizedBox(height: AppSpacing.sm),
-                      Wrap(
-                        spacing: AppSpacing.xs,
-                        runSpacing: AppSpacing.xs,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _MetaPill(
-                            icon: priority.icon,
-                            label: priority.label,
-                            color: priority.color,
-                            background: priority.background,
-                          ),
-                          if (dueMeta != null)
-                            _MetaPill(
-                              icon: dueMeta.icon,
-                              label: dueMeta.label,
-                              color: dueMeta.color,
-                              background: dueMeta.background,
-                            ),
-                        ],
-                      ),
-                      if (subtaskProgress != null) ...[
-                        const SizedBox(height: AppSpacing.sm),
-                        Row(
-                          children: [
-                            const Icon(Icons.checklist_rounded, size: 14, color: AppColors.violet),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(999),
-                                child: LinearProgressIndicator(
-                                  value: subtaskProgress,
-                                  minHeight: 5,
-                                  backgroundColor: AppColors.violet.withValues(alpha: 0.12),
-                                  color: AppColors.violet,
+                          Text(
+                            title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  height: 1.3,
+                                  fontWeight: FontWeight.w600,
+                                  color: titleColor,
                                 ),
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          Wrap(
+                            spacing: AppSpacing.xs,
+                            runSpacing: AppSpacing.xs,
+                            children: [
+                              _MetaPill(
+                                icon: priority.icon,
+                                label: priority.label,
+                                color: priority.color,
+                                background: priority.background,
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '${task.completedSubtasks}/${task.subtasks.length}',
-                              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                                    color: AppColors.violet,
-                                    fontSize: 11,
+                              if (dueMeta != null)
+                                _MetaPill(
+                                  icon: dueMeta.icon,
+                                  label: dueMeta.label,
+                                  color: dueMeta.color,
+                                  background: dueMeta.background,
+                                ),
+                            ],
+                          ),
+                          if (subtaskProgress != null) ...[
+                            const SizedBox(height: AppSpacing.sm),
+                            Row(
+                              children: [
+                                const Icon(Icons.checklist_rounded, size: 14, color: AppColors.violet),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(999),
+                                    child: LinearProgressIndicator(
+                                      value: subtaskProgress,
+                                      minHeight: 5,
+                                      backgroundColor: AppColors.violet.withValues(alpha: 0.12),
+                                      color: AppColors.violet,
+                                    ),
                                   ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '${task.completedSubtasks}/${task.subtasks.length}',
+                                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                        color: AppColors.violet,
+                                        fontSize: 11,
+                                      ),
+                                ),
+                              ],
                             ),
                           ],
-                        ),
-                      ],
-                    ],
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(right: AppSpacing.xs, top: AppSpacing.sm),
-                child: Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.textMuted.withValues(alpha: 0.7),
-                ),
+                  Padding(
+                    padding: const EdgeInsets.only(right: AppSpacing.xs, top: AppSpacing.sm),
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      color: AppColors.textMuted.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
               ),
             ],
-          ),
           ),
         ),
       ),

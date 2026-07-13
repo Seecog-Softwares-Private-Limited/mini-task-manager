@@ -16,9 +16,6 @@ class TaskSubtask {
     this.priority,
     this.statusId,
     this.completionRecord,
-    this.reporterId,
-    this.createdAt,
-    this.note,
   });
 
   final String id;
@@ -32,9 +29,6 @@ class TaskSubtask {
   final String? priority;
   final String? statusId;
   final SubtaskCompletionRecord? completionRecord;
-  final String? reporterId;
-  final String? createdAt;
-  final String? note;
 
   factory TaskSubtask.fromJson(Map<String, dynamic> json) {
     final rawRecord = json['completionRecord'];
@@ -52,9 +46,6 @@ class TaskSubtask {
       completionRecord: rawRecord is Map<String, dynamic>
           ? SubtaskCompletionRecord.fromJson(rawRecord)
           : null,
-      reporterId: _nullableString(json['reporterId']),
-      createdAt: _nullableString(json['createdAt']),
-      note: _nullableString(json['note']),
     );
   }
 
@@ -71,10 +62,6 @@ class TaskSubtask {
     String? statusId,
     SubtaskCompletionRecord? completionRecord,
     bool clearCompletionRecord = false,
-    String? reporterId,
-    String? createdAt,
-    String? note,
-    bool clearNote = false,
   }) {
     return TaskSubtask(
       id: id ?? this.id,
@@ -89,9 +76,6 @@ class TaskSubtask {
       statusId: statusId ?? this.statusId,
       completionRecord:
           clearCompletionRecord ? null : (completionRecord ?? this.completionRecord),
-      reporterId: reporterId ?? this.reporterId,
-      createdAt: createdAt ?? this.createdAt,
-      note: clearNote ? null : (note ?? this.note),
     );
   }
 }
@@ -113,11 +97,7 @@ class Task {
     this.assigneeIds = const [],
     this.tags = const [],
     this.dueDate,
-    this.completedAt,
     this.subtasks = const [],
-    this.recurringTemplateId,
-    this.recurrenceType,
-    this.recurrenceSequence,
   });
 
   final String id;
@@ -132,12 +112,8 @@ class Task {
   final List<String> tags;
   final String reporterId;
   final String? dueDate;
-  final String? completedAt;
   final int loggedMinutes;
   final List<TaskSubtask> subtasks;
-  final String? recurringTemplateId;
-  final String? recurrenceType;
-  final int? recurrenceSequence;
   final String createdAt;
   final String updatedAt;
 
@@ -157,16 +133,10 @@ class Task {
       tags: _parseTags(json['tags']),
       reporterId: _asString(json['reporterId']),
       dueDate: _nullableDateString(json['dueDate']),
-      completedAt: _nullableDateString(json['completedAt']),
       loggedMinutes: json['loggedMinutes'] is int
           ? json['loggedMinutes'] as int
           : int.tryParse('${json['loggedMinutes']}') ?? 0,
       subtasks: _parseSubtasks(json['subtasks']),
-      recurringTemplateId: _nullableString(json['recurringTemplateId']),
-      recurrenceType: _nullableString(json['recurrenceType']),
-      recurrenceSequence: json['recurrenceSequence'] is int
-          ? json['recurrenceSequence'] as int
-          : int.tryParse('${json['recurrenceSequence']}'),
       createdAt: _nullableDateString(json['createdAt']) ?? '',
       updatedAt: _nullableDateString(json['updatedAt']) ?? '',
     );
@@ -195,12 +165,8 @@ class Task {
       tags: tags ?? this.tags,
       reporterId: reporterId,
       dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
-      completedAt: completedAt,
       loggedMinutes: loggedMinutes,
       subtasks: subtasks ?? this.subtasks,
-      recurringTemplateId: recurringTemplateId,
-      recurrenceType: recurrenceType,
-      recurrenceSequence: recurrenceSequence,
       createdAt: createdAt,
       updatedAt: updatedAt,
     );

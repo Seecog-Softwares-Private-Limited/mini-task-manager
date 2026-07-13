@@ -32,7 +32,6 @@ import {
 import { DropdownScrollList } from "@/components/ui/dropdown-scroll-list";
 import { parseApiError } from "@/services/api/client";
 import { useAuth } from "@/hooks/use-auth";
-import { useOrgRole } from "@/hooks/use-org-role";
 import {
   canUserDeleteTask,
   canUserEditTaskFully,
@@ -295,7 +294,6 @@ export function TaskDetailModal({
   const { toast } = useToast();
   const { showNotice, noticeDialogProps } = useNoticeDialog();
   const { user } = useAuth();
-  const { isOwner: orgIsOwner, isAdmin: orgIsAdmin } = useOrgRole();
   const currentUserId = user?.id ?? "";
   const [commentText, setCommentText] = React.useState("");
   const [commentMentionedIds, setCommentMentionedIds] = React.useState<string[]>([]);
@@ -487,9 +485,8 @@ export function TaskDetailModal({
     [orgMembers, currentUserId]
   );
 
-  const isOwner = orgIsOwner || currentMember?.role?.toUpperCase() === "OWNER";
-  const isAdmin = orgIsAdmin || currentMember?.role?.toUpperCase() === "ADMIN";
-  const canManageAnyTask = isOwner || isAdmin;
+  const isOwner = currentMember?.role?.toUpperCase() === "OWNER";
+  const isAdmin = currentMember?.role?.toUpperCase() === "ADMIN";
 
   const isAssignee = React.useMemo(
     () => (task ? isUserAssignedToTask(task, currentUserId) : false),
@@ -501,13 +498,13 @@ export function TaskDetailModal({
     [task, currentUserId]
   );
 
-  const canManageAssignees = canManageAnyTask || (isReporter && isAssignee);
+  const canManageAssignees = isOwner || isAdmin || (isReporter && isAssignee);
 
   /** Owner/admin or assigned-by user (when also assigned) can edit every field; other assignees get limited fields. */
-  const canEditAll = canUserEditTaskFully(task ?? {}, currentUserId, canManageAnyTask);
-  const canDeleteTask = canUserDeleteTask(task ?? {}, currentUserId, canManageAnyTask);
-  const canEditWorkflowFields = canManageAnyTask || isAssignee;
-  const canEditSubtasks = canManageAnyTask || isAssignee;
+  const canEditAll = canUserEditTaskFully(task ?? {}, currentUserId, isOwner || isAdmin);
+  const canDeleteTask = canUserDeleteTask(task ?? {}, currentUserId, isOwner);
+  const canEditWorkflowFields = isOwner || isAdmin || isAssignee;
+  const canEditSubtasks = canManageAssignees || isAssignee;
   const isViewOnly = !canEditWorkflowFields;
 
   /** Subtask assignees are limited to members assigned on the parent task. */
@@ -802,7 +799,7 @@ export function TaskDetailModal({
 
   const updateSubtasksMutation = useMutation({
     mutationFn: (subtasks: TaskSubtask[]) => {
-      if (!canEditSubtasks) {
+      if (!canEditWorkflowFields) {
         return Promise.reject(new Error("You do not have permission to update subtasks"));
       }
       return updateTask(taskId!, { subtasks });
@@ -1470,7 +1467,7 @@ export function TaskDetailModal({
                                 taskAssigneesOnly
                                 persistAttachments
                                 disabled={!canEditSubtasks}
-                                readOnly={!canEditSubtasks}
+                                readOnly={isViewOnly}
                                 saving={updateSubtasksMutation.isPending}
                                 onSave={saveSubtaskDetail}
                                 onDirtyChange={setSubtaskDraftDirty}

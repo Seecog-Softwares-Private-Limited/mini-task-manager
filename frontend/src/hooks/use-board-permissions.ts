@@ -16,8 +16,8 @@ export interface BoardPermissions {
 
 /**
  * Board permissions from org membership.
- * Task create/update/delete/move is allowed for workspace OWNER and ADMIN.
- * MEMBER / VIEWER are read-only on the board.
+ * Task create/update/delete/move is limited to workspace OWNER.
+ * ADMIN can create tasks; MEMBER / VIEWER are read-only on the board.
  */
 export function useBoardPermissions(
   orgMembers: OrgMember[],
@@ -55,11 +55,11 @@ export function useBoardPermissions(
       case "ADMIN":
         return {
           canCreateTask: true,
-          canEditTask: true,
-          canMoveTask: true,
-          canDeleteTask: true,
-          canManageBoard: true,
-          canBulkSelect: true,
+          canEditTask: false,
+          canMoveTask: false,
+          canDeleteTask: false,
+          canManageBoard: false,
+          canBulkSelect: false,
           role,
           isViewer: false,
         };
