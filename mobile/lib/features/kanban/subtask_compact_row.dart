@@ -20,6 +20,7 @@ class SubtaskCompactRow extends StatelessWidget {
     required this.onToggleComplete,
     required this.onExpand,
     required this.onAssigneesChanged,
+    this.onDelete,
   });
 
   final TaskSubtask subtask;
@@ -30,6 +31,7 @@ class SubtaskCompactRow extends StatelessWidget {
   final ValueChanged<bool> onToggleComplete;
   final VoidCallback onExpand;
   final ValueChanged<List<String>> onAssigneesChanged;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -140,6 +142,24 @@ class SubtaskCompactRow extends StatelessWidget {
                       enabled: enabled,
                       onTap: () => _pickAssignees(context, assigneeIds),
                     ),
+                    if (onDelete != null)
+                      IconButton(
+                        tooltip: 'Delete subtask',
+                        onPressed: enabled ? onDelete : null,
+                        visualDensity: VisualDensity.compact,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 28,
+                          minHeight: 28,
+                        ),
+                        icon: Icon(
+                          Icons.delete_outline_rounded,
+                          size: 18,
+                          color: enabled
+                              ? AppColors.danger.withValues(alpha: 0.85)
+                              : AppColors.textMuted,
+                        ),
+                      ),
                     IconButton(
                       onPressed: onExpand,
                       visualDensity: VisualDensity.compact,

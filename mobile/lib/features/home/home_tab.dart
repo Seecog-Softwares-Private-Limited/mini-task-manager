@@ -41,7 +41,9 @@ class HomeTab extends ConsumerWidget {
     return RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(projectsProvider);
+        ref.invalidate(workspaceBoardTasksProvider);
         ref.invalidate(homeDashboardProvider);
+        ref.invalidate(myWorkProvider);
         ref.invalidate(recurringAnalyticsProvider);
         await ref.read(homeDashboardProvider.future);
       },
@@ -308,27 +310,27 @@ class _StatRow extends StatelessWidget {
       data: (d) => Row(
         children: [
           _StatCard(
-            label: 'Due today',
-            value: '${d.counts.dueToday}',
-            color: AppColors.sky,
-            icon: Icons.today_rounded,
-            onTap: () => onOpenFilter(MyWorkFilter.today),
+            label: 'Total',
+            value: '${d.counts.total}',
+            color: AppColors.primary,
+            icon: Icons.task_alt_rounded,
+            onTap: () => onOpenFilter(MyWorkFilter.open),
           ),
           const SizedBox(width: AppSpacing.sm),
           _StatCard(
             label: 'Overdue',
             value: '${d.counts.overdue}',
             color: AppColors.danger,
-            icon: Icons.error_rounded,
+            icon: Icons.warning_amber_rounded,
             onTap: () => onOpenFilter(MyWorkFilter.overdue),
           ),
           const SizedBox(width: AppSpacing.sm),
           _StatCard(
-            label: 'Done this week',
-            value: '${d.counts.completedThisWeek}',
-            color: AppColors.success,
-            icon: Icons.check_circle_rounded,
-            onTap: () => onOpenFilter(MyWorkFilter.completed),
+            label: 'Due today',
+            value: '${d.counts.dueToday}',
+            color: AppColors.sky,
+            icon: Icons.today_rounded,
+            onTap: () => onOpenFilter(MyWorkFilter.today),
           ),
         ],
       ),
@@ -344,22 +346,22 @@ class _StatRow extends StatelessWidget {
       error: (_, __) => const Row(
         children: [
           _StatCard(
-              label: 'Due today',
+              label: 'Total',
               value: '—',
-              color: AppColors.sky,
-              icon: Icons.today_rounded),
+              color: AppColors.primary,
+              icon: Icons.task_alt_rounded),
           SizedBox(width: AppSpacing.sm),
           _StatCard(
               label: 'Overdue',
               value: '—',
               color: AppColors.danger,
-              icon: Icons.error_rounded),
+              icon: Icons.warning_amber_rounded),
           SizedBox(width: AppSpacing.sm),
           _StatCard(
-              label: 'Done this week',
+              label: 'Due today',
               value: '—',
-              color: AppColors.success,
-              icon: Icons.check_circle_rounded),
+              color: AppColors.sky,
+              icon: Icons.today_rounded),
         ],
       ),
     );
@@ -482,7 +484,7 @@ class _NeedsAttention extends StatelessWidget {
                           style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: 2),
                       Text(
-                        'No tasks assigned to you are overdue or due today.',
+                        'No tasks are overdue or due today.',
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                     ],

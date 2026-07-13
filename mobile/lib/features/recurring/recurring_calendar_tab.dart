@@ -847,6 +847,65 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
     }
   }
 
+  Future<void> _confirmDeleteSubtask(Task task, int subIndex) async {
+    if (_busy) return;
+    final ti = _tasks.indexWhere((t) => t.id == task.id);
+    if (ti < 0 || subIndex < 0 || subIndex >= _tasks[ti].subtasks.length) {
+      return;
+    }
+    final title = _tasks[ti].subtasks[subIndex].title.trim();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete subtask'),
+        content: Text(
+          title.isEmpty
+              ? 'Remove this subtask from the checklist?'
+              : 'Remove "$title" from the checklist?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      await _deleteSubtask(task, subIndex);
+    }
+  }
+
+  Future<void> _deleteSubtask(Task task, int subIndex) async {
+    final ti = _tasks.indexWhere((t) => t.id == task.id);
+    if (ti < 0 || subIndex < 0 || subIndex >= _tasks[ti].subtasks.length) {
+      return;
+    }
+    final prevTask = _tasks[ti];
+    final subs = List<TaskSubtask>.from(prevTask.subtasks)..removeAt(subIndex);
+    setState(() {
+      _busy = true;
+      _tasks[ti] = prevTask.copyWith(subtasks: subs);
+    });
+    try {
+      await ref
+          .read(tasksRepositoryProvider)
+          .updateTask(taskId: task.id, subtasks: subs);
+      widget.onChanged();
+      _snack('Subtask deleted');
+    } catch (error) {
+      if (mounted) setState(() => _tasks[ti] = prevTask);
+      _snack('Could not delete subtask: ${_msg(error)}');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _markDone(Task task) async {
     final orgId = _orgId;
     if (orgId == null) return;
@@ -1275,6 +1334,7 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
                         subtask: task.subtasks[i],
                         onToggle: (value) => _toggleSubtask(task, i, value),
                         onEditNote: () => _editSubtaskNote(task, i),
+                        onDelete: () => _confirmDeleteSubtask(task, i),
                         enabled: !_busy,
                       ),
                   const SizedBox(height: 6),
@@ -1333,12 +1393,14 @@ class _SubtaskRow extends StatelessWidget {
     required this.subtask,
     required this.onToggle,
     required this.onEditNote,
+    required this.onDelete,
     required this.enabled,
   });
 
   final TaskSubtask subtask;
   final ValueChanged<bool> onToggle;
   final VoidCallback onEditNote;
+  final VoidCallback onDelete;
   final bool enabled;
 
   @override
@@ -1416,6 +1478,20 @@ class _SubtaskRow extends StatelessWidget {
                     color: hasNote ? AppColors.primary : AppColors.textMuted,
                   ),
                 ),
+                  IconButton(
+                    onPressed: enabled ? onDelete : null,
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    tooltip: 'Delete subtask',
+                    icon: Icon(
+                      Icons.delete_outline_rounded,
+                      size: 18,
+                      color: enabled
+                          ? AppColors.danger.withValues(alpha: 0.85)
+                          : AppColors.textMuted,
+                    ),
+                  ),
               ],
             ),
           ),

@@ -79,6 +79,12 @@ function isTaskReporter(task: TaskEntity, userId: string): boolean {
   return normalizedUserId === normalizeAssigneeUserId(task.reporterId);
 }
 
+function isRecurringTaskEntity(task: TaskEntity): boolean {
+  if (task.recurringTemplateId) return true;
+  const type = (task.recurrenceType ?? '').toUpperCase();
+  return type.length > 0 && type !== 'NONE';
+}
+
 function patchDtoKeys(dto: PatchTaskDto): string[] {
   return (Object.keys(dto) as (keyof PatchTaskDto)[]).filter((k) => dto[k] !== undefined);
 }
@@ -160,6 +166,277 @@ export class TasksService {
         ...(subtasksChanged ? { subtasks: nextSubtasks } : {}),
       });
     }
+  }
+
+  /**
+   * Workspace home dashboard: aggregates the same Total / Overdue style stats
+   * users see on each project board (across active projects), plus due-today
+   * and this week's completions. Planner/recurring runs stay out so numbers
+   * match the Projects tab.
+   */
+  async getHomeDashboard(_userId: string, organizationId: string) {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekAgo = new Date(todayStart);
+    weekAgo.setDate(weekAgo.getDate() - 6);
+    const weekEnd = new Date(todayStart);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+
+    const [tasks, projects] = await Promise.all([
+      this.tasksRepository.findForHomeDashboard(organizationId, weekAgo),
+      this.projectsService.findByOrganization(organizationId),
+    ]);
+
+    // Same population as project boards (active projects, no planner runs).
+    // Assignee-only filtering made Home show 0 while Projects showed Total/Overdue.
+    const scope = this.filterWorkspaceBoardTasks(tasks, projects);
+    const dateOnly = TasksService.dateOnly;
+
+    const isOverdueDue = (t: TaskEntity) => {
+      const due = dateOnly(t.dueDate);
+      return due != null && due < todayStart;
+    };
+    const isDueToday = (t: TaskEntity) => {
+      const due = dateOnly(t.dueDate);
+      return due != null && due.getTime() === todayStart.getTime();
+    };
+
+    // Match project boards: Total = all visible tasks; Overdue = past due date.
+    const overdueTasks = scope
+      .filter(isOverdueDue)
+      .sort(
+        (a, b) =>
+          dateOnly(a.dueDate)!.getTime() - dateOnly(b.dueDate)!.getTime(),
+      );
+    const dueTodayTasks = scope.filter(
+      (t) => isDueToday(t) && !t.completedAt,
+    );
+    const open = scope.filter((t) => !t.completedAt);
+    const dueThisWeek = open.filter((t) => {
+      const due = dateOnly(t.dueDate);
+      return due != null && due >= todayStart && due < weekEnd;
+    }).length;
+
+    const completedRecently = scope.filter(
+      (t) => t.completedAt && new Date(t.completedAt) >= weekAgo,
+    );
+
+    const trendMap = new Map<string, number>();
+    for (let i = 0; i < 7; i += 1) {
+      const d = new Date(weekAgo);
+      d.setDate(weekAgo.getDate() + i);
+      trendMap.set(this.ymd(d), 0);
+    }
+    for (const t of completedRecently) {
+      const key = this.ymd(new Date(t.completedAt as Date));
+      if (trendMap.has(key)) trendMap.set(key, (trendMap.get(key) ?? 0) + 1);
+    }
+    const weeklyTrend = Array.from(trendMap.entries()).map(([date, count]) => ({
+      date,
+      count,
+    }));
+
+    // Needs-attention list: incomplete overdue + due today (actionable).
+    const attentionOverdue = overdueTasks.filter((t) => !t.completedAt);
+    const attentionDueToday = dueTodayTasks;
+
+    return {
+      counts: {
+        dueToday: dueTodayTasks.length,
+        overdue: overdueTasks.length,
+        dueThisWeek,
+        completedThisWeek: completedRecently.length,
+        openAssigned: open.length,
+        total: scope.length,
+      },
+      weeklyTrend,
+      overdueTasks: attentionOverdue.slice(0, 5),
+      dueTodayTasks: attentionDueToday.slice(0, 5),
+    };
+  }
+
+  private ymd(d: Date): string {
+    const m = `${d.getMonth() + 1}`.padStart(2, '0');
+    const day = `${d.getDate()}`.padStart(2, '0');
+    return `${d.getFullYear()}-${m}-${day}`;
+  }
+
+  private static dateOnly(
+    value: Date | string | null | undefined,
+  ): Date | null {
+    if (!value) return null;
+    const d = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(d.getTime())) return null;
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  /** Active-project, non-planner tasks — same population as project boards. */
+  private filterWorkspaceBoardTasks(
+    tasks: TaskEntity[],
+    projects: Array<{ id: string; isArchived?: boolean }>,
+  ): TaskEntity[] {
+    const archived = new Set(
+      projects
+        .filter((p) => p.isArchived)
+        .map((p) => normalizeAssigneeUserId(p.id))
+        .filter((id): id is string => !!id),
+    );
+    return tasks.filter((t) => {
+      if (isRecurringTaskEntity(t)) return false;
+      const projId = normalizeAssigneeUserId(t.projectId);
+      if (projId && archived.has(projId)) return false;
+      return true;
+    });
+  }
+
+  private filterMineExcludingArchived(
+    tasks: TaskEntity[],
+    projects: Array<{ id: string; isArchived?: boolean }>,
+    userId: string,
+  ): TaskEntity[] {
+    const target = normalizeAssigneeUserId(userId);
+    if (!target) return [];
+    const archived = new Set(
+      projects
+        .filter((p) => p.isArchived)
+        .map((p) => normalizeAssigneeUserId(p.id))
+        .filter((id): id is string => !!id),
+    );
+    return tasks.filter((t) => {
+      if (isRecurringTaskEntity(t)) return false;
+      const projId = normalizeAssigneeUserId(t.projectId);
+      if (projId && archived.has(projId)) return false;
+      return taskAssigneeUserIds(t).includes(target);
+    });
+  }
+
+  /**
+   * Filterable, paginated "My Work" list across projects.
+   */
+  async getMyTasks(
+    userId: string,
+    organizationId: string,
+    filter: 'overdue' | 'today' | 'week' | 'completed' | 'open' | 'all',
+    page = 1,
+    limit = 20,
+  ): Promise<{
+    data: TaskEntity[];
+    meta: { page: number; limit: number; total: number; totalPages: number };
+    counts: {
+      overdue: number;
+      today: number;
+      week: number;
+      completed: number;
+      open: number;
+      all: number;
+    };
+  }> {
+    const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+    const safeLimit =
+      Number.isFinite(limit) && limit > 0 ? Math.min(Math.floor(limit), 50) : 20;
+
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekEnd = new Date(todayStart);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    const completedSince = new Date(todayStart);
+    completedSince.setDate(completedSince.getDate() - 30);
+
+    const [tasks, projects] = await Promise.all([
+      this.tasksRepository.findForHomeDashboard(organizationId, completedSince),
+      this.projectsService.findByOrganization(organizationId),
+    ]);
+
+    // Match Home/project boards: show workspace tasks, not only assignee matches.
+    // (Many tasks have no assignee — assignee-only made Tasks look empty.)
+    const mine = this.filterMineExcludingArchived(tasks, projects, userId);
+    const workspace = this.filterWorkspaceBoardTasks(tasks, projects);
+    const scope = mine.length > 0 ? mine : workspace;
+    const dateOnly = TasksService.dateOnly;
+
+    const open = scope.filter((t) => !t.completedAt);
+    const isOverdue = (t: TaskEntity) => {
+      const due = dateOnly(t.dueDate);
+      return due != null && due < todayStart;
+    };
+    const isToday = (t: TaskEntity) => {
+      const due = dateOnly(t.dueDate);
+      return due != null && due.getTime() === todayStart.getTime();
+    };
+    const isWeek = (t: TaskEntity) => {
+      const due = dateOnly(t.dueDate);
+      return due != null && due >= todayStart && due < weekEnd;
+    };
+    const isCompleted = (t: TaskEntity) =>
+      !!t.completedAt && new Date(t.completedAt) >= completedSince;
+
+    const overdue = open.filter(isOverdue);
+    // Overdue chip should match project-board overdue (past due), including
+    // completed-with-past-due when nothing is assignee-scoped.
+    const overdueAll = scope.filter(isOverdue);
+    const today = open.filter(isToday);
+    const week = open.filter(isWeek);
+    const completed = scope.filter(isCompleted);
+
+    const counts = {
+      overdue: mine.length > 0 ? overdue.length : overdueAll.length,
+      today: today.length,
+      week: week.length,
+      completed: completed.length,
+      open: open.length,
+      all: open.length + completed.length,
+    };
+
+    const byDueAsc = (a: TaskEntity, b: TaskEntity) => {
+      const da = dateOnly(a.dueDate);
+      const db = dateOnly(b.dueDate);
+      if (da && db) return da.getTime() - db.getTime();
+      if (da) return -1;
+      if (db) return 1;
+      return 0;
+    };
+
+    let selected: TaskEntity[];
+    switch (filter) {
+      case 'overdue':
+        selected = (mine.length > 0 ? overdue : overdueAll).sort(byDueAsc);
+        break;
+      case 'today':
+        selected = today.sort(byDueAsc);
+        break;
+      case 'week':
+        selected = week.sort(byDueAsc);
+        break;
+      case 'completed':
+        selected = completed.sort(
+          (a, b) =>
+            new Date(b.completedAt as Date).getTime() -
+            new Date(a.completedAt as Date).getTime(),
+        );
+        break;
+      case 'all':
+        selected = [...open.sort(byDueAsc), ...completed];
+        break;
+      case 'open':
+      default:
+        selected = open.sort(byDueAsc);
+        break;
+    }
+
+    const total = selected.length;
+    const start = (safePage - 1) * safeLimit;
+    const data = selected.slice(start, start + safeLimit);
+
+    return {
+      data,
+      meta: {
+        page: safePage,
+        limit: safeLimit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / safeLimit)),
+      },
+      counts,
+    };
   }
 
   async findByProject(

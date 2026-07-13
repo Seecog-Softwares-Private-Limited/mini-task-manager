@@ -532,6 +532,70 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     }
   }
 
+  Future<void> _confirmDeleteSubtask(int index) async {
+    if (!_canEditSubtasks() || _saving || _savingSubtaskIndex != null) return;
+    if (index < 0 || index >= _subtasks.length) return;
+    final title = _subtasks[index].title.trim();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete subtask'),
+        content: Text(
+          title.isEmpty
+              ? 'Remove this subtask? This cannot be undone.'
+              : 'Remove "$title"? This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      await _deleteSubtask(index);
+    }
+  }
+
+  Future<void> _deleteSubtask(int index) async {
+    if (!_canEditSubtasks() || _saving || _savingSubtaskIndex != null) return;
+    if (index < 0 || index >= _subtasks.length) return;
+    final updated = List<TaskSubtask>.from(_subtasks)..removeAt(index);
+    setState(() {
+      _subtasks = updated;
+      _savingSubtaskIndex = index;
+      _expandedSubtaskIndex = null;
+      _error = null;
+    });
+    try {
+      final saved = await ref.read(tasksRepositoryProvider).updateTask(
+            taskId: _task.id,
+            subtasks: updated,
+          );
+      if (!mounted) return;
+      setState(() {
+        _task = saved;
+        _subtasks = List.of(saved.subtasks);
+      });
+      widget.onUpdated();
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.message;
+          _subtasks = List.of(_task.subtasks);
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _savingSubtaskIndex = null);
+    }
+  }
+
   Future<void> _run(Future<Task> Function() action) async {
     setState(() {
       _saving = true;
@@ -916,6 +980,9 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                         },
                         onAssigneesChanged: (ids) =>
                             _quickUpdateSubtaskAssignees(index, ids),
+                        onDelete: canEditSubtasks
+                            ? () => _confirmDeleteSubtask(index)
+                            : null,
                       ),
                       if (expanded)
                         Padding(
@@ -948,6 +1015,9 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                                     ),
                                 onCancel: () => _cancelSubtaskEdit(index),
                                 onSave: (draft) => _saveSubtask(index, draft),
+                                onDelete: canEditSubtasks
+                                    ? () => _confirmDeleteSubtask(index)
+                                    : null,
                               ),
                             ),
                           ),

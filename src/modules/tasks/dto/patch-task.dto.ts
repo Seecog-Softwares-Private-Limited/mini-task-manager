@@ -2,6 +2,7 @@ import {
   Allow,
   IsArray,
   IsBoolean,
+  IsObject,
   IsString,
   IsIn,
   IsInt,
@@ -102,6 +103,28 @@ class PatchTaskSubtaskDto {
   @IsString()
   @MaxLength(10000)
   description?: string;
+
+  /** Audit fields preserved server-side; accepted so clients may echo them back. */
+  @IsOptional()
+  @Transform(emptyStrToUndef)
+  @ValidateIf((_o, v) => v != null && v !== '')
+  @IsString()
+  @MaxLength(100)
+  reporterId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  createdAt?: string;
+
+  @IsOptional()
+  @IsObject()
+  completionRecord?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  note?: string;
 }
 
 class PatchTaskTagDto {

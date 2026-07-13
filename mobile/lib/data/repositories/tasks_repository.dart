@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/api_exception.dart';
+import '../models/home_dashboard.dart';
+import '../models/my_tasks.dart';
 import '../models/paginated_result.dart';
 import '../models/task_attachment.dart';
 import '../models/task_comment.dart';
@@ -12,16 +14,49 @@ class TasksRepository {
 
   final ApiClient _api;
 
+  Future<HomeDashboard> fetchHomeDashboard({
+    required String organizationId,
+  }) async {
+    try {
+      final response = await _api.dio.get<Map<String, dynamic>>(
+        '/tasks/home',
+        options: _api.withOrgHeader(organizationId),
+      );
+      return HomeDashboard.fromJson(response.data ?? const {});
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<MyTasksResult> fetchMyTasks({
+    required String organizationId,
+    required String filter,
+    int page = 1,
+    int limit = 50,
+  }) async {
+    try {
+      final response = await _api.dio.get<Map<String, dynamic>>(
+        '/tasks/my',
+        queryParameters: {'filter': filter, 'page': page, 'limit': limit},
+        options: _api.withOrgHeader(organizationId),
+      );
+      return MyTasksResult.fromJson(response.data ?? const {});
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
   Future<PaginatedResult<Task>> fetchByProject({
     required String projectId,
     required String organizationId,
     int page = 1,
     int limit = 100,
   }) async {
+    final safeLimit = limit.clamp(1, 100);
     try {
       final response = await _api.dio.get<Map<String, dynamic>>(
         '/tasks/project/$projectId',
-        queryParameters: {'page': page, 'limit': limit},
+        queryParameters: {'page': page, 'limit': safeLimit},
         options: _api.withOrgHeader(organizationId),
       );
       final body = response.data ?? const {};
@@ -39,6 +74,32 @@ class TasksRepository {
     } on DioException catch (error) {
       throw ApiException.fromDio(error);
     }
+  }
+
+  /// Pages through a project (API max limit is 100) until all tasks are loaded.
+  Future<List<Task>> fetchAllByProject({
+    required String projectId,
+    required String organizationId,
+  }) async {
+    const pageSize = 100;
+    final all = <Task>[];
+    var page = 1;
+    while (true) {
+      final result = await fetchByProject(
+        projectId: projectId,
+        organizationId: organizationId,
+        page: page,
+        limit: pageSize,
+      );
+      all.addAll(result.data);
+      final exhausted = result.data.length < pageSize ||
+          !result.meta.hasNext ||
+          all.length >= result.meta.total;
+      if (exhausted || result.data.isEmpty) break;
+      page += 1;
+      if (page > 50) break; // safety cap
+    }
+    return all;
   }
 
   Future<Task> fetchTask(String taskId) async {
@@ -144,6 +205,9 @@ class TasksRepository {
                 if (s.statusId != null) 'statusId': s.statusId,
                 if (s.completionRecord != null)
                   'completionRecord': s.completionRecord!.toJson(),
+                if (s.reporterId != null) 'reporterId': s.reporterId,
+                if (s.createdAt != null) 'createdAt': s.createdAt,
+                if (s.note != null && s.note!.isNotEmpty) 'note': s.note,
               },
             )
             .toList();
@@ -163,6 +227,14 @@ class TasksRepository {
     required String? statusId,
   }) async {
     return updateTask(taskId: taskId, statusId: statusId);
+  }
+
+  Future<void> deleteTask(String taskId) async {
+    try {
+      await _api.dio.delete<void>('/tasks/$taskId');
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
   }
 
   Future<List<TaskComment>> fetchComments(String taskId) async {
