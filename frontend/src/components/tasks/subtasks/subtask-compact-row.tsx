@@ -7,6 +7,7 @@ import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-sel
 import { SubtaskDueDatePicker } from "@/components/tasks/subtask-due-date-picker";
 import { SubtaskStatusSelector } from "@/components/tasks/subtask-status-selector";
 import type { SubtaskStatus } from "@/lib/subtask-status";
+import { getSubtaskRowClassName } from "@/lib/subtask-row-style";
 import type { OrgMember } from "@/types/api";
 import { getSubtaskAssigneeIds } from "@/lib/subtask-assignees";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -18,6 +19,7 @@ interface SubtaskCompactRowProps {
   completed: boolean;
   status?: SubtaskStatus | string;
   dueDate?: string;
+  dueTime?: string;
   assigneeId?: string;
   assigneeIds?: string[];
   projectId: string;
@@ -41,6 +43,7 @@ export function SubtaskCompactRow({
   completed,
   status,
   dueDate,
+  dueTime,
   assigneeId,
   assigneeIds,
   projectId,
@@ -65,8 +68,8 @@ export function SubtaskCompactRow({
   return (
     <div
       className={cn(
-        "group flex items-center gap-2 rounded-xl border border-border/50 bg-background/60 px-3 py-2.5 shadow-sm transition-all",
-        expanded && "border-primary/30 bg-primary/[0.03] ring-1 ring-primary/15",
+        "group flex items-center gap-2 rounded-xl border px-3 py-2.5 shadow-sm transition-all",
+        getSubtaskRowClassName({ status, completed, dueDate, dueTime, expanded }),
         completed && "opacity-75"
       )}
     >

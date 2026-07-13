@@ -28,6 +28,7 @@ import {
   subtaskWithCompleted,
   type SubtaskStatus,
 } from "@/lib/subtask-status";
+import { getSubtaskRowClassName } from "@/lib/subtask-row-style";
 import {
   SubtaskPrioritySelector,
   resolveSubtaskPriority,
@@ -445,8 +446,15 @@ export function SubtasksEditor({
               <li key={field.id}>
                 <div
                   className={cn(
-                    "group flex items-center gap-1.5 rounded-md border border-border/45 bg-background/80 px-1.5 py-1 transition-all duration-200 hover:border-border/70 hover:bg-muted/20",
-                    isEditingThis && "border-violet-500/25 bg-violet-500/[0.04]",
+                    "group flex items-center gap-1.5 rounded-md border px-1.5 py-1 transition-all duration-200 hover:opacity-95",
+                    getSubtaskRowClassName({
+                      status: resolveSubtaskStatus(value ?? { completed: false }),
+                      completed,
+                      dueDate: value?.dueDate,
+                      dueTime: value?.dueTime,
+                      expanded: isEditingThis,
+                    }),
+                    isEditingThis && "ring-1 ring-violet-500/20",
                     completed && "opacity-75"
                   )}
                 >

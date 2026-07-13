@@ -1386,6 +1386,7 @@ export function TaskDetailModal({
                               completed={resolveSubtaskStatus(item) === "DONE"}
                               status={resolveSubtaskStatus(item)}
                               dueDate={item.dueDate}
+                              dueTime={item.dueTime}
                               assigneeId={item.assigneeId}
                               assigneeIds={item.assigneeIds}
                               projectId={projectId}

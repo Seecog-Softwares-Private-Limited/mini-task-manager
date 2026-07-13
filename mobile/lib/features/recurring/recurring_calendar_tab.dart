@@ -12,6 +12,7 @@ import '../../data/models/workflow.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../auth/session_controller.dart';
 import '../kanban/kanban_providers.dart';
+import '../kanban/subtask_row_style.dart';
 import '../kanban/task_detail_sheet.dart';
 import 'recurring_providers.dart';
 
@@ -1345,49 +1346,56 @@ class _SubtaskRow extends StatelessWidget {
     final completed = subtask.completed;
     final note = subtask.note?.trim();
     final hasNote = note != null && note.isNotEmpty;
+    final rowStyle = subtaskRowStyle(subtask);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: enabled ? () => onToggle(!completed) : null,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                SizedBox(
-                  width: 28,
-                  height: 28,
-                  child: Checkbox(
-                    value: completed,
+        Container(
+          decoration: BoxDecoration(
+            color: rowStyle.backgroundColor,
+            border: Border.all(color: rowStyle.borderColor),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: enabled ? () => onToggle(!completed) : null,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: Checkbox(
+                      value: completed,
+                      visualDensity: VisualDensity.compact,
+                      activeColor: AppColors.success,
+                      onChanged:
+                          enabled ? (value) => onToggle(value ?? false) : null,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      subtask.title,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: completed
+                                ? AppColors.textMuted
+                                : AppColors.textPrimary,
+                            decoration:
+                                completed ? TextDecoration.lineThrough : null,
+                          ),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: enabled ? onEditNote : null,
                     visualDensity: VisualDensity.compact,
-                    activeColor: AppColors.success,
-                    onChanged:
-                        enabled ? (value) => onToggle(value ?? false) : null,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    subtask.title,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: completed
-                              ? AppColors.textMuted
-                              : AppColors.textPrimary,
-                          decoration:
-                              completed ? TextDecoration.lineThrough : null,
-                        ),
-                  ),
-                ),
-                IconButton(
-                  onPressed: enabled ? onEditNote : null,
-                  visualDensity: VisualDensity.compact,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                  tooltip: hasNote ? 'Edit note' : 'Add note',
-                  icon: Icon(
-                    hasNote
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    tooltip: hasNote ? 'Edit note' : 'Add note',
+                    icon: Icon(
+                      hasNote
                         ? Icons.sticky_note_2_rounded
                         : Icons.note_add_outlined,
                     size: 18,
@@ -1397,6 +1405,7 @@ class _SubtaskRow extends StatelessWidget {
               ],
             ),
           ),
+        ),
         ),
         if (hasNote)
           Padding(

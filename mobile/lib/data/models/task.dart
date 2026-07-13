@@ -12,6 +12,7 @@ class TaskSubtask {
     this.assigneeId,
     this.assigneeIds = const [],
     this.dueDate,
+    this.dueTime,
     this.status,
     this.priority,
     this.statusId,
@@ -28,6 +29,7 @@ class TaskSubtask {
   final String? assigneeId;
   final List<String> assigneeIds;
   final String? dueDate;
+  final String? dueTime;
   final String? status;
   final String? priority;
   final String? statusId;
@@ -46,6 +48,7 @@ class TaskSubtask {
       assigneeId: _nullableString(json['assigneeId']),
       assigneeIds: _parseStringList(json['assigneeIds']),
       dueDate: _nullableDateString(json['dueDate']),
+      dueTime: _nullableString(json['dueTime']),
       status: _nullableString(json['status']),
       priority: _nullableString(json['priority']),
       statusId: _nullableString(json['statusId']),
@@ -66,6 +69,7 @@ class TaskSubtask {
     String? assigneeId,
     List<String>? assigneeIds,
     String? dueDate,
+    String? dueTime,
     String? status,
     String? priority,
     String? statusId,
@@ -84,6 +88,7 @@ class TaskSubtask {
       assigneeId: assigneeId ?? this.assigneeId,
       assigneeIds: assigneeIds ?? this.assigneeIds,
       dueDate: dueDate ?? this.dueDate,
+      dueTime: dueTime ?? this.dueTime,
       status: status ?? this.status,
       priority: priority ?? this.priority,
       statusId: statusId ?? this.statusId,

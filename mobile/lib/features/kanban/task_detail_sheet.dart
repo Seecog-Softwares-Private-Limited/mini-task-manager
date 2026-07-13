@@ -24,6 +24,7 @@ import '../projects/projects_providers.dart';
 import 'subtask_completion_sheet.dart';
 import 'subtask_completion_utils.dart';
 import 'subtask_detail_panel.dart';
+import 'subtask_row_style.dart';
 import 'attachment_picker_section.dart';
 import 'attachment_preview.dart';
 import 'assignee_picker_sheet.dart';
@@ -857,12 +858,15 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                   final expanded = _expandedSubtaskIndex == index;
                   final displayTitle =
                       item.title.trim().isEmpty ? 'New subtask' : item.title;
+                  final rowStyle = subtaskRowStyle(item, expanded: expanded);
                   return Container(
                     margin: const EdgeInsets.only(bottom: AppSpacing.sm),
                     decoration: BoxDecoration(
                       border: Border.all(
-                        color: expanded ? AppColors.primary : AppColors.border,
+                        color: rowStyle.borderColor,
+                        width: expanded ? 1.5 : 1,
                       ),
+                      color: rowStyle.backgroundColor,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(

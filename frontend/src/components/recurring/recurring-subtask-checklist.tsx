@@ -17,6 +17,7 @@ import {
   getOccurrenceSubtaskProgress,
 } from "@/lib/recurring-subtask-utils";
 import { resolveSubtaskStatus, subtaskWithCompleted } from "@/lib/subtask-status";
+import { getSubtaskRowClassName } from "@/lib/subtask-row-style";
 import { EXEC_PLANNER } from "@/lib/executive-planner-theme";
 import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-selector";
 import { withSubtaskAssignees } from "@/lib/subtask-assignees";
@@ -208,8 +209,14 @@ export function RecurringSubtaskChecklist({
                 <li
                   key={s.id}
                   className={cn(
-                    "flex items-start gap-2.5 rounded-lg border border-border/35 bg-background/70 px-2.5 py-2 transition-all duration-200",
-                    done && "opacity-80 bg-emerald-500/5"
+                    "flex items-start gap-2.5 rounded-lg border px-2.5 py-2 transition-all duration-200",
+                    getSubtaskRowClassName({
+                      status: resolveSubtaskStatus(s),
+                      completed: done,
+                      dueDate: s.dueDate,
+                      dueTime: s.dueTime,
+                    }),
+                    done && "opacity-80"
                   )}
                 >
                   <input
