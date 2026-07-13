@@ -199,14 +199,23 @@ function parseTaskDueDate(iso?: string | null): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-/** Compare due date to today in local time (avoids UTC off-by-one). */
-function isTaskDueDateOverdue(iso?: string | null): boolean {
+/** Compare due date (+ optional HH:mm) to now in local time. */
+function isTaskDueDateOverdue(iso?: string | null, dueTime?: string | null): boolean {
   if (!iso) return false;
   const match = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
   const due = match
     ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
     : new Date(iso);
   if (Number.isNaN(due.getTime())) return false;
+
+  const timeMatch = dueTime
+    ? String(dueTime).match(/^([01]\d|2[0-3]):([0-5]\d)/)
+    : null;
+  if (timeMatch) {
+    due.setHours(Number(timeMatch[1]), Number(timeMatch[2]), 0, 0);
+    return due.getTime() < Date.now();
+  }
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   due.setHours(0, 0, 0, 0);
@@ -885,7 +894,7 @@ export function TaskDetailModal({
 
   const isOverdue =
     Boolean(task?.dueDate) &&
-    isTaskDueDateOverdue(task?.dueDate) &&
+    isTaskDueDateOverdue(task?.dueDate, task?.dueTime) &&
     task?.statusId !== statuses.find((s) => s.type === "DONE")?.id;
   const selectedPriority =
     PRIORITIES.find((pr) => pr.value === (task?.priority ?? "").toUpperCase()) ?? PRIORITIES[1];
@@ -1420,10 +1429,10 @@ export function TaskDetailModal({
                                   )
                                 );
                               }}
-                              onDueDateChange={(dueDate) => {
+                              onDueDateChange={(dueDate, dueTime) => {
                                 updateSubtasksMutation.mutate(
                                   checklist.map((i) =>
-                                    i.id === item.id ? { ...i, dueDate } : i
+                                    i.id === item.id ? { ...i, dueDate, dueTime } : i
                                   )
                                 );
                               }}
@@ -1460,6 +1469,7 @@ export function TaskDetailModal({
                                   assigneeId: item.assigneeId,
                                   assigneeIds: item.assigneeIds ?? getSubtaskAssigneeIds(item),
                                   dueDate: item.dueDate,
+                                  dueTime: item.dueTime,
                                   status: resolveSubtaskStatus(item),
                                   priority: item.priority,
                                 }}
@@ -1920,44 +1930,70 @@ export function TaskDetailModal({
                         </Label>
 
                         {canEditAll ? (
-                          <label
-                            htmlFor="task-detail-due-date"
-                            className={cn(
-                              "relative block cursor-pointer",
-                              (updateMutation.isPending || !canEditAll) && "cursor-default"
-                            )}
-                          >
-                            <Input
-                              id="task-detail-due-date"
-                              type="date"
-                              disabled={updateMutation.isPending}
-                              value={taskDueDateToInputValue(task.dueDate)}
-                              onChange={(e) => {
-                                const v = e.target.value;
-                                updateMutation.mutate({ dueDate: v ? v : null });
-                              }}
-                              className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
-                              aria-label="Due date"
-                            />
-                            <div
+                          <div className="space-y-2">
+                            <label
+                              htmlFor="task-detail-due-date"
                               className={cn(
-                                "pointer-events-none flex h-11 w-full items-center gap-3 rounded-xl border px-3.5 transition-colors",
-                                isOverdue && task.dueDate
-                                  ? "border-destructive/30 bg-destructive/[0.04]"
-                                  : "border-[#E5E7EB] bg-white dark:border-border dark:bg-white/[0.06]"
+                                "relative block cursor-pointer",
+                                updateMutation.isPending && "cursor-default"
                               )}
                             >
-                              <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                              <span
+                              <Input
+                                id="task-detail-due-date"
+                                type="date"
+                                disabled={updateMutation.isPending}
+                                value={taskDueDateToInputValue(task.dueDate)}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  updateMutation.mutate({
+                                    dueDate: v ? v : null,
+                                    dueTime: v ? task.dueTime ?? null : null,
+                                  });
+                                }}
+                                className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+                                aria-label="Due date"
+                              />
+                              <div
                                 className={cn(
-                                  "min-w-0 flex-1 truncate text-sm font-medium",
-                                  task.dueDate ? "text-foreground" : "text-muted-foreground"
+                                  "pointer-events-none flex h-11 w-full items-center gap-3 rounded-xl border px-3.5 transition-colors",
+                                  isOverdue && task.dueDate
+                                    ? "border-destructive/30 bg-destructive/[0.04]"
+                                    : "border-[#E5E7EB] bg-white dark:border-border dark:bg-white/[0.06]"
                                 )}
                               >
-                                {formatTaskDueDatePrimary(task.dueDate)}
-                              </span>
-                            </div>
-                          </label>
+                                <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                                <span
+                                  className={cn(
+                                    "min-w-0 flex-1 truncate text-sm font-medium",
+                                    task.dueDate ? "text-foreground" : "text-muted-foreground"
+                                  )}
+                                >
+                                  {formatTaskDueDatePrimary(task.dueDate)}
+                                </span>
+                              </div>
+                            </label>
+                            {task.dueDate ? (
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="time"
+                                  disabled={updateMutation.isPending}
+                                  value={
+                                    task.dueTime &&
+                                    /^([01]\d|2[0-3]):[0-5]\d/.test(task.dueTime)
+                                      ? task.dueTime.slice(0, 5)
+                                      : ""
+                                  }
+                                  onChange={(e) => {
+                                    updateMutation.mutate({
+                                      dueTime: e.target.value || null,
+                                    });
+                                  }}
+                                  className="h-11 rounded-xl border-[#E5E7EB] bg-white text-sm dark:border-border dark:bg-white/[0.06]"
+                                  aria-label="Due time (optional)"
+                                />
+                              </div>
+                            ) : null}
+                          </div>
                         ) : (
                           <div
                             className={cn(
@@ -1969,14 +2005,25 @@ export function TaskDetailModal({
                           >
                             <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                             <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">
-                              {task.dueDate ? formatTaskDueDatePrimary(task.dueDate) : "No date selected"}
+                              {task.dueDate
+                                ? [
+                                    formatTaskDueDatePrimary(task.dueDate),
+                                    task.dueTime ? task.dueTime.slice(0, 5) : null,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" · ")
+                                : "No date selected"}
                             </span>
                           </div>
                         )}
 
                         {task.dueDate ? (
                           <div className="flex items-center justify-between gap-3">
-                            <p className="text-xs text-muted-foreground">{formatTaskDueDateHelper(task.dueDate)}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {[formatTaskDueDateHelper(task.dueDate), task.dueTime?.slice(0, 5)]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </p>
                             {canEditAll ? (
                               <Button
                                 type="button"
@@ -1984,7 +2031,9 @@ export function TaskDetailModal({
                                 size="sm"
                                 className="h-7 shrink-0 rounded-lg px-2 text-xs font-normal text-muted-foreground hover:text-foreground"
                                 disabled={updateMutation.isPending}
-                                onClick={() => updateMutation.mutate({ dueDate: null })}
+                                onClick={() =>
+                                  updateMutation.mutate({ dueDate: null, dueTime: null })
+                                }
                               >
                                 Clear
                               </Button>

@@ -436,6 +436,13 @@ export class TasksService {
       dto.statusId,
     );
 
+    const dueDate = dto.dueDate ? String(dto.dueDate).slice(0, 10) : null;
+    const dueTimeRaw = typeof dto.dueTime === 'string' ? dto.dueTime.trim() : '';
+    const dueTime =
+      dueDate && /^([01]\d|2[0-3]):[0-5]\d/.test(dueTimeRaw)
+        ? dueTimeRaw.slice(0, 5)
+        : null;
+
     const task = await this.tasksRepository.create({
       projectId,
       organizationId,
@@ -446,7 +453,8 @@ export class TasksService {
       priority: dto.priority ?? 'MEDIUM',
       assigneeId: assigneeIds[0] ?? dto.assigneeId ?? null,
       assigneeIds: assigneeIds.length ? assigneeIds : null,
-      dueDate: dto.dueDate ? (String(dto.dueDate).slice(0, 10) as unknown as Date) : null,
+      dueDate: dueDate ? (dueDate as unknown as Date) : null,
+      dueTime,
       storyPoints: dto.storyPoints ?? null,
       subtasks: normalizedSubtasks.length ? normalizedSubtasks : null,
       parentTaskId: dto.parentTaskId ?? null,
@@ -470,6 +478,7 @@ export class TasksService {
         subtasks: dto.subtasks,
         tags: tags.length ? tags : null,
         dueDate: dto.dueDate ? String(dto.dueDate).slice(0, 10) : null,
+        dueTime: dueTime ?? null,
         recurrence: dto.recurrence,
       });
     }
@@ -526,11 +535,22 @@ export class TasksService {
     if (dto.dueDate !== undefined) {
       if (dto.dueDate === null || dto.dueDate === '') {
         patch.dueDate = null;
+        patch.dueTime = null;
       } else {
         // MySQL `DATE`: use calendar YYYY-MM-DD string. JS `Date` from "YYYY-MM-DD" is UTC midnight and
         // can produce driver/sql errors or off-by-one days vs local date pickers.
         const ymd = String(dto.dueDate).slice(0, 10);
         patch.dueDate = ymd as unknown as Date;
+      }
+    }
+    if (dto.dueTime !== undefined) {
+      if (dto.dueTime === null || dto.dueTime === '') {
+        patch.dueTime = null;
+      } else if (patch.dueDate !== null || (patch.dueDate === undefined && task.dueDate)) {
+        const raw = String(dto.dueTime).trim();
+        patch.dueTime = /^([01]\d|2[0-3]):[0-5]\d/.test(raw) ? raw.slice(0, 5) : null;
+      } else {
+        patch.dueTime = null;
       }
     }
     if (dto.priority !== undefined) {
@@ -750,6 +770,7 @@ export class TasksService {
       assigneeId?: string;
       assigneeIds?: string[];
       dueDate?: string;
+      dueTime?: string;
       priority?: string;
       status?: string;
       statusId?: string;
@@ -770,6 +791,7 @@ export class TasksService {
     assigneeId?: string;
     assigneeIds?: string[];
     dueDate?: string;
+    dueTime?: string;
     status: 'TODO' | 'IN_PROGRESS' | 'DONE';
     priority?: string;
     statusId?: string;
@@ -796,6 +818,12 @@ export class TasksService {
         const reporterId =
           prior?.reporterId ?? s.reporterId ?? context?.currentUserId ?? undefined;
         const createdAt = prior?.createdAt ?? s.createdAt ?? nowIso;
+        const dueDate = s.dueDate ? String(s.dueDate).slice(0, 10) : undefined;
+        const dueTimeRaw = typeof s.dueTime === 'string' ? s.dueTime.trim() : '';
+        const dueTime =
+          dueDate && /^([01]\d|2[0-3]):[0-5]\d/.test(dueTimeRaw)
+            ? dueTimeRaw.slice(0, 5)
+            : undefined;
         return {
           id: s.id ?? generateUuid(),
           title: s.title?.trim() ?? '',
@@ -803,7 +831,8 @@ export class TasksService {
           status,
           ...(description ? { description } : {}),
           ...assignees,
-          dueDate: s.dueDate ? String(s.dueDate).slice(0, 10) : undefined,
+          ...(dueDate ? { dueDate } : {}),
+          ...(dueTime ? { dueTime } : {}),
           ...(s.priority ? { priority: s.priority } : {}),
           ...(s.statusId ? { statusId: s.statusId } : {}),
           ...(s.completionRecord && typeof s.completionRecord === 'object'

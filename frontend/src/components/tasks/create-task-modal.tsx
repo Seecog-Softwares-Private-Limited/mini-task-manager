@@ -131,6 +131,12 @@ const schema = z.object({
     .refine((value) => !value || !Number.isNaN(Date.parse(value)), {
       message: "Due date must be a valid date",
     }),
+  dueTime: z
+    .string()
+    .optional()
+    .refine((value) => !value || /^([01]\d|2[0-3]):[0-5]\d$/.test(value), {
+      message: "Due time must be HH:mm",
+    }),
   labels: z
     .array(
       z.object({
@@ -233,6 +239,7 @@ export function CreateTaskModal({
       assigneeIds: [],
       storyPoints: undefined,
       dueDate: "",
+      dueTime: "",
       labels: [],
       subtasks: [],
       recurrence: initialRecurrence,
@@ -302,6 +309,7 @@ export function CreateTaskModal({
         assigneeIds: [],
         storyPoints: undefined,
         dueDate: "",
+        dueTime: "",
         labels: [],
         subtasks: [],
         recurrence: initialRecurrence,
@@ -334,10 +342,28 @@ export function CreateTaskModal({
       });
       return;
     }
+    const formDueTime =
+      data.dueDate && data.dueTime?.trim()
+        ? data.dueTime.trim().slice(0, 5)
+        : undefined;
+    const submitData: CreateTaskFormData =
+      showRecurrence &&
+      data.recurrence?.repeat &&
+      data.recurrence.repeat !== "NONE" &&
+      formDueTime
+        ? {
+            ...data,
+            recurrence: {
+              ...data.recurrence,
+              dueTime: formDueTime,
+              dueLogic: data.recurrence.dueLogic ?? "DUE_TIME",
+            },
+          }
+        : data;
     const imageFiles = descriptionFieldRef.current?.getPendingImageFiles() ?? [];
     const hasSubtaskFiles = Object.values(pendingSubtaskAttachments).some((list) => list.length > 0);
     onSubmit(
-      data,
+      submitData,
       imageFiles.length ? imageFiles : undefined,
       hasSubtaskFiles ? pendingSubtaskAttachments : undefined,
       pendingTaskAttachments.length ? pendingTaskAttachments : undefined
@@ -584,10 +610,12 @@ export function CreateTaskModal({
                       render={({ field }) => (
                         <DueDateField
                           value={field.value}
+                          dueTime={watch("dueTime")}
                           onChange={field.onChange}
+                          onDueTimeChange={(time) => setValue("dueTime", time)}
                           disabled={isSubmitting}
                           label="First run date"
-                          hint="Anchor date — the series repeats from here."
+                          hint="Anchor date — the series repeats from here. Time is optional."
                         />
                       )}
                     />
@@ -847,14 +875,16 @@ export function CreateTaskModal({
                   render={({ field }) => (
                     <DueDateField
                       value={field.value}
+                      dueTime={watch("dueTime")}
                       onChange={field.onChange}
+                      onDueTimeChange={(time) => setValue("dueTime", time)}
                       disabled={isSubmitting}
                       hint={
                         showRecurrence &&
                         watchedRecurrence?.repeat &&
                         watchedRecurrence.repeat !== "NONE"
-                          ? "First occurrence due date — the series repeats from this anchor."
-                          : undefined
+                          ? "First occurrence due date — the series repeats from this anchor. Time is optional."
+                          : "Optional due date and time for this task."
                       }
                     />
                   )}

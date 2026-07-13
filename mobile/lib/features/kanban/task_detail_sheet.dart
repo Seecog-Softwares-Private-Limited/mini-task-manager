@@ -23,8 +23,8 @@ import '../kanban/kanban_providers.dart';
 import '../projects/projects_providers.dart';
 import 'subtask_completion_sheet.dart';
 import 'subtask_completion_utils.dart';
+import 'subtask_compact_row.dart';
 import 'subtask_detail_panel.dart';
-import 'subtask_row_style.dart';
 import 'attachment_picker_section.dart';
 import 'attachment_preview.dart';
 import 'assignee_picker_sheet.dart';
@@ -272,6 +272,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     String? priority,
     String? dueDate,
     bool clearDueDate = false,
+    String? dueTime,
+    bool clearDueTime = false,
     List<String>? tags,
     List<String>? assigneeIds,
     List<TaskSubtask>? subtasks,
@@ -284,6 +286,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
           priority: priority,
           dueDate: dueDate,
           clearDueDate: clearDueDate,
+          dueTime: dueTime,
+          clearDueTime: clearDueTime,
           tags: tags,
           assigneeIds: assigneeIds,
           subtasks: subtasks,
@@ -301,12 +305,36 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     if (picked == null) return;
     final formatted = DateFormat('yyyy-MM-dd').format(picked);
     if (formatted == _task.dueDate) return;
+    // Date only — do not prompt for time; keep existing dueTime if any.
     await _patchTask(dueDate: formatted);
+  }
+
+  Future<void> _pickDueTime() async {
+    if (_task.dueDate == null) return;
+    final parts = (_task.dueTime ?? '09:00').split(':');
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(
+        hour: int.tryParse(parts[0]) ?? 9,
+        minute: parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0,
+      ),
+      helpText: 'Due time (optional)',
+    );
+    if (time == null || !mounted) return;
+    await _patchTask(
+      dueTime:
+          '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
+    );
   }
 
   Future<void> _clearDueDate() async {
     if (_task.dueDate == null) return;
-    await _patchTask(clearDueDate: true);
+    await _patchTask(clearDueDate: true, clearDueTime: true);
+  }
+
+  Future<void> _clearDueTime() async {
+    if (_task.dueTime == null) return;
+    await _patchTask(clearDueTime: true);
   }
 
   Future<void> _addTag(String rawName) async {
@@ -462,6 +490,19 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       }
       _expandedSubtaskIndex = null;
     });
+  }
+
+  Future<void> _quickUpdateSubtaskAssignees(
+    int index,
+    List<String> assigneeIds,
+  ) async {
+    if (_saving || _savingSubtaskIndex != null) return;
+    final item = _subtasks[index];
+    final draft = item.copyWith(
+      assigneeIds: assigneeIds,
+      assigneeId: assigneeIds.isNotEmpty ? assigneeIds.first : null,
+    );
+    await _saveSubtask(index, draft);
   }
 
   Future<void> _saveSubtask(int index, TaskSubtask draft) async {
@@ -741,7 +782,9 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                 onStatusChanged: (statusId) => _patchTask(statusId: statusId),
                 onPriorityChanged: (priority) => _patchTask(priority: priority),
                 onPickDueDate: _pickDueDate,
+                onPickDueTime: _pickDueTime,
                 onClearDueDate: _clearDueDate,
+                onClearDueTime: _clearDueTime,
                 onAddTag: _addTag,
                 onRemoveTag: _removeTag,
                 onAssigneesChanged: (assigneeIds) => _patchTask(assigneeIds: assigneeIds),
@@ -856,124 +899,60 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                 ...List.generate(_subtasks.length, (index) {
                   final item = _subtasks[index];
                   final expanded = _expandedSubtaskIndex == index;
-                  final displayTitle =
-                      item.title.trim().isEmpty ? 'New subtask' : item.title;
-                  final rowStyle = subtaskRowStyle(item, expanded: expanded);
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: AppSpacing.sm),
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: rowStyle.borderColor,
-                        width: expanded ? 1.5 : 1,
+                  return Column(
+                    key: ValueKey('subtask-row-${item.id}'),
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SubtaskCompactRow(
+                        subtask: item,
+                        members: _members,
+                        expanded: expanded,
+                        enabled: !_saving && _savingSubtaskIndex == null,
+                        canComplete: canCompleteSubtasks,
+                        onToggleComplete: (value) => _toggleSubtask(index, value),
+                        onExpand: () {
+                          FocusManager.instance.primaryFocus?.unfocus();
+                          _toggleSubtaskExpanded(index);
+                        },
+                        onAssigneesChanged: (ids) =>
+                            _quickUpdateSubtaskAssignees(index, ids),
                       ),
-                      color: rowStyle.backgroundColor,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      children: [
+                      if (expanded)
                         Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Checkbox(
-                                value: item.completed,
-                                onChanged: _saving ||
-                                        !canCompleteSubtasks ||
-                                        item.title.trim().isEmpty
-                                    ? null
-                                    : (value) => _toggleSubtask(index, value),
-                                materialTapTargetSize:
-                                    MaterialTapTargetSize.shrinkWrap,
-                                visualDensity: VisualDensity.compact,
-                              ),
-                              Expanded(
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    borderRadius: BorderRadius.circular(8),
-                                    onTap: () {
-                                      FocusManager.instance.primaryFocus
-                                          ?.unfocus();
-                                      _toggleSubtaskExpanded(index);
-                                    },
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 12,
-                                        horizontal: 4,
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Expanded(
-                                            child: Text(
-                                              displayTitle,
-                                              style: TextStyle(
-                                                color: item.title.trim().isEmpty
-                                                    ? AppColors.textMuted
-                                                    : null,
-                                                fontStyle:
-                                                    item.title.trim().isEmpty
-                                                        ? FontStyle.italic
-                                                        : null,
-                                                decoration: item.completed
-                                                    ? TextDecoration.lineThrough
-                                                    : null,
-                                              ),
-                                            ),
-                                          ),
-                                          Icon(
-                                            expanded
-                                                ? Icons
-                                                    .keyboard_arrow_up_rounded
-                                                : Icons
-                                                    .keyboard_arrow_down_rounded,
-                                            color: AppColors.textMuted,
-                                          ),
-                                        ],
-                                      ),
+                          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                          child: Material(
+                            color: AppColors.surface,
+                            elevation: 1,
+                            shadowColor: Colors.black.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(12),
+                            child: Padding(
+                              padding: const EdgeInsets.all(AppSpacing.sm),
+                              child: SubtaskDetailPanel(
+                                subtask: item,
+                                members: _members,
+                                taskId: _task.id,
+                                organizationId: orgId,
+                                fallbackReporterId: _task.reporterId,
+                                fallbackCreatedAt: _task.createdAt,
+                                saving: _savingSubtaskIndex == index,
+                                canComplete: canCompleteSubtasks,
+                                onRequestCompletion: ({
+                                  required String subtaskId,
+                                  required String subtaskTitle,
+                                  required String? subtaskPriority,
+                                }) =>
+                                    _requestSubtaskCompletion(
+                                      subtaskId: subtaskId,
+                                      subtaskTitle: subtaskTitle,
+                                      subtaskPriority: subtaskPriority,
                                     ),
-                                  ),
-                                ),
+                                onCancel: () => _cancelSubtaskEdit(index),
+                                onSave: (draft) => _saveSubtask(index, draft),
                               ),
-                            ],
+                            ),
                           ),
                         ),
-                        if (expanded)
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(
-                              AppSpacing.sm,
-                              0,
-                              AppSpacing.sm,
-                              AppSpacing.sm,
-                            ),
-                            child: SubtaskDetailPanel(
-                              subtask: item,
-                              members: _members,
-                              taskId: _task.id,
-                              organizationId: orgId,
-                              fallbackReporterId: _task.reporterId,
-                              fallbackCreatedAt: _task.createdAt,
-                              saving: _savingSubtaskIndex == index,
-                              canComplete: canCompleteSubtasks,
-                              onRequestCompletion: ({
-                                required String subtaskId,
-                                required String subtaskTitle,
-                                required String? subtaskPriority,
-                              }) =>
-                                  _requestSubtaskCompletion(
-                                    subtaskId: subtaskId,
-                                    subtaskTitle: subtaskTitle,
-                                    subtaskPriority: subtaskPriority,
-                                  ),
-                              onCancel: () => _cancelSubtaskEdit(index),
-                              onSave: (draft) => _saveSubtask(index, draft),
-                            ),
-                          ),
-                      ],
-                    ),
+                    ],
                   );
                 }),
               ],
@@ -1029,7 +1008,9 @@ class _TaskMetaSection extends StatefulWidget {
     required this.onStatusChanged,
     required this.onPriorityChanged,
     required this.onPickDueDate,
+    required this.onPickDueTime,
     required this.onClearDueDate,
+    required this.onClearDueTime,
     required this.onAddTag,
     required this.onRemoveTag,
     required this.onAssigneesChanged,
@@ -1051,7 +1032,9 @@ class _TaskMetaSection extends StatefulWidget {
   final ValueChanged<String> onStatusChanged;
   final ValueChanged<String> onPriorityChanged;
   final VoidCallback onPickDueDate;
+  final VoidCallback onPickDueTime;
   final VoidCallback onClearDueDate;
+  final VoidCallback onClearDueTime;
   final ValueChanged<String> onAddTag;
   final ValueChanged<String> onRemoveTag;
   final ValueChanged<List<String>> onAssigneesChanged;
@@ -1107,7 +1090,8 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
     final priorityValue = widget.task.priority.toUpperCase();
     final selectedPriority = _TaskMetaSection.findPriority(priorityValue);
     final dueDate = _parseDueDate(widget.task.dueDate);
-    final isOverdue = dueDate != null && _isDueDateOverdue(dueDate);
+    final isOverdue =
+        dueDate != null && _isDueDateOverdue(dueDate, widget.task.dueTime);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1228,45 +1212,70 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
               ),
         ),
         const SizedBox(height: AppSpacing.md),
-        _FieldLabel(text: 'Due date'),
+        _FieldLabel(text: 'Due date & time'),
         const SizedBox(height: AppSpacing.xs),
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: widget.saving || !widget.canEditDetails ? null : widget.onPickDueDate,
-            borderRadius: BorderRadius.circular(14),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: isOverdue ? AppColors.danger.withValues(alpha: 0.35) : AppColors.border,
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed:
+                    widget.saving || !widget.canEditDetails ? null : widget.onPickDueDate,
+                icon: Icon(
+                  Icons.calendar_today_rounded,
+                  size: 18,
+                  color: isOverdue ? AppColors.danger : AppColors.textMuted,
                 ),
-                borderRadius: BorderRadius.circular(14),
-                color: isOverdue ? AppColors.dangerSoft.withValues(alpha: 0.35) : null,
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.calendar_today_rounded,
-                    size: 18,
-                    color: AppColors.textMuted,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: isOverdue ? AppColors.danger : null,
+                  side: BorderSide(
+                    color: isOverdue
+                        ? AppColors.danger.withValues(alpha: 0.45)
+                        : AppColors.border,
                   ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Text(
-                      dueDate == null
-                          ? 'No date selected'
-                          : DateFormat('MMM d, yyyy').format(dueDate),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: dueDate == null ? AppColors.textMuted : null,
-                          ),
-                    ),
-                  ),
-                ],
+                  backgroundColor:
+                      isOverdue ? AppColors.dangerSoft.withValues(alpha: 0.35) : null,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  alignment: Alignment.centerLeft,
+                ),
+                label: Text(
+                  dueDate == null
+                      ? 'Date'
+                      : DateFormat('MMM d, yyyy').format(dueDate),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ),
-          ),
+            const SizedBox(width: AppSpacing.xs),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: widget.saving ||
+                        !widget.canEditDetails ||
+                        dueDate == null
+                    ? null
+                    : widget.onPickDueTime,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.schedule_rounded, size: 18),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        (widget.task.dueTime == null ||
+                                widget.task.dueTime!.isEmpty)
+                            ? 'Time'
+                            : widget.task.dueTime!,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
         if (dueDate != null) ...[
           const SizedBox(height: AppSpacing.xs),
@@ -1274,14 +1283,26 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
             children: [
               Expanded(
                 child: Text(
-                  DateFormat('EEE, MMM d, yyyy').format(dueDate),
+                  [
+                    DateFormat('EEE, MMM d, yyyy').format(dueDate),
+                    if (widget.task.dueTime != null &&
+                        widget.task.dueTime!.isNotEmpty)
+                      widget.task.dueTime!,
+                  ].join(' · '),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppColors.textMuted,
                       ),
                 ),
               ),
+              if (widget.task.dueTime != null && widget.task.dueTime!.isNotEmpty)
+                TextButton(
+                  onPressed:
+                      widget.saving || !widget.canEditDetails ? null : widget.onClearDueTime,
+                  child: const Text('Clear time'),
+                ),
               TextButton(
-                onPressed: widget.saving || !widget.canEditDetails ? null : widget.onClearDueDate,
+                onPressed:
+                    widget.saving || !widget.canEditDetails ? null : widget.onClearDueDate,
                 child: const Text('Clear'),
               ),
             ],
@@ -1753,8 +1774,15 @@ DateTime? _parseDueDate(String? raw) {
   return DateTime.tryParse(raw);
 }
 
-bool _isDueDateOverdue(DateTime dueDate) {
+bool _isDueDateOverdue(DateTime dueDate, [String? dueTime]) {
   final now = DateTime.now();
+  if (dueTime != null && dueTime.isNotEmpty) {
+    final parts = dueTime.split(':');
+    final hour = int.tryParse(parts[0]) ?? 0;
+    final minute = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
+    final due = DateTime(dueDate.year, dueDate.month, dueDate.day, hour, minute);
+    return due.isBefore(now);
+  }
   final today = DateTime(now.year, now.month, now.day);
   final due = DateTime(dueDate.year, dueDate.month, dueDate.day);
   return due.isBefore(today);
@@ -1907,30 +1935,7 @@ class _AttachmentsSectionState extends ConsumerState<_AttachmentsSection> {
             organizationId: widget.organizationId,
             file: picked,
           );
-      final items = await ref.read(tasksRepositoryProvider).fetchAttachments(widget.taskId);
-      final entityItems = await ref.read(attachmentsRepositoryProvider).fetchEntityAttachments(
-            entityType: 'TASK',
-            entityId: widget.taskId,
-            organizationId: widget.organizationId,
-            taskId: widget.taskId,
-          );
-      final seen = items.map((e) => e.id).toSet();
-      final merged = <_TaskAttachmentItem>[
-        ...items.map(
-          (attachment) => _TaskAttachmentItem(
-            attachment: attachment,
-            source: AttachmentSource.task,
-          ),
-        ),
-        ...entityItems
-            .where((attachment) => attachment.id.isNotEmpty && !seen.contains(attachment.id))
-            .map(
-              (attachment) => _TaskAttachmentItem(
-                attachment: attachment,
-                source: AttachmentSource.entity,
-              ),
-            ),
-      ];
+      final merged = await _reloadAttachments();
       if (!mounted) return;
       widget.onAttachmentsChanged(merged);
     } on ApiException catch (error) {
@@ -1938,6 +1943,68 @@ class _AttachmentsSectionState extends ConsumerState<_AttachmentsSection> {
       setState(() => _uploadError = error.message);
     } finally {
       if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  Future<List<_TaskAttachmentItem>> _reloadAttachments() async {
+    final items =
+        await ref.read(tasksRepositoryProvider).fetchAttachments(widget.taskId);
+    final entityItems =
+        await ref.read(attachmentsRepositoryProvider).fetchEntityAttachments(
+              entityType: 'TASK',
+              entityId: widget.taskId,
+              organizationId: widget.organizationId,
+              taskId: widget.taskId,
+            );
+    final seen = items.map((e) => e.id).toSet();
+    return <_TaskAttachmentItem>[
+      ...items.map(
+        (attachment) => _TaskAttachmentItem(
+          attachment: attachment,
+          source: AttachmentSource.task,
+        ),
+      ),
+      ...entityItems
+          .where(
+            (attachment) =>
+                attachment.id.isNotEmpty && !seen.contains(attachment.id),
+          )
+          .map(
+            (attachment) => _TaskAttachmentItem(
+              attachment: attachment,
+              source: AttachmentSource.entity,
+            ),
+          ),
+    ];
+  }
+
+  Future<void> _deleteAttachment(_TaskAttachmentItem item) async {
+    if (widget.disabled || widget.loading || item.attachment.id.isEmpty) return;
+
+    setState(() => _uploadError = null);
+    final repo = ref.read(attachmentsRepositoryProvider);
+    try {
+      if (item.source == AttachmentSource.task) {
+        await repo.deleteTaskAttachment(
+          taskId: widget.taskId,
+          attachmentId: item.attachment.id,
+          organizationId: widget.organizationId,
+        );
+      } else {
+        await repo.deleteAttachment(
+          attachmentId: item.attachment.id,
+          organizationId: widget.organizationId,
+        );
+      }
+      if (!mounted) return;
+      widget.onAttachmentsChanged(
+        widget.attachments
+            .where((entry) => entry.attachment.id != item.attachment.id)
+            .toList(),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() => _uploadError = error.message);
     }
   }
 
@@ -1971,6 +2038,9 @@ class _AttachmentsSectionState extends ConsumerState<_AttachmentsSection> {
                 attachment: entry.value.attachment,
                 source: entry.value.source,
                 index: entry.key + 1,
+                onDelete: widget.disabled
+                    ? null
+                    : () => _deleteAttachment(entry.value),
               ),
             ).toList(),
           ),

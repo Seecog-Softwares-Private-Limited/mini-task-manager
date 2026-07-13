@@ -77,6 +77,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
   late String _status;
   late String _priority;
   String? _dueDate;
+  String? _dueTime;
   late List<String> _assigneeIds;
   List<TaskAttachment> _attachments = const [];
   bool _loadingAttachments = true;
@@ -93,6 +94,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     _status = _resolveSubtaskStatus(widget.subtask);
     _priority = (widget.subtask.priority ?? 'MEDIUM').toUpperCase();
     _dueDate = widget.subtask.dueDate;
+    _dueTime = widget.subtask.dueTime;
     _assigneeIds = _storedAssigneeIds(widget.subtask);
     _completionRecord = widget.subtask.completionRecord;
     _loadAttachments();
@@ -186,7 +188,30 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     setState(() => _dueDate = DateFormat('yyyy-MM-dd').format(picked));
   }
 
-  void _clearDueDate() => setState(() => _dueDate = null);
+  Future<void> _pickDueTime() async {
+    if (_dueDate == null) return;
+    final parts = (_dueTime ?? '09:00').split(':');
+    final initial = TimeOfDay(
+      hour: int.tryParse(parts[0]) ?? 9,
+      minute: parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0,
+    );
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: initial,
+    );
+    if (picked == null) return;
+    setState(() {
+      _dueTime =
+          '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
+    });
+  }
+
+  void _clearDueDate() => setState(() {
+        _dueDate = null;
+        _dueTime = null;
+      });
+
+  void _clearDueTime() => setState(() => _dueTime = null);
 
   void _openAssigneeSheet() {
     showAssigneePickerSheet(
@@ -211,6 +236,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
         _status != _resolveSubtaskStatus(widget.subtask) ||
         _priority != (widget.subtask.priority ?? 'MEDIUM').toUpperCase() ||
         _dueDate != widget.subtask.dueDate ||
+        (_dueTime ?? '') != (widget.subtask.dueTime ?? '') ||
         !_assigneeListsEqual(_assigneeIds, _storedAssigneeIds(widget.subtask));
   }
 
@@ -282,6 +308,9 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
           completed: true,
           priority: _priority,
           dueDate: _dueDate,
+          dueTime: _dueTime,
+          clearDueDate: _dueDate == null,
+          clearDueTime: _dueDate == null || _dueTime == null,
           assigneeIds: _assigneeIds,
           assigneeId: _assigneeIds.isNotEmpty ? _assigneeIds.first : null,
           completionRecord: record,
@@ -327,6 +356,9 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
         completed: completed,
         priority: _priority,
         dueDate: _dueDate,
+        dueTime: _dueTime,
+        clearDueDate: _dueDate == null,
+        clearDueTime: _dueDate == null || _dueTime == null,
         assigneeIds: _assigneeIds,
         assigneeId: _assigneeIds.isNotEmpty ? _assigneeIds.first : null,
         completionRecord: completed ? record : null,
@@ -509,14 +541,33 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
                   onPressed: widget.saving ? null : _pickDueDate,
                   icon: const Icon(Icons.calendar_today_rounded, size: 18),
                   label: Text(
-                    dueDate == null ? 'Due' : DateFormat('MMM d, yyyy').format(dueDate),
+                    dueDate == null
+                        ? 'Due date'
+                        : DateFormat('MMM d, yyyy').format(dueDate),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ),
               if (_dueDate != null) ...[
                 const SizedBox(width: AppSpacing.xs),
-                TextButton(onPressed: widget.saving ? null : _clearDueDate, child: const Text('Clear')),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: widget.saving ? null : _pickDueTime,
+                    icon: const Icon(Icons.schedule_rounded, size: 18),
+                    label: Text(
+                      _dueTime == null
+                          ? 'Time'
+                          : _formatDueTimeLabel(_dueTime!),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: widget.saving
+                      ? null
+                      : (_dueTime != null ? _clearDueTime : _clearDueDate),
+                  child: Text(_dueTime != null ? 'Clear time' : 'Clear'),
+                ),
               ],
               const SizedBox(width: AppSpacing.sm),
               OutlinedButton(
@@ -851,6 +902,16 @@ String _labelForSubtaskStatus(String status) {
 DateTime? _parseDueDate(String? raw) {
   if (raw == null || raw.isEmpty) return null;
   return DateTime.tryParse(raw);
+}
+
+String _formatDueTimeLabel(String raw) {
+  final match = RegExp(r'^([01]\d|2[0-3]):([0-5]\d)').firstMatch(raw.trim());
+  if (match == null) return raw;
+  final hour = int.parse(match.group(1)!);
+  final minute = int.parse(match.group(2)!);
+  final period = hour >= 12 ? 'PM' : 'AM';
+  final hour12 = hour % 12 == 0 ? 12 : hour % 12;
+  return '$hour12:${minute.toString().padLeft(2, '0')} $period';
 }
 
 Color _priorityColor(String priority) {

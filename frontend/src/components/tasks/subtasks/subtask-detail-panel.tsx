@@ -35,7 +35,16 @@ type MemberHint = { id: string; name: string; email?: string; avatarUrl?: string
 
 export type SubtaskDraft = Pick<
   TaskSubtask,
-  "id" | "title" | "description" | "completed" | "assigneeId" | "assigneeIds" | "dueDate" | "status" | "priority"
+  | "id"
+  | "title"
+  | "description"
+  | "completed"
+  | "assigneeId"
+  | "assigneeIds"
+  | "dueDate"
+  | "dueTime"
+  | "status"
+  | "priority"
 >;
 
 interface SubtaskDetailPanelProps {
@@ -97,6 +106,7 @@ export function SubtaskDetailPanel({
       a.completed === b.completed &&
       subtaskAssigneesEqual(a, b) &&
       a.dueDate === b.dueDate &&
+      (a.dueTime ?? "") === (b.dueTime ?? "") &&
       resolveSubtaskStatus(a) === resolveSubtaskStatus(b) &&
       resolveSubtaskPriority(a.priority) === resolveSubtaskPriority(b.priority)
     );
@@ -120,6 +130,7 @@ export function SubtaskDetailPanel({
     initialDraft.assigneeId,
     initialDraft.assigneeIds,
     initialDraft.dueDate,
+    initialDraft.dueTime,
     initialDraft.status,
     initialDraft.priority,
   ]);
@@ -256,8 +267,15 @@ export function SubtaskDetailPanel({
         </div>
         <SubtaskDueDatePicker
           value={draft.dueDate}
+          dueTime={draft.dueTime}
           completed={draft.completed}
-          onChange={(dueDate) => update("dueDate", dueDate)}
+          onChange={(dueDate, nextDueTime) => {
+            setDraft((prev) => {
+              const next = { ...prev, dueDate, dueTime: nextDueTime };
+              onDraftChange?.(next);
+              return next;
+            });
+          }}
           disabled={fieldsDisabled}
         />
         <SubtaskAssigneeSelector

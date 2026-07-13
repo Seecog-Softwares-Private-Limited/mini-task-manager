@@ -69,6 +69,10 @@ export class TaskEntity extends BaseEntity {
   @Column({ name: 'due_date', type: 'date', nullable: true })
   dueDate!: Date | null;
 
+  /** Optional local time of day (HH:mm) for the due date. */
+  @Column({ name: 'due_time', type: 'varchar', length: 5, nullable: true })
+  dueTime!: string | null;
+
   @Column({ name: 'completed_at', type: 'timestamp', nullable: true })
   completedAt!: Date | null;
 

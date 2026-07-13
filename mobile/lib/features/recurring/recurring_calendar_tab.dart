@@ -1351,12 +1351,26 @@ class _SubtaskRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             color: rowStyle.backgroundColor,
             border: Border.all(color: rowStyle.borderColor),
             borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
+              ),
+            ],
           ),
-          child: InkWell(
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(width: 4, color: rowStyle.accentColor),
+                Expanded(
+                  child: InkWell(
             borderRadius: BorderRadius.circular(8),
             onTap: enabled ? () => onToggle(!completed) : null,
             child: Padding(
@@ -1406,6 +1420,10 @@ class _SubtaskRow extends StatelessWidget {
             ),
           ),
         ),
+                ),
+              ],
+            ),
+          ),
         ),
         if (hasNote)
           Padding(

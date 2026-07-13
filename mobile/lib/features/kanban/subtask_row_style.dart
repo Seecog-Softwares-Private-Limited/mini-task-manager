@@ -8,10 +8,12 @@ class SubtaskRowStyle {
   const SubtaskRowStyle({
     required this.borderColor,
     required this.backgroundColor,
+    required this.accentColor,
   });
 
   final Color borderColor;
   final Color backgroundColor;
+  final Color accentColor;
 }
 
 String resolveSubtaskStatusValue(TaskSubtask subtask) {
@@ -54,30 +56,47 @@ bool isSubtaskOverdue(TaskSubtask subtask) {
   return due.isBefore(today);
 }
 
+/// Kanban-card style: thick left accent + neutral body + subtle gray border.
+/// - To Do → light red
+/// - In Progress → light yellow
+/// - Done → light green
+/// - Overdue → dark red
 SubtaskRowStyle subtaskRowStyle(TaskSubtask subtask, {bool expanded = false}) {
+  final surface = AppColors.surface;
+  final grayBorder = AppColors.border;
+
   if (isSubtaskOverdue(subtask)) {
-    return const SubtaskRowStyle(
-      borderColor: Color(0xFF991B1B),
-      backgroundColor: Color(0xFFFECACA),
+    return SubtaskRowStyle(
+      borderColor: grayBorder,
+      backgroundColor: surface,
+      accentColor: const Color(0xFFB91C1C), // red-700
     );
   }
 
   switch (resolveSubtaskStatusValue(subtask)) {
     case 'TODO':
       return SubtaskRowStyle(
-        borderColor: AppColors.danger.withValues(alpha: 0.45),
-        backgroundColor: AppColors.dangerSoft.withValues(alpha: 0.75),
+        borderColor: grayBorder,
+        backgroundColor: surface,
+        accentColor: const Color(0xFFF87171), // red-400
       );
     case 'IN_PROGRESS':
+      return SubtaskRowStyle(
+        borderColor: grayBorder,
+        backgroundColor: surface,
+        accentColor: const Color(0xFFEAB308), // yellow-500
+      );
     case 'DONE':
       return SubtaskRowStyle(
-        borderColor: AppColors.success.withValues(alpha: 0.35),
-        backgroundColor: AppColors.successSoft.withValues(alpha: 0.85),
+        borderColor: grayBorder,
+        backgroundColor: surface,
+        accentColor: const Color(0xFF34D399), // emerald-400
       );
     default:
       return SubtaskRowStyle(
-        borderColor: expanded ? AppColors.primary : AppColors.border,
-        backgroundColor: AppColors.surface,
+        borderColor: expanded ? AppColors.primary : grayBorder,
+        backgroundColor: surface,
+        accentColor: expanded ? AppColors.primary : grayBorder,
       );
   }
 }

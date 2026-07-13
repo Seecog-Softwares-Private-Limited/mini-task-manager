@@ -916,6 +916,7 @@ export default function RecurringTasksPage() {
         assigneeId: data.assigneeIds?.[0] || undefined,
         storyPoints: data.storyPoints,
         dueDate: data.dueDate || undefined,
+        dueTime: data.dueDate ? data.dueTime || undefined : undefined,
         tags: data.labels?.length ? data.labels.map((l) => ({ name: l.name, color: l.color })) : undefined,
         subtasks: data.subtasks
           .map((s) => ({

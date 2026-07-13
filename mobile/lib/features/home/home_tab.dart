@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../core/preferences/app_preferences.dart';
-import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../data/models/home_dashboard.dart';
@@ -19,6 +16,7 @@ import '../projects/projects_providers.dart';
 import '../recurring/recurring_providers.dart';
 import '../workspaces/workspace_switcher_sheet.dart';
 import 'home_providers.dart';
+import 'my_work_providers.dart';
 
 class HomeTab extends ConsumerWidget {
   const HomeTab({
@@ -28,7 +26,7 @@ class HomeTab extends ConsumerWidget {
   });
 
   final String? orgId;
-  final ValueChanged<int> onNavigateTab;
+  final void Function(int index, {MyWorkFilter? tasksFilter}) onNavigateTab;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -37,7 +35,6 @@ class HomeTab extends ConsumerWidget {
     final projectsAsync = ref.watch(projectsProvider);
     final dashboardAsync = ref.watch(homeDashboardProvider);
     final analyticsAsync = ref.watch(recurringAnalyticsProvider);
-    final lastProjectId = ref.watch(lastProjectIdProvider);
 
     final firstName = _firstName(session.user?.fullName);
 
@@ -62,13 +59,17 @@ class HomeTab extends ConsumerWidget {
             onTap: () => showWorkspaceSwitcherSheet(context: context, ref: ref),
           ),
           const SizedBox(height: AppSpacing.md),
-          _StatRow(dashboardAsync: dashboardAsync),
+          _StatRow(
+            dashboardAsync: dashboardAsync,
+            onOpenFilter: (filter) => onNavigateTab(1, tasksFilter: filter),
+          ),
           const SizedBox(height: AppSpacing.lg),
           _SectionHeader(
             title: 'Needs attention',
             icon: Icons.priority_high_rounded,
             trailing: TextButton(
-              onPressed: () => context.push(AppRoutes.myWork('open')),
+              onPressed: () =>
+                  onNavigateTab(1, tasksFilter: MyWorkFilter.open),
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.primary,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -87,7 +88,7 @@ class HomeTab extends ConsumerWidget {
           _MomentumCard(
             dashboardAsync: dashboardAsync,
             analyticsAsync: analyticsAsync,
-            onTap: () => onNavigateTab(2),
+            onTap: () => onNavigateTab(3),
           ),
           const SizedBox(height: AppSpacing.lg),
           const _SectionHeader(title: 'Quick actions', icon: Icons.bolt_rounded),
@@ -99,7 +100,7 @@ class HomeTab extends ConsumerWidget {
                   icon: Icons.view_kanban_rounded,
                   label: 'Open tasks',
                   color: AppColors.sky,
-                  onTap: () => _openLastBoard(context, ref, lastProjectId),
+                  onTap: () => onNavigateTab(1, tasksFilter: MyWorkFilter.open),
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
@@ -108,7 +109,7 @@ class HomeTab extends ConsumerWidget {
                   icon: Icons.event_repeat_rounded,
                   label: 'Planner',
                   color: AppColors.violet,
-                  onTap: () => onNavigateTab(2),
+                  onTap: () => onNavigateTab(3),
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
@@ -117,7 +118,7 @@ class HomeTab extends ConsumerWidget {
                   icon: Icons.folder_open_rounded,
                   label: 'Projects',
                   color: AppColors.primary,
-                  onTap: () => onNavigateTab(1),
+                  onTap: () => onNavigateTab(2),
                 ),
               ),
             ],
@@ -125,18 +126,6 @@ class HomeTab extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  void _openLastBoard(BuildContext context, WidgetRef ref, String? lastId) {
-    final projects = ref.read(projectsProvider).valueOrNull ?? const [];
-    if (projects.isEmpty) {
-      onNavigateTab(1);
-      return;
-    }
-    final project =
-        projects.where((p) => p.id == lastId).firstOrNull ?? projects.first;
-    ref.read(lastProjectIdProvider.notifier).setProjectId(project.id);
-    context.push(AppRoutes.projectBoard(project.id));
   }
 
   Future<void> _openTask(BuildContext context, WidgetRef ref, Task task) async {
@@ -175,14 +164,6 @@ String _greeting() {
 String? _firstName(String? fullName) {
   if (fullName == null || fullName.trim().isEmpty) return null;
   return fullName.trim().split(RegExp(r'\s+')).first;
-}
-
-extension _FirstOrNull<T> on Iterable<T> {
-  T? get firstOrNull {
-    final it = iterator;
-    if (!it.moveNext()) return null;
-    return it.current;
-  }
 }
 
 class _HeroCard extends StatelessWidget {
@@ -313,9 +294,13 @@ class _HeroCard extends StatelessWidget {
 }
 
 class _StatRow extends StatelessWidget {
-  const _StatRow({required this.dashboardAsync});
+  const _StatRow({
+    required this.dashboardAsync,
+    required this.onOpenFilter,
+  });
 
   final AsyncValue<HomeDashboard> dashboardAsync;
+  final ValueChanged<MyWorkFilter> onOpenFilter;
 
   @override
   Widget build(BuildContext context) {
@@ -327,7 +312,7 @@ class _StatRow extends StatelessWidget {
             value: '${d.counts.dueToday}',
             color: AppColors.sky,
             icon: Icons.today_rounded,
-            onTap: () => context.push(AppRoutes.myWork('today')),
+            onTap: () => onOpenFilter(MyWorkFilter.today),
           ),
           const SizedBox(width: AppSpacing.sm),
           _StatCard(
@@ -335,7 +320,7 @@ class _StatRow extends StatelessWidget {
             value: '${d.counts.overdue}',
             color: AppColors.danger,
             icon: Icons.error_rounded,
-            onTap: () => context.push(AppRoutes.myWork('overdue')),
+            onTap: () => onOpenFilter(MyWorkFilter.overdue),
           ),
           const SizedBox(width: AppSpacing.sm),
           _StatCard(
@@ -343,7 +328,7 @@ class _StatRow extends StatelessWidget {
             value: '${d.counts.completedThisWeek}',
             color: AppColors.success,
             icon: Icons.check_circle_rounded,
-            onTap: () => context.push(AppRoutes.myWork('completed')),
+            onTap: () => onOpenFilter(MyWorkFilter.completed),
           ),
         ],
       ),

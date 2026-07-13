@@ -14,9 +14,16 @@ import 'home_providers.dart';
 import 'my_work_providers.dart';
 
 class MyWorkScreen extends ConsumerStatefulWidget {
-  const MyWorkScreen({super.key, required this.initialFilter});
+  const MyWorkScreen({
+    super.key,
+    required this.initialFilter,
+    this.embedded = false,
+  });
 
   final MyWorkFilter initialFilter;
+
+  /// When true, renders without its own [Scaffold]/[AppBar] (for shell tabs).
+  final bool embedded;
 
   @override
   ConsumerState<MyWorkScreen> createState() => _MyWorkScreenState();
@@ -69,57 +76,61 @@ class _MyWorkScreenState extends ConsumerState<MyWorkScreen> {
     final projects = ref.watch(projectsProvider).valueOrNull ?? const [];
     final projectNames = {for (final p in projects) p.id: p.name};
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('My work')),
-      body: Column(
-        children: [
-          _FilterBar(
-            active: activeFilter,
-            counts: counts,
-            onSelected: (f) =>
-                ref.read(myWorkFilterProvider.notifier).state = f,
-          ),
-          const Divider(height: 1),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: () async {
-                ref.invalidate(myWorkProvider);
-                await ref.read(myWorkProvider.future);
-              },
-              child: resultAsync.when(
-                data: (result) => _TaskList(
-                  result: result,
-                  filter: activeFilter,
-                  projectNames: projectNames,
-                  onOpenTask: _openTask,
-                ),
-                loading: () => ListView(
-                  padding: const EdgeInsets.all(AppSpacing.md),
-                  children: const [
-                    ShimmerBox(height: 64),
-                    SizedBox(height: AppSpacing.sm),
-                    ShimmerBox(height: 64),
-                    SizedBox(height: AppSpacing.sm),
-                    ShimmerBox(height: 64),
-                  ],
-                ),
-                error: (error, __) => ListView(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.all(AppSpacing.lg),
-                      child: EmptyState(
-                        icon: Icons.error_outline_rounded,
-                        title: 'Could not load tasks',
-                        message: error.toString(),
-                      ),
+    final body = Column(
+      children: [
+        _FilterBar(
+          active: activeFilter,
+          counts: counts,
+          onSelected: (f) =>
+              ref.read(myWorkFilterProvider.notifier).state = f,
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(myWorkProvider);
+              await ref.read(myWorkProvider.future);
+            },
+            child: resultAsync.when(
+              data: (result) => _TaskList(
+                result: result,
+                filter: activeFilter,
+                projectNames: projectNames,
+                onOpenTask: _openTask,
+              ),
+              loading: () => ListView(
+                padding: const EdgeInsets.all(AppSpacing.md),
+                children: const [
+                  ShimmerBox(height: 64),
+                  SizedBox(height: AppSpacing.sm),
+                  ShimmerBox(height: 64),
+                  SizedBox(height: AppSpacing.sm),
+                  ShimmerBox(height: 64),
+                ],
+              ),
+              error: (error, __) => ListView(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    child: EmptyState(
+                      icon: Icons.error_outline_rounded,
+                      title: 'Could not load tasks',
+                      message: error.toString(),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
+    );
+
+    if (widget.embedded) return body;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('My work')),
+      body: body,
     );
   }
 }

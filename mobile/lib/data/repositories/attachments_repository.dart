@@ -98,6 +98,21 @@ class AttachmentsRepository {
     }
   }
 
+  Future<void> deleteTaskAttachment({
+    required String taskId,
+    required String attachmentId,
+    required String organizationId,
+  }) async {
+    try {
+      await _api.dio.delete<void>(
+        '/tasks/$taskId/attachments/$attachmentId',
+        options: _api.withOrgHeader(organizationId),
+      );
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
   Future<Uint8List> fetchPreviewBytes({
     required String attachmentId,
     required String organizationId,

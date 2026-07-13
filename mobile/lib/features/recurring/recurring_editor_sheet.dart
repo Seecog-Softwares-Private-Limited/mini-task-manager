@@ -99,6 +99,21 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
       _startDate = DateTime.tryParse(t.startDueDate ?? '') ?? DateTime.now();
       _endType = t.endType ?? 'NEVER';
       _endDate = DateTime.tryParse(t.endDate ?? '');
+      final rawTime = t.rawRuleConfig?['dueTime']?.toString().trim();
+      if (rawTime != null && rawTime.isNotEmpty) {
+        final parts = rawTime.split(':');
+        final hour = int.tryParse(parts[0]);
+        final minute =
+            parts.length > 1 ? int.tryParse(parts[1]) : 0;
+        if (hour != null &&
+            hour >= 0 &&
+            hour <= 23 &&
+            minute != null &&
+            minute >= 0 &&
+            minute <= 59) {
+          _dueTime = TimeOfDay(hour: hour, minute: minute);
+        }
+      }
     }
     if (_weeklyDays.isEmpty) {
       _weeklyDays.add(DateTime.now().weekday % 7);
@@ -162,11 +177,16 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
     } else {
       base.remove('endAfterOccurrences');
     }
-    if (!_isEdit && _dueTime != null) {
+    if (_dueTime != null) {
       final h = _dueTime!.hour.toString().padLeft(2, '0');
       final m = _dueTime!.minute.toString().padLeft(2, '0');
       base['dueTime'] = '$h:$m';
       base['dueLogic'] = 'DUE_TIME';
+    } else {
+      base.remove('dueTime');
+      if (base['dueLogic'] == 'DUE_TIME') {
+        base['dueLogic'] = 'DUE_DATE';
+      }
     }
     return base;
   }
@@ -496,29 +516,31 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
                   label: DateFormat('EEE, MMM d, yyyy').format(_startDate),
                   onTap: _loading ? null : _pickStartDate,
                 ),
-                const SizedBox(height: AppSpacing.md),
-                Text('Due time (optional)', style: labelStyle),
-                const SizedBox(height: AppSpacing.xs),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _TapField(
-                        icon: Icons.schedule_rounded,
-                        label: _dueTime != null
-                            ? _dueTime!.format(context)
-                            : 'No specific time',
-                        onTap: _loading ? null : _pickDueTime,
-                      ),
+              ],
+              const SizedBox(height: AppSpacing.md),
+              Text('Due time (optional)', style: labelStyle),
+              const SizedBox(height: AppSpacing.xs),
+              Row(
+                children: [
+                  Expanded(
+                    child: _TapField(
+                      icon: Icons.schedule_rounded,
+                      label: _dueTime != null
+                          ? _dueTime!.format(context)
+                          : 'No specific time',
+                      onTap: _loading ? null : _pickDueTime,
                     ),
-                    if (_dueTime != null)
-                      IconButton(
-                        tooltip: 'Clear time',
-                        onPressed:
-                            _loading ? null : () => setState(() => _dueTime = null),
-                        icon: const Icon(Icons.clear_rounded),
-                      ),
-                  ],
-                ),
+                  ),
+                  if (_dueTime != null)
+                    IconButton(
+                      tooltip: 'Clear time',
+                      onPressed:
+                          _loading ? null : () => setState(() => _dueTime = null),
+                      icon: const Icon(Icons.clear_rounded),
+                    ),
+                ],
+              ),
+              if (!_isEdit) ...[
                 const SizedBox(height: AppSpacing.md),
                 Text('Assignees', style: labelStyle),
                 const SizedBox(height: AppSpacing.xs),

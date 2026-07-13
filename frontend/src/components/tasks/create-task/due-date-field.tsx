@@ -2,13 +2,15 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CalendarDays, X } from "lucide-react";
+import { CalendarDays, Clock, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CREATE_FIELD_LABEL } from "@/components/tasks/create-task/form-section";
 
 interface DueDateFieldProps {
   value?: string;
+  dueTime?: string;
   onChange: (value: string) => void;
+  onDueTimeChange?: (value: string) => void;
   disabled?: boolean;
   hint?: string;
   label?: string;
@@ -19,6 +21,12 @@ function toInputDate(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+function dueTimeInputValue(value?: string): string {
+  if (!value) return "";
+  const match = String(value).match(/^([01]\d|2[0-3]):[0-5]\d/);
+  return match ? match[0] : "";
 }
 
 function getQuickDates() {
@@ -45,8 +53,17 @@ const QUICK_BTN = cn(
   "border-border/50 bg-background hover:bg-muted/40"
 );
 
-export function DueDateField({ value, onChange, disabled, hint, label = "Due date" }: DueDateFieldProps) {
+export function DueDateField({
+  value,
+  dueTime,
+  onChange,
+  onDueTimeChange,
+  disabled,
+  hint,
+  label = "Due date",
+}: DueDateFieldProps) {
   const quick = getQuickDates();
+  const timeValue = dueTimeInputValue(dueTime);
   const activeQuick =
     value === quick.today
       ? "today"
@@ -57,6 +74,11 @@ export function DueDateField({ value, onChange, disabled, hint, label = "Due dat
           : value
             ? "custom"
             : null;
+
+  const setDate = (next: string) => {
+    onChange(next);
+    if (!next) onDueTimeChange?.("");
+  };
 
   return (
     <div className="space-y-2">
@@ -76,7 +98,7 @@ export function DueDateField({ value, onChange, disabled, hint, label = "Due dat
             key={opt.key}
             type="button"
             disabled={disabled}
-            onClick={() => onChange(opt.date)}
+            onClick={() => setDate(opt.date)}
             className={cn(
               QUICK_BTN,
               activeQuick === opt.key &&
@@ -90,7 +112,7 @@ export function DueDateField({ value, onChange, disabled, hint, label = "Due dat
           type="button"
           disabled={disabled}
           onClick={() => {
-            if (!value) onChange(quick.today);
+            if (!value) setDate(quick.today);
           }}
           className={cn(
             QUICK_BTN,
@@ -106,7 +128,7 @@ export function DueDateField({ value, onChange, disabled, hint, label = "Due dat
         <Input
           type="date"
           value={value ?? ""}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => setDate(e.target.value)}
           disabled={disabled}
           className="h-9 rounded-lg border-border/55 bg-background text-sm shadow-sm transition-all duration-200 focus-visible:ring-violet-500/20"
         />
@@ -116,7 +138,7 @@ export function DueDateField({ value, onChange, disabled, hint, label = "Due dat
             variant="ghost"
             size="icon"
             className="h-9 w-9 shrink-0 rounded-lg text-muted-foreground transition-colors duration-200 hover:text-foreground"
-            onClick={() => onChange("")}
+            onClick={() => setDate("")}
             disabled={disabled}
             aria-label="Clear due date"
           >
@@ -124,6 +146,37 @@ export function DueDateField({ value, onChange, disabled, hint, label = "Due dat
           </Button>
         )}
       </div>
+
+      {value && onDueTimeChange ? (
+        <div className="space-y-1.5">
+          <label className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+            <Clock className="h-3.5 w-3.5" />
+            Due time <span className="font-normal">(optional)</span>
+          </label>
+          <div className="flex items-center gap-2">
+            <Input
+              type="time"
+              value={timeValue}
+              onChange={(e) => onDueTimeChange(e.target.value)}
+              disabled={disabled}
+              className="h-9 rounded-lg border-border/55 bg-background text-sm shadow-sm transition-all duration-200 focus-visible:ring-violet-500/20"
+            />
+            {timeValue ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 shrink-0 rounded-lg text-muted-foreground"
+                onClick={() => onDueTimeChange("")}
+                disabled={disabled}
+                aria-label="Clear due time"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       {hint ? (
         <p className="text-[11px] leading-relaxed text-muted-foreground">{hint}</p>

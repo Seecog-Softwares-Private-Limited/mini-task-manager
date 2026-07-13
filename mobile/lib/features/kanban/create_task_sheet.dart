@@ -43,6 +43,7 @@ class _CreateTaskSheetState extends ConsumerState<CreateTaskSheet> {
   String _priority = 'MEDIUM';
   String? _statusId;
   DateTime? _dueDate;
+  TimeOfDay? _dueTime;
   final _taskAttachments = <PendingAttachment>[];
 
   bool _loading = false;
@@ -92,9 +93,19 @@ class _CreateTaskSheetState extends ConsumerState<CreateTaskSheet> {
       firstDate: DateTime.now().subtract(const Duration(days: 365)),
       lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
     );
-    if (picked != null) {
-      setState(() => _dueDate = picked);
-    }
+    if (picked == null) return;
+    setState(() => _dueDate = picked);
+  }
+
+  Future<void> _pickDueTime() async {
+    if (_dueDate == null) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: _dueTime ?? const TimeOfDay(hour: 9, minute: 0),
+      helpText: 'Due time (optional)',
+    );
+    if (time == null || !mounted) return;
+    setState(() => _dueTime = time);
   }
 
   Future<void> _submit() async {
@@ -136,6 +147,9 @@ class _CreateTaskSheetState extends ConsumerState<CreateTaskSheet> {
         statusId: _statusId,
         priority: _priority,
         dueDate: _dueDate == null ? null : DateFormat('yyyy-MM-dd').format(_dueDate!),
+        dueTime: _dueDate == null || _dueTime == null
+            ? null
+            : '${_dueTime!.hour.toString().padLeft(2, '0')}:${_dueTime!.minute.toString().padLeft(2, '0')}',
         subtasks: subtaskInputs,
       );
 
@@ -305,21 +319,71 @@ class _CreateTaskSheetState extends ConsumerState<CreateTaskSheet> {
                   ),
                 ],
                 const SizedBox(height: AppSpacing.md),
-                _SectionLabel('Due date'),
-                OutlinedButton.icon(
-                  onPressed: _loading ? null : _pickDueDate,
-                  icon: const Icon(Icons.calendar_today_rounded, size: 18),
-                  label: Text(
-                    _dueDate == null
-                        ? 'No due date'
-                        : DateFormat.yMMMd().format(_dueDate!),
-                  ),
+                _SectionLabel('Due date & time'),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _loading ? null : _pickDueDate,
+                        icon: const Icon(Icons.calendar_today_rounded, size: 18),
+                        label: Text(
+                          _dueDate == null
+                              ? 'Date'
+                              : DateFormat.yMMMd().format(_dueDate!),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _loading || _dueDate == null ? null : _pickDueTime,
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 12,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.schedule_rounded, size: 18),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                _dueTime == null
+                                    ? 'Time'
+                                    : _dueTime!.format(context),
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 if (_dueDate != null) ...[
                   const SizedBox(height: AppSpacing.xs),
-                  TextButton(
-                    onPressed: _loading ? null : () => setState(() => _dueDate = null),
-                    child: const Text('Clear due date'),
+                  Row(
+                    children: [
+                      if (_dueTime != null)
+                        TextButton(
+                          onPressed:
+                              _loading ? null : () => setState(() => _dueTime = null),
+                          child: const Text('Clear time'),
+                        ),
+                      TextButton(
+                        onPressed: _loading
+                            ? null
+                            : () => setState(() {
+                                  _dueDate = null;
+                                  _dueTime = null;
+                                }),
+                        child: const Text('Clear date'),
+                      ),
+                    ],
                   ),
                 ],
                 const SizedBox(height: AppSpacing.md),

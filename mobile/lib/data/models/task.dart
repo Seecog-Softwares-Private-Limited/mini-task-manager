@@ -79,6 +79,8 @@ class TaskSubtask {
     String? createdAt,
     String? note,
     bool clearNote = false,
+    bool clearDueDate = false,
+    bool clearDueTime = false,
   }) {
     return TaskSubtask(
       id: id ?? this.id,
@@ -87,8 +89,8 @@ class TaskSubtask {
       description: description ?? this.description,
       assigneeId: assigneeId ?? this.assigneeId,
       assigneeIds: assigneeIds ?? this.assigneeIds,
-      dueDate: dueDate ?? this.dueDate,
-      dueTime: dueTime ?? this.dueTime,
+      dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
+      dueTime: clearDueTime || clearDueDate ? null : (dueTime ?? this.dueTime),
       status: status ?? this.status,
       priority: priority ?? this.priority,
       statusId: statusId ?? this.statusId,
@@ -118,6 +120,7 @@ class Task {
     this.assigneeIds = const [],
     this.tags = const [],
     this.dueDate,
+    this.dueTime,
     this.completedAt,
     this.subtasks = const [],
     this.recurringTemplateId,
@@ -137,6 +140,7 @@ class Task {
   final List<String> tags;
   final String reporterId;
   final String? dueDate;
+  final String? dueTime;
   final String? completedAt;
   final int loggedMinutes;
   final List<TaskSubtask> subtasks;
@@ -162,6 +166,7 @@ class Task {
       tags: _parseTags(json['tags']),
       reporterId: _asString(json['reporterId']),
       dueDate: _nullableDateString(json['dueDate']),
+      dueTime: _nullableString(json['dueTime']),
       completedAt: _nullableDateString(json['completedAt']),
       loggedMinutes: json['loggedMinutes'] is int
           ? json['loggedMinutes'] as int
@@ -183,7 +188,9 @@ class Task {
     String? title,
     String? priority,
     String? dueDate,
+    String? dueTime,
     bool clearDueDate = false,
+    bool clearDueTime = false,
     List<String>? tags,
     List<String>? assigneeIds,
   }) {
@@ -200,6 +207,7 @@ class Task {
       tags: tags ?? this.tags,
       reporterId: reporterId,
       dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
+      dueTime: clearDueDate || clearDueTime ? null : (dueTime ?? this.dueTime),
       completedAt: completedAt,
       loggedMinutes: loggedMinutes,
       subtasks: subtasks ?? this.subtasks,
