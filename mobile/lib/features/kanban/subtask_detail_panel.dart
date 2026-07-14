@@ -496,10 +496,17 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
                         (status) => DropdownMenuItem(
                           value: status,
                           enabled: widget.canComplete || status != 'DONE',
-                          child: Text(_labelForSubtaskStatus(status)),
+                          child: Text(
+                            _labelForSubtaskStatus(status),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                       )
                       .toList(),
+                  selectedChild: Text(
+                    _labelForSubtaskStatus(_status),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   onChanged: _handleStatusChange,
                 ),
               ),
@@ -517,7 +524,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
                             children: [
                               _StatusDot(color: _priorityColor(item.$1)),
                               const SizedBox(width: 8),
-                              Text(item.$2),
+                              Flexible(child: Text(item.$2)),
                             ],
                           ),
                         ),
@@ -527,7 +534,12 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
                     children: [
                       _StatusDot(color: _priorityColor(priority.$1)),
                       const SizedBox(width: 8),
-                      Expanded(child: Text(priority.$2)),
+                      Expanded(
+                        child: Text(
+                          priority.$2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
                   ),
                   onChanged: (value) => setState(() => _priority = value),
@@ -564,27 +576,42 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
                     ),
                   ),
                 ),
-                TextButton(
-                  onPressed: widget.saving
-                      ? null
-                      : (_dueTime != null ? _clearDueTime : _clearDueDate),
-                  child: Text(_dueTime != null ? 'Clear time' : 'Clear'),
-                ),
               ],
               const SizedBox(width: AppSpacing.sm),
               OutlinedButton(
                 onPressed: widget.saving ? null : _openAssigneeSheet,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  minimumSize: const Size(40, 40),
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const Icon(Icons.person_add_alt_1_rounded, size: 18),
-                    const SizedBox(width: 6),
-                    Text(assigneeCount == 0 ? 'Assign' : '$assigneeCount'),
+                    if (assigneeCount > 0) ...[
+                      const SizedBox(width: 6),
+                      Text('$assigneeCount'),
+                    ],
                   ],
                 ),
               ),
             ],
           ),
+          if (_dueDate != null) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: widget.saving
+                    ? null
+                    : (_dueTime != null ? _clearDueTime : _clearDueDate),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  visualDensity: VisualDensity.compact,
+                ),
+                child: Text(_dueTime != null ? 'Clear time' : 'Clear date'),
+              ),
+            ),
+          ],
           if (!widget.canComplete) ...[
             const SizedBox(height: AppSpacing.sm),
             Text(

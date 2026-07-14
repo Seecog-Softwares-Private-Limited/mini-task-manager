@@ -11,6 +11,8 @@ import { VerifyEmailDto } from './dto/verify-email.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { RequestEmailChangeDto } from './dto/request-email-change.dto';
+import { VerifyEmailChangeDto } from './dto/verify-email-change.dto';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -128,6 +130,26 @@ export class AuthController {
     @Body() dto: ChangePasswordDto,
   ): Promise<{ message: string }> {
     return this.authService.changePassword(req.user.userId, dto.currentPassword, dto.newPassword);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @SkipThrottle({ auth: true })
+  @Post('request-email-change')
+  async requestEmailChange(
+    @Req() req: { user: { userId: string } },
+    @Body() dto: RequestEmailChangeDto,
+  ): Promise<{ message: string; pendingEmail: string; devVerificationCode?: string }> {
+    return this.authService.requestEmailChange(req.user.userId, dto.newEmail);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @SkipThrottle({ auth: true })
+  @Post('verify-email-change')
+  async verifyEmailChange(
+    @Req() req: { user: { userId: string } },
+    @Body() dto: VerifyEmailChangeDto,
+  ): Promise<LoginResponseDto & { message: string }> {
+    return this.authService.verifyEmailChange(req.user.userId, dto.token);
   }
 
   @Public()

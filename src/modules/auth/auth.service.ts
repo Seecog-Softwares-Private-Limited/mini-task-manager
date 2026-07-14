@@ -254,7 +254,7 @@ export class AuthService {
       where: isShortCode ? { shortCode: trimmed } : { token: trimmed },
       relations: ['user'],
     });
-    if (!record || !record.user) {
+    if (!record || !record.user || record.pendingEmail) {
       throw new BadRequestException(
         isShortCode
           ? 'Invalid or expired verification code.'
@@ -386,6 +386,115 @@ export class AuthService {
       message: hasPassword
         ? 'Password updated successfully'
         : 'Password set successfully. You can now sign in with email and password.',
+    };
+  }
+
+  async requestEmailChange(
+    userId: string,
+    newEmailRaw: string,
+  ): Promise<{
+    message: string;
+    pendingEmail: string;
+    devVerificationCode?: string;
+  }> {
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new BadRequestException('User not found');
+    if (!user.isActive) {
+      throw new BadRequestException('Your account is deactivated.');
+    }
+
+    const newEmail = newEmailRaw.toLowerCase().trim();
+    if (!newEmail) {
+      throw new BadRequestException('Enter a valid email address');
+    }
+    if (newEmail === user.email.toLowerCase()) {
+      throw new BadRequestException('New email must be different from your current email');
+    }
+
+    const existing = await this.usersService.findByEmail(newEmail);
+    if (existing && existing.id !== userId) {
+      throw new ConflictException('That email is already used by another account');
+    }
+
+    await this.verificationTokenRepo.delete({ userId });
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const shortCode = await this.generateUniqueVerificationShortCode();
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 1);
+
+    await this.verificationTokenRepo.save({
+      id: generateUuid(),
+      userId,
+      pendingEmail: newEmail,
+      token,
+      shortCode,
+      expiresAt,
+    } as Partial<EmailVerificationTokenEntity>);
+
+    this.logger.log(`Sending email-change verification to ${newEmail} for user ${userId}`);
+    if (process.env.NODE_ENV !== 'production') {
+      this.logger.log(`[dev] Email-change code for ${newEmail}: ${shortCode}`);
+    }
+
+    await this.emailService.sendEmailChangeVerification({
+      to: newEmail,
+      fullName: user.fullName,
+      shortCode,
+    });
+
+    const response = {
+      message: 'Verification code sent to your new email. Enter it to confirm the change.',
+      pendingEmail: newEmail,
+    };
+    if (process.env.NODE_ENV === 'production') return response;
+    return { ...response, devVerificationCode: shortCode };
+  }
+
+  async verifyEmailChange(
+    userId: string,
+    tokenOrCode: string,
+  ): Promise<LoginResponseDto & { message: string }> {
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new BadRequestException('User not found');
+    if (!user.isActive) {
+      throw new BadRequestException('Your account is deactivated.');
+    }
+
+    const trimmed = tokenOrCode.trim();
+    const isShortCode = /^\d{6}$/.test(trimmed);
+    const record = await this.verificationTokenRepo.findOne({
+      where: isShortCode ? { shortCode: trimmed, userId } : { token: trimmed, userId },
+    });
+
+    if (!record || !record.pendingEmail) {
+      throw new BadRequestException(
+        isShortCode
+          ? 'Invalid or expired verification code.'
+          : 'Invalid or expired verification link.',
+      );
+    }
+    if (new Date() > record.expiresAt) {
+      throw new BadRequestException('Verification code has expired. Please request a new one.');
+    }
+
+    const pendingEmail = record.pendingEmail.toLowerCase().trim();
+    const conflict = await this.usersService.findByEmail(pendingEmail);
+    if (conflict && conflict.id !== userId) {
+      throw new ConflictException('That email is already used by another account');
+    }
+
+    await this.usersService.updateEmail(userId, pendingEmail);
+    await this.verificationTokenRepo.delete(record.id);
+
+    const refreshedUser = await this.usersService.findById(userId);
+    if (!refreshedUser) {
+      throw new BadRequestException('User not found after email change.');
+    }
+
+    return {
+      ...(await this.buildLoginResponse(refreshedUser)),
+      message: 'Email updated successfully.',
     };
   }
 
@@ -558,6 +667,7 @@ export class AuthService {
     await this.verificationTokenRepo.save({
       id: generateUuid(),
       userId,
+      pendingEmail: null,
       token,
       shortCode,
       expiresAt,

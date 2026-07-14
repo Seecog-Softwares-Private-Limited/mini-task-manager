@@ -10,6 +10,10 @@ export class EmailVerificationTokenEntity {
   @Column({ name: 'user_id', type: 'binary', length: 16, transformer: uuidBinaryTransformer })
   userId!: string;
 
+  /** Target email when this token is for an email-change request; null for signup verify. */
+  @Column({ name: 'pending_email', type: 'varchar', length: 150, nullable: true })
+  pendingEmail!: string | null;
+
   @Column({ type: 'varchar', length: 64 })
   token!: string;
 

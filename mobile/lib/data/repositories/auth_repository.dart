@@ -90,4 +90,45 @@ class AuthRepository {
       throw ApiException.fromDio(error);
     }
   }
+
+  Future<({String message, String pendingEmail, String? devCode})> requestEmailChange(
+    String newEmail,
+  ) async {
+    try {
+      final response = await _api.dio.post<Map<String, dynamic>>(
+        '/auth/request-email-change',
+        data: {'newEmail': newEmail.trim()},
+      );
+      final data = response.data ?? const <String, dynamic>{};
+      return (
+        message: data['message'] as String? ?? 'Verification code sent',
+        pendingEmail: data['pendingEmail'] as String? ?? newEmail.trim(),
+        devCode: data['devVerificationCode'] as String?,
+      );
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<({String message, LoginResponse login})> verifyEmailChange(String code) async {
+    try {
+      final response = await _api.dio.post<Map<String, dynamic>>(
+        '/auth/verify-email-change',
+        data: {'token': code.trim()},
+      );
+      final data = response.data!;
+      final login = LoginResponse.fromJson(data);
+      await _storage.writeToken(login.accessToken);
+      await _storage.writeUser(login.user);
+      if (login.organizationId != null) {
+        await _storage.writeOrgId(login.organizationId);
+      }
+      return (
+        message: data['message'] as String? ?? 'Email updated successfully',
+        login: login,
+      );
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
 }

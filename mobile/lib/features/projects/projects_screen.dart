@@ -85,15 +85,10 @@ class ProjectsScreen extends ConsumerWidget {
           },
           child: ListView.separated(
             padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, 88),
-            itemCount: projects.length + 1,
+            itemCount: projects.length,
             separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
             itemBuilder: (context, index) {
-              if (index == 0) {
-                return _CreateProjectBanner(
-                  onTap: () => _openCreateProject(context, ref),
-                );
-              }
-              final project = projects[index - 1];
+              final project = projects[index];
               return _PremiumProjectCard(
                 project: project,
                 isDark: isDark,
@@ -106,76 +101,6 @@ class ProjectsScreen extends ConsumerWidget {
           ),
         );
       },
-    );
-  }
-}
-
-class _CreateProjectBanner extends StatelessWidget {
-  const _CreateProjectBanner({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Ink(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: AppColors.primary.withValues(alpha: 0.45),
-              width: 1.5,
-            ),
-            color: AppColors.primary.withValues(alpha: 0.06),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.md,
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [AppColors.primary, AppColors.primaryGradientEnd],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.add_rounded, color: Colors.white),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Create project',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.primary,
-                            ),
-                      ),
-                      Text(
-                        'Add a new project to this workspace',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColors.textMuted,
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(Icons.chevron_right_rounded, color: AppColors.primary.withValues(alpha: 0.7)),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

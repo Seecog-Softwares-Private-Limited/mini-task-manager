@@ -35,7 +35,7 @@ const _weekdayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 class _ChecklistDraft {
   _ChecklistDraft() : titleController = TextEditingController();
   final TextEditingController titleController;
-  int offsetDays = 0;
+  TimeOfDay? dueTime;
   void dispose() => titleController.dispose();
 }
 
@@ -196,12 +196,15 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
     for (final item in _checklist) {
       final title = item.titleController.text.trim();
       if (title.isEmpty) continue;
+      final time = item.dueTime;
       result.add({
         'title': title,
         'completed': false,
         'status': 'TODO',
         'priority': 'MEDIUM',
-        if (item.offsetDays > 0) 'dueOffsetDays': item.offsetDays,
+        if (time != null)
+          'dueTime':
+              '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
       });
     }
     return result;
@@ -560,8 +563,8 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
                   onRemove: (i) => setState(() {
                     _checklist.removeAt(i).dispose();
                   }),
-                  onOffsetChanged: (i, v) =>
-                      setState(() => _checklist[i].offsetDays = v),
+                  onDueTimeChanged: (i, time) =>
+                      setState(() => _checklist[i].dueTime = time),
                 ),
               ],
               const SizedBox(height: AppSpacing.md),
@@ -707,14 +710,23 @@ class _ChecklistEditor extends StatelessWidget {
     required this.enabled,
     required this.onAdd,
     required this.onRemove,
-    required this.onOffsetChanged,
+    required this.onDueTimeChanged,
   });
 
   final List<_ChecklistDraft> items;
   final bool enabled;
   final VoidCallback onAdd;
   final ValueChanged<int> onRemove;
-  final void Function(int index, int offset) onOffsetChanged;
+  final void Function(int index, TimeOfDay? time) onDueTimeChanged;
+
+  Future<void> _pickTime(BuildContext context, int index) async {
+    final current = items[index].dueTime;
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: current ?? const TimeOfDay(hour: 9, minute: 0),
+    );
+    if (picked != null) onDueTimeChanged(index, picked);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -760,23 +772,13 @@ class _ChecklistEditor extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 6),
-                Tooltip(
-                  message: 'Due days after run',
-                  child: SizedBox(
-                    width: 54,
-                    child: DropdownButtonFormField<int>(
-                      initialValue: items[i].offsetDays,
-                      isDense: true,
-                      decoration: const InputDecoration(isDense: true),
-                      items: [
-                        for (var d = 0; d <= 7; d++)
-                          DropdownMenuItem(value: d, child: Text('+$d')),
-                      ],
-                      onChanged: enabled
-                          ? (v) => onOffsetChanged(i, v ?? 0)
-                          : null,
-                    ),
-                  ),
+                _ChecklistTimeCircle(
+                  time: items[i].dueTime,
+                  enabled: enabled,
+                  onTap: () => _pickTime(context, i),
+                  onLongPress: items[i].dueTime == null
+                      ? null
+                      : () => onDueTimeChanged(i, null),
                 ),
                 IconButton(
                   onPressed: enabled ? () => onRemove(i) : null,
@@ -795,6 +797,60 @@ class _ChecklistEditor extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ChecklistTimeCircle extends StatelessWidget {
+  const _ChecklistTimeCircle({
+    required this.time,
+    required this.enabled,
+    required this.onTap,
+    this.onLongPress,
+  });
+
+  final TimeOfDay? time;
+  final bool enabled;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasTime = time != null;
+    final tooltip = hasTime
+        ? '${time!.format(context)} · long-press to clear'
+        : 'Set due time';
+
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: enabled ? onTap : null,
+          onLongPress: enabled ? onLongPress : null,
+          customBorder: const CircleBorder(),
+          child: Ink(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: hasTime
+                  ? AppColors.primary.withValues(alpha: 0.12)
+                  : AppColors.border.withValues(alpha: 0.45),
+              border: Border.all(
+                color: hasTime
+                    ? AppColors.primary.withValues(alpha: 0.35)
+                    : AppColors.border,
+              ),
+            ),
+            child: Icon(
+              Icons.schedule_rounded,
+              size: 16,
+              color: hasTime ? AppColors.primary : AppColors.textMuted,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

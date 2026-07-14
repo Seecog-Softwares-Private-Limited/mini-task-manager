@@ -12,7 +12,6 @@ import '../../data/models/workflow.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../auth/session_controller.dart';
 import '../kanban/kanban_providers.dart';
-import '../kanban/subtask_row_style.dart';
 import '../kanban/task_detail_sheet.dart';
 import 'recurring_providers.dart';
 
@@ -64,16 +63,42 @@ String _cadenceLabel(String repeatType) => switch (repeatType.toUpperCase()) {
       _ => 'Recurring',
     };
 
-/// Advances a date by one cadence step. Returns null for unknown cadences.
-DateTime? _nextCadence(DateTime from, String repeatType) =>
-    switch (repeatType.toUpperCase()) {
-      'DAILY' => from.add(const Duration(days: 1)),
-      'WEEKLY' => from.add(const Duration(days: 7)),
-      'BIWEEKLY' => from.add(const Duration(days: 14)),
-      'MONTHLY' => DateTime(from.year, from.month + 1, from.day),
-      'YEARLY' => DateTime(from.year + 1, from.month, from.day),
-      _ => null,
-    };
+/// JS/backend day index: 0=Sun … 6=Sat. Dart weekday is 1=Mon … 7=Sun.
+int _jsWeekday(DateTime d) => d.weekday % 7;
+
+/// Advances a projected due date using template cadence (honors weeklyDays).
+DateTime? _nextProjectedDue(DateTime from, RecurringTemplate tpl) {
+  final repeat = tpl.repeatType.toUpperCase();
+  final interval = (tpl.interval ?? 1).clamp(1, 999);
+  if (repeat == 'WEEKLY') {
+    final weeklyDays = tpl.weeklyDays;
+    final startParsed = DateTime.tryParse(tpl.startDueDate ?? '');
+    final start = startParsed == null
+        ? DateTime(from.year, from.month, from.day)
+        : DateTime(startParsed.year, startParsed.month, startParsed.day);
+    for (var i = 1; i <= 400; i++) {
+      final candidate = from.add(Duration(days: i));
+      final day = _jsWeekday(candidate);
+      if (weeklyDays.isNotEmpty && !weeklyDays.contains(day)) continue;
+      if (weeklyDays.isEmpty && day != _jsWeekday(start)) continue;
+      final weekDiff = candidate.difference(start).inDays ~/ 7;
+      if (weekDiff < 0) continue;
+      if (weekDiff % interval == 0) {
+        return DateTime(candidate.year, candidate.month, candidate.day);
+      }
+    }
+    return DateTime(from.year, from.month, from.day)
+        .add(Duration(days: 7 * interval));
+  }
+
+  return switch (repeat) {
+    'DAILY' => from.add(Duration(days: interval)),
+    'BIWEEKLY' => from.add(const Duration(days: 14)),
+    'MONTHLY' => DateTime(from.year, from.month + interval, from.day),
+    'YEARLY' => DateTime(from.year + interval, from.month, from.day),
+    _ => null,
+  };
+}
 
 bool _isTaskDone(Task task, Set<String> doneStatusIds) =>
     task.statusId != null && doneStatusIds.contains(task.statusId);
@@ -302,9 +327,18 @@ class _RecurringCalendarTabState extends ConsumerState<RecurringCalendarTab> {
       final next = DateTime.tryParse(tpl.nextDueDate);
       if (next == null) continue;
       var cursor = DateTime(next.year, next.month, next.day);
+      final endLimit = () {
+        if ((tpl.endType ?? '').toUpperCase() != 'ON_DATE') return null;
+        final raw = tpl.endDate;
+        if (raw == null || raw.isEmpty) return null;
+        final parsed = DateTime.tryParse(raw);
+        if (parsed == null) return null;
+        return DateTime(parsed.year, parsed.month, parsed.day);
+      }();
       var guard = 0;
       while (!cursor.isAfter(horizonEnd) && guard < 400) {
         guard++;
+        if (endLimit != null && cursor.isAfter(endLimit)) break;
         if (cursor.isAfter(today)) {
           final key = DateTime(cursor.year, cursor.month, cursor.day);
           final alreadyReal = (byDay[key] ?? const [])
@@ -321,7 +355,7 @@ class _RecurringCalendarTabState extends ConsumerState<RecurringCalendarTab> {
                 );
           }
         }
-        final stepped = _nextCadence(cursor, tpl.repeatType);
+        final stepped = _nextProjectedDue(cursor, tpl);
         if (stepped == null) break;
         cursor = stepped;
       }
@@ -1080,119 +1114,86 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.md, AppSpacing.md, AppSpacing.md, AppSpacing.sm),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.event_repeat,
-                            color: AppColors.violet, size: 22),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                DateFormat('EEEE, MMM d').format(widget.day),
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              Text(
-                                totalRuns == 0
-                                    ? 'No runs scheduled'
-                                    : '$totalRuns ${totalRuns == 1 ? 'run' : 'runs'} · tap to check off',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(color: AppColors.textMuted),
-                              ),
-                            ],
+                    Text(
+                      DateFormat('EEEE, MMM d').format(widget.day),
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
                           ),
-                        ),
-                      ],
                     ),
-                    if (allRunsDone) ...[
-                      const SizedBox(height: AppSpacing.sm),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: AppColors.success.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.celebration_rounded,
-                                size: 16, color: AppColors.success),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'All runs complete for this day!',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelMedium
-                                    ?.copyWith(
-                                      color: AppColors.success,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ] else if (totalSubs > 0) ...[
-                      const SizedBox(height: AppSpacing.sm),
+                    const SizedBox(height: 4),
+                    Text(
+                      totalRuns == 0
+                          ? 'Nothing scheduled'
+                          : allRunsDone
+                              ? 'All $totalRuns ${totalRuns == 1 ? 'run' : 'runs'} complete'
+                              : '$totalRuns ${totalRuns == 1 ? 'run' : 'runs'} · tap checklist to check off',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.textMuted,
+                          ),
+                    ),
+                    if (totalSubs > 0) ...[
+                      const SizedBox(height: 14),
                       Row(
                         children: [
                           Text(
-                            'Day progress',
+                            'Progress',
                             style: Theme.of(context)
                                 .textTheme
-                                .labelSmall
-                                ?.copyWith(color: AppColors.textMuted),
+                                .labelMedium
+                                ?.copyWith(
+                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w600,
+                                ),
                           ),
                           const Spacer(),
                           Text(
-                            '$doneSubs/$totalSubs subtasks',
+                            '$doneSubs / $totalSubs',
                             style: Theme.of(context)
                                 .textTheme
-                                .labelSmall
+                                .labelMedium
                                 ?.copyWith(
-                                  color: AppColors.textSecondary,
+                                  color: allRunsDone
+                                      ? AppColors.success
+                                      : AppColors.textPrimary,
                                   fontWeight: FontWeight.w700,
                                 ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 5),
+                      const SizedBox(height: 8),
                       ClipRRect(
                         borderRadius: BorderRadius.circular(999),
                         child: LinearProgressIndicator(
                           value: doneSubs / totalSubs,
-                          minHeight: 7,
+                          minHeight: 6,
                           backgroundColor:
-                              AppColors.success.withValues(alpha: 0.12),
-                          color: AppColors.success,
+                              AppColors.border.withValues(alpha: 0.7),
+                          color: allRunsDone
+                              ? AppColors.success
+                              : AppColors.primary,
                         ),
                       ),
                     ],
                   ],
                 ),
               ),
-              const Divider(height: 1),
+              Divider(height: 1, color: AppColors.border.withValues(alpha: 0.8)),
               Flexible(
                 child: ListView(
                   controller: scrollController,
-                  padding: const EdgeInsets.all(AppSpacing.md),
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
                   children: [
                     for (final task in _tasks) ...[
                       _buildRunCard(task, todayKey),
-                      const SizedBox(height: AppSpacing.xs),
+                      const SizedBox(height: 10),
                     ],
                     for (final run in widget.projected) ...[
                       _ProjectedRunCard(run: run),
-                      const SizedBox(height: AppSpacing.xs),
+                      const SizedBox(height: 10),
                     ],
                   ],
                 ),
@@ -1201,7 +1202,7 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
                 SafeArea(
                   top: false,
                   child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.md),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -1212,9 +1213,10 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
                               canCompleteDay ? () => _completeDay(eligible) : null,
                         ),
                         if (blocked.isNotEmpty) ...[
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 8),
                           Text(
-                            'Finish all subtasks to complete every run.',
+                            'Finish every checklist item to unlock Complete day.',
+                            textAlign: TextAlign.center,
                             style: Theme.of(context)
                                 .textTheme
                                 .labelSmall
@@ -1238,9 +1240,14 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
     final isExpanded = _expanded.contains(task.id);
     final canMarkDone =
         !_busy && !_isDone(task) && (total == 0 || done == total);
+    final progress = total == 0 ? 0.0 : done / total;
 
-    return SurfaceCard(
-      padding: EdgeInsets.zero,
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.85)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1254,78 +1261,99 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
               }
             }),
             child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.sm),
-              child: IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Container(
-                      width: 4,
-                      decoration: BoxDecoration(
-                        color: _priorityColor(task.priority),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
+              padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: _priorityColor(task.priority).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  task.title,
-                                  style:
-                                      Theme.of(context).textTheme.titleMedium,
-                                ),
+                    child: Icon(
+                      Icons.event_repeat_rounded,
+                      size: 18,
+                      color: _priorityColor(task.priority),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          task.title,
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
                               ),
-                              const SizedBox(width: AppSpacing.xs),
-                              _statusBadge(task, todayKey),
-                            ],
-                          ),
-                          if (total > 0) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              '$done of $total subtasks done',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelSmall
-                                  ?.copyWith(color: AppColors.textMuted),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            _statusBadge(task, todayKey),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                total == 0
+                                    ? 'No checklist'
+                                    : '$done of $total done',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(color: AppColors.textMuted),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
                           ],
+                        ),
+                        if (total > 0) ...[
+                          const SizedBox(height: 8),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(999),
+                            child: LinearProgressIndicator(
+                              value: progress,
+                              minHeight: 4,
+                              backgroundColor:
+                                  AppColors.border.withValues(alpha: 0.6),
+                              color: progress >= 1
+                                  ? AppColors.success
+                                  : AppColors.primary,
+                            ),
+                          ),
                         ],
-                      ),
+                      ],
                     ),
-                    const SizedBox(width: AppSpacing.xs),
-                    Icon(
-                      isExpanded
-                          ? Icons.keyboard_arrow_up_rounded
-                          : Icons.keyboard_arrow_down_rounded,
-                      color: AppColors.textMuted,
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    isExpanded
+                        ? Icons.keyboard_arrow_up_rounded
+                        : Icons.keyboard_arrow_down_rounded,
+                    color: AppColors.textMuted,
+                  ),
+                ],
               ),
             ),
           ),
-          if (isExpanded)
+          if (isExpanded) ...[
+            Divider(height: 1, color: AppColors.border.withValues(alpha: 0.7)),
             Padding(
-              padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.md, 0, AppSpacing.sm, AppSpacing.sm),
+              padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (total == 0)
                     Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 10,
+                      ),
                       child: Text(
                         'No checklist for this run.',
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: AppColors.textMuted),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.textMuted,
+                            ),
                       ),
                     )
                   else
@@ -1337,52 +1365,92 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
                         onDelete: () => _confirmDeleteSubtask(task, i),
                         enabled: !_busy,
                       ),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: AppSpacing.xs,
-                    runSpacing: AppSpacing.xs,
-                    crossAxisAlignment: WrapCrossAlignment.center,
+                  const SizedBox(height: 8),
+                  Row(
                     children: [
-                      FilledButton.icon(
-                        onPressed: canMarkDone ? () => _markDone(task) : null,
-                        icon: const Icon(Icons.check_circle_rounded, size: 16),
-                        label: const Text('Mark done'),
-                        style: FilledButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                          backgroundColor: AppColors.success,
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: canMarkDone ? () => _markDone(task) : null,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.success,
+                            disabledBackgroundColor:
+                                AppColors.border.withValues(alpha: 0.5),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text('Mark done'),
                         ),
                       ),
-                      OutlinedButton.icon(
+                      const SizedBox(width: 8),
+                      _RunIconAction(
+                        tooltip: 'Snooze',
+                        icon: Icons.snooze_rounded,
                         onPressed: _busy ? null : () => _snooze(task),
-                        icon: const Icon(Icons.snooze_rounded, size: 16),
-                        label: const Text('Snooze'),
-                        style: OutlinedButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                        ),
                       ),
-                      OutlinedButton.icon(
+                      _RunIconAction(
+                        tooltip: 'Skip',
+                        icon: Icons.skip_next_rounded,
                         onPressed: _busy ? null : () => _skip(task),
-                        icon: const Icon(Icons.skip_next_rounded, size: 16),
-                        label: const Text('Skip'),
-                        style: OutlinedButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                        ),
                       ),
-                      TextButton.icon(
+                      _RunIconAction(
+                        tooltip: 'Details',
+                        icon: Icons.open_in_new_rounded,
                         onPressed: () => widget.onOpenDetails(task),
-                        icon: const Icon(Icons.open_in_new_rounded, size: 16),
-                        label: const Text('Details'),
-                        style: TextButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                          foregroundColor: AppColors.textSecondary,
-                        ),
                       ),
                     ],
                   ),
                 ],
               ),
             ),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+class _RunIconAction extends StatelessWidget {
+  const _RunIconAction({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Tooltip(
+        message: tooltip,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onPressed,
+            borderRadius: BorderRadius.circular(12),
+            child: Ink(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Icon(
+                icon,
+                size: 18,
+                color: onPressed == null
+                    ? AppColors.textMuted.withValues(alpha: 0.45)
+                    : AppColors.textSecondary,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -1408,138 +1476,104 @@ class _SubtaskRow extends StatelessWidget {
     final completed = subtask.completed;
     final note = subtask.note?.trim();
     final hasNote = note != null && note.isNotEmpty;
-    final rowStyle = subtaskRowStyle(subtask);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: rowStyle.backgroundColor,
-            border: Border.all(color: rowStyle.borderColor),
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
-                blurRadius: 4,
-                offset: const Offset(0, 1),
-              ),
-            ],
-          ),
-          child: IntrinsicHeight(
+    final dueTime = subtask.dueTime?.trim();
+    final hasTime = dueTime != null && dueTime.isNotEmpty;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: enabled ? () => onToggle(!completed) : null,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(4, 6, 2, 6),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Container(width: 4, color: rowStyle.accentColor),
+                SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: Checkbox(
+                    value: completed,
+                    visualDensity: VisualDensity.compact,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    activeColor: AppColors.success,
+                    onChanged:
+                        enabled ? (value) => onToggle(value ?? false) : null,
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Expanded(
-                  child: InkWell(
-            borderRadius: BorderRadius.circular(8),
-            onTap: enabled ? () => onToggle(!completed) : null,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: Checkbox(
-                      value: completed,
-                      visualDensity: VisualDensity.compact,
-                      activeColor: AppColors.success,
-                      onChanged:
-                          enabled ? (value) => onToggle(value ?? false) : null,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      subtask.title,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: completed
-                                ? AppColors.textMuted
-                                : AppColors.textPrimary,
-                            decoration:
-                                completed ? TextDecoration.lineThrough : null,
-                          ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: enabled ? onEditNote : null,
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                    tooltip: hasNote ? 'Edit note' : 'Add note',
-                    icon: Icon(
-                      hasNote
-                        ? Icons.sticky_note_2_rounded
-                        : Icons.note_add_outlined,
-                    size: 18,
-                    color: hasNote ? AppColors.primary : AppColors.textMuted,
-                  ),
-                ),
-                  IconButton(
-                    onPressed: enabled ? onDelete : null,
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                    tooltip: 'Delete subtask',
-                    icon: Icon(
-                      Icons.delete_outline_rounded,
-                      size: 18,
-                      color: enabled
-                          ? AppColors.danger.withValues(alpha: 0.85)
-                          : AppColors.textMuted,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (hasNote)
-          Padding(
-            padding: const EdgeInsets.only(left: 34, bottom: 4, right: 4),
-            child: GestureDetector(
-              onTap: enabled ? onEditNote : null,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.06),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.15),
-                  ),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.subject_rounded,
-                        size: 14, color: AppColors.textMuted),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        note,
-                        style: Theme.of(context)
-                            .textTheme
-                            .bodySmall
-                            ?.copyWith(color: AppColors.textSecondary),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        subtask.title,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w500,
+                              color: completed
+                                  ? AppColors.textMuted
+                                  : AppColors.textPrimary,
+                              decoration: completed
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                            ),
                       ),
+                      if (hasTime || hasNote) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          [
+                            if (hasTime) dueTime,
+                            if (hasNote) 'Note',
+                          ].join(' · '),
+                          style:
+                              Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: AppColors.textMuted,
+                                  ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                PopupMenuButton<_SubtaskMenuAction>(
+                  tooltip: 'More',
+                  enabled: enabled,
+                  padding: EdgeInsets.zero,
+                  icon: Icon(
+                    Icons.more_horiz_rounded,
+                    color: AppColors.textMuted.withValues(alpha: 0.9),
+                  ),
+                  onSelected: (action) {
+                    switch (action) {
+                      case _SubtaskMenuAction.note:
+                        onEditNote();
+                      case _SubtaskMenuAction.delete:
+                        onDelete();
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: _SubtaskMenuAction.note,
+                      child: Text(hasNote ? 'Edit note' : 'Add note'),
+                    ),
+                    const PopupMenuItem(
+                      value: _SubtaskMenuAction.delete,
+                      child: Text('Delete'),
                     ),
                   ],
                 ),
-              ),
+              ],
             ),
           ),
-      ],
+        ),
+      ),
     );
   }
 }
+
+enum _SubtaskMenuAction { note, delete }
 
 /// Read-only card for a projected upcoming run (not yet a real task).
 class _ProjectedRunCard extends StatelessWidget {
@@ -1549,66 +1583,51 @@ class _ProjectedRunCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Opacity(
-      opacity: 0.85,
-      child: SurfaceCard(
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(
-                width: 4,
-                decoration: BoxDecoration(
-                  color: _priorityColor(run.priority),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            run.title,
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.xs),
-                        const _Pill(
-                          label: 'Upcoming',
-                          color: AppColors.violet,
-                          icon: Icons.event_repeat_rounded,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.autorenew_rounded,
-                            size: 13, color: AppColors.textMuted),
-                        const SizedBox(width: 5),
-                        Text(
-                          _cadenceLabel(run.repeatType),
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelSmall
-                              ?.copyWith(
-                                color: AppColors.textMuted,
-                                fontSize: 11,
-                              ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.85)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: _priorityColor(run.priority).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              Icons.schedule_rounded,
+              size: 18,
+              color: _priorityColor(run.priority).withValues(alpha: 0.75),
+            ),
           ),
-        ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  run.title,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textSecondary,
+                      ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Upcoming · ${_cadenceLabel(run.repeatType)}',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: AppColors.textMuted,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

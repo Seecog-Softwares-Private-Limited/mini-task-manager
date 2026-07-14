@@ -1,389 +1,197 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/preferences/app_preferences.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../data/models/my_tasks.dart';
-import '../../data/models/task.dart';
-import '../../data/models/workflow.dart';
+import '../../data/models/project.dart';
 import '../../shared/widgets/app_widgets.dart';
-import '../kanban/kanban_providers.dart';
-import '../kanban/task_detail_sheet.dart';
+import '../kanban/project_board_screen.dart';
+import '../kanban/project_switcher.dart';
 import '../projects/projects_providers.dart';
-import 'home_providers.dart';
 import 'my_work_providers.dart';
 
-class MyWorkScreen extends ConsumerStatefulWidget {
+class MyWorkScreen extends ConsumerWidget {
   const MyWorkScreen({
     super.key,
-    required this.initialFilter,
+    this.initialFilter = MyWorkFilter.open,
     this.embedded = false,
   });
 
+  /// Kept for Home quick-links compatibility; filters are no longer shown.
   final MyWorkFilter initialFilter;
 
   /// When true, renders without its own [Scaffold]/[AppBar] (for shell tabs).
   final bool embedded;
 
   @override
-  ConsumerState<MyWorkScreen> createState() => _MyWorkScreenState();
-}
-
-class _MyWorkScreenState extends ConsumerState<MyWorkScreen> {
-  @override
-  void initState() {
-    super.initState();
-    // Seed the active filter before the first build reads myWorkProvider.
-    ref.read(myWorkFilterProvider.notifier).state = widget.initialFilter;
-  }
-
-  Future<void> _openTask(Task task) async {
-    List<WorkflowStatus> statuses = const [];
-    try {
-      statuses = await ref
-          .read(projectWorkflowStatusesProvider(task.projectId).future);
-    } catch (_) {
-      statuses = const [];
-    }
-    if (!mounted) return;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) {
-        return TaskDetailSheet(
-          task: task,
-          statuses: statuses,
-          projectId: task.projectId,
-          onUpdated: () {
-            ref.invalidate(myWorkProvider);
-            ref.invalidate(homeDashboardProvider);
-          },
-          onDeleted: () {
-            ref.invalidate(myWorkProvider);
-            ref.invalidate(homeDashboardProvider);
-          },
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final activeFilter = ref.watch(myWorkFilterProvider);
-    final resultAsync = ref.watch(myWorkProvider);
-    final counts = resultAsync.valueOrNull?.counts;
-    final projects = ref.watch(projectsProvider).valueOrNull ?? const [];
-    final projectNames = {for (final p in projects) p.id: p.name};
+  Widget build(BuildContext context, WidgetRef ref) {
+    final projectsAsync = ref.watch(projectsProvider);
+    final projects = (projectsAsync.valueOrNull ?? const [])
+        .where((p) => !p.isArchived)
+        .toList();
+    final selectedProjectId = ref.watch(tasksSelectedProjectIdProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final body = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _FilterBar(
-          active: activeFilter,
-          counts: counts,
-          onSelected: (f) =>
-              ref.read(myWorkFilterProvider.notifier).state = f,
+        _ProjectPicker(
+          projects: projects,
+          selectedProjectId: selectedProjectId,
+          loading: projectsAsync.isLoading,
+          onSelected: (projectId) {
+            ref.read(tasksProjectIdProvider.notifier).state = projectId;
+            ref.read(lastProjectIdProvider.notifier).setProjectId(projectId);
+          },
         ),
-        const Divider(height: 1),
         Expanded(
-          child: RefreshIndicator(
-            onRefresh: () async {
-              ref.invalidate(myWorkProvider);
-              await ref.read(myWorkProvider.future);
-            },
-            child: resultAsync.when(
-              data: (result) => _TaskList(
-                result: result,
-                filter: activeFilter,
-                projectNames: projectNames,
-                onOpenTask: _openTask,
-              ),
-              loading: () => ListView(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                children: const [
-                  ShimmerBox(height: 64),
-                  SizedBox(height: AppSpacing.sm),
-                  ShimmerBox(height: 64),
-                  SizedBox(height: AppSpacing.sm),
-                  ShimmerBox(height: 64),
-                ],
-              ),
-              error: (error, __) => ListView(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(AppSpacing.lg),
-                    child: EmptyState(
-                      icon: Icons.error_outline_rounded,
-                      title: 'Could not load tasks',
-                      message: error.toString(),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          child: ColoredBox(
+            color: isDark ? const Color(0xFF0B1220) : const Color(0xFFF1F5F9),
+            child: projects.isEmpty && !projectsAsync.isLoading
+                ? const EmptyState(
+                    icon: Icons.folder_off_outlined,
+                    title: 'No projects',
+                    message:
+                        'Create a project first, then open its board here.',
+                  )
+                : selectedProjectId == null
+                    ? const Center(child: CircularProgressIndicator())
+                    : ProjectBoardScreen(
+                        key: ValueKey('tasks-board-$selectedProjectId'),
+                        projectId: selectedProjectId,
+                        embedded: true,
+                      ),
           ),
         ),
       ],
     );
 
-    if (widget.embedded) return body;
+    if (embedded) return body;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('My work')),
+      appBar: AppBar(title: const Text('Tasks')),
       body: body,
     );
   }
 }
 
-class _FilterBar extends StatelessWidget {
-  const _FilterBar({
-    required this.active,
-    required this.counts,
+class _ProjectPicker extends StatelessWidget {
+  const _ProjectPicker({
+    required this.projects,
+    required this.selectedProjectId,
+    required this.loading,
     required this.onSelected,
   });
 
-  final MyWorkFilter active;
-  final MyTasksCounts? counts;
-  final ValueChanged<MyWorkFilter> onSelected;
-
-  int? _countFor(MyWorkFilter f) {
-    final c = counts;
-    if (c == null) return null;
-    return switch (f) {
-      MyWorkFilter.overdue => c.overdue,
-      MyWorkFilter.today => c.today,
-      MyWorkFilter.week => c.week,
-      MyWorkFilter.completed => c.completed,
-      MyWorkFilter.open => c.open,
-      MyWorkFilter.all => c.all,
-    };
-  }
+  final List<Project> projects;
+  final String? selectedProjectId;
+  final bool loading;
+  final ValueChanged<String> onSelected;
 
   @override
   Widget build(BuildContext context) {
-    const order = [
-      MyWorkFilter.overdue,
-      MyWorkFilter.today,
-      MyWorkFilter.week,
-      MyWorkFilter.open,
-      MyWorkFilter.completed,
-      MyWorkFilter.all,
-    ];
-    return SizedBox(
-      height: 56,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-        children: [
-          for (final f in order)
-            Padding(
-              padding: const EdgeInsets.only(right: AppSpacing.xs),
-              child: Center(
-                child: ChoiceChip(
-                  selected: active == f,
-                  label: Text(
-                    _countFor(f) != null
-                        ? '${f.label} ${_countFor(f)}'
-                        : f.label,
-                  ),
-                  onSelected: (_) => onSelected(f),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TaskList extends StatelessWidget {
-  const _TaskList({
-    required this.result,
-    required this.filter,
-    required this.projectNames,
-    required this.onOpenTask,
-  });
-
-  final MyTasksResult result;
-  final MyWorkFilter filter;
-  final Map<String, String> projectNames;
-  final ValueChanged<Task> onOpenTask;
-
-  @override
-  Widget build(BuildContext context) {
-    if (result.data.isEmpty) {
-      return ListView(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: EmptyState(
-              icon: filter == MyWorkFilter.completed
-                  ? Icons.emoji_events_outlined
-                  : Icons.check_circle_outline_rounded,
-              title: _emptyTitle(filter),
-              message: _emptyMessage(filter),
-            ),
-          ),
-        ],
+    if (loading && projects.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(AppSpacing.md),
+        child: LinearProgressIndicator(),
       );
     }
+    if (projects.isEmpty) return const SizedBox.shrink();
 
-    final hasMore = result.meta.total > result.data.length;
-    return ListView.separated(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      itemCount: result.data.length + (hasMore ? 1 : 0),
-      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
-      itemBuilder: (context, index) {
-        if (index >= result.data.length) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-            child: Text(
-              'Showing ${result.data.length} of ${result.meta.total}',
-              textAlign: TextAlign.center,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
-                  ?.copyWith(color: AppColors.textMuted),
+    final effectiveId = selectedProjectId != null &&
+            projects.any((p) => p.id == selectedProjectId)
+        ? selectedProjectId!
+        : projects.first.id;
+    final selected =
+        projects.firstWhere((p) => p.id == effectiveId, orElse: () => projects.first);
+
+    return Material(
+      color: Theme.of(context).colorScheme.surface,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.sm,
+          AppSpacing.md,
+          AppSpacing.sm,
+        ),
+        child: DropdownButtonFormField<String>(
+          key: ValueKey('project-picker-$effectiveId'),
+          initialValue: effectiveId,
+          isExpanded: true,
+          borderRadius: BorderRadius.circular(14),
+          decoration: InputDecoration(
+            labelText: 'Project',
+            filled: true,
+            fillColor: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFF1E293B)
+                : const Color(0xFFF8FAFC),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: AppSpacing.sm,
             ),
-          );
-        }
-        final task = result.data[index];
-        return _MyTaskRow(
-          task: task,
-          projectName: projectNames[task.projectId],
-          onTap: () => onOpenTask(task),
-        );
-      },
-    );
-  }
-
-  String _emptyTitle(MyWorkFilter f) => switch (f) {
-        MyWorkFilter.overdue => 'Nothing overdue',
-        MyWorkFilter.today => 'Nothing due today',
-        MyWorkFilter.week => 'Clear this week',
-        MyWorkFilter.completed => 'No completions yet',
-        MyWorkFilter.open => 'No open tasks',
-        MyWorkFilter.all => 'Nothing here',
-      };
-
-  String _emptyMessage(MyWorkFilter f) => switch (f) {
-        MyWorkFilter.completed =>
-          'Finish a task and it will show up here.',
-        MyWorkFilter.overdue =>
-          'You are on top of your deadlines. Nice work.',
-        _ => 'No tasks assigned to you match this filter.',
-      };
-}
-
-class _MyTaskRow extends StatelessWidget {
-  const _MyTaskRow({
-    required this.task,
-    required this.projectName,
-    required this.onTap,
-  });
-
-  final Task task;
-  final String? projectName;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final completed = task.completedAt != null;
-    final color = _priorityColor(task.priority);
-    final due = _dueMeta(task);
-
-    return SurfaceCard(
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      onTap: onTap,
-      child: Row(
-        children: [
-          Container(
-            width: 4,
-            height: 40,
-            decoration: BoxDecoration(
-              color: completed ? AppColors.success : color,
-              borderRadius: BorderRadius.circular(4),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: AppColors.border.withValues(alpha: 0.7)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: BorderSide(color: AppColors.border.withValues(alpha: 0.7)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: AppColors.primary, width: 1.4),
             ),
           ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  task.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        decoration:
-                            completed ? TextDecoration.lineThrough : null,
-                        color: completed ? AppColors.textMuted : null,
+          selectedItemBuilder: (context) {
+            return [
+              for (final project in projects)
+                Row(
+                  children: [
+                    ProjectThumb(project: project, size: 28, radius: 8),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        project.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
                       ),
+                    ),
+                  ],
                 ),
-                if (projectName != null && projectName!.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Row(
-                    children: [
-                      const Icon(Icons.folder_outlined,
-                          size: 13, color: AppColors.textMuted),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          projectName!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelMedium
-                              ?.copyWith(color: AppColors.textMuted),
-                        ),
+            ];
+          },
+          items: [
+            for (final project in projects)
+              DropdownMenuItem(
+                value: project.id,
+                child: Row(
+                  children: [
+                    ProjectThumb(project: project, size: 26, radius: 7),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        project.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-          if (due != null) ...[
-            const SizedBox(width: AppSpacing.xs),
-            StatusChip(label: due.$1, color: due.$2),
+                    ),
+                    if (project.id == selected.id)
+                      const Icon(Icons.check_rounded,
+                          size: 18, color: AppColors.primary),
+                  ],
+                ),
+              ),
           ],
-        ],
+          onChanged: (value) {
+            if (value == null || value.isEmpty) return;
+            onSelected(value);
+          },
+        ),
       ),
     );
-  }
-}
-
-/// Returns (label, color) describing the task's due state, or null.
-(String, Color)? _dueMeta(Task task) {
-  if (task.completedAt != null) return ('Done', AppColors.success);
-  final raw = task.dueDate;
-  if (raw == null || raw.isEmpty) return null;
-  final parsed = DateTime.tryParse(raw);
-  if (parsed == null) return null;
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
-  final due = DateTime(parsed.year, parsed.month, parsed.day);
-  final diff = due.difference(today).inDays;
-  if (diff < 0) {
-    final d = -diff;
-    return (d == 1 ? '1d overdue' : '${d}d overdue', AppColors.danger);
-  }
-  if (diff == 0) return ('Today', AppColors.sky);
-  if (diff == 1) return ('Tomorrow', AppColors.warning);
-  if (diff <= 7) return ('${diff}d', AppColors.textMuted);
-  return null;
-}
-
-Color _priorityColor(String priority) {
-  switch (priority.toUpperCase()) {
-    case 'CRITICAL':
-      return AppColors.danger;
-    case 'HIGH':
-      return AppColors.warning;
-    case 'LOW':
-      return AppColors.textMuted;
-    default:
-      return AppColors.sky;
   }
 }

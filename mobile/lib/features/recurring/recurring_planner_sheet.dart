@@ -12,6 +12,7 @@ import '../../shared/widgets/app_widgets.dart';
 import '../auth/session_controller.dart';
 import '../kanban/kanban_providers.dart';
 import '../kanban/task_detail_sheet.dart';
+import 'recurring_actions.dart';
 import 'recurring_providers.dart';
 
 Future<void> showRecurringPlannerSheet({
@@ -144,6 +145,14 @@ class _RecurringPlannerSheetState extends ConsumerState<_RecurringPlannerSheet> 
                         onPressed: () => _togglePause(ref, resume: false),
                         child: const Text('Pause'),
                       ),
+                    if (canManageRecurring(ref))
+                      TextButton(
+                        onPressed: _deleteSeries,
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.danger,
+                        ),
+                        child: const Text('Delete'),
+                      ),
                   ],
                 ),
               ],
@@ -243,6 +252,17 @@ class _RecurringPlannerSheetState extends ConsumerState<_RecurringPlannerSheet> 
     }
     ref.invalidate(recurringTemplatesProvider);
     ref.invalidate(recurringSummaryProvider);
+  }
+
+  Future<void> _deleteSeries() async {
+    final deleted = await confirmDeleteSeries(
+      context: context,
+      ref: ref,
+      template: template,
+    );
+    if (deleted && mounted) {
+      Navigator.of(context).pop();
+    }
   }
 
   Future<void> _openTask(BuildContext context, String taskId) async {
