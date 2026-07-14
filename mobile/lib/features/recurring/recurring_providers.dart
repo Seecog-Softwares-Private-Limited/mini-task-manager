@@ -75,31 +75,6 @@ final recurringSelectedProjectIdProvider = Provider<String?>((ref) {
   return projects.first.id;
 });
 
-/// Trailing window (in days) used by the Insights analytics tab.
-final recurringAnalyticsRangeProvider = StateProvider<int>((ref) => 30);
-
-final recurringAnalyticsProvider =
-    FutureProvider<RecurringAnalytics>((ref) async {
-  final session = ref.watch(sessionControllerProvider);
-  if (session.status != SessionStatus.authenticated) {
-    throw StateError('Session not ready');
-  }
-
-  final orgId = session.orgId;
-  if (orgId == null || orgId.isEmpty) {
-    throw StateError('No workspace selected');
-  }
-
-  final projectId = ref.watch(recurringSelectedProjectIdProvider);
-  final days = ref.watch(recurringAnalyticsRangeProvider);
-  final repo = ref.watch(recurringRepositoryProvider);
-  return repo.fetchAnalytics(
-    organizationId: orgId,
-    projectId: projectId,
-    days: days,
-  );
-});
-
 final recurringSummaryProvider = FutureProvider<RecurringSummary>((ref) async {
   final session = ref.watch(sessionControllerProvider);
   if (session.status != SessionStatus.authenticated) {
