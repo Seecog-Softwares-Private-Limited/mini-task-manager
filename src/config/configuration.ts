@@ -80,6 +80,12 @@ export const configuration = () => {
       keepAliveInitialDelay: parseInt(process.env.DB_KEEPALIVE_MS || '10000', 10),
     },
   },
+  firebase: {
+    /** Absolute or cwd-relative path to service account JSON. */
+    serviceAccountPath: process.env.FIREBASE_SERVICE_ACCOUNT_PATH || '',
+    /** Optional raw JSON string (useful for secrets managers). */
+    serviceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '',
+  },
   };
 };
 

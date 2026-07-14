@@ -1,10 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { NotificationsRepository } from './repositories/notifications.repository';
 import { PaginationQueryDto, PaginatedResult, paginate } from '../../common/pagination';
+import { PushNotificationsService } from './push-notifications.service';
 
 @Injectable()
 export class NotificationsService {
-  constructor(private readonly notificationsRepository: NotificationsRepository) {}
+  constructor(
+    private readonly notificationsRepository: NotificationsRepository,
+    private readonly pushNotifications: PushNotificationsService,
+  ) {}
 
   async findByUser(userId: string, query: PaginationQueryDto): Promise<PaginatedResult<import('./entities/notification.entity').NotificationEntity>> {
     const page = query?.page ?? 1;
@@ -28,5 +32,10 @@ export class NotificationsService {
 
   async createNotification(userId: string, title: string, message: string): Promise<void> {
     await this.notificationsRepository.create({ userId, title, message });
+
+    // Fire-and-forget push so callers are unchanged and API latency stays low.
+    void this.pushNotifications
+      .sendToUser(userId, title || 'Notification', message || '')
+      .catch(() => undefined);
   }
 }

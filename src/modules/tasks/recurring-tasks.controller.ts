@@ -56,6 +56,20 @@ export class RecurringTasksController {
     return this.recurringTasksService.getSummary(organizationId, projectId);
   }
 
+  @Get('analytics')
+  async analytics(
+    @TenantId() organizationId: string,
+    @Query('projectId') projectId?: string,
+    @Query('days') days?: string,
+  ) {
+    const parsedDays = days ? parseInt(days, 10) : 30;
+    return this.recurringTasksService.getAnalytics(
+      organizationId,
+      projectId,
+      Number.isFinite(parsedDays) ? parsedDays : 30,
+    );
+  }
+
   @Get()
   async list(
     @TenantId() organizationId: string,
