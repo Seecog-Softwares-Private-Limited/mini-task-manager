@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddEmailChangePendingEmail1760000035000 implements MigrationInterface {
-  name = 'AddEmailChangePendingEmail1760000035000';
+export class AddEmailChangePendingEmail1760000036000 implements MigrationInterface {
+  name = 'AddEmailChangePendingEmail1760000036000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     const hasColumn = await queryRunner.query(`

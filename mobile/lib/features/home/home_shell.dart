@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../workspaces/workspace_switcher_sheet.dart';
+import '../../core/services/push_nav.dart';
 import '../../core/theme/app_colors.dart';
 import '../auth/session_controller.dart';
 import '../notifications/notifications_providers.dart';
@@ -17,6 +18,9 @@ import '../recurring/recurring_screen.dart';
 import 'home_tab.dart';
 import 'my_work_providers.dart';
 import 'my_work_screen.dart';
+
+/// Alerts tab index inside the bottom navigation.
+const int kAlertsTabIndex = 4;
 
 class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({super.key});
@@ -112,6 +116,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    // Phase 11: push tap / cold start → Alerts tab.
+    ref.listen<int>(openAlertsTabTickProvider, (_, __) {
+      _selectTab(kAlertsTabIndex);
+    });
+
     final orgId = ref.watch(
       sessionControllerProvider.select((session) => session.orgId),
     );

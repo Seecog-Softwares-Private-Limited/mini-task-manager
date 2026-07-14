@@ -136,8 +136,19 @@ mobile/lib/
 
 ## Not yet implemented
 
-- Push notifications (FCM/APNs + backend device registration)
 - Full offline sync for tasks/boards (projects only are cached today)
+
+## Push notifications (FCM)
+
+Android + iOS use Firebase Cloud Messaging. After login the app registers the device token with `POST /device-tokens`. Nest sends push from `NotificationsService.createNotification` via Firebase Admin.
+
+**Manual setup still required:**
+
+1. Place `mobile/android/app/google-services.json` (done when Android app is registered in Firebase).
+2. For iOS: add app in Firebase, place `GoogleService-Info.plist` in `mobile/ios/Runner/`, enable Push Notifications capability in Xcode, upload APNs `.p8` key in Firebase.
+3. Download Firebase service account JSON → save as `config/firebase-service-account.json` (gitignored) or set `FIREBASE_SERVICE_ACCOUNT_PATH` / `FIREBASE_SERVICE_ACCOUNT_JSON` in `properties.env`.
+4. Run migration: `npm run migration:run` (creates `device_tokens`).
+5. Rebuild APK/IPA — old binaries do not include FCM.
 
 ## API reference
 

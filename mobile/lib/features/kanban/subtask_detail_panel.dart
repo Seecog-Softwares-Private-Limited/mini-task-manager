@@ -741,35 +741,43 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _ReporterAvatar(name: name, imageUrl: imageUrl, size: 26),
-          const SizedBox(width: 7),
+          _ReporterAvatar(name: name, imageUrl: imageUrl, size: 28),
+          const SizedBox(width: 8),
           Flexible(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
+                  'Raised by',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: AppColors.textMuted,
+                        fontSize: 9.5,
+                        letterSpacing: 0.4,
+                        fontWeight: FontWeight.w600,
+                        height: 1.1,
+                      ),
+                ),
+                Text(
                   name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.w700,
-                        fontSize: 9.5,
-                        height: 1.15,
-                        color: AppColors.textPrimary,
+                        fontSize: 12,
+                        height: 1.2,
                       ),
                 ),
-                if (dateLabel != null) ...[
-                  const SizedBox(height: 1),
+                if (dateLabel != null)
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Icon(
                         Icons.schedule_rounded,
-                        size: 8.5,
+                        size: 10,
                         color: AppColors.textMuted,
                       ),
-                      const SizedBox(width: 2),
+                      const SizedBox(width: 3),
                       Flexible(
                         child: Text(
                           dateLabel,
@@ -778,14 +786,13 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
                           style:
                               Theme.of(context).textTheme.labelSmall?.copyWith(
                                     color: AppColors.textMuted,
-                                    fontSize: 8.5,
-                                    height: 1.15,
+                                    fontSize: 10,
+                                    height: 1.1,
                                   ),
                         ),
                       ),
                     ],
                   ),
-                ],
               ],
             ),
           ),
