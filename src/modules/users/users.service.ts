@@ -137,6 +137,13 @@ export class UsersService {
     await this.usersRepository.update(userId, { isEmailVerified: verified });
   }
 
+  async updateEmail(userId: string, email: string): Promise<void> {
+    await this.usersRepository.update(userId, {
+      email: email.toLowerCase().trim(),
+      isEmailVerified: true,
+    });
+  }
+
   async updateFullName(userId: string, fullName: string): Promise<void> {
     await this.usersRepository.update(userId, { fullName });
   }

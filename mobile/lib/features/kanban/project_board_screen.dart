@@ -18,9 +18,16 @@ import 'project_switcher.dart';
 import 'task_detail_sheet.dart';
 
 class ProjectBoardScreen extends ConsumerStatefulWidget {
-  const ProjectBoardScreen({super.key, required this.projectId});
+  const ProjectBoardScreen({
+    super.key,
+    required this.projectId,
+    this.embedded = false,
+  });
 
   final String projectId;
+
+  /// When true, hides standalone chrome (back / project switcher) for the Tasks tab.
+  final bool embedded;
 
   @override
   ConsumerState<ProjectBoardScreen> createState() => _ProjectBoardScreenState();
@@ -69,6 +76,7 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
               ? error.message
               : 'Unable to load board.';
           return _BoardScaffold(
+            embedded: widget.embedded,
             header: const _BoardTitleHeader(title: 'Board'),
             child: EmptyState(
               title: 'Board unavailable',
@@ -79,11 +87,17 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
         },
         data: (board) {
           if (board.statuses.isEmpty) {
-          return _BoardScaffold(
-            header: ProjectSwitcher(
-              selectedProjectId: widget.projectId,
-              subtitle: 'No workflow columns',
-            ),
+            return _BoardScaffold(
+              embedded: widget.embedded,
+              header: widget.embedded
+                  ? const _BoardTitleHeader(
+                      title: 'Board',
+                      subtitle: 'No workflow columns',
+                    )
+                  : ProjectSwitcher(
+                      selectedProjectId: widget.projectId,
+                      subtitle: 'No workflow columns',
+                    ),
               child: const EmptyState(
                 title: 'No workflow columns',
                 message: 'Create a workflow in the web app first.',
@@ -100,13 +114,66 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
 
           final totalTasks = board.tasks.length;
           final overdueCount = board.overdueCount;
+          final boardBody = Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _StatusStrip(
+                statuses: board.statuses,
+                selectedIndex: _selectedColumn,
+                taskCounts: {
+                  for (final status in board.statuses)
+                    status.id: board.countForStatus(status.id),
+                },
+                colorForStatus: (status) => _parseColor(status.color),
+                onSelect: _selectColumn,
+              ),
+              Expanded(
+                child: PageView.builder(
+                  controller: _pageController,
+                  itemCount: board.statuses.length,
+                  onPageChanged: (index) {
+                    HapticFeedback.selectionClick();
+                    setState(() => _selectedColumn = index);
+                  },
+                  itemBuilder: (context, index) {
+                    final status = board.statuses[index];
+                    final tasks = board.tasksForStatus(status.id);
+                    return _ColumnPage(
+                      status: status,
+                      statusColor: _parseColor(status.color),
+                      tasks: tasks,
+                      onRefresh: () async {
+                        ref.invalidate(projectBoardProvider(widget.projectId));
+                        await ref
+                            .read(projectBoardProvider(widget.projectId).future);
+                      },
+                      onOpenTask: (task) => _openTaskSheet(
+                        context,
+                        ref,
+                        task: task,
+                        board: board,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          );
 
           return _BoardScaffold(
-            header: ProjectSwitcher(
-              selectedProjectId: widget.projectId,
-              taskCount: totalTasks,
-              subtitle: '$totalTasks tasks · ${board.statuses.length} columns',
-            ),
+            embedded: widget.embedded,
+            header: widget.embedded
+                ? _BoardTitleHeader(
+                    title: 'Board',
+                    subtitle:
+                        '$totalTasks tasks · ${board.statuses.length} columns',
+                  )
+                : ProjectSwitcher(
+                    selectedProjectId: widget.projectId,
+                    taskCount: totalTasks,
+                    subtitle:
+                        '$totalTasks tasks · ${board.statuses.length} columns',
+                  ),
             onRefresh: () async {
               ref.invalidate(projectBoardProvider(widget.projectId));
               await ref.read(projectBoardProvider(widget.projectId).future);
@@ -122,7 +189,8 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
                 icon: Icons.warning_amber_rounded,
                 label: 'Overdue',
                 value: '$overdueCount',
-                color: overdueCount > 0 ? AppColors.danger : AppColors.textMuted,
+                color:
+                    overdueCount > 0 ? AppColors.danger : AppColors.textMuted,
               ),
               _HeaderStat(
                 icon: Icons.view_column_rounded,
@@ -131,50 +199,7 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
                 color: AppColors.violet,
               ),
             ],
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _StatusStrip(
-                  statuses: board.statuses,
-                  selectedIndex: _selectedColumn,
-                  taskCounts: {
-                    for (final status in board.statuses)
-                      status.id: board.countForStatus(status.id),
-                  },
-                  colorForStatus: (status) => _parseColor(status.color),
-                  onSelect: _selectColumn,
-                ),
-                Expanded(
-                  child: PageView.builder(
-                    controller: _pageController,
-                    itemCount: board.statuses.length,
-                    onPageChanged: (index) {
-                      HapticFeedback.selectionClick();
-                      setState(() => _selectedColumn = index);
-                    },
-                    itemBuilder: (context, index) {
-                      final status = board.statuses[index];
-                      final tasks = board.tasksForStatus(status.id);
-                      return _ColumnPage(
-                        status: status,
-                        statusColor: _parseColor(status.color),
-                        tasks: tasks,
-                        onRefresh: () async {
-                          ref.invalidate(projectBoardProvider(widget.projectId));
-                          await ref.read(projectBoardProvider(widget.projectId).future);
-                        },
-                        onOpenTask: (task) => _openTaskSheet(
-                          context,
-                          ref,
-                          task: task,
-                          board: board,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
+            child: boardBody,
           );
         },
       ),
@@ -259,12 +284,14 @@ class _BoardScaffold extends StatelessWidget {
     required this.child,
     this.headerStats,
     this.onRefresh,
+    this.embedded = false,
   });
 
   final Widget header;
   final List<_HeaderStat>? headerStats;
   final Widget child;
   final Future<void> Function()? onRefresh;
+  final bool embedded;
 
   @override
   Widget build(BuildContext context) {
@@ -273,65 +300,73 @@ class _BoardScaffold extends StatelessWidget {
         ? [const Color(0xFF1E293B), const Color(0xFF0B1220)]
         : [const Color(0xFFFFFFFF), const Color(0xFFF1F5F9)];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: topGradient,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.06),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
+    final headerPadding = embedded
+        ? const EdgeInsets.fromLTRB(
+            AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.sm)
+        : const EdgeInsets.fromLTRB(
+            AppSpacing.xs, AppSpacing.xs, AppSpacing.md, AppSpacing.md);
+
+    final headerBlock = Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: topGradient,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
-          child: SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.xs, AppSpacing.xs, AppSpacing.md, AppSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      _CircleIconButton(
-                        icon: Icons.arrow_back_rounded,
-                        onPressed: () => AppRoutes.leaveProjectBoard(context),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(child: header),
-                      if (onRefresh != null)
-                        _CircleIconButton(
-                          icon: Icons.refresh_rounded,
-                          onPressed: () => onRefresh!(),
-                        ),
-                    ],
+        ],
+      ),
+      child: Padding(
+        padding: headerPadding,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                if (!embedded) ...[
+                  _CircleIconButton(
+                    icon: Icons.arrow_back_rounded,
+                    onPressed: () => AppRoutes.leaveProjectBoard(context),
                   ),
-                  if (headerStats != null) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    Row(
-                      children: [
-                        for (var i = 0; i < headerStats!.length; i++) ...[
-                          if (i > 0) const SizedBox(width: AppSpacing.sm),
-                          Expanded(child: headerStats![i]),
-                        ],
-                      ],
-                    ),
+                  const SizedBox(width: AppSpacing.sm),
+                ],
+                Expanded(child: header),
+                if (onRefresh != null)
+                  _CircleIconButton(
+                    icon: Icons.refresh_rounded,
+                    onPressed: () => onRefresh!(),
+                  ),
+              ],
+            ),
+            if (headerStats != null) ...[
+              SizedBox(height: embedded ? AppSpacing.sm : AppSpacing.md),
+              Row(
+                children: [
+                  for (var i = 0; i < headerStats!.length; i++) ...[
+                    if (i > 0) const SizedBox(width: AppSpacing.sm),
+                    Expanded(child: headerStats![i]),
                   ],
                 ],
               ),
-            ),
-          ),
+            ],
+          ],
         ),
-        Expanded(
-          child: child,
-        ),
+      ),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (embedded)
+          headerBlock
+        else
+          SafeArea(bottom: false, child: headerBlock),
+        Expanded(child: child),
       ],
     );
   }

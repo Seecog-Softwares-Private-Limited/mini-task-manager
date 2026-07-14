@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_exception.dart';
 import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_spacing.dart';
 import '../../data/models/recurring.dart';
 import '../auth/session_controller.dart';
 import 'recurring_providers.dart';
@@ -113,7 +112,7 @@ Future<void> archiveRecurring({
   }
 }
 
-/// Shows the guarded delete dialog. Returns true if the series was deleted.
+/// Shows a simple delete confirmation. Returns true if the series was deleted.
 Future<bool> confirmDeleteSeries({
   required BuildContext context,
   required WidgetRef ref,
@@ -121,148 +120,48 @@ Future<bool> confirmDeleteSeries({
 }) async {
   final orgId = ref.read(sessionControllerProvider).orgId;
   if (orgId == null) return false;
-  final deleted = await showDialog<bool>(
+
+  final confirmed = await showDialog<bool>(
     context: context,
-    builder: (_) => _DeleteSeriesDialog(
-      organizationId: orgId,
-      template: template,
-      ref: ref,
-    ),
-  );
-  if (deleted == true) {
-    invalidateRecurringData(ref);
-  }
-  return deleted == true;
-}
-
-class _DeleteSeriesDialog extends StatefulWidget {
-  const _DeleteSeriesDialog({
-    required this.organizationId,
-    required this.template,
-    required this.ref,
-  });
-
-  final String organizationId;
-  final RecurringTemplate template;
-  final WidgetRef ref;
-
-  @override
-  State<_DeleteSeriesDialog> createState() => _DeleteSeriesDialogState();
-}
-
-class _DeleteSeriesDialogState extends State<_DeleteSeriesDialog> {
-  final _controller = TextEditingController();
-  bool _deleting = false;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller.addListener(() => setState(() {}));
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  bool get _confirmed =>
-      _controller.text.trim() == widget.template.title.trim();
-
-  Future<void> _delete() async {
-    setState(() {
-      _deleting = true;
-      _error = null;
-    });
-    try {
-      await widget.ref.read(recurringRepositoryProvider).deleteSeries(
-            templateId: widget.template.id,
-            organizationId: widget.organizationId,
-          );
-      if (mounted) Navigator.of(context).pop(true);
-    } on ApiException catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.message;
-          _deleting = false;
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final generated = widget.template.generatedCount;
-    final impact = generated > 0
-        ? 'This permanently deletes "${widget.template.title}", its recurrence '
-            'rule and its ${generated == 1 ? '1 generated run' : '$generated generated runs'}.'
-        : 'This permanently deletes "${widget.template.title}" and its recurrence rule.';
-
-    return AlertDialog(
-      title: const Row(
-        children: [
-          Icon(Icons.warning_amber_rounded, color: AppColors.danger),
-          SizedBox(width: AppSpacing.xs),
-          Expanded(child: Text('Delete series')),
-        ],
-      ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(impact),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Consider archiving instead — it keeps your history for reviews. '
-            'Deleting cannot be undone.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.danger,
-                  fontWeight: FontWeight.w600,
-                ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'Type the series name to confirm:',
-            style: Theme.of(context).textTheme.labelMedium,
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          TextField(
-            controller: _controller,
-            autofocus: true,
-            enabled: !_deleting,
-            decoration: InputDecoration(
-              hintText: widget.template.title,
-              border: const OutlineInputBorder(),
-            ),
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              _error!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-          ],
-        ],
+    builder: (dialogContext) => AlertDialog(
+      title: const Text('Delete series?'),
+      content: Text(
+        'Delete "${template.title}"? This cannot be undone.',
       ),
       actions: [
         TextButton(
-          onPressed: _deleting ? null : () => Navigator.of(context).pop(false),
+          onPressed: () => Navigator.of(dialogContext).pop(false),
           child: const Text('Cancel'),
         ),
         FilledButton(
-          onPressed: (_confirmed && !_deleting) ? _delete : null,
+          onPressed: () => Navigator.of(dialogContext).pop(true),
           style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
-          child: _deleting
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white),
-                )
-              : const Text('Delete forever'),
+          child: const Text('Delete'),
         ),
       ],
-    );
+    ),
+  );
+
+  if (confirmed != true) return false;
+
+  try {
+    await ref.read(recurringRepositoryProvider).deleteSeries(
+          templateId: template.id,
+          organizationId: orgId,
+        );
+    invalidateRecurringData(ref);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Deleted "${template.title}"')),
+      );
+    }
+    return true;
+  } on ApiException catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    }
+    return false;
   }
 }

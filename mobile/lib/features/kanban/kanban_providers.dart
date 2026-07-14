@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/utils/recurrence_display.dart';
 import '../../data/models/task.dart';
 import '../../data/models/workflow.dart';
 import '../../data/repositories/attachments_repository.dart';
@@ -69,11 +70,12 @@ final projectBoardProvider =
     orElse: () => workflows.first,
   );
   final statuses = await workflowsRepo.fetchStatuses(workflow.id);
-  final tasksResult = await tasksRepo.fetchByProject(
+  final projectTasks = await tasksRepo.fetchAllByProject(
     projectId: projectId,
     organizationId: orgId,
   );
-  final tasks = tasksResult.data;
+  // Match web board: planner/recurring runs belong in Planner only.
+  final tasks = projectTasks.where((task) => !isRecurringTask(task)).toList();
 
   var projectName = 'Project board';
   final cachedProjects = ref.read(projectsProvider).valueOrNull;

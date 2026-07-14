@@ -198,7 +198,7 @@ ${actionUrl}
 If the link is not clickable, copy and paste the URL above into your browser.`;
 }
 
-function emailExpiryNote(duration: string): string {
+export function emailExpiryNote(duration: string): string {
   return `
 <p style="text-align:center;color:${BRAND.textLight};font-size:13px;line-height:1.5;margin:28px 0 0;">
   This link expires in ${duration}. If you didn&apos;t expect this email, you can safely ignore it.

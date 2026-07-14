@@ -11,6 +11,9 @@ import {
   emailPlainTextWithLink,
   emailTaskAssignmentBody,
   emailVerificationBody,
+  emailVerificationCodeBlock,
+  emailExpiryNote,
+  escapeHtml,
   type TaskAssignmentAttachment,
   type TaskAssignmentSubtask,
 } from './email-template.util';
@@ -61,6 +64,12 @@ export interface PasswordResetEmailPayload {
   to: string;
   fullName: string;
   resetUrl: string;
+}
+
+export interface EmailChangePayload {
+  to: string;
+  fullName: string;
+  shortCode: string;
 }
 
 type SmtpConfig = Configuration['smtp'];
@@ -203,6 +212,36 @@ export class EmailService implements OnModuleInit {
       subject: 'Reset your password - Mini Task Manager',
       text: emailPlainTextWithLink(`Hi ${fullName}, reset your password by visiting:`, resetUrl),
       html: emailLayout(emailPasswordResetBody({ fullName, resetUrl })),
+    });
+  }
+
+  async sendEmailChangeVerification(payload: EmailChangePayload): Promise<void> {
+    const { to, fullName, shortCode } = payload;
+    const appHint = 'the Mini Task Manager app (Profile → Change email)';
+
+    await this.deliver({
+      kind: 'email-change',
+      to,
+      subject: 'Confirm your new email - Mini Task Manager',
+      text: [
+        `Hi ${fullName},`,
+        '',
+        `Use this code to confirm your new email address (${to}):`,
+        shortCode,
+        '',
+        `Enter the code in ${appHint}.`,
+        'This code expires in 1 hour. If you did not request this change, ignore this email.',
+      ].join('\n'),
+      html: emailLayout(`
+<h1 style="font-size:26px;font-weight:700;text-align:center;margin:0 0 8px;letter-spacing:-0.02em;">
+  Confirm your new email
+</h1>
+<p style="text-align:center;font-size:15px;line-height:1.6;margin:0 0 24px;">
+  Hi <strong>${escapeHtml(fullName)}</strong>, enter this code in ${escapeHtml(appHint)} to finish updating your sign-in email to <strong>${escapeHtml(to)}</strong>.
+</p>
+${emailVerificationCodeBlock(shortCode, 'Profile → Change email')}
+${emailExpiryNote('1 hour')}
+`.trim()),
     });
   }
 

@@ -42,13 +42,21 @@ export class TasksRepository {
   }
 
   async findByProject(projectId: string, page: number, limit: number): Promise<[TaskEntity[], number]> {
-    return this.repo.findAndCount({
+    // Filter planner/recurring runs BEFORE pagination. Taking the newest N rows
+    // first drops almost everything when recent rows are materialized runs.
+    const rows = await this.repo.find({
       where: { projectId },
       relations: ['assignee'],
       order: { createdAt: 'DESC' },
-      skip: getSkip(page, limit),
-      take: limit,
+      take: 2000,
     });
+    const filtered = rows.filter((task) => {
+      if (task.recurringTemplateId) return false;
+      const type = (task.recurrenceType ?? '').toUpperCase();
+      return type.length === 0 || type === 'NONE';
+    });
+    const skip = getSkip(page, limit);
+    return [filtered.slice(skip, skip + limit), filtered.length];
   }
 
   async findRecurringByProject(projectId: string, organizationId: string): Promise<TaskEntity[]> {
@@ -82,23 +90,18 @@ export class TasksRepository {
   }
 
   /**
-   * Loads the working set for the per-user home dashboard: every open task
-   * plus anything completed since [sinceCompleted]. Assignee matching and date
-   * bucketing happen in the service (assignee_ids is JSON and format-sensitive),
-   * so this stays a cheap, bounded org-scoped fetch.
+   * Working set for home / My Work: org tasks (capped). Includes completed
+   * work so Total/Overdue match project boards. Caller filters as needed.
    */
   async findForHomeDashboard(
     organizationId: string,
-    sinceCompleted: Date,
+    _sinceCompleted: Date,
   ): Promise<TaskEntity[]> {
     return this.repo
       .createQueryBuilder('task')
       .leftJoinAndSelect('task.assignee', 'assignee')
       .where('task.organization_id = :organizationId', {
         organizationId: uuidBinaryTransformer.to(organizationId),
-      })
-      .andWhere('(task.completed_at IS NULL OR task.completed_at >= :since)', {
-        since: sinceCompleted,
       })
       .orderBy('task.dueDate', 'ASC')
       .addOrderBy('task.createdAt', 'DESC')

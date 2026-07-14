@@ -7,11 +7,32 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../auth/session_controller.dart';
+import 'recurring_actions.dart';
+import 'recurring_editor_sheet.dart';
 import 'recurring_planner_sheet.dart';
 import 'recurring_providers.dart';
 
 class RecurringSeriesTab extends ConsumerWidget {
   const RecurringSeriesTab({super.key});
+
+  Future<void> _openCreate(BuildContext context, WidgetRef ref) async {
+    final orgId = ref.read(sessionControllerProvider).orgId;
+    final projectId = ref.read(recurringSelectedProjectIdProvider);
+    if (orgId == null || projectId == null) return;
+    if (!canManageRecurring(ref)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Only workspace owners and admins can create planners.'),
+        ),
+      );
+      return;
+    }
+    await showRecurringEditorSheet(
+      context: context,
+      organizationId: orgId,
+      projectId: projectId,
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -52,10 +73,27 @@ class RecurringSeriesTab extends ConsumerWidget {
       },
       data: (templates) {
         if (templates.isEmpty) {
-          return const EmptyState(
-            title: 'No recurring planners',
-            message: 'Create a recurring planner in the web app.',
-            icon: Icons.event_repeat_rounded,
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const EmptyState(
+                    title: 'No recurring planners',
+                    message:
+                        'Add a planner series for this project. It stays in Planner and won’t show on Tasks.',
+                    icon: Icons.event_repeat_rounded,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  PrimaryButton(
+                    label: 'Add planner',
+                    expand: false,
+                    onPressed: () => _openCreate(context, ref),
+                  ),
+                ],
+              ),
+            ),
           );
         }
 

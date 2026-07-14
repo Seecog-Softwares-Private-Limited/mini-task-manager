@@ -903,7 +903,10 @@ export class RecurringTasksService {
       createdBy: string;
       startDueDate: Date;
       endType: string;
+      endDate: Date | null;
+      endAfterOccurrences: number | null;
       createDaysBeforeDue: number;
+      ruleConfig: Record<string, unknown> | null;
     }> = [];
     for (const tpl of templates) {
       const history = await this.occurrencesRepository.findByTemplate(tpl.id);
@@ -947,7 +950,11 @@ export class RecurringTasksService {
         createdBy: tpl.createdBy,
         startDueDate: tpl.startDueDate,
         endType: tpl.endType,
+        endDate: tpl.endDate ?? null,
+        endAfterOccurrences: tpl.endAfterOccurrences ?? null,
         createDaysBeforeDue: tpl.createDaysBeforeDue,
+        // Needed so clients can expand WEEKLY calendars with weeklyDays / interval.
+        ruleConfig: tpl.ruleConfig ?? null,
       });
     }
     return items;

@@ -12,6 +12,7 @@ import '../../shared/widgets/user_avatar.dart';
 import '../../shared/widgets/workspace_avatar.dart';
 import '../auth/session_controller.dart';
 import 'avatar_crop_sheet.dart';
+import 'change_email_screen.dart';
 
 class MyProfileScreen extends ConsumerStatefulWidget {
   const MyProfileScreen({super.key});
@@ -22,6 +23,7 @@ class MyProfileScreen extends ConsumerStatefulWidget {
 
 class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
   final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
   bool _loading = false;
   bool _saving = false;
   bool _uploadingAvatar = false;
@@ -32,12 +34,14 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
     super.initState();
     final user = ref.read(sessionControllerProvider).user;
     _nameController.text = _editableName(user?.fullName, user?.email);
+    _emailController.text = user?.email ?? '';
     Future.microtask(_refreshProfile);
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _emailController.dispose();
     super.dispose();
   }
 
@@ -57,6 +61,7 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
       final user = await ref.read(usersRepositoryProvider).fetchCurrentUser();
       await ref.read(sessionControllerProvider.notifier).updateUser(user);
       _nameController.text = _editableName(user.fullName, user.email);
+      _emailController.text = user.email;
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } finally {
@@ -369,18 +374,19 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                       ),
                       const SizedBox(height: AppSpacing.md),
                       TextField(
-                        enabled: false,
-                        decoration: InputDecoration(
+                        controller: _emailController,
+                        readOnly: true,
+                        enableInteractiveSelection: true,
+                        decoration: const InputDecoration(
                           labelText: 'Email',
-                          hintText: user?.email ?? '—',
-                          border: const OutlineInputBorder(
+                          border: OutlineInputBorder(
                             borderRadius: BorderRadius.all(Radius.circular(14)),
                           ),
                         ),
                       ),
                       const SizedBox(height: AppSpacing.xs),
                       Text(
-                        'Email is used to sign in and cannot be changed here.',
+                        'Changing email requires a verification code sent to the new address.',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: AppColors.textMuted,
                             ),
@@ -389,18 +395,45 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                         const SizedBox(height: AppSpacing.sm),
                         Text(
                           _error!,
-                          style: TextStyle(color: Theme.of(context).colorScheme.error),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
                         ),
                       ],
                       const SizedBox(height: AppSpacing.md),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: PrimaryButton(
-                          label: 'Save changes',
-                          expand: false,
-                          loading: _saving,
-                          onPressed: !dirty || busy ? null : _saveName,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: PrimaryButton(
+                              label: 'Save name',
+                              expand: true,
+                              loading: _saving,
+                              onPressed: !dirty || busy ? null : _saveName,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: PrimaryButton(
+                              label: 'Change email',
+                              expand: true,
+                              onPressed: busy
+                                  ? null
+                                  : () async {
+                                      final changed =
+                                          await Navigator.of(context)
+                                              .push<bool>(
+                                        MaterialPageRoute<bool>(
+                                          builder: (_) =>
+                                              const ChangeEmailScreen(),
+                                        ),
+                                      );
+                                      if (changed == true && mounted) {
+                                        await _refreshProfile();
+                                      }
+                                    },
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
