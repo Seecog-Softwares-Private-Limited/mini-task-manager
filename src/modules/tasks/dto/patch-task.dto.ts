@@ -107,6 +107,7 @@ class PatchTaskSubtaskDto {
   description?: string;
 
   /** Audit fields preserved server-side; accepted so clients may echo them back. */
+  @Allow()
   @IsOptional()
   @Transform(emptyStrToUndef)
   @ValidateIf((_o, v) => v != null && v !== '')
@@ -114,6 +115,7 @@ class PatchTaskSubtaskDto {
   @MaxLength(100)
   reporterId?: string;
 
+  @Allow()
   @IsOptional()
   @IsString()
   @MaxLength(40)

@@ -165,55 +165,41 @@ class TasksRepository {
     List<String>? tags,
     List<TaskSubtask>? subtasks,
   }) async {
-    try {
-      final data = _buildUpdatePayload(
-        title: title,
-        description: description,
-        statusId: statusId,
-        assigneeIds: assigneeIds,
-        priority: priority,
-        dueDate: dueDate,
-        clearDueDate: clearDueDate,
-        dueTime: dueTime,
-        clearDueTime: clearDueTime,
-        tags: tags,
-        subtasks: subtasks,
-      );
-      final response = await _api.dio.patch<Map<String, dynamic>>(
-        '/tasks/$taskId',
-        data: data,
-      );
-      return Task.fromJson(response.data!);
-    } on DioException catch (error) {
-      // Older backends reject nested dueTime with forbidNonWhitelisted.
-      // Retry once without subtask dueTime so checklist edits still save.
-      if (subtasks != null && _isSubtaskDueTimeForbidden(error)) {
-        try {
-          final data = _buildUpdatePayload(
-            title: title,
-            description: description,
-            statusId: statusId,
-            assigneeIds: assigneeIds,
-            priority: priority,
-            dueDate: dueDate,
-            clearDueDate: clearDueDate,
-            dueTime: dueTime,
-            clearDueTime: clearDueTime,
-            tags: tags,
-            subtasks: subtasks,
-            omitSubtaskDueTime: true,
-          );
-          final response = await _api.dio.patch<Map<String, dynamic>>(
-            '/tasks/$taskId',
-            data: data,
-          );
-          return Task.fromJson(response.data!);
-        } on DioException catch (retryError) {
-          throw ApiException.fromDio(retryError);
-        }
+    final omitSubtaskKeys = <String>{};
+    DioException? lastError;
+
+    for (var attempt = 0; attempt < 4; attempt++) {
+      try {
+        final data = _buildUpdatePayload(
+          title: title,
+          description: description,
+          statusId: statusId,
+          assigneeIds: assigneeIds,
+          priority: priority,
+          dueDate: dueDate,
+          clearDueDate: clearDueDate,
+          dueTime: dueTime,
+          clearDueTime: clearDueTime,
+          tags: tags,
+          subtasks: subtasks,
+          omitSubtaskKeys: omitSubtaskKeys,
+        );
+        final response = await _api.dio.patch<Map<String, dynamic>>(
+          '/tasks/$taskId',
+          data: data,
+        );
+        return Task.fromJson(response.data!);
+      } on DioException catch (error) {
+        lastError = error;
+        if (subtasks == null) break;
+        final forbidden = _forbiddenSubtaskProperties(error);
+        final next = forbidden.difference(omitSubtaskKeys);
+        if (next.isEmpty) break;
+        omitSubtaskKeys.addAll(next);
       }
-      throw ApiException.fromDio(error);
     }
+
+    throw ApiException.fromDio(lastError!);
   }
 
   Map<String, dynamic> _buildUpdatePayload({
@@ -228,7 +214,7 @@ class TasksRepository {
     bool clearDueTime = false,
     List<String>? tags,
     List<TaskSubtask>? subtasks,
-    bool omitSubtaskDueTime = false,
+    Set<String> omitSubtaskKeys = const {},
   }) {
     final data = <String, dynamic>{};
     if (title != null) data['title'] = title.trim();
@@ -248,39 +234,54 @@ class TasksRepository {
       data['dueTime'] = dueTime;
     }
     if (tags != null) {
-      data['tags'] = tags
-          .map((name) => {'name': name, 'color': '#8B5CF6'})
-          .toList();
+      data['tags'] =
+          tags.map((name) => {'name': name, 'color': '#8B5CF6'}).toList();
     }
     if (subtasks != null) {
-      data['subtasks'] = subtasks
-          .map(
-            (s) => {
-              'id': s.id,
-              'title': s.title,
-              'completed': s.completed,
-              if (s.description != null) 'description': s.description,
-              if (s.assigneeId != null) 'assigneeId': s.assigneeId,
-              if (s.assigneeIds.isNotEmpty) 'assigneeIds': s.assigneeIds,
-              if (s.dueDate != null) 'dueDate': s.dueDate,
-              if (!omitSubtaskDueTime)
-                ..._normalizedDueTimeField(s.dueTime),
-              if (s.status != null) 'status': s.status,
-              if (s.priority != null) 'priority': s.priority,
-              if (s.statusId != null) 'statusId': s.statusId,
-              if (s.completionRecord != null)
-                'completionRecord': s.completionRecord!.toJson(),
-              if (s.reporterId != null) 'reporterId': s.reporterId,
-              if (s.createdAt != null) 'createdAt': s.createdAt,
-              if (s.note != null && s.note!.isNotEmpty) 'note': s.note,
-            },
-          )
-          .toList();
+      data['subtasks'] = subtasks.map((s) {
+        final row = <String, dynamic>{
+          'id': s.id,
+          'title': s.title,
+          'completed': s.completed,
+        };
+        void put(String key, Object? value) {
+          if (omitSubtaskKeys.contains(key) || value == null) return;
+          row[key] = value;
+        }
+
+        put('description', s.description);
+        put('assigneeId', s.assigneeId);
+        if (!omitSubtaskKeys.contains('assigneeIds') &&
+            s.assigneeIds.isNotEmpty) {
+          row['assigneeIds'] = s.assigneeIds;
+        }
+        put('dueDate', s.dueDate);
+        if (!omitSubtaskKeys.contains('dueTime')) {
+          row.addAll(_normalizedDueTimeField(s.dueTime));
+        }
+        put('status', s.status);
+        put('priority', s.priority);
+        put('statusId', s.statusId);
+        if (!omitSubtaskKeys.contains('completionRecord') &&
+            s.completionRecord != null) {
+          row['completionRecord'] = s.completionRecord!.toJson();
+        }
+        if (!omitSubtaskKeys.contains('note') &&
+            s.note != null &&
+            s.note!.isNotEmpty) {
+          row['note'] = s.note;
+        }
+        return row;
+      }).toList();
     }
     return data;
   }
 
   static final _hhMm = RegExp(r'^([01]\d|2[0-3]):([0-5]\d)');
+  static final _forbiddenProp = RegExp(
+    r'subtasks\.\d+\.property\s+(\w+)\s+should not exist',
+    caseSensitive: false,
+  );
 
   Map<String, String> _normalizedDueTimeField(String? dueTime) {
     final raw = dueTime?.trim() ?? '';
@@ -290,7 +291,7 @@ class TasksRepository {
     return {'dueTime': '${match.group(1)}:${match.group(2)}'};
   }
 
-  bool _isSubtaskDueTimeForbidden(DioException error) {
+  Set<String> _forbiddenSubtaskProperties(DioException error) {
     final data = error.response?.data;
     final messages = <String>[];
     if (data is Map && data['message'] is List) {
@@ -300,11 +301,26 @@ class TasksRepository {
     } else if (data is List) {
       messages.addAll(data.map((e) => e.toString()));
     }
-    return messages.any(
-      (m) =>
-          m.contains('dueTime') &&
-          (m.contains('should not exist') || m.contains('property')),
-    );
+
+    final keys = <String>{};
+    for (final m in messages) {
+      for (final match in _forbiddenProp.allMatches(m)) {
+        final key = match.group(1);
+        if (key != null && key.isNotEmpty) keys.add(key);
+      }
+      for (final key in const [
+        'dueTime',
+        'reporterId',
+        'createdAt',
+        'note',
+        'completionRecord',
+      ]) {
+        if (m.contains(key) && m.contains('should not exist')) {
+          keys.add(key);
+        }
+      }
+    }
+    return keys;
   }
 
   Future<Task> updateStatus({

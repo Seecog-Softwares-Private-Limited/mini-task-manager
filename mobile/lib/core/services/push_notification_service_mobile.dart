@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -39,8 +41,13 @@ class PushNotificationService {
     await _setupLocalNotifications();
     await _requestPermission();
 
-    _token = await _messaging!.getToken();
-    debugPrint('FCM TOKEN: $_token');
+    // getToken() can hang indefinitely on iOS Simulator (no APNs).
+    try {
+      _token = await _messaging!.getToken().timeout(const Duration(seconds: 5));
+      debugPrint('FCM TOKEN: $_token');
+    } catch (e) {
+      debugPrint('FCM getToken skipped: $e');
+    }
 
     _messaging!.onTokenRefresh.listen((newToken) {
       _token = newToken;
@@ -54,9 +61,15 @@ class PushNotificationService {
       onOpenAlerts?.call();
     });
 
-    final initial = await _messaging!.getInitialMessage();
-    if (initial != null) {
-      Future.microtask(() => onOpenAlerts?.call());
+    try {
+      final initial = await _messaging!
+          .getInitialMessage()
+          .timeout(const Duration(seconds: 2));
+      if (initial != null) {
+        Future.microtask(() => onOpenAlerts?.call());
+      }
+    } catch (e) {
+      debugPrint('FCM getInitialMessage skipped: $e');
     }
   }
 

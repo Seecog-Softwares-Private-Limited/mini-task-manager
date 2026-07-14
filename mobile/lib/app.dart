@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -14,13 +16,10 @@ import 'firebase_bootstrap.dart';
 Future<void> bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Mobile: initialize Firebase + FCM. Web: no-op (see firebase_bootstrap*.dart).
-  await initializeFirebaseAndPush();
-
   final prefs = await SharedPreferences.getInstance();
-  // Pick AWS (or another reachable server) before the first API call when localhost is down.
-  await ApiReachabilityProbe.ensureReachable(prefs);
 
+  // Show UI immediately. Reachability + FCM can hang on iOS Simulator
+  // (no APNs) or when the API is unreachable — never block first frame.
   runApp(
     ProviderScope(
       overrides: [
@@ -29,7 +28,27 @@ Future<void> bootstrap() async {
       child: const MiniTaskManagerApp(),
     ),
   );
+
+  unawaited(_postLaunchInit(prefs));
 }
+
+Future<void> _postLaunchInit(SharedPreferences prefs) async {
+  try {
+    await ApiReachabilityProbe.ensureReachable(prefs).timeout(
+      const Duration(seconds: 6),
+      onTimeout: () => null,
+    );
+  } catch (e, st) {
+    debugPrint('API reachability probe failed: $e\n$st');
+  }
+
+  try {
+    await initializeFirebaseAndPush().timeout(const Duration(seconds: 8));
+  } catch (e, st) {
+    debugPrint('Firebase/FCM post-launch init failed: $e\n$st');
+  }
+}
+
 
 class MiniTaskManagerApp extends ConsumerStatefulWidget {
   const MiniTaskManagerApp({super.key});
