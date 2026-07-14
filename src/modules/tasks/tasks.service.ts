@@ -863,10 +863,10 @@ export class TasksService {
         const createdAt = prior?.createdAt ?? s.createdAt ?? nowIso;
         const dueDate = s.dueDate ? String(s.dueDate).slice(0, 10) : undefined;
         const dueTimeRaw = typeof s.dueTime === 'string' ? s.dueTime.trim() : '';
-        const dueTime =
-          dueDate && /^([01]\d|2[0-3]):[0-5]\d/.test(dueTimeRaw)
-            ? dueTimeRaw.slice(0, 5)
-            : undefined;
+        // Keep HH:mm even when dueDate is absent (checklist items may set time only).
+        const dueTime = /^([01]\d|2[0-3]):[0-5]\d/.test(dueTimeRaw)
+          ? dueTimeRaw.slice(0, 5)
+          : undefined;
         return {
           id: s.id ?? generateUuid(),
           title: s.title?.trim() ?? '',

@@ -77,7 +77,9 @@ class PatchTaskSubtaskDto {
   dueDate?: string;
 
   /** Optional time of day (HH:mm). Cleared when dueDate is cleared. */
+  @Allow()
   @IsOptional()
+  @IsString()
   @Transform(emptyStrToUndef)
   @ValidateIf((_o, v) => v != null && v !== '')
   @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'dueTime must be HH:mm' })
