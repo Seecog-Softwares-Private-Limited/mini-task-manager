@@ -463,6 +463,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     final title = rawTitle.trim();
     if (title.isEmpty || title.length > subtaskTitleMaxLength) return;
 
+    final previous = List<TaskSubtask>.from(_subtasks);
     final updated = [
       TaskSubtask(
         id: generateClientId(),
@@ -471,15 +472,32 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
         status: 'TODO',
         priority: 'MEDIUM',
       ),
-      ..._subtasks,
+      ...previous,
     ];
-    setState(() => _subtasks = updated);
-    await _run(() => ref.read(tasksRepositoryProvider).updateTask(
-          taskId: _task.id,
-          subtasks: updated,
-        ));
-    if (mounted) {
-      setState(() => _subtasks = List.of(_task.subtasks));
+    setState(() {
+      _subtasks = updated;
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final saved = await ref.read(tasksRepositoryProvider).updateTask(
+            taskId: _task.id,
+            subtasks: updated,
+          );
+      if (!mounted) return;
+      setState(() {
+        _task = saved;
+        _subtasks = List.of(saved.subtasks);
+      });
+      widget.onUpdated();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _subtasks = previous;
+      });
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -606,6 +624,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       if (!mounted) return;
       setState(() {
         _task = updated;
+        _subtasks = List.of(updated.subtasks);
         _syncTextControllersFromTask();
       });
       widget.onUpdated();
