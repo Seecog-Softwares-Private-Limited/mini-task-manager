@@ -1,11 +1,16 @@
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/auth/auth_storage.dart';
+import '../../core/services/device_info_service.dart';
+import '../../core/services/push_nav.dart';
+import '../../core/services/push_notification_service.dart';
 import '../../data/models/login_response.dart';
 import '../../data/models/organization.dart';
 import '../../data/repositories/auth_repository.dart';
+import '../../data/repositories/device_tokens_repository.dart';
 import '../../data/repositories/organizations_repository.dart';
 
 enum SessionStatus {
@@ -51,20 +56,32 @@ class SessionState extends Equatable {
 class SessionController extends Notifier<SessionState> {
   late AuthRepository _authRepository;
   late OrganizationsRepository _organizationsRepository;
+  late DeviceTokensRepository _deviceTokensRepository;
   late AuthStorage _authStorage;
   int _operationGeneration = 0;
   bool _restoreScheduled = false;
+  bool _tokenRefreshWired = false;
 
   @override
   SessionState build() {
     _authRepository = ref.read(authRepositoryProvider);
     _organizationsRepository = ref.read(organizationsRepositoryProvider);
+    _deviceTokensRepository = ref.read(deviceTokensRepositoryProvider);
     _authStorage = ref.read(authStorageProvider);
 
     ref.listen<int>(sessionExpiredTickProvider, (_, __) {
       _operationGeneration++;
       state = const SessionState(status: SessionStatus.unauthenticated);
     });
+
+    if (!_tokenRefreshWired) {
+      _tokenRefreshWired = true;
+      PushNotificationService.instance.onTokenRefresh = (_) {
+        if (state.status == SessionStatus.authenticated) {
+          unawaitedRegisterDeviceToken();
+        }
+      };
+    }
 
     if (!_restoreScheduled) {
       _restoreScheduled = true;
@@ -74,6 +91,47 @@ class SessionController extends Notifier<SessionState> {
   }
 
   bool _isStale(int generation) => generation != _operationGeneration;
+
+  Future<void> unawaitedRegisterDeviceToken() async {
+    try {
+      await registerDeviceToken();
+    } catch (e) {
+      debugPrint('registerDeviceToken failed: $e');
+    }
+  }
+
+  Future<void> registerDeviceToken() async {
+    if (kIsWeb) return;
+    final platform = pushPlatformName();
+    if (platform != 'android' && platform != 'ios') return;
+
+    final fcmToken = await PushNotificationService.instance.getToken();
+    if (fcmToken == null || fcmToken.isEmpty) return;
+
+    String? deviceId;
+    try {
+      final info = await DeviceInfoService.capture();
+      deviceId = info['deviceId'] as String?;
+    } catch (_) {}
+
+    await _deviceTokensRepository.register(
+      token: fcmToken,
+      platform: platform,
+      deviceId: deviceId,
+    );
+  }
+
+  Future<void> unregisterDeviceToken() async {
+    if (kIsWeb) return;
+    final fcmToken = PushNotificationService.instance.token;
+    if (fcmToken == null || fcmToken.isEmpty) return;
+    try {
+      await _deviceTokensRepository.unregister(fcmToken);
+    } catch (e) {
+      debugPrint('unregisterDeviceToken API failed: $e');
+    }
+    await PushNotificationService.instance.deleteToken();
+  }
 
   Future<void> restoreSession() async {
     final generation = _operationGeneration;
@@ -105,6 +163,7 @@ class SessionController extends Notifier<SessionState> {
           user: user,
           orgId: storedOrgId,
         );
+        unawaitedRegisterDeviceToken();
         return;
       }
       if (state.status != SessionStatus.authenticated &&
@@ -125,6 +184,7 @@ class SessionController extends Notifier<SessionState> {
           orgId: storedOrgId,
           organizations: organizations,
         );
+        unawaitedRegisterDeviceToken();
         return;
       }
       await _authStorage.writeOrgId(null);
@@ -141,6 +201,7 @@ class SessionController extends Notifier<SessionState> {
         orgId: org.id,
         organizations: organizations,
       );
+      unawaitedRegisterDeviceToken();
       return;
     }
 
@@ -169,6 +230,7 @@ class SessionController extends Notifier<SessionState> {
         orgId: response.organizationId,
         organizations: organizations,
       );
+      unawaitedRegisterDeviceToken();
       return;
     }
 
@@ -207,6 +269,7 @@ class SessionController extends Notifier<SessionState> {
       orgId: orgId,
       organizations: state.organizations,
     );
+    unawaitedRegisterDeviceToken();
   }
 
   Future<void> refreshOrganizations() async {
@@ -250,6 +313,7 @@ class SessionController extends Notifier<SessionState> {
   }
 
   Future<void> logout() async {
+    await unregisterDeviceToken();
     await _authRepository.logout();
     state = const SessionState(status: SessionStatus.unauthenticated);
   }
