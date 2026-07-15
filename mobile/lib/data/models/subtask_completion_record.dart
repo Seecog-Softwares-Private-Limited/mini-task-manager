@@ -67,6 +67,23 @@ class SubtaskCompletionRecord {
     );
   }
 
+  /// Lightweight stamp for planner checklist taps (time-only, no site proof).
+  factory SubtaskCompletionRecord.timestampOnly({
+    required DateTime completedAt,
+    String employeeId = '',
+    String employeeName = '',
+  }) {
+    return SubtaskCompletionRecord(
+      completedAt: completedAt.toUtc().toIso8601String(),
+      employeeId: employeeId,
+      employeeName: employeeName,
+      latitude: 0,
+      longitude: 0,
+      geofenceValid: false,
+      deviceInfo: const {},
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'completedAt': completedAt,

@@ -7,6 +7,7 @@ import '../../core/api/api_exception.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../data/models/recurring.dart';
+import '../../data/models/subtask_completion_record.dart';
 import '../../data/models/task.dart';
 import '../../data/models/workflow.dart';
 import '../../shared/widgets/app_widgets.dart';
@@ -810,10 +811,20 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
     final prevTask = _tasks[ti];
     final subs = List<TaskSubtask>.from(prevTask.subtasks);
     final sub = subs[subIndex];
+    final user = ref.read(sessionControllerProvider).user;
     subs[subIndex] = sub.copyWith(
       completed: value,
       status: value ? 'DONE' : (sub.status == 'DONE' ? 'TODO' : sub.status),
       clearCompletionRecord: !value,
+      completionRecord: value
+          ? SubtaskCompletionRecord.timestampOnly(
+              completedAt: DateTime.now(),
+              employeeId: user?.id ?? '',
+              employeeName: user?.fullName.trim().isNotEmpty == true
+                  ? user!.fullName.trim()
+                  : (user?.email ?? ''),
+            )
+          : null,
     );
     setState(() => _tasks[ti] = prevTask.copyWith(subtasks: subs));
     try {
@@ -1478,6 +1489,7 @@ class _SubtaskRow extends StatelessWidget {
     final hasNote = note != null && note.isNotEmpty;
     final dueTime = subtask.dueTime?.trim();
     final hasTime = dueTime != null && dueTime.isNotEmpty;
+    final doneAtLabel = _completedAtLabel(subtask);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
@@ -1537,6 +1549,10 @@ class _SubtaskRow extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (doneAtLabel != null) ...[
+                  const SizedBox(width: 4),
+                  _DoneAtChip(label: doneAtLabel),
+                ],
                 PopupMenuButton<_SubtaskMenuAction>(
                   tooltip: 'More',
                   enabled: enabled,
@@ -1568,6 +1584,48 @@ class _SubtaskRow extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+String? _completedAtLabel(TaskSubtask subtask) {
+  if (!subtask.completed) return null;
+  final raw = subtask.completionRecord?.completedAt.trim();
+  if (raw == null || raw.isEmpty) return null;
+  final parsed = DateTime.tryParse(raw);
+  if (parsed == null) return null;
+  return DateFormat('h:mm a').format(parsed.toLocal());
+}
+
+class _DoneAtChip extends StatelessWidget {
+  const _DoneAtChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.success.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.check_circle_rounded,
+              size: 11, color: AppColors.success),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: AppColors.success,
+            ),
+          ),
+        ],
       ),
     );
   }
