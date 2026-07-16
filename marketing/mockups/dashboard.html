@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>MiniTask Dashboard Mockup</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: #e8ecf4;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 40px;
+    }
+    .chrome {
+      width: 1280px;
+      border-radius: 16px;
+      overflow: hidden;
+      background: #fcfcfc;
+      border: 1px solid #e2e8f0;
+      box-shadow:
+        0 1px 2px rgba(15, 23, 42, 0.04),
+        0 24px 64px -16px rgba(15, 23, 42, 0.18),
+        0 0 0 1px rgba(99, 102, 241, 0.06);
+    }
+    .bar {
+      height: 40px;
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 8px;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot.r { background: #f87171; }
+    .dot.y { background: #fbbf24; }
+    .dot.g { background: #34d399; }
+    .url {
+      flex: 1;
+      margin-left: 8px;
+      height: 26px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      background: #fff;
+      color: #64748b;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      padding: 0 12px;
+    }
+    .app { display: flex; height: 720px; }
+    .sidebar {
+      width: 240px;
+      border-right: 1px solid #e2e8f0;
+      background: #fff;
+      padding: 16px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 4px 8px 16px;
+      margin-bottom: 4px;
+    }
+    .logo {
+      width: 32px; height: 32px;
+      border-radius: 10px;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .brand span { font-size: 15px; font-weight: 600; color: #020617; letter-spacing: -0.02em; }
+    .section {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      padding: 12px 10px 6px;
+    }
+    .nav {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #64748b;
+    }
+    .nav.active {
+      background: rgba(139, 92, 246, 0.11);
+      color: #5b21b6;
+      font-weight: 600;
+    }
+    .nav.active::before {
+      content: "";
+      position: absolute;
+      left: 0; top: 6px; bottom: 6px;
+      width: 3px;
+      border-radius: 0 4px 4px 0;
+      background: #8b5cf6;
+      box-shadow: 0 0 10px rgba(139, 92, 246, 0.55);
+    }
+    .nav svg { width: 18px; height: 18px; opacity: 0.75; flex-shrink: 0; }
+    .nav.active svg { color: #7c3aed; opacity: 1; }
+    .main { flex: 1; background: #fcfcfc; display: flex; flex-direction: column; }
+    .top {
+      height: 54px;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+    }
+    .top h1 { font-size: 15px; font-weight: 600; color: #020617; }
+    .top-meta { font-size: 12px; color: #64748b; }
+    .btn {
+      background: linear-gradient(135deg, #6366f1, #c026d3);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 8px 14px;
+      border-radius: 10px;
+      border: none;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+    }
+    .content { padding: 20px 24px; flex: 1; }
+    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
+    .stat {
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      border-radius: 12px;
+      padding: 14px 16px;
+    }
+    .stat label { font-size: 11px; font-weight: 500; color: #64748b; display: block; }
+    .stat strong { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+    .stat strong.p { color: #6366f1; }
+    .stat strong.s { color: #16a34a; }
+    .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .col-h {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: #64748b;
+      margin-bottom: 10px;
+    }
+    .pip { width: 6px; height: 6px; border-radius: 50%; }
+    .pip.slate { background: #94a3b8; }
+    .pip.amber { background: #fbbf24; }
+    .pip.green { background: #34d399; }
+    .card {
+      background: #fff;
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+    .card h3 { font-size: 13px; font-weight: 600; color: #0f172a; margin-bottom: 4px; letter-spacing: -0.01em; }
+    .card p { font-size: 11px; color: #64748b; line-height: 1.45; margin-bottom: 10px; }
+    .meta { display: flex; align-items: center; justify-content: space-between; }
+    .chips { display: flex; gap: 4px; }
+    .chip {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      color: #475569;
+    }
+    .chip.hi { background: rgba(239, 68, 68, 0.08); color: #b91c1c; border-color: rgba(239, 68, 68, 0.15); }
+    .chip.feat { background: rgba(99, 102, 241, 0.1); color: #4f46e5; border-color: rgba(99, 102, 241, 0.18); }
+    .avatars { display: flex; }
+    .av {
+      width: 22px; height: 22px; border-radius: 50%;
+      border: 2px solid #fff;
+      margin-left: -6px;
+      font-size: 9px; font-weight: 700; color: #fff;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .av:first-child { margin-left: 0; }
+    .av.a { background: #6366f1; }
+    .av.b { background: #c026d3; }
+    .av.c { background: #0ea5e9; }
+    .progress {
+      margin-top: 10px;
+      height: 3px;
+      background: #f1f5f9;
+      border-radius: 99px;
+      overflow: hidden;
+    }
+    .progress > i {
+      display: block;
+      height: 100%;
+      background: rgba(139, 92, 246, 0.7);
+      border-radius: 99px;
+    }
+  </style>
+</head>
+<body>
+  <div class="chrome">
+    <div class="bar">
+      <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+      <div class="url">app.minitask.io/dashboard</div>
+    </div>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="logo">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <rect x="5" y="7" width="14" height="15" rx="2" fill="#6366f1" fill-opacity="0.12"/>
+              <rect x="8" y="4" width="8" height="4" rx="1.5" fill="#6366f1" fill-opacity="0.18"/>
+              <path d="M8.5 14.5L11 17l5.5-7" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <span>MiniTask</span>
+        </div>
+        <div class="section">Workspace</div>
+        <div class="nav active">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+          Overview
+        </div>
+        <div class="nav">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-8h6v8"/></svg>
+          Workspaces
+        </div>
+        <div class="nav">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
+          Projects
+        </div>
+        <div class="nav">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>
+          Tasks
+        </div>
+        <div class="nav">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M17 1v4M7 1v4M3 9h18"/><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 14h.01M12 14h.01M16 14h.01"/></svg>
+          Recurring Tasks
+        </div>
+        <div class="section">Reporting</div>
+        <div class="nav">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+          Notifications
+        </div>
+        <div class="nav">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          Activity
+        </div>
+        <div class="nav">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M3 3v18h18"/><path d="M7 14l4-6 3 3 4-7"/></svg>
+          Analytics
+        </div>
+      </aside>
+      <main class="main">
+        <div class="top">
+          <div>
+            <h1>Product Launch</h1>
+            <div class="top-meta">Kanban · 12 members · Updated just now</div>
+          </div>
+          <button class="btn">+ New task</button>
+        </div>
+        <div class="content">
+          <div class="stats">
+            <div class="stat"><label>Active</label><strong class="p">42</strong></div>
+            <div class="stat"><label>Done</label><strong class="s">128</strong></div>
+            <div class="stat"><label>Team</label><strong class="p">12</strong></div>
+          </div>
+          <div class="board">
+            <div>
+              <div class="col-h"><span class="pip slate"></span> To do <span style="opacity:.6">· 4</span></div>
+              <div class="card">
+                <h3>Wire onboarding checklist</h3>
+                <p>Map first-run steps for workspace setup and invites.</p>
+                <div class="meta">
+                  <div class="chips"><span class="chip feat">Feature</span><span class="chip">Med</span></div>
+                  <div class="avatars"><div class="av a">A</div></div>
+                </div>
+                <div class="progress"><i style="width:25%"></i></div>
+              </div>
+              <div class="card">
+                <h3>CSV import polish</h3>
+                <p>Validate headers and surface row-level errors.</p>
+                <div class="meta">
+                  <div class="chips"><span class="chip">Story</span></div>
+                  <div class="avatars"><div class="av b">R</div></div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="col-h"><span class="pip amber"></span> In progress <span style="opacity:.6">· 3</span></div>
+              <div class="card">
+                <h3>Recurring series drawer</h3>
+                <p>Health metrics, pause, and skip next occurrence.</p>
+                <div class="meta">
+                  <div class="chips"><span class="chip hi">High</span><span class="chip feat">Feature</span></div>
+                  <div class="avatars"><div class="av a">A</div><div class="av c">M</div></div>
+                </div>
+                <div class="progress"><i style="width:68%"></i></div>
+              </div>
+              <div class="card">
+                <h3>Sprint burndown chart</h3>
+                <p>Connect analytics API to dashboard widgets.</p>
+                <div class="meta">
+                  <div class="chips"><span class="chip">UI</span></div>
+                  <div class="avatars"><div class="av c">M</div></div>
+                </div>
+                <div class="progress"><i style="width:45%"></i></div>
+              </div>
+            </div>
+            <div>
+              <div class="col-h"><span class="pip green"></span> Done <span style="opacity:.6">· 5</span></div>
+              <div class="card">
+                <h3>Role-based board moves</h3>
+                <p>Enforce assignee permissions on drag-and-drop.</p>
+                <div class="meta">
+                  <div class="chips"><span class="chip">Backend</span></div>
+                  <div class="avatars"><div class="av b">R</div></div>
+                </div>
+                <div class="progress"><i style="width:100%"></i></div>
+              </div>
+              <div class="card">
+                <h3>Invite acceptance flow</h3>
+                <p>Token page, email verify, workspace join.</p>
+                <div class="meta">
+                  <div class="chips"><span class="chip feat">Feature</span></div>
+                  <div class="avatars"><div class="av a">A</div></div>
+                </div>
+                <div class="progress"><i style="width:100%"></i></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

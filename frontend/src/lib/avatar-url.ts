@@ -47,7 +47,10 @@ export function resolveAvatarSrc(
     return avatarApiPath(apiMatch[1]);
   }
 
-  if (userId) {
+  // Avoid calling the backend avatar endpoint when `avatarUrl` is missing.
+  // In this app, `avatarUrl` being empty means the user has no stored upload,
+  // and requesting `/api/v1/users/avatar/:userId` would just generate 404s.
+  if (userId && trimmed) {
     return avatarApiPath(userId);
   }
 

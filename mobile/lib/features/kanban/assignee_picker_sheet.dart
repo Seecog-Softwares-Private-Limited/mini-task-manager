@@ -409,7 +409,6 @@ class _AssigneeMemberRow extends ConsumerWidget {
               CircleAvatar(
                 radius: 18,
                 backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-                backgroundImage: imageUrl.isEmpty ? null : NetworkImage(imageUrl),
                 child: imageUrl.isEmpty
                     ? Text(
                         workspaceInitials(name),
@@ -419,7 +418,26 @@ class _AssigneeMemberRow extends ConsumerWidget {
                           color: AppColors.primary,
                         ),
                       )
-                    : null,
+                    : ClipOval(
+                        child: Image.network(
+                          imageUrl,
+                          width: 36,
+                          height: 36,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Center(
+                              child: Text(
+                                workspaceInitials(name),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
               ),
               const SizedBox(width: 10),
               Expanded(

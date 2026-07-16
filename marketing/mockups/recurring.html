@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>MiniTask Recurring Mockup</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: #e8ecf4;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 40px;
+    }
+    .chrome {
+      width: 1280px; border-radius: 16px; overflow: hidden; background: #fcfcfc;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 24px 64px -16px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(99, 102, 241, 0.06);
+    }
+    .bar {
+      height: 40px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+      display: flex; align-items: center; padding: 0 14px; gap: 8px;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot.r { background: #f87171; } .dot.y { background: #fbbf24; } .dot.g { background: #34d399; }
+    .url {
+      flex: 1; margin-left: 8px; height: 26px; border-radius: 8px; border: 1px solid #e2e8f0;
+      background: #fff; color: #64748b; font-size: 11px; display: flex; align-items: center; padding: 0 12px;
+    }
+    .body { padding: 24px; height: 720px; }
+    .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+    .head h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.03em; color: #020617; }
+    .head p { font-size: 13px; color: #64748b; margin-top: 4px; }
+    .btn {
+      background: linear-gradient(135deg, #6366f1, #c026d3); color: #fff;
+      font-size: 12px; font-weight: 600; padding: 8px 14px; border-radius: 10px; border: none;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+    }
+    .health {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px;
+    }
+    .hcard {
+      border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; padding: 14px 16px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+    .hcard label { font-size: 11px; color: #64748b; font-weight: 500; }
+    .hcard strong { display: block; margin-top: 4px; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+    .ok { color: #16a34a; } .warn { color: #d97706; } .prim { color: #6366f1; }
+    .board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .col-h {
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+      color: #64748b; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
+    }
+    .pip { width: 6px; height: 6px; border-radius: 50%; }
+    .card {
+      background: #fff; border: 1px solid rgba(226,232,240,0.9); border-radius: 12px;
+      padding: 12px; margin-bottom: 10px; box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+      position: relative; overflow: hidden;
+    }
+    .ribbon {
+      position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, #6366f1, #c026d3);
+    }
+    .ribbon.daily { background: #6366f1; }
+    .ribbon.weekly { background: #c026d3; }
+    .ribbon.missed { background: #ef4444; }
+    .card h3 { font-size: 13px; font-weight: 600; color: #0f172a; margin: 4px 0 6px; }
+    .sched { font-size: 11px; color: #64748b; margin-bottom: 10px; }
+    .chip {
+      display: inline-flex; font-size: 10px; font-weight: 600; padding: 2px 7px;
+      border-radius: 6px; border: 1px solid #e2e8f0; background: #f8fafc; color: #475569; margin-right: 4px;
+    }
+    .chip.miss { background: rgba(239,68,68,0.08); color: #b91c1c; border-color: rgba(239,68,68,0.15); }
+    .chip.rep { background: rgba(99,102,241,0.1); color: #4f46e5; border-color: rgba(99,102,241,0.18); }
+    .foot { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+    .av {
+      width: 22px; height: 22px; border-radius: 50%; background: #6366f1; color: #fff;
+      font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="chrome">
+    <div class="bar">
+      <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+      <div class="url">app.minitask.io/dashboard/recurring-tasks</div>
+    </div>
+    <div class="body">
+      <div class="head">
+        <div>
+          <h1>Recurring Tasks</h1>
+          <p>Series health, occurrences, and cadence across your workspace</p>
+        </div>
+        <button class="btn">+ New series</button>
+      </div>
+      <div class="health">
+        <div class="hcard"><label>Healthy</label><strong class="ok">18</strong></div>
+        <div class="hcard"><label>At risk</label><strong class="warn">3</strong></div>
+        <div class="hcard"><label>Missed</label><strong style="color:#dc2626">2</strong></div>
+        <div class="hcard"><label>Active series</label><strong class="prim">23</strong></div>
+      </div>
+      <div class="board">
+        <div>
+          <div class="col-h"><span class="pip" style="background:#94a3b8"></span> Upcoming</div>
+          <div class="card"><div class="ribbon daily"></div>
+            <h3>Daily standup notes</h3>
+            <div class="sched">Every weekday · 9:30 AM</div>
+            <span class="chip rep">Daily</span><span class="chip">On track</span>
+            <div class="foot"><span class="chip">Med</span><div class="av">A</div></div>
+          </div>
+          <div class="card"><div class="ribbon weekly"></div>
+            <h3>Weekly status digest</h3>
+            <div class="sched">Every Friday · 4:00 PM</div>
+            <span class="chip rep">Weekly</span>
+            <div class="foot"><span class="chip">Low</span><div class="av">R</div></div>
+          </div>
+        </div>
+        <div>
+          <div class="col-h"><span class="pip" style="background:#fbbf24"></span> Due today</div>
+          <div class="card"><div class="ribbon daily"></div>
+            <h3>Backup verification</h3>
+            <div class="sched">Daily · Due in 2h</div>
+            <span class="chip rep">Daily</span><span class="chip">High</span>
+            <div class="foot"><span class="chip">Ops</span><div class="av">M</div></div>
+          </div>
+        </div>
+        <div>
+          <div class="col-h"><span class="pip" style="background:#34d399"></span> Completed</div>
+          <div class="card"><div class="ribbon weekly"></div>
+            <h3>Security patch review</h3>
+            <div class="sched">Weekly · Done today</div>
+            <span class="chip rep">Weekly</span>
+            <div class="foot"><span class="chip">Done</span><div class="av">A</div></div>
+          </div>
+        </div>
+        <div>
+          <div class="col-h"><span class="pip" style="background:#ef4444"></span> Overdue</div>
+          <div class="card"><div class="ribbon missed"></div>
+            <h3>Invoice reconciliation</h3>
+            <div class="sched">Monthly · Missed by 2 days</div>
+            <span class="chip miss">Missed</span><span class="chip">High</span>
+            <div class="foot"><span class="chip">Finance</span><div class="av">R</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

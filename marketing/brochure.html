@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MiniTask — Product Brochure</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #0f172a;
+      --muted: #64748b;
+      --soft: #475569;
+      --line: #e2e8f0;
+      --paper: #ffffff;
+      --wash: #f8fafc;
+      --canvas: #e8ecf4;
+      --indigo: #4f46e5;
+      --violet: #7c3aed;
+      --grad: linear-gradient(135deg, #4f46e5, #a21caf);
+      --success: #16a34a;
+      --page-w: 210mm;
+      --page-h: 297mm;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    @page {
+      size: A4 portrait;
+      margin: 0;
+    }
+
+    body {
+      font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+      background: #c7ced9;
+      color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.45;
+    }
+
+    .deck {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 28px;
+      padding: 36px 20px 64px;
+    }
+
+    .toolbar {
+      width: min(210mm, 100%);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: #334155;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .toolbar button {
+      appearance: none;
+      border: none;
+      background: var(--grad);
+      color: #fff;
+      font: inherit;
+      font-weight: 600;
+      padding: 10px 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.28);
+    }
+    .toolbar button:hover { filter: brightness(1.05); }
+
+    .page {
+      width: var(--page-w);
+      height: var(--page-h);
+      background: var(--paper);
+      position: relative;
+      overflow: hidden;
+      box-shadow:
+        0 1px 2px rgba(15, 23, 42, 0.06),
+        0 24px 48px -20px rgba(15, 23, 42, 0.35);
+      page-break-after: always;
+      break-after: page;
+    }
+    .page:last-child {
+      page-break-after: auto;
+      break-after: auto;
+    }
+
+    img { display: block; max-width: 100%; }
+
+    .logo-mark {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: #fff; border: 1px solid var(--line);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+      flex-shrink: 0;
+    }
+    .brand-row {
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 600; font-size: 15px; letter-spacing: -0.02em;
+    }
+    .grad-text {
+      background: var(--grad);
+      -webkit-background-clip: text; background-clip: text;
+      color: transparent;
+    }
+    .page-num {
+      position: absolute; bottom: 12mm; right: 16mm;
+      font-size: 10px; font-weight: 600; color: #94a3b8; letter-spacing: 0.06em;
+    }
+    .page-num.light { color: rgba(255,255,255,0.55); }
+
+    /* ── Cover ── */
+    .cover {
+      background:
+        radial-gradient(ellipse 90% 55% at 50% -5%, rgba(79,70,229,0.16), transparent 55%),
+        radial-gradient(ellipse 55% 40% at 100% 85%, rgba(162,28,175,0.1), transparent 50%),
+        linear-gradient(165deg, #fafbff 0%, #eef2ff 45%, #f8fafc 100%);
+      padding: 18mm 16mm 16mm;
+      display: flex;
+      flex-direction: column;
+    }
+    .cover-top { display: flex; justify-content: space-between; align-items: center; }
+    .cover-tag {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+      color: #4338ca; background: rgba(79,70,229,0.1);
+      padding: 5px 10px; border-radius: 6px;
+    }
+    .cover h1 {
+      margin-top: 22mm;
+      font-family: "Instrument Serif", Georgia, serif;
+      font-size: 46px; font-weight: 400; letter-spacing: -0.02em; line-height: 1.05;
+      max-width: 14ch;
+    }
+    .cover .deck-line {
+      margin-top: 14px; font-size: 15px; color: var(--muted); max-width: 38ch; line-height: 1.55;
+    }
+    .cover-chips {
+      margin-top: 14px;
+      display: flex; flex-wrap: wrap; gap: 6px;
+    }
+    .cover-chips span {
+      font-size: 10px; font-weight: 600; color: #4338ca;
+      background: rgba(79,70,229,0.08);
+      border: 1px solid rgba(79,70,229,0.14);
+      padding: 4px 9px; border-radius: 6px;
+    }
+    .cover-shot {
+      margin-top: auto;
+      border-radius: 12px; overflow: hidden;
+      border: 1px solid var(--line);
+      box-shadow: 0 20px 50px -18px rgba(15,23,42,0.28);
+      background: var(--canvas);
+      height: 108mm;
+    }
+    .cover-shot img {
+      width: 100%; height: 100%; object-fit: cover; object-position: top center;
+    }
+    .cover-foot {
+      margin-top: 8mm;
+      display: flex; justify-content: space-between; align-items: flex-end;
+      font-size: 11px; color: var(--muted);
+    }
+    .cover-foot strong { display: block; color: var(--ink); font-size: 12px; margin-bottom: 2px; }
+
+    /* ── Interior ── */
+    .interior { padding: 14mm 16mm 18mm; display: flex; flex-direction: column; height: 100%; }
+    .eyebrow {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+      color: #4338ca;
+    }
+    .interior h2 {
+      margin-top: 6px;
+      font-family: "Instrument Serif", Georgia, serif;
+      font-size: 30px; font-weight: 400; letter-spacing: -0.02em; line-height: 1.12;
+    }
+    .lede {
+      margin-top: 8px; font-size: 13px; color: var(--muted); max-width: 52ch; line-height: 1.55;
+    }
+
+    .spread-img {
+      margin-top: 8mm;
+      flex: 1;
+      min-height: 0;
+      border-radius: 12px; overflow: hidden;
+      border: 1px solid var(--line);
+      background: var(--canvas);
+      box-shadow: 0 8px 28px -12px rgba(15,23,42,0.18);
+    }
+    .spread-img img {
+      width: 100%; height: 100%; object-fit: cover; object-position: top center;
+    }
+
+    .two-col {
+      margin-top: 8mm;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6mm;
+      flex: 1;
+      min-height: 0;
+    }
+    .three-col {
+      margin-top: 8mm;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 4.5mm;
+      flex: 1;
+      min-height: 0;
+    }
+    .feature-block h3 {
+      font-size: 13px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 5px;
+    }
+    .feature-block p { font-size: 11px; color: var(--muted); line-height: 1.5; }
+    .feature-block ul {
+      list-style: none; margin-top: 8px; display: grid; gap: 5px;
+    }
+    .feature-block li {
+      font-size: 11px; color: var(--soft); padding-left: 13px; position: relative; line-height: 1.35;
+    }
+    .feature-block li::before {
+      content: ""; position: absolute; left: 0; top: 5px;
+      width: 5px; height: 5px; border-radius: 50%;
+      background: var(--grad);
+    }
+
+    .mini-shot {
+      border-radius: 10px; overflow: hidden; border: 1px solid var(--line);
+      background: var(--canvas); height: 62mm; margin-bottom: 7px;
+    }
+    .mini-shot.tall { height: 72mm; }
+    .mini-shot img { width: 100%; height: 100%; object-fit: cover; object-position: center top; }
+
+    /* Dense feature lists */
+    .catalog {
+      margin-top: 7mm;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4mm;
+      flex: 1;
+      align-content: start;
+    }
+    .catalog.tri {
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 3.5mm;
+    }
+    .cat-card {
+      background: var(--wash);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 4mm 4.5mm;
+    }
+    .cat-card h3 {
+      font-size: 11.5px; font-weight: 600; margin-bottom: 5px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .cat-card h3 span {
+      width: 6px; height: 6px; border-radius: 50%; background: var(--grad); flex-shrink: 0;
+    }
+    .cat-card ul { list-style: none; display: grid; gap: 3.5px; }
+    .cat-card li { font-size: 10px; color: var(--soft); line-height: 1.35; }
+
+    .pill-row {
+      margin-top: 6mm;
+      display: flex; flex-wrap: wrap; gap: 5px;
+    }
+    .pill-row span {
+      font-size: 10px; font-weight: 600; color: var(--soft);
+      background: var(--wash); border: 1px solid var(--line);
+      padding: 4px 9px; border-radius: 6px;
+    }
+
+    /* Pricing */
+    .plans {
+      margin-top: 8mm;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4mm;
+    }
+    .plan {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 5mm;
+      background: var(--paper);
+    }
+    .plan.featured {
+      border-color: var(--indigo);
+      box-shadow: 0 0 0 1px rgba(79,70,229,0.12);
+      background: linear-gradient(180deg, rgba(79,70,229,0.06), transparent 40%);
+    }
+    .plan .name { font-size: 14px; font-weight: 600; }
+    .plan .price {
+      margin: 8px 0 4px;
+      font-size: 26px; font-weight: 600; letter-spacing: -0.03em;
+    }
+    .plan .price small { font-size: 11px; font-weight: 500; color: var(--muted); }
+    .plan .blurb { font-size: 10.5px; color: var(--muted); margin-bottom: 10px; min-height: 2.8em; }
+    .plan ul { list-style: none; display: grid; gap: 5px; }
+    .plan li {
+      font-size: 10.5px; color: var(--soft);
+      display: flex; gap: 6px; align-items: flex-start;
+    }
+    .plan li::before {
+      content: "✓"; color: var(--success); font-weight: 700; font-size: 10px; margin-top: 1px;
+    }
+    .pill {
+      display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: 0.06em;
+      text-transform: uppercase; color: #fff; background: var(--grad);
+      padding: 3px 8px; border-radius: 999px; margin-bottom: 6px;
+    }
+
+    .back-cta {
+      margin-top: auto;
+      padding: 6mm 7mm;
+      border-radius: 12px;
+      background: var(--grad);
+      color: #fff;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .back-cta h3 { font-size: 17px; font-weight: 600; letter-spacing: -0.02em; }
+    .back-cta p { font-size: 11.5px; opacity: 0.9; margin-top: 3px; }
+    .back-cta .url {
+      font-size: 13px; font-weight: 700; background: rgba(255,255,255,0.18);
+      padding: 10px 14px; border-radius: 8px; white-space: nowrap;
+    }
+
+    .stats-row {
+      margin-top: 7mm;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4mm;
+    }
+    .stat {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 4mm 4.5mm;
+      background: var(--wash);
+    }
+    .stat strong {
+      font-size: 22px; font-weight: 600; letter-spacing: -0.03em;
+      background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .stat span { display: block; margin-top: 2px; font-size: 11px; color: var(--muted); }
+
+    .toc {
+      margin-top: 8mm;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3mm 8mm;
+    }
+    .toc-item {
+      display: flex; gap: 10px; align-items: baseline;
+      padding: 3.5mm 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .toc-item .n {
+      font-size: 11px; font-weight: 700; color: #4338ca; letter-spacing: 0.04em;
+      min-width: 2.2em;
+    }
+    .toc-item .t { font-size: 12.5px; font-weight: 600; }
+    .toc-item .d { font-size: 10.5px; color: var(--muted); margin-top: 1px; }
+
+    .how-steps {
+      margin-top: 8mm;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4mm;
+    }
+    .how-step {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 5mm;
+      background: var(--wash);
+    }
+    .how-step .n {
+      font-size: 11px; font-weight: 700; color: #4338ca; letter-spacing: 0.08em;
+    }
+    .how-step h3 { margin-top: 6px; font-size: 14px; font-weight: 600; }
+    .how-step p { margin-top: 5px; font-size: 11px; color: var(--muted); line-height: 1.45; }
+
+    .security-row {
+      margin-top: 6mm;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 3mm;
+    }
+    .security-row .s {
+      text-align: center;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 3.5mm 2mm;
+      background: var(--wash);
+      font-size: 10px; font-weight: 600; color: var(--soft);
+    }
+
+    @media print {
+      body { background: #fff; }
+      .deck { padding: 0; gap: 0; }
+      .toolbar { display: none !important; }
+      .page {
+        box-shadow: none;
+        width: 210mm;
+        height: 297mm;
+        margin: 0;
+      }
+    }
+
+    @media screen and (max-width: 900px) {
+      .page {
+        width: min(100%, 210mm);
+        height: auto;
+        min-height: 297mm;
+        aspect-ratio: 210 / 297;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="deck">
+    <div class="toolbar">
+      <span>MiniTask product brochure · 10 pages · A4</span>
+      <button type="button" onclick="window.print()">Print / Save as PDF</button>
+    </div>
+
+    <!-- 01 COVER -->
+    <article class="page cover" aria-label="Cover">
+      <div class="cover-top">
+        <div class="brand-row">
+          <div class="logo-mark" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <rect x="5" y="7" width="14" height="15" rx="2" fill="#4f46e5" fill-opacity="0.12"/>
+              <rect x="8" y="4" width="8" height="4" rx="1.5" fill="#4f46e5" fill-opacity="0.18"/>
+              <path d="M8.5 14.5L11 17l5.5-7" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          MiniTask
+        </div>
+        <span class="cover-tag">Product brochure 2026</span>
+      </div>
+
+      <h1>Project management <span class="grad-text">built for speed</span></h1>
+      <p class="deck-line">
+        Boards, recurring ops, automations, analytics, and real-time collaboration —
+        one workspace for teams that ship.
+      </p>
+      <div class="cover-chips">
+        <span>Kanban &amp; Scrum</span>
+        <span>Recurring work</span>
+        <span>Automations</span>
+        <span>Analytics</span>
+        <span>Mobile</span>
+        <span>REST API</span>
+      </div>
+
+      <div class="cover-shot">
+        <img src="assets/dashboard.png" alt="MiniTask dashboard and Kanban board" />
+      </div>
+
+      <div class="cover-foot">
+        <div>
+          <strong>For modern delivery teams</strong>
+          Workspaces · Projects · Boards · Analytics
+        </div>
+        <div style="text-align:right">
+          <strong>Free forever plan</strong>
+          Setup in under 2 minutes
+        </div>
+      </div>
+      <span class="page-num">01 / 10</span>
+    </article>
+
+    <!-- 02 OVERVIEW + TOC -->
+    <article class="page interior" aria-label="Overview">
+      <div class="brand-row" style="margin-bottom: 6mm">
+        <div class="logo-mark" style="width:28px;height:28px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path d="M8.5 14.5L11 17l5.5-7" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        MiniTask
+      </div>
+      <p class="eyebrow">Overview</p>
+      <h2>One product. Every workflow.</h2>
+      <p class="lede">
+        MiniTask replaces scattered boards and spreadsheets with a single workspace —
+        from first invite to shipping analytics, recurring ops, and mobile companion apps.
+      </p>
+
+      <div class="stats-row">
+        <div class="stat"><strong>3×</strong><span>Faster task completion</span></div>
+        <div class="stat"><strong>60%</strong><span>Less status-meeting time</span></div>
+        <div class="stat"><strong>2 min</strong><span>To first live board</span></div>
+      </div>
+
+      <div class="how-steps" style="flex: none;">
+        <div class="how-step">
+          <div class="n">01</div>
+          <h3>Create your workspace</h3>
+          <p>Sign up, invite your team, and set roles in under two minutes.</p>
+        </div>
+        <div class="how-step">
+          <div class="n">02</div>
+          <h3>Organize projects</h3>
+          <p>Spin up boards, columns, and sprints matched to how you deliver.</p>
+        </div>
+        <div class="how-step">
+          <div class="n">03</div>
+          <h3>Collaborate &amp; ship</h3>
+          <p>Comments, mentions, automations, and analytics keep delivery moving.</p>
+        </div>
+      </div>
+
+      <div class="toc" style="flex: none;">
+        <div class="toc-item">
+          <span class="n">03</span>
+          <div><div class="t">Boards &amp; views</div><div class="d">Kanban, Scrum, table, filters</div></div>
+        </div>
+        <div class="toc-item">
+          <span class="n">04</span>
+          <div><div class="t">Tasks &amp; subtasks</div><div class="d">Priorities, labels, attachments</div></div>
+        </div>
+        <div class="toc-item">
+          <span class="n">05</span>
+          <div><div class="t">Recurring work</div><div class="d">Series, health, overdue lanes</div></div>
+        </div>
+        <div class="toc-item">
+          <span class="n">06</span>
+          <div><div class="t">Collaboration</div><div class="d">Mentions, notifications, activity</div></div>
+        </div>
+        <div class="toc-item">
+          <span class="n">07</span>
+          <div><div class="t">Analytics &amp; automation</div><div class="d">Insights, rules, time tracking</div></div>
+        </div>
+        <div class="toc-item">
+          <span class="n">08</span>
+          <div><div class="t">Workspace &amp; security</div><div class="d">RBAC, audit, billing, mobile</div></div>
+        </div>
+      </div>
+      <span class="page-num">02 / 10</span>
+    </article>
+
+    <!-- 03 BOARDS -->
+    <article class="page interior" aria-label="Boards and views">
+      <p class="eyebrow">Core delivery</p>
+      <h2>Boards &amp; views</h2>
+      <p class="lede">Drag-and-drop delivery surfaces that match how your team actually works — switch views without losing data.</p>
+
+      <div class="two-col" style="flex: none;">
+        <div class="feature-block">
+          <div class="mini-shot tall">
+            <img src="assets/dashboard.png" alt="Kanban board" />
+          </div>
+        </div>
+        <div class="feature-block" style="display:flex;flex-direction:column;justify-content:center">
+          <h3>Three views. One source of truth.</h3>
+          <ul>
+            <li><strong>Kanban</strong> — custom columns, WIP limits, quick-add</li>
+            <li><strong>Scrum</strong> — sprint swimlanes plus backlog</li>
+            <li><strong>Table</strong> — sort, filter, and bulk-edit at scale</li>
+            <li>Switch Kanban ↔ Scrum ↔ Table without data loss</li>
+            <li>Saved views to bookmark filter sets</li>
+            <li>Board search, priority &amp; assignee filters</li>
+            <li>Sort by created, completed, priority, due, title</li>
+            <li>Bulk selection and assignee actions</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="catalog" style="flex: none; margin-top: 6mm;">
+        <div class="cat-card">
+          <h3><span></span> Workflow control</h3>
+          <ul>
+            <li>Custom workflow statuses and columns</li>
+            <li>WIP limits per column</li>
+            <li>Board stats and WIP awareness</li>
+            <li>Role-based board permissions</li>
+          </ul>
+        </div>
+        <div class="cat-card">
+          <h3><span></span> Scrum &amp; sprints</h3>
+          <ul>
+            <li>Sprint entities with task assignment</li>
+            <li>Swimlanes by sprint + Backlog lane</li>
+            <li>Story points on tasks</li>
+            <li>Estimated minutes for planning</li>
+          </ul>
+        </div>
+      </div>
+      <span class="page-num">03 / 10</span>
+    </article>
+
+    <!-- 04 TASKS -->
+    <article class="page interior" aria-label="Tasks and subtasks">
+      <p class="eyebrow">Work items</p>
+      <h2>Tasks, subtasks &amp; files</h2>
+      <p class="lede">Rich work items with everything a delivery team needs — from priorities and labels to nested checklists and previews.</p>
+
+      <div class="catalog tri" style="flex: none;">
+        <div class="cat-card">
+          <h3><span></span> Task fields</h3>
+          <ul>
+            <li>Title &amp; rich-text description</li>
+            <li>Priority: Critical / High / Medium / Low</li>
+            <li>Due date and due time</li>
+            <li>Multi-assignee support</li>
+            <li>Color-coded labels &amp; tags</li>
+            <li>Story points &amp; estimates</li>
+            <li>Sprint association</li>
+            <li>Parent / child task hierarchy</li>
+          </ul>
+        </div>
+        <div class="cat-card">
+          <h3><span></span> Subtasks</h3>
+          <ul>
+            <li>Nested checklist with status</li>
+            <li>TODO · In progress · Done</li>
+            <li>Per-subtask assignees</li>
+            <li>Per-subtask due date &amp; priority</li>
+            <li>Subtask detail panel</li>
+            <li>Subtask file attachments</li>
+            <li>On-site completion (mobile geofence)</li>
+          </ul>
+        </div>
+        <div class="cat-card">
+          <h3><span></span> Attachments</h3>
+          <ul>
+            <li>Task &amp; subtask uploads</li>
+            <li>Image, PDF, Office preview</li>
+            <li>Description image embeds</li>
+            <li>Org storage quota enforcement</li>
+            <li>CSV import into projects</li>
+            <li>ZIP export / import with media</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="two-col" style="flex: none; margin-top: 7mm;">
+        <div class="feature-block">
+          <h3>Built for day-to-day execution</h3>
+          <ul>
+            <li>Task detail modal with full editing</li>
+            <li>Quick-add tasks directly on the board</li>
+            <li>Status moves via board drag or detail view</li>
+            <li>Recurrence filter on boards</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <h3>Data portability</h3>
+          <ul>
+            <li>CSV import for bulk boarding</li>
+            <li>ZIP export of tasks and media</li>
+            <li>Workspace CSV export for backups</li>
+            <li>Your data stays exportable on every plan</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="pill-row">
+        <span>Rich text (TinyMCE)</span>
+        <span>Multi-assignee</span>
+        <span>Labels</span>
+        <span>Story points</span>
+        <span>File preview</span>
+        <span>CSV / ZIP</span>
+      </div>
+      <span class="page-num">04 / 10</span>
+    </article>
+
+    <!-- 05 RECURRING -->
+    <article class="page interior" aria-label="Recurring work">
+      <p class="eyebrow">Operations</p>
+      <h2>Recurring work engine</h2>
+      <p class="lede">A dedicated system for work that never stops — daily ops, weekly rituals, and monthly checkpoints with health visibility.</p>
+
+      <div class="two-col">
+        <div class="feature-block">
+          <div class="mini-shot tall">
+            <img src="assets/recurring.png" alt="Recurring tasks board" />
+          </div>
+          <h3>Series planner</h3>
+          <ul>
+            <li>Daily, weekly, monthly, and custom cadences</li>
+            <li>Series library with drawers for management</li>
+            <li>Duplicate, archive, or delete series</li>
+            <li>Pause and resume entire series</li>
+            <li>Recurring subtask checklists per occurrence</li>
+            <li>Automatic occurrence generation</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <div class="mini-shot tall">
+            <img src="assets/recurring.png" alt="Recurring health and overdue" style="object-position: center 40%" />
+          </div>
+          <h3>Execution &amp; health</h3>
+          <ul>
+            <li>Complete, skip, or snooze occurrences</li>
+            <li>Calendar, agenda, and board views</li>
+            <li>Dedicated overdue lane with missed tones</li>
+            <li>Executive health panel (missed &amp; at-risk)</li>
+            <li>Permission-aware status moves</li>
+            <li>Recurring summary KPIs</li>
+          </ul>
+        </div>
+      </div>
+      <span class="page-num">05 / 10</span>
+    </article>
+
+    <!-- 06 COLLABORATION -->
+    <article class="page interior" aria-label="Collaboration">
+      <p class="eyebrow">Teamwork</p>
+      <h2>Collaboration &amp; communication</h2>
+      <p class="lede">Keep everyone aligned with comments, mentions, notifications, and a live activity stream — without another status sync.</p>
+
+      <div class="two-col" style="flex: none;">
+        <div class="feature-block">
+          <div class="mini-shot">
+            <img src="assets/collaboration.png" alt="Comments and notifications" />
+          </div>
+        </div>
+        <div class="feature-block" style="display:flex;flex-direction:column;justify-content:center">
+          <h3>Stay in the loop</h3>
+          <ul>
+            <li>Threaded task comments</li>
+            <li>@mentions in comment input</li>
+            <li>In-app notifications inbox</li>
+            <li>Mark read / read all</li>
+            <li>Live activity feed</li>
+            <li>Push notifications on mobile (FCM)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="catalog" style="flex: none; margin-top: 6mm;">
+        <div class="cat-card">
+          <h3><span></span> Email &amp; alerts</h3>
+          <ul>
+            <li>Assignment notifications</li>
+            <li>Invite emails</li>
+            <li>Subtask update alerts</li>
+            <li>Email verification &amp; password reset</li>
+            <li>Email change request / verify</li>
+          </ul>
+        </div>
+        <div class="cat-card">
+          <h3><span></span> Auth options</h3>
+          <ul>
+            <li>Email &amp; password signup / login</li>
+            <li>Google OAuth (optional)</li>
+            <li>Phone OTP login</li>
+            <li>Invite-based signup links</li>
+            <li>Change password &amp; secure logout</li>
+          </ul>
+        </div>
+      </div>
+      <span class="page-num">06 / 10</span>
+    </article>
+
+    <!-- 07 ANALYTICS + AUTOMATION -->
+    <article class="page interior" aria-label="Analytics and automation">
+      <p class="eyebrow">Visibility &amp; leverage</p>
+      <h2>Analytics, time &amp; automations</h2>
+      <p class="lede">Leaders get delivery truth. Teams reduce manual overhead with rules that notify, update status, and log time as work moves.</p>
+
+      <div class="two-col" style="flex: none;">
+        <div class="feature-block">
+          <div class="mini-shot">
+            <img src="assets/analytics.png" alt="Analytics dashboard" />
+          </div>
+          <h3>Analytics &amp; reporting</h3>
+          <ul>
+            <li>Org analytics for admins &amp; owners</li>
+            <li>Member, project &amp; task counts</li>
+            <li>Active users &amp; activation funnel</li>
+            <li>Plan status and usage visibility</li>
+            <li>Project overview dashboards</li>
+            <li>Recurring health &amp; summary KPIs</li>
+            <li>Throughput and delivery trends</li>
+          </ul>
+        </div>
+        <div class="feature-block">
+          <div class="mini-shot">
+            <img src="assets/analytics.png" alt="Automation and time" style="object-position: left top" />
+          </div>
+          <h3>Automations &amp; time</h3>
+          <ul>
+            <li>Org-scoped automation rules</li>
+            <li>Auto-notify stakeholders</li>
+            <li>Auto-update statuses on moves</li>
+            <li>Auto log time when tasks progress</li>
+            <li>Manual time entries with notes</li>
+            <li>Estimated vs logged minutes</li>
+            <li>Custom fields module</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="pill-row">
+        <span>Velocity insights</span>
+        <span>Activation funnel</span>
+        <span>Automation rules</span>
+        <span>Time tracking</span>
+        <span>Custom fields</span>
+        <span>Saved views</span>
+      </div>
+      <span class="page-num">07 / 10</span>
+    </article>
+
+    <!-- 08 WORKSPACE + SECURITY + MOBILE -->
+    <article class="page interior" aria-label="Workspace security and mobile">
+      <p class="eyebrow">Platform</p>
+      <h2>Workspaces, security &amp; mobile</h2>
+      <p class="lede">Multi-tenant structure with enterprise-grade controls — plus a Flutter companion for iOS and Android.</p>
+
+      <div class="catalog tri" style="flex: none;">
+        <div class="cat-card">
+          <h3><span></span> Workspaces &amp; orgs</h3>
+          <ul>
+            <li>Multi-workspace accounts</li>
+            <li>Org switcher (sidebar + nav)</li>
+            <li>Workspace name, logo, font size</li>
+            <li>Member invite &amp; ownership transfer</li>
+            <li>Roles: Owner / Admin / Member</li>
+            <li>Custom roles &amp; permission matrix</li>
+            <li>Plan usage limits visible in UI</li>
+          </ul>
+        </div>
+        <div class="cat-card">
+          <h3><span></span> Projects</h3>
+          <ul>
+            <li>Create, list &amp; open projects</li>
+            <li>Project icons</li>
+            <li>Overview dashboard</li>
+            <li>Project members &amp; roles</li>
+            <li>Visibility settings</li>
+            <li>Archive / restore / delete</li>
+            <li>Guided onboarding to first board</li>
+          </ul>
+        </div>
+        <div class="cat-card">
+          <h3><span></span> Security &amp; admin</h3>
+          <ul>
+            <li>Role-based access control (RBAC)</li>
+            <li>Audit logs for admins / owners</li>
+            <li>API keys (mtm_… prefix)</li>
+            <li>Webhooks with event subscriptions</li>
+            <li>Encryption in transit &amp; at rest</li>
+            <li>Platform super-admin portal</li>
+            <li>Tenant, plan &amp; coupon ops</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="catalog" style="flex: none; margin-top: 5mm;">
+        <div class="cat-card">
+          <h3><span></span> Integrations &amp; settings</h3>
+          <ul>
+            <li>Full REST API for custom workflows</li>
+            <li>Profile photo crop &amp; upload</li>
+            <li>⌘K command palette (pages + projects)</li>
+            <li>Light / dark theme toggle</li>
+            <li>“What’s new” banner &amp; feature tour</li>
+            <li>System status / health widget</li>
+          </ul>
+        </div>
+        <div class="cat-card">
+          <h3><span></span> Mobile companion</h3>
+          <ul>
+            <li>iOS &amp; Android (Flutter)</li>
+            <li>Boards, tasks, comments, attachments</li>
+            <li>Recurring planner (calendar + series)</li>
+            <li>Offline project cache</li>
+            <li>FCM push notifications</li>
+            <li>Geofenced subtask completion</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="security-row">
+        <div class="s">RBAC</div>
+        <div class="s">Audit logs</div>
+        <div class="s">API keys</div>
+        <div class="s">Webhooks</div>
+      </div>
+      <span class="page-num">08 / 10</span>
+    </article>
+
+    <!-- 09 FULL FEATURE MATRIX -->
+    <article class="page interior" aria-label="Complete feature catalog">
+      <p class="eyebrow">Capability matrix</p>
+      <h2>Complete feature catalog</h2>
+      <p class="lede">Everything MiniTask ships today — for RFPs, sales decks, and security questionnaires.</p>
+
+      <div class="catalog" style="flex: none;">
+        <div class="cat-card">
+          <h3><span></span> Account &amp; access</h3>
+          <ul>
+            <li>Email/password, Google OAuth, phone OTP</li>
+            <li>Email verify, reset, change email</li>
+            <li>Invite-token signup · Super-admin login</li>
+          </ul>
+        </div>
+        <div class="cat-card">
+          <h3><span></span> Structure</h3>
+          <ul>
+            <li>Multi-workspace · Org branding · Custom roles</li>
+            <li>Projects with icons, members, archive</li>
+            <li>Guided onboarding · Plan limit enforcement</li>
+          </ul>
+        </div>
+        <div class="cat-card">
+          <h3><span></span> Boards</h3>
+          <ul>
+            <li>Kanban · Scrum swimlanes · Table view</li>
+            <li>WIP limits · Filters · Sort · Saved views</li>
+            <li>Bulk actions · Quick-add · Board RBAC</li>
+          </ul>
+        </div>
+        <div class="cat-card">
+          <h3><span></span> Tasks</h3>
+          <ul>
+            <li>Rich text · Priorities · Due date/time</li>
+            <li>Multi-assignee · Labels · Story points</li>
+            <li>Hierarchy · CSV/ZIP import &amp; export</li>
+          </ul>
+        </div>
+        <div class="cat-card">
+          <h3><span></span> Subtasks &amp; files</h3>
+          <ul>
+            <li>Status, assignees, dues, priorities</li>
+            <li>Attachments with preview</li>
+            <li>Mobile geofenced completion</li>
+          </ul>
+        </div>
+        <div class="cat-card">
+          <h3><span></span> Recurring</h3>
+          <ul>
+            <li>Daily / weekly / monthly / custom</li>
+            <li>Complete · Skip · Snooze · Pause</li>
+            <li>Health panel · Overdue lane · Calendar</li>
+          </ul>
+        </div>
+        <div class="cat-card">
+          <h3><span></span> Collaboration</h3>
+          <ul>
+            <li>Comments · @mentions · Activity feed</li>
+            <li>Notifications inbox · Email alerts</li>
+            <li>Mobile FCM push</li>
+          </ul>
+        </div>
+        <div class="cat-card">
+          <h3><span></span> Automation &amp; time</h3>
+          <ul>
+            <li>Rules: notify, status, log time</li>
+            <li>Time entries · Estimated vs logged</li>
+            <li>Custom fields · Saved views</li>
+          </ul>
+        </div>
+        <div class="cat-card">
+          <h3><span></span> Analytics</h3>
+          <ul>
+            <li>Org &amp; project dashboards</li>
+            <li>Activation funnel · Active users</li>
+            <li>Recurring health KPIs</li>
+          </ul>
+        </div>
+        <div class="cat-card">
+          <h3><span></span> Billing</h3>
+          <ul>
+            <li>Free / Silver / Gold · Razorpay</li>
+            <li>Annual billing (~15% save)</li>
+            <li>Coupons · Usage widgets · Downgrade</li>
+          </ul>
+        </div>
+        <div class="cat-card">
+          <h3><span></span> Integrations</h3>
+          <ul>
+            <li>REST API · API keys · Webhooks</li>
+            <li>Workspace CSV export</li>
+            <li>⌘K palette · Themes · What’s new</li>
+          </ul>
+        </div>
+        <div class="cat-card">
+          <h3><span></span> Mobile &amp; ops</h3>
+          <ul>
+            <li>Flutter iOS / Android companion</li>
+            <li>Offline project cache</li>
+            <li>Super-admin tenants, plans, audit</li>
+          </ul>
+        </div>
+      </div>
+      <span class="page-num">09 / 10</span>
+    </article>
+
+    <!-- 10 PRICING + BACK -->
+    <article class="page interior" aria-label="Pricing and contact">
+      <p class="eyebrow">Plans</p>
+      <h2>Start free. Scale when ready.</h2>
+      <p class="lede">Transparent per-user pricing. Annual billing saves 15%. Upgrade or cancel anytime.</p>
+
+      <div class="plans">
+        <div class="plan">
+          <div class="name">Free</div>
+          <div class="price">₹0 <small>/forever</small></div>
+          <p class="blurb">Core task management to get started.</p>
+          <ul>
+            <li>1 workspace</li>
+            <li>5 members / workspace</li>
+            <li>500 MB storage</li>
+            <li>Kanban boards</li>
+            <li>Basic reporting</li>
+            <li>Community support</li>
+          </ul>
+        </div>
+        <div class="plan featured">
+          <div class="pill">Most popular</div>
+          <div class="name">Silver</div>
+          <div class="price">₹500 <small>/user/mo</small></div>
+          <p class="blurb">More members, storage, and support.</p>
+          <ul>
+            <li>1 workspace</li>
+            <li>20 members / workspace</li>
+            <li>2 GB storage</li>
+            <li>Upgraded reporting</li>
+            <li>Priority email support</li>
+            <li>Faster collaboration</li>
+          </ul>
+        </div>
+        <div class="plan">
+          <div class="name">Gold</div>
+          <div class="price">₹1000 <small>/user/mo</small></div>
+          <p class="blurb">More workspaces &amp; advanced analytics.</p>
+          <ul>
+            <li>10 workspaces</li>
+            <li>Unlimited members</li>
+            <li>4 GB storage</li>
+            <li>Advanced analytics</li>
+            <li>Gold support</li>
+            <li>Priority upgrades</li>
+          </ul>
+        </div>
+      </div>
+
+      <div style="margin-top: 6mm" class="feature-block">
+        <h3>Security included on every plan</h3>
+        <p>Role-based access, audit logs, organization controls, API keys, and encryption in transit and at rest.</p>
+      </div>
+
+      <div class="security-row" style="margin-top: 4mm;">
+        <div class="s">No credit card for Free</div>
+        <div class="s">Cancel anytime</div>
+        <div class="s">Export your data</div>
+        <div class="s">Razorpay billing</div>
+      </div>
+
+      <div class="back-cta">
+        <div>
+          <h3>Start shipping with MiniTask</h3>
+          <p>Free forever plan · Setup in 2 minutes · Cancel anytime</p>
+        </div>
+        <div class="url">app.minitask.io</div>
+      </div>
+      <span class="page-num">10 / 10</span>
+    </article>
+  </div>
+</body>
+</html>
