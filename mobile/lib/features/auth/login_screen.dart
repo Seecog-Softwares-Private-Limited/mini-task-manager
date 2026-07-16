@@ -119,8 +119,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _testingConnection = true;
       _serverStatus = null;
     });
+    // Web: try Hostinger first, then local Nest (CORS allows localhost → prod after server update).
     final result = kIsWeb
-        ? await ApiConnectionService.test('http://localhost:3007/api/v1')
+        ? await ApiConnectionService.findFirstReachable([
+            ...AppConfig.productionApiCandidates,
+            'http://localhost:3007/api/v1',
+          ])
         : await ApiConnectionService.findFirstReachable(AppConfig.productionApiCandidates);
     if (!mounted) return;
     if (result.ok) {

@@ -17,13 +17,31 @@ async function bootstrap() {
 
   app.setGlobalPrefix(apiPrefix, { exclude: ['/'] });
 
-  // In development, reflect the browser Origin so Next (:3008), Flutter web (:8090), etc. all work.
-  // In production, use CORS_ORIGIN from env (set by resolve-env-urls from properties.env).
+  // In development, reflect any Origin (Next, Flutter web, etc.).
+  // In production, allow CORS_ORIGIN (comma-separated) plus local Flutter web origins.
   const isProduction = nodeEnv === 'production';
-  const corsOrigin =
-    isProduction && process.env.CORS_ORIGIN?.trim()
-      ? process.env.CORS_ORIGIN.trim()
-      : true;
+  const configuredOrigins = (process.env.CORS_ORIGIN ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const corsOrigin = isProduction
+    ? (
+        origin: string | undefined,
+        callback: (err: Error | null, allow?: boolean) => void,
+      ) => {
+        if (!origin) {
+          callback(null, true);
+          return;
+        }
+        const isLocalFlutterWeb =
+          /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+        if (isLocalFlutterWeb || configuredOrigins.includes(origin)) {
+          callback(null, true);
+          return;
+        }
+        callback(null, false);
+      }
+    : true;
   app.enableCors({
     origin: corsOrigin,
     credentials: true,

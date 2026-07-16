@@ -39,8 +39,8 @@ class AppConfig {
     );
   }
 
-  /// Public AWS server IP.
-  static const productionHost = '3.110.214.243';
+  /// Public Hostinger VPS IP (was AWS Lightsail 3.110.214.243).
+  static const productionHost = '200.97.172.61';
 
   /// Next.js on port 3000 (works on Wi‑Fi / desktop; many mobile carriers block this port).
   static const productionApiBaseUrl = 'http://$productionHost:3000/api/v1';
