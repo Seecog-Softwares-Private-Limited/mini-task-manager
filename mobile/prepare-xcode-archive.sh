@@ -6,7 +6,7 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 source "$ROOT/env.sh"
 cd "$ROOT"
 
-PROD_URL="${API_BASE_URL:-http://3.110.214.243:3000}"
+PROD_URL="${API_BASE_URL:-http://200.97.172.61:3000}"
 
 echo "Preparing iOS archive (prod API → ${PROD_URL}/api/v1)"
 flutter pub get

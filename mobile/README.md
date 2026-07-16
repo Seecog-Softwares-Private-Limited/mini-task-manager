@@ -157,7 +157,7 @@ Android + iOS use Firebase Cloud Messaging. After login the app registers the de
 
 ## iOS HTTP (production server)
 
-Production API uses HTTP on `3.110.214.243`. ATS exceptions are configured in `ios/Runner/Info.plist` (same intent as Android `network_security_config.xml`). Prefer HTTPS long-term.
+Production API uses HTTP on Hostinger `200.97.172.61`. ATS exceptions are configured in `ios/Runner/Info.plist` (same intent as Android `network_security_config.xml`). Prefer HTTPS long-term.
 
 ## Build release
 

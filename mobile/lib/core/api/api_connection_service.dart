@@ -90,7 +90,7 @@ class ApiConnectionService {
 
   static String _hintForUrl(String url) {
     if (kIsWeb) {
-      return 'For Flutter web use http://localhost:3007 (backend with CORS for :8090).';
+      return 'Flutter web needs CORS for localhost. On Hostinger, deploy latest API (allows localhost origins), then use http://YOUR_VPS:3000/api/v1. Or use local API: http://localhost:3007/api/v1.';
     }
     if (url.contains('localhost') || url.contains('127.0.0.1')) {
       return 'Start backend from repo root: node app.js (default API port 3007).';
@@ -98,6 +98,6 @@ class ApiConnectionService {
     if (url.contains(':3000')) {
       return 'Port 3000 is often blocked on mobile data. Try Wi‑Fi, or use port 80 (http://YOUR_SERVER without :3000).';
     }
-    return 'Check the server is running and port 80/3000 is open in the AWS security group.';
+    return 'Check the server is running and port 80/3000 is open in the Hostinger firewall.';
   }
 }

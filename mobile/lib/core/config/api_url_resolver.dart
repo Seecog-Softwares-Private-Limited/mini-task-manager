@@ -39,9 +39,21 @@ abstract final class ApiUrlResolver {
   }
 
   /// Nest often listens on :3007 locally, but production exposes the API via the web app on :3000.
+  /// Also migrates the old AWS Lightsail IP to the Hostinger VPS.
   static String _migrateUnreachableBackendPort(String url) {
     final origin = AppConfig.parseApiOrigin(url);
     if (origin == null) return url;
+
+    // Old AWS Lightsail → Hostinger
+    if (origin.host == '3.110.214.243') {
+      return AppConfig.normalizeBaseUrl(
+        Uri(
+          scheme: origin.scheme.isEmpty ? 'http' : origin.scheme,
+          host: AppConfig.productionHost,
+          port: origin.hasPort ? origin.port : 3000,
+        ).toString(),
+      );
+    }
 
     final isLocalHost = origin.host == 'localhost' ||
         origin.host == '10.0.2.2' ||
@@ -75,10 +87,20 @@ abstract final class ApiUrlResolver {
     }
   }
 
+  /// On Flutter web during local `flutter run -d chrome`, keep an explicit remote
+  /// Hostinger/production URL. Only fall back to local Nest when the URL is local.
   static String _preferLocalProxyOnWeb(String url) {
     if (!kIsWeb) return url;
     final host = Uri.base.host;
-    if (host == 'localhost' || host == '127.0.0.1') {
+    if (host != 'localhost' && host != '127.0.0.1') {
+      return url;
+    }
+    final apiHost = Uri.tryParse(url)?.host ?? '';
+    final isLocalApi = apiHost == 'localhost' ||
+        apiHost == '127.0.0.1' ||
+        apiHost == '10.0.2.2' ||
+        apiHost.isEmpty;
+    if (isLocalApi) {
       return 'http://localhost:3007/api/v1';
     }
     return url;
