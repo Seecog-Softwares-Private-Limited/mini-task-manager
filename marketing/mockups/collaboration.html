@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>MiniTask Collaboration Mockup</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: #e8ecf4;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 40px;
+    }
+    .chrome {
+      width: 1280px; border-radius: 16px; overflow: hidden; background: #fcfcfc;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 24px 64px -16px rgba(15, 23, 42, 0.18), 0 0 0 1px rgba(99, 102, 241, 0.06);
+    }
+    .bar {
+      height: 40px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+      display: flex; align-items: center; padding: 0 14px; gap: 8px;
+    }
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot.r { background: #f87171; } .dot.y { background: #fbbf24; } .dot.g { background: #34d399; }
+    .url {
+      flex: 1; margin-left: 8px; height: 26px; border-radius: 8px; border: 1px solid #e2e8f0;
+      background: #fff; color: #64748b; font-size: 11px; display: flex; align-items: center; padding: 0 12px;
+    }
+    .layout { display: grid; grid-template-columns: 1fr 340px; height: 720px; }
+    .main { padding: 24px; border-right: 1px solid #e2e8f0; }
+    .side { padding: 20px; background: #f8fafc; }
+    h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.03em; color: #020617; }
+    .sub { font-size: 13px; color: #64748b; margin: 4px 0 18px; }
+    .task {
+      border: 1px solid #e2e8f0; background: #fff; border-radius: 12px; padding: 18px;
+      box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 4px 16px -4px rgba(15,23,42,0.06);
+    }
+    .task h2 { font-size: 16px; font-weight: 600; color: #0f172a; margin-bottom: 8px; }
+    .task p { font-size: 13px; color: #64748b; line-height: 1.55; margin-bottom: 14px; }
+    .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+    .chip {
+      font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px;
+      border: 1px solid #e2e8f0; background: #f8fafc; color: #475569;
+    }
+    .chip.p { background: rgba(99,102,241,0.1); color: #4f46e5; border-color: rgba(99,102,241,0.18); }
+    .chip.h { background: rgba(239,68,68,0.08); color: #b91c1c; border-color: rgba(239,68,68,0.15); }
+    .row { display: flex; gap: 16px; margin-bottom: 16px; }
+    .field { flex: 1; }
+    .field label { display: block; font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .assignees { display: flex; gap: 6px; align-items: center; }
+    .av {
+      width: 28px; height: 28px; border-radius: 50%; color: #fff; font-size: 11px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; border: 2px solid #fff;
+      box-shadow: 0 0 0 1px #e2e8f0;
+    }
+    .av.a { background: #6366f1; } .av.b { background: #c026d3; } .av.c { background: #0ea5e9; }
+    .status {
+      display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px;
+      border-radius: 8px; border: 1px solid #e2e8f0; background: #fff; font-size: 12px; font-weight: 600; color: #0f172a;
+    }
+    .pip { width: 6px; height: 6px; border-radius: 50%; background: #fbbf24; }
+    .comments { margin-top: 18px; }
+    .comments h3 { font-size: 13px; font-weight: 600; color: #0f172a; margin-bottom: 12px; }
+    .cmt {
+      display: flex; gap: 10px; padding: 12px; border-radius: 10px; border: 1px solid #e2e8f0;
+      background: #f8fafc; margin-bottom: 8px;
+    }
+    .cmt .body { flex: 1; }
+    .cmt strong { font-size: 12px; color: #0f172a; }
+    .cmt time { font-size: 11px; color: #94a3b8; margin-left: 6px; font-weight: 500; }
+    .cmt p { font-size: 12px; color: #475569; margin-top: 4px; line-height: 1.45; }
+    .mention { color: #4f46e5; font-weight: 600; }
+    .side h2 { font-size: 14px; font-weight: 600; color: #0f172a; margin-bottom: 12px; }
+    .n {
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px;
+      margin-bottom: 8px; box-shadow: 0 1px 2px rgba(15,23,42,0.04);
+    }
+    .n.new { border-color: rgba(99,102,241,0.35); box-shadow: 0 0 0 1px rgba(99,102,241,0.08); }
+    .n strong { display: block; font-size: 12px; color: #0f172a; margin-bottom: 2px; }
+    .n span { font-size: 11px; color: #64748b; line-height: 1.4; display: block; }
+    .n time { font-size: 10px; color: #94a3b8; margin-top: 6px; display: block; }
+    .act {
+      display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid #e2e8f0;
+    }
+    .act:last-child { border-bottom: none; }
+    .act p { font-size: 12px; color: #475569; line-height: 1.4; }
+    .act time { font-size: 10px; color: #94a3b8; margin-top: 2px; display: block; }
+  </style>
+</head>
+<body>
+  <div class="chrome">
+    <div class="bar">
+      <div class="dot r"></div><div class="dot y"></div><div class="dot g"></div>
+      <div class="url">app.minitask.io/dashboard/projects/launch/tasks/recurring-series</div>
+    </div>
+    <div class="layout">
+      <main class="main">
+        <h1>Task detail</h1>
+        <p class="sub">Product Launch · In progress</p>
+        <div class="task">
+          <h2>Recurring series drawer</h2>
+          <p>Ship the executive health panel, pause controls, and skip-next actions for recurring occurrences — matching board permissions.</p>
+          <div class="chips">
+            <span class="chip p">Feature</span>
+            <span class="chip h">High</span>
+            <span class="chip">Sprint 14</span>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label>Assignees</label>
+              <div class="assignees">
+                <div class="av a">A</div>
+                <div class="av b">R</div>
+                <div class="av c">M</div>
+              </div>
+            </div>
+            <div class="field">
+              <label>Status</label>
+              <div class="status"><span class="pip"></span> In progress</div>
+            </div>
+          </div>
+          <div class="comments">
+            <h3>Comments</h3>
+            <div class="cmt">
+              <div class="av a">A</div>
+              <div class="body">
+                <strong>Alex</strong><time>2h ago</time>
+                <p><span class="mention">@Riley</span> can you wire the missed-tone badge before we open the drawer PR?</p>
+              </div>
+            </div>
+            <div class="cmt">
+              <div class="av b">R</div>
+              <div class="body">
+                <strong>Riley</strong><time>1h ago</time>
+                <p>Done — also mirrored the violet progress bar used on the board cards.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+      <aside class="side">
+        <h2>Notifications</h2>
+        <div class="n new">
+          <strong>You were mentioned</strong>
+          <span>Alex mentioned you on Recurring series drawer</span>
+          <time>2 hours ago</time>
+        </div>
+        <div class="n new">
+          <strong>Assigned to you</strong>
+          <span>Sprint burndown chart was assigned to you</span>
+          <time>Yesterday</time>
+        </div>
+        <div class="n">
+          <strong>Invite accepted</strong>
+          <span>morgan@acme.com joined Product Launch</span>
+          <time>2 days ago</time>
+        </div>
+        <h2 style="margin-top:20px">Activity</h2>
+        <div class="act">
+          <div class="av c" style="width:24px;height:24px;font-size:9px">M</div>
+          <div>
+            <p>Morgan moved <strong>Invite acceptance flow</strong> to Done</p>
+            <time>3 hours ago</time>
+          </div>
+        </div>
+        <div class="act">
+          <div class="av a" style="width:24px;height:24px;font-size:9px">A</div>
+          <div>
+            <p>Alex attached 2 files to <strong>CSV import polish</strong></p>
+            <time>5 hours ago</time>
+          </div>
+        </div>
+        <div class="act">
+          <div class="av b" style="width:24px;height:24px;font-size:9px">R</div>
+          <div>
+            <p>Riley completed occurrence of <strong>Daily standup notes</strong></p>
+            <time>Yesterday</time>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</body>
+</html>

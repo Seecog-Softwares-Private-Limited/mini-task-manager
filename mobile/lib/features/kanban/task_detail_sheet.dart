@@ -1817,7 +1817,6 @@ class _MemberAvatar extends ConsumerWidget {
     return CircleAvatar(
       radius: size / 2,
       backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-      backgroundImage: imageUrl.isEmpty ? null : NetworkImage(imageUrl),
       child: imageUrl.isEmpty
           ? Text(
               _initials(member.name),
@@ -1826,7 +1825,25 @@ class _MemberAvatar extends ConsumerWidget {
                 fontSize: size * 0.34,
               ),
             )
-          : null,
+          : ClipOval(
+              child: Image.network(
+                imageUrl,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Center(
+                    child: Text(
+                      _initials(member.name),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: size * 0.34,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
     );
   }
 }
