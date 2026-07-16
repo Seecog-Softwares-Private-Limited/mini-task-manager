@@ -15,6 +15,7 @@ import { getMessaging } from 'firebase-admin/messaging';
 import { DataSource } from 'typeorm';
 import '../src/bootstrap-env';
 
+async function main(): Promise<void> {
   const platformFilter = (process.argv[2] || '').toLowerCase();
   if (platformFilter && platformFilter !== 'android' && platformFilter !== 'ios') {
     console.error('Usage: send-test-push.ts [android|ios]');

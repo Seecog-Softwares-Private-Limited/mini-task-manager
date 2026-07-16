@@ -196,6 +196,11 @@ export class TaskNotificationsService {
   ): Promise<string[]> {
     const context = await this.buildTaskEmailContext(task, assignerUserId);
     const notified: string[] = [];
+    const markNotified = (id: string) => {
+      if (!notified.some((item) => this.isSameUser(item, id))) {
+        notified.push(id);
+      }
+    };
 
     for (const assigneeId of notifyAssigneeIds) {
       if (this.isSameUser(assigneeId, assignerUserId)) continue;
@@ -204,15 +209,17 @@ export class TaskNotificationsService {
         headline: 'Task Assigned to You',
       });
       if (sent) {
-        notified.push(assigneeId);
-        await this.notificationsService
-          .createNotification(
-            assigneeId,
-            `Task assigned: ${task.title}`,
-            `${context.assignerName} assigned you to "${task.title}"${context.projectName ? ` in ${context.projectName}` : ''}.`,
-          )
-          .catch((err) => this.logger.warn(`In-app notification failed: ${err}`));
+        markNotified(assigneeId);
       }
+      // Push/in-app notification should not depend on SMTP success.
+      await this.notificationsService
+        .createNotification(
+          assigneeId,
+          `Task assigned: ${task.title}`,
+          `${context.assignerName} assigned you to "${task.title}"${context.projectName ? ` in ${context.projectName}` : ''}.`,
+        )
+        .then(() => markNotified(assigneeId))
+        .catch((err) => this.logger.warn(`In-app notification failed: ${err}`));
     }
 
     return notified;
@@ -231,7 +238,7 @@ export class TaskNotificationsService {
       ? ` in <strong>${escapeHtml(context.projectName)}</strong>`
       : '';
 
-    return this.sendTaskEmailToUser(assigneeId, context, {
+    const sent = await this.sendTaskEmailToUser(assigneeId, context, {
       emailSubject: `Subtask assigned: ${subtask.title}`,
       headline: 'Subtask Assigned to You',
       introHtml: `<p style="text-align:center;color:#64748b;font-size:15px;line-height:1.6;margin:0 0 20px;">
@@ -244,6 +251,17 @@ export class TaskNotificationsService {
         ? formatTaskDueDateLabel(subtask.dueDate)
         : context.dueDateLabel,
     });
+
+    // Push/in-app notification for subtask assignee (independent of email).
+    await this.notificationsService
+      .createNotification(
+        assigneeId,
+        `Subtask assigned: ${subtask.title}`,
+        `${context.assignerName} assigned you subtask "${subtask.title}" on "${task.title}"${context.projectName ? ` in ${context.projectName}` : ''}.`,
+      )
+      .catch((err) => this.logger.warn(`In-app notification failed: ${err}`));
+
+    return sent ?? assigneeId;
   }
 
   private async notifyTaskAssigneesAboutSubtasks(

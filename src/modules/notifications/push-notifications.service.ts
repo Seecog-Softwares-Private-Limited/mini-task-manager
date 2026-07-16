@@ -82,7 +82,10 @@ export class PushNotificationsService implements OnModuleInit {
     if (!this.ready) return;
 
     const tokens = await this.deviceTokensRepository.findByUserId(userId);
-    if (tokens.length === 0) return;
+    if (tokens.length === 0) {
+      this.logger.log(`No FCM tokens for user ${userId}; skipping push for "${title}"`);
+      return;
+    }
 
     const payloadData: Record<string, string> = {
       click_action: 'FLUTTER_NOTIFICATION_CLICK',
