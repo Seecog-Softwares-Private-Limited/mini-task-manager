@@ -122,6 +122,7 @@ const schema = z.object({
   title: z.string().min(1, "Title is required").max(500),
   description: z.string().max(5000).optional(),
   priority: z.string().default("MEDIUM"),
+  requireLocation: z.boolean().default(false),
   statusId: z.string().optional(),
   assigneeIds: z.array(z.string().uuid()).default([]),
   storyPoints: z.coerce.number().min(0).max(100).optional(),
@@ -164,6 +165,7 @@ const schema = z.object({
           }),
         dueOffsetDays: z.coerce.number().min(0).max(365).optional(),
         dueTime: z.string().optional(),
+        requireLocation: z.boolean().optional().default(false),
       })
     )
     .default([]),
@@ -235,6 +237,7 @@ export function CreateTaskModal({
       title: "",
       description: "",
       priority: "MEDIUM",
+      requireLocation: false,
       statusId: defaultStatusId || statuses[0]?.id || "",
       assigneeIds: [],
       storyPoints: undefined,
@@ -305,6 +308,7 @@ export function CreateTaskModal({
         title: "",
         description: "",
         priority: "MEDIUM",
+        requireLocation: false,
         statusId: defaultStatusId || statuses[0]?.id || "",
         assigneeIds: [],
         storyPoints: undefined,
@@ -890,6 +894,25 @@ export function CreateTaskModal({
                   )}
                 />
               </div>
+            </CreateTaskFormSection>
+
+            <CreateTaskFormSection title="Completion">
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-3">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4 rounded border-border"
+                  disabled={isSubmitting}
+                  {...register("requireLocation")}
+                />
+                <span className="space-y-0.5">
+                  <span className="block text-sm font-medium text-foreground">
+                    Require location to complete
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    GPS and site check when marking subtasks done on this task
+                  </span>
+                </span>
+              </label>
             </CreateTaskFormSection>
 
             <CreateTaskFormSection title="Labels & attachments">

@@ -133,6 +133,45 @@ bool isUserAssignedToTask({
       .any((id) => normalizeUserId(id) == normalized);
 }
 
+/// Owner/admin or task creator can change the task-level location requirement.
+bool canToggleTaskRequireLocation({
+  required Organization? org,
+  required String? userId,
+  required Task task,
+}) {
+  if (isOwnerOrAdmin(org: org, userId: userId)) return true;
+  return isUserTaskReporter(task: task, userId: userId);
+}
+
+bool isUserSubtaskReporter({
+  required TaskSubtask subtask,
+  required String? userId,
+  String? fallbackReporterId,
+}) {
+  if (userId == null || userId.isEmpty) return false;
+  final reporter = (subtask.reporterId != null && subtask.reporterId!.trim().isNotEmpty)
+      ? subtask.reporterId
+      : fallbackReporterId;
+  if (reporter == null || reporter.isEmpty) return false;
+  return normalizeUserId(reporter) == normalizeUserId(userId);
+}
+
+/// Owner/admin, task creator, or this subtask's creator can change its location requirement.
+bool canToggleSubtaskRequireLocation({
+  required Organization? org,
+  required String? userId,
+  required Task task,
+  required TaskSubtask subtask,
+}) {
+  if (isOwnerOrAdmin(org: org, userId: userId)) return true;
+  if (isUserTaskReporter(task: task, userId: userId)) return true;
+  return isUserSubtaskReporter(
+    subtask: subtask,
+    userId: userId,
+    fallbackReporterId: task.reporterId,
+  );
+}
+
 bool isSubtaskDone(TaskSubtask subtask) {
   final status = subtask.status?.toUpperCase();
   if (status == 'DONE') return true;

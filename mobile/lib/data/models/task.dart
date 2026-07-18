@@ -20,6 +20,7 @@ class TaskSubtask {
     this.reporterId,
     this.createdAt,
     this.note,
+    this.requireLocation = false,
   });
 
   final String id;
@@ -37,6 +38,7 @@ class TaskSubtask {
   final String? reporterId;
   final String? createdAt;
   final String? note;
+  final bool requireLocation;
 
   factory TaskSubtask.fromJson(Map<String, dynamic> json) {
     final rawRecord = json['completionRecord'];
@@ -58,6 +60,7 @@ class TaskSubtask {
       reporterId: _nullableString(json['reporterId']),
       createdAt: _nullableString(json['createdAt']),
       note: _nullableString(json['note']),
+      requireLocation: json['requireLocation'] == true,
     );
   }
 
@@ -81,6 +84,7 @@ class TaskSubtask {
     bool clearNote = false,
     bool clearDueDate = false,
     bool clearDueTime = false,
+    bool? requireLocation,
   }) {
     return TaskSubtask(
       id: id ?? this.id,
@@ -99,6 +103,7 @@ class TaskSubtask {
       reporterId: reporterId ?? this.reporterId,
       createdAt: createdAt ?? this.createdAt,
       note: clearNote ? null : (note ?? this.note),
+      requireLocation: requireLocation ?? this.requireLocation,
     );
   }
 }
@@ -126,6 +131,7 @@ class Task {
     this.recurringTemplateId,
     this.recurrenceType,
     this.recurrenceSequence,
+    this.requireLocation = false,
   });
 
   final String id;
@@ -147,6 +153,7 @@ class Task {
   final String? recurringTemplateId;
   final String? recurrenceType;
   final int? recurrenceSequence;
+  final bool requireLocation;
   final String createdAt;
   final String updatedAt;
 
@@ -177,6 +184,7 @@ class Task {
       recurrenceSequence: json['recurrenceSequence'] is int
           ? json['recurrenceSequence'] as int
           : int.tryParse('${json['recurrenceSequence']}'),
+      requireLocation: json['requireLocation'] == true,
       createdAt: _nullableDateString(json['createdAt']) ?? '',
       updatedAt: _nullableDateString(json['updatedAt']) ?? '',
     );
@@ -193,6 +201,7 @@ class Task {
     bool clearDueTime = false,
     List<String>? tags,
     List<String>? assigneeIds,
+    bool? requireLocation,
   }) {
     return Task(
       id: id,
@@ -214,6 +223,7 @@ class Task {
       recurringTemplateId: recurringTemplateId,
       recurrenceType: recurrenceType,
       recurrenceSequence: recurrenceSequence,
+      requireLocation: requireLocation ?? this.requireLocation,
       createdAt: createdAt,
       updatedAt: updatedAt,
     );

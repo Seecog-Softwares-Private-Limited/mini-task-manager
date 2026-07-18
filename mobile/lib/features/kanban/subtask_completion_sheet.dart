@@ -346,7 +346,7 @@ class _SubtaskCompletionSheetState extends State<_SubtaskCompletionSheet> {
                   const _InfoTile(
                     icon: Icons.location_off_rounded,
                     label: 'Location',
-                    value: 'Not required (disabled in Account Settings)',
+                    value: 'Not required for this subtask',
                   ),
                 const SizedBox(height: AppSpacing.md),
                 TextField(

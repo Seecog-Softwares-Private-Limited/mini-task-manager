@@ -23,7 +23,15 @@ export interface CreateTaskPayload {
   subtasks?: Array<
     Pick<
       TaskSubtask,
-      "title" | "completed" | "description" | "assigneeId" | "assigneeIds" | "dueDate" | "priority" | "statusId"
+      | "title"
+      | "completed"
+      | "description"
+      | "assigneeId"
+      | "assigneeIds"
+      | "dueDate"
+      | "priority"
+      | "statusId"
+      | "requireLocation"
     > & {
       id?: string;
     }
@@ -32,6 +40,7 @@ export interface CreateTaskPayload {
   storyPoints?: number;
   dueDate?: string;
   dueTime?: string;
+  requireLocation?: boolean;
   recurrence?: TaskRecurrenceConfig;
 }
 
@@ -62,6 +71,9 @@ export function serializeSubtasksForApi(subtasks: TaskSubtask[]): TaskSubtask[] 
     }
     if (s.priority) {
       item.priority = s.priority;
+    }
+    if (s.requireLocation === true) {
+      item.requireLocation = true;
     }
     return item;
   });
@@ -140,6 +152,7 @@ export interface UpdateTaskPayload {
   storyPoints?: number | null;
   tags?: Array<{ name: string; color: string }>;
   subtasks?: TaskSubtask[];
+  requireLocation?: boolean;
   recurrence?: TaskRecurrenceConfig;
 }
 
@@ -159,6 +172,9 @@ export async function updateTask(
   if (payload.priority !== undefined) body.priority = payload.priority;
   if (payload.storyPoints !== undefined) body.storyPoints = payload.storyPoints;
   if (payload.tags !== undefined) body.tags = payload.tags;
+  if (payload.requireLocation !== undefined) {
+    body.requireLocation = payload.requireLocation === true;
+  }
   if (payload.subtasks !== undefined) {
     body.subtasks = serializeSubtasksForApi(payload.subtasks);
   }

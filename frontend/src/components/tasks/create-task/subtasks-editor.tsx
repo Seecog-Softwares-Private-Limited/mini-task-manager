@@ -53,6 +53,7 @@ export interface SubtaskItem {
   dueTime?: string;
   status?: SubtaskStatus;
   priority?: SubtaskPriority;
+  requireLocation?: boolean;
 }
 
 interface SubtasksEditorProps {
@@ -100,6 +101,7 @@ export function SubtasksEditor({
   const [draftDueDate, setDraftDueDate] = useState<string | undefined>(undefined);
   const [draftDueTime, setDraftDueTime] = useState<string | undefined>(undefined);
   const [draftPriority, setDraftPriority] = useState<SubtaskPriority>("MEDIUM");
+  const [draftRequireLocation, setDraftRequireLocation] = useState(false);
   const [pasteFlash, setPasteFlash] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<{
     index: number;
@@ -185,6 +187,7 @@ export function SubtasksEditor({
     setDraftDueDate(undefined);
     setDraftDueTime(undefined);
     setDraftPriority("MEDIUM");
+    setDraftRequireLocation(false);
     setComposerOpen(true);
     requestAnimationFrame(() => titleInputRef.current?.focus());
   }
@@ -200,6 +203,7 @@ export function SubtasksEditor({
     setDraftDueDate(value?.dueDate);
     setDraftDueTime(value?.dueTime);
     setDraftPriority(resolveSubtaskPriority(value?.priority));
+    setDraftRequireLocation(value?.requireLocation === true);
     setComposerOpen(true);
     requestAnimationFrame(() => titleInputRef.current?.focus());
   }
@@ -217,6 +221,7 @@ export function SubtasksEditor({
     setDraftDueDate(undefined);
     setDraftDueTime(undefined);
     setDraftPriority("MEDIUM");
+    setDraftRequireLocation(false);
     setPasteFlash(false);
   }
 
@@ -252,6 +257,10 @@ export function SubtasksEditor({
         shouldDirty: true,
         shouldTouch: true,
       });
+      setValue(`subtasks.${editingIndex}.requireLocation`, draftRequireLocation, {
+        shouldDirty: true,
+        shouldTouch: true,
+      });
       if (!values?.[editingIndex]?.id) {
         setValue(`subtasks.${editingIndex}.id`, draftKey, { shouldDirty: true });
       }
@@ -267,6 +276,7 @@ export function SubtasksEditor({
             dueTime: draftDueTime,
             status: "TODO",
             priority: draftPriority,
+            requireLocation: draftRequireLocation || undefined,
           },
           draftAssigneeIds
         )
@@ -282,6 +292,7 @@ export function SubtasksEditor({
     setDraftDueDate(undefined);
     setDraftDueTime(undefined);
     setDraftPriority("MEDIUM");
+    setDraftRequireLocation(false);
   }
 
   function handleRemoveSubtask(index: number, key: string) {
@@ -402,6 +413,24 @@ export function SubtasksEditor({
               />
             </div>
           </div>
+
+          <label className="mt-2 flex cursor-pointer items-start gap-2 rounded-md border border-border/50 bg-background/60 px-2.5 py-2">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-3.5 w-3.5 rounded border-border"
+              checked={draftRequireLocation}
+              disabled={disabled}
+              onChange={(e) => setDraftRequireLocation(e.target.checked)}
+            />
+            <span className="space-y-0.5">
+              <span className="block text-[12px] font-medium text-foreground">
+                Require location
+              </span>
+              <span className="block text-[10px] text-muted-foreground">
+                Ask for GPS when this subtask is completed
+              </span>
+            </span>
+          </label>
 
           {onPendingAttachmentsChange && draftKey ? (
             <SubtaskComposerAttachments

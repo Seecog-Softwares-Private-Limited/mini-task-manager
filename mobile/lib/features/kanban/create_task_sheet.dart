@@ -12,6 +12,7 @@ import '../../data/repositories/tasks_repository.dart';
 import '../../shared/widgets/app_widgets.dart';
 import 'attachment_picker_section.dart';
 import 'kanban_providers.dart';
+import 'require_location_toggle.dart';
 
 class CreateTaskSheet extends ConsumerStatefulWidget {
   const CreateTaskSheet({
@@ -45,6 +46,7 @@ class _CreateTaskSheetState extends ConsumerState<CreateTaskSheet> {
   String? _statusId;
   DateTime? _dueDate;
   TimeOfDay? _dueTime;
+  bool _requireLocation = false;
   final _taskAttachments = <PendingAttachment>[];
 
   bool _loading = false;
@@ -139,6 +141,8 @@ class _CreateTaskSheetState extends ConsumerState<CreateTaskSheet> {
           title: subtaskTitle,
           description: draft.descriptionController.text,
           priority: draft.priority,
+          // Inherit task-level setting when creating; refine per-subtask after create.
+          requireLocation: _requireLocation,
         ),
       );
     }
@@ -164,6 +168,7 @@ class _CreateTaskSheetState extends ConsumerState<CreateTaskSheet> {
         dueTime: _dueDate == null || _dueTime == null
             ? null
             : '${_dueTime!.hour.toString().padLeft(2, '0')}:${_dueTime!.minute.toString().padLeft(2, '0')}',
+        requireLocation: _requireLocation,
         subtasks: subtaskInputs,
       );
 
@@ -410,6 +415,15 @@ class _CreateTaskSheetState extends ConsumerState<CreateTaskSheet> {
                       ..clear()
                       ..addAll(items);
                   }),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                RequireLocationToggle(
+                  value: _requireLocation,
+                  enabled: !_loading,
+                  title: 'Require location to complete',
+                  subtitle:
+                      'GPS and site check when marking subtasks done on this task',
+                  onChanged: (value) => setState(() => _requireLocation = value),
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 Row(

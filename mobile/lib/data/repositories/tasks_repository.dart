@@ -120,6 +120,7 @@ class TasksRepository {
     String priority = 'MEDIUM',
     String? dueDate,
     String? dueTime,
+    bool requireLocation = false,
     List<CreateTaskSubtaskInput>? subtasks,
   }) async {
     try {
@@ -128,6 +129,7 @@ class TasksRepository {
         'organizationId': organizationId,
         'title': title.trim(),
         'priority': priority.toUpperCase(),
+        'requireLocation': requireLocation,
         if (statusId != null) 'statusId': statusId,
         if (description != null && description.trim().isNotEmpty)
           'description': description.trim(),
@@ -164,6 +166,7 @@ class TasksRepository {
     bool clearDueTime = false,
     List<String>? tags,
     List<TaskSubtask>? subtasks,
+    bool? requireLocation,
   }) async {
     final omitSubtaskKeys = <String>{};
     DioException? lastError;
@@ -182,6 +185,7 @@ class TasksRepository {
           clearDueTime: clearDueTime,
           tags: tags,
           subtasks: subtasks,
+          requireLocation: requireLocation,
           omitSubtaskKeys: omitSubtaskKeys,
         );
         final response = await _api.dio.patch<Map<String, dynamic>>(
@@ -191,8 +195,17 @@ class TasksRepository {
         return Task.fromJson(response.data!);
       } on DioException catch (error) {
         lastError = error;
+        if (_mentionsForbiddenProperty(error, 'requireLocation')) {
+          throw ApiException(
+            message:
+                'Server is missing requireLocation support. Redeploy/restart the API on the VPS, then try again.',
+            statusCode: error.response?.statusCode,
+          );
+        }
         if (subtasks == null) break;
-        final forbidden = _forbiddenSubtaskProperties(error);
+        final forbidden = _forbiddenSubtaskProperties(error)
+          // Never silently drop location — that makes the toggle look broken.
+          ..remove('requireLocation');
         final next = forbidden.difference(omitSubtaskKeys);
         if (next.isEmpty) break;
         omitSubtaskKeys.addAll(next);
@@ -214,6 +227,7 @@ class TasksRepository {
     bool clearDueTime = false,
     List<String>? tags,
     List<TaskSubtask>? subtasks,
+    bool? requireLocation,
     Set<String> omitSubtaskKeys = const {},
   }) {
     final data = <String, dynamic>{};
@@ -222,6 +236,7 @@ class TasksRepository {
     if (statusId != null) data['statusId'] = statusId;
     if (assigneeIds != null) data['assigneeIds'] = assigneeIds;
     if (priority != null) data['priority'] = priority.toUpperCase();
+    if (requireLocation != null) data['requireLocation'] = requireLocation;
     if (clearDueDate) {
       data['dueDate'] = null;
       data['dueTime'] = null;
@@ -271,6 +286,9 @@ class TasksRepository {
             s.note!.isNotEmpty) {
           row['note'] = s.note;
         }
+        if (!omitSubtaskKeys.contains('requireLocation')) {
+          row['requireLocation'] = s.requireLocation;
+        }
         return row;
       }).toList();
     }
@@ -283,15 +301,14 @@ class TasksRepository {
     caseSensitive: false,
   );
 
-  Map<String, String> _normalizedDueTimeField(String? dueTime) {
-    final raw = dueTime?.trim() ?? '';
-    if (raw.isEmpty) return const {};
-    final match = _hhMm.firstMatch(raw);
-    if (match == null) return const {};
-    return {'dueTime': '${match.group(1)}:${match.group(2)}'};
+  bool _mentionsForbiddenProperty(DioException error, String property) {
+    for (final m in _errorMessages(error)) {
+      if (m.contains(property) && m.contains('should not exist')) return true;
+    }
+    return false;
   }
 
-  Set<String> _forbiddenSubtaskProperties(DioException error) {
+  List<String> _errorMessages(DioException error) {
     final data = error.response?.data;
     final messages = <String>[];
     if (data is Map && data['message'] is List) {
@@ -301,9 +318,20 @@ class TasksRepository {
     } else if (data is List) {
       messages.addAll(data.map((e) => e.toString()));
     }
+    return messages;
+  }
 
+  Map<String, String> _normalizedDueTimeField(String? dueTime) {
+    final raw = dueTime?.trim() ?? '';
+    if (raw.isEmpty) return const {};
+    final match = _hhMm.firstMatch(raw);
+    if (match == null) return const {};
+    return {'dueTime': '${match.group(1)}:${match.group(2)}'};
+  }
+
+  Set<String> _forbiddenSubtaskProperties(DioException error) {
     final keys = <String>{};
-    for (final m in messages) {
+    for (final m in _errorMessages(error)) {
       for (final match in _forbiddenProp.allMatches(m)) {
         final key = match.group(1);
         if (key != null && key.isNotEmpty) keys.add(key);
@@ -386,12 +414,14 @@ class CreateTaskSubtaskInput {
     required this.title,
     this.description = '',
     this.priority = 'MEDIUM',
+    this.requireLocation = false,
   });
 
   final String clientId;
   final String title;
   final String description;
   final String priority;
+  final bool requireLocation;
 
   Map<String, dynamic> toJson() {
     return {
@@ -401,6 +431,7 @@ class CreateTaskSubtaskInput {
       'completed': false,
       'status': 'TODO',
       'priority': priority.toUpperCase(),
+      if (requireLocation) 'requireLocation': true,
     };
   }
 }

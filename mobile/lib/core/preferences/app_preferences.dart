@@ -4,7 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 const _themeKey = 'mini_tm_theme_mode';
 const _lastProjectKey = 'mini_tm_last_project_id';
-const _requireLocationKey = 'mini_tm_subtask_require_location';
 
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   throw UnimplementedError('SharedPreferences must be overridden in main()');
@@ -51,24 +50,5 @@ class LastProjectController extends Notifier<String?> {
     }
     await prefs.setString(_lastProjectKey, projectId);
     state = projectId;
-  }
-}
-
-/// When true, completing a subtask requires GPS + geofence. Default: off.
-final requireLocationForSubtaskCompletionProvider =
-    NotifierProvider<RequireLocationForSubtaskCompletionController, bool>(
-  RequireLocationForSubtaskCompletionController.new,
-);
-
-class RequireLocationForSubtaskCompletionController extends Notifier<bool> {
-  @override
-  bool build() {
-    return ref.watch(sharedPreferencesProvider).getBool(_requireLocationKey) ?? false;
-  }
-
-  Future<void> setEnabled(bool enabled) async {
-    final prefs = ref.read(sharedPreferencesProvider);
-    await prefs.setBool(_requireLocationKey, enabled);
-    state = enabled;
   }
 }

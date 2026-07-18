@@ -36,6 +36,8 @@ import {
   canUserDeleteTask,
   canUserEditTaskFully,
   canUserEditTaskTitleAndDescription,
+  canUserToggleSubtaskRequireLocation,
+  canUserToggleTaskRequireLocation,
   getTaskAssigneeIdList,
   isUserAssignedToTask,
   isUserTaskReporter,
@@ -517,6 +519,11 @@ export function TaskDetailModal({
 
   /** Owner/admin or task creator can edit every field; assignees get limited fields. */
   const canEditAll = canUserEditTaskFully(task ?? {}, currentUserId, isOwner || isAdmin);
+  const canToggleRequireLocation = canUserToggleTaskRequireLocation(
+    task ?? {},
+    currentUserId,
+    isOwner || isAdmin
+  );
   const canEditTitleAndDescription = canUserEditTaskTitleAndDescription(
     task ?? {},
     currentUserId,
@@ -1501,6 +1508,7 @@ export function TaskDetailModal({
                                   dueTime: item.dueTime,
                                   status: resolveSubtaskStatus(item),
                                   priority: item.priority,
+                                  requireLocation: item.requireLocation === true,
                                 }}
                                 projectId={projectId}
                                 organizationId={organizationId}
@@ -1511,6 +1519,12 @@ export function TaskDetailModal({
                                 persistAttachments
                                 disabled={!canEditSubtasks}
                                 readOnly={isViewOnly}
+                                canEditRequireLocation={canUserToggleSubtaskRequireLocation(
+                                  task ?? {},
+                                  item,
+                                  currentUserId,
+                                  isOwner || isAdmin
+                                )}
                                 saving={updateSubtasksMutation.isPending}
                                 onSave={saveSubtaskDetail}
                                 onDirtyChange={setSubtaskDraftDirty}
@@ -2207,6 +2221,28 @@ export function TaskDetailModal({
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
+
+                      <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border/60 bg-muted/15 px-3 py-2.5">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5 h-4 w-4 rounded border-border"
+                          checked={task.requireLocation === true}
+                          disabled={!canToggleRequireLocation || updateMutation.isPending}
+                          onChange={(e) =>
+                            updateMutation.mutate({ requireLocation: e.target.checked })
+                          }
+                        />
+                        <span className="space-y-0.5">
+                          <span className="block text-xs font-medium text-foreground">
+                            Require location to complete
+                          </span>
+                          <span className="block text-[11px] text-muted-foreground">
+                            {canToggleRequireLocation
+                              ? "GPS check when marking subtasks done on this task"
+                              : "Only the owner or task creator can change this"}
+                          </span>
+                        </span>
+                      </label>
                     </div>
                   </div>
 

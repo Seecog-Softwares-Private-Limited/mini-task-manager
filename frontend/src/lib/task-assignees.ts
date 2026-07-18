@@ -180,6 +180,41 @@ export function canUserEditTaskFully(
   return isUserTaskReporter(task, userId);
 }
 
+/** Owner/admin or task creator can change task-level require location. */
+export function canUserToggleTaskRequireLocation(
+  task: TaskReporterSource,
+  userId: string | null | undefined,
+  canEditAllTasks: boolean
+): boolean {
+  return canUserEditTaskFully(task, userId, canEditAllTasks);
+}
+
+export function isUserSubtaskReporter(
+  subtask: { reporterId?: string | null },
+  userId: string | null | undefined,
+  fallbackReporterId?: string | null
+): boolean {
+  const uid = normalizeAssigneeUserId(userId);
+  if (!uid) return false;
+  const reporter =
+    subtask.reporterId && String(subtask.reporterId).trim()
+      ? subtask.reporterId
+      : fallbackReporterId;
+  return uid === normalizeAssigneeUserId(reporter);
+}
+
+/** Owner/admin, task creator, or this subtask's creator. */
+export function canUserToggleSubtaskRequireLocation(
+  task: TaskReporterSource,
+  subtask: { reporterId?: string | null },
+  userId: string | null | undefined,
+  canEditAllTasks: boolean
+): boolean {
+  if (canEditAllTasks) return true;
+  if (isUserTaskReporter(task, userId)) return true;
+  return isUserSubtaskReporter(subtask, userId, task.reporterId);
+}
+
 /** Title/description when owner/admin, reporter, or assignee. */
 export function canUserEditTaskTitleAndDescription(
   task: TaskReporterSource,

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/api_exception.dart';
-import '../../core/preferences/app_preferences.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/client_id.dart';
 import '../../core/utils/html_plain_text.dart';
@@ -29,6 +29,7 @@ import 'subtask_detail_panel.dart';
 import 'attachment_picker_section.dart';
 import 'attachment_preview.dart';
 import 'assignee_picker_sheet.dart';
+import 'require_location_toggle.dart';
 
 class _TaskAttachmentItem {
   const _TaskAttachmentItem({
@@ -78,6 +79,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
   int? _savingSubtaskIndex;
   bool _addingSubtask = false;
   final GlobalKey _checklistAddKey = GlobalKey();
+  final Map<String, GlobalKey> _subtaskRowKeys = {};
+  ScrollController? _sheetScroll;
   String? _error;
   List<ProjectMember> _members = const [];
   List<_TaskAttachmentItem> _attachments = const [];
@@ -285,6 +288,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     List<String>? tags,
     List<String>? assigneeIds,
     List<TaskSubtask>? subtasks,
+    bool? requireLocation,
   }) async {
     await _run(() => ref.read(tasksRepositoryProvider).updateTask(
           taskId: _task.id,
@@ -299,6 +303,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
           tags: tags,
           assigneeIds: assigneeIds,
           subtasks: subtasks,
+          requireLocation: requireLocation,
         ));
   }
 
@@ -359,10 +364,64 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     await _patchTask(tags: next);
   }
 
-  void _toggleSubtaskExpanded(int index) {
-    setState(() {
-      _expandedSubtaskIndex = _expandedSubtaskIndex == index ? null : index;
+  GlobalKey _subtaskRowKey(String id) {
+    return _subtaskRowKeys.putIfAbsent(id, GlobalKey.new);
+  }
+
+  /// Keep [subtaskId]'s compact row at the same screen position after the
+  /// checklist height changes (collapse editor / delete). Uses jumpTo — animated
+  /// ensureVisible was still sliding the sheet down the long list.
+  void _stabilizeChecklistScroll(String? subtaskId, {double alignment = 0.12}) {
+    final capturedOffset =
+        _sheetScroll?.hasClients == true ? _sheetScroll!.offset : null;
+
+    void apply() {
+      if (!mounted) return;
+      final controller = _sheetScroll;
+      if (controller == null || !controller.hasClients) return;
+
+      if (subtaskId != null) {
+        final ctx = _subtaskRowKeys[subtaskId]?.currentContext;
+        final renderObject = ctx?.findRenderObject();
+        if (renderObject != null && renderObject.attached) {
+          try {
+            final viewport = RenderAbstractViewport.maybeOf(renderObject);
+            if (viewport != null) {
+              final target = viewport
+                  .getOffsetToReveal(renderObject, alignment)
+                  .offset
+                  .clamp(0.0, controller.position.maxScrollExtent);
+              controller.jumpTo(target);
+              return;
+            }
+          } catch (_) {
+            // Fall through to offset clamp.
+          }
+        }
+      }
+
+      if (capturedOffset != null) {
+        controller.jumpTo(
+          capturedOffset.clamp(0.0, controller.position.maxScrollExtent),
+        );
+      }
+    }
+
+    // Two frames: first after setState layout, second after any follow-up rebuild
+    // from onUpdated / provider invalidation.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      apply();
+      WidgetsBinding.instance.addPostFrameCallback((_) => apply());
     });
+  }
+
+  void _toggleSubtaskExpanded(int index) {
+    final collapsing = _expandedSubtaskIndex == index;
+    final id = _subtasks[index].id;
+    setState(() {
+      _expandedSubtaskIndex = collapsing ? null : index;
+    });
+    _stabilizeChecklistScroll(id, alignment: collapsing ? 0.12 : 0.05);
   }
 
   bool _canEditSubtasks() {
@@ -401,12 +460,17 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
           taskId: _task.id,
           subtasks: updated,
         ));
+    if (!mounted) return;
+    setState(() {
+      _subtasks = _mergeSubtasksPreservingOrder(updated, _subtasks);
+    });
   }
 
   Future<SubtaskCompletionRecord?> _requestSubtaskCompletion({
     required String subtaskId,
     required String subtaskTitle,
     required String? subtaskPriority,
+    bool itemRequireLocation = false,
   }) async {
     if (!_canEditSubtasks()) {
       if (mounted) {
@@ -424,7 +488,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     FocusManager.instance.primaryFocus?.unfocus();
     final requireVideo =
         isCriticalPriority(subtaskPriority) || isCriticalPriority(_task.priority);
-    final requireLocation = ref.read(requireLocationForSubtaskCompletionProvider);
+    final requireLocation = itemRequireLocation || _task.requireLocation;
     final result = await showSubtaskCompletionSheet(
       context: context,
       subtaskTitle: subtaskTitle,
@@ -453,6 +517,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       subtaskId: item.id,
       subtaskTitle: item.title,
       subtaskPriority: item.priority,
+      itemRequireLocation: item.requireLocation,
     );
     if (record == null) return;
 
@@ -467,6 +532,10 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
           taskId: _task.id,
           subtasks: updated,
         ));
+    if (!mounted) return;
+    setState(() {
+      _subtasks = _mergeSubtasksPreservingOrder(updated, _subtasks);
+    });
   }
 
   Future<void> _appendSubtask(String rawTitle) async {
@@ -482,6 +551,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
         completed: false,
         status: 'TODO',
         priority: 'MEDIUM',
+        requireLocation: _task.requireLocation,
       ),
       ...previous,
     ];
@@ -510,7 +580,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       if (!mounted) return;
       setState(() {
         _task = saved;
-        _subtasks = List.of(saved.subtasks);
+        _subtasks = _mergeSubtasksPreservingOrder(updated, saved.subtasks);
       });
       widget.onUpdated();
     } on ApiException catch (e) {
@@ -525,12 +595,14 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
   }
 
   void _cancelSubtaskEdit(int index) {
+    final id = _subtasks[index].id;
     setState(() {
       if (_subtasks[index].title.trim().isEmpty) {
         _subtasks = List<TaskSubtask>.from(_subtasks)..removeAt(index);
       }
       _expandedSubtaskIndex = null;
     });
+    _stabilizeChecklistScroll(id);
   }
 
   Future<void> _quickUpdateSubtaskAssignees(
@@ -547,8 +619,22 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
   }
 
   Future<void> _saveSubtask(int index, TaskSubtask draft) async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final rowId = draft.id;
+    final existing = _subtasks[index];
+    final org = ref.read(selectedOrgProvider);
+    final userId = ref.read(sessionControllerProvider).user?.id;
+    final canSetLocation = canToggleSubtaskRequireLocation(
+      org: org,
+      userId: userId,
+      task: _task,
+      subtask: existing,
+    );
+    final toSave = canSetLocation
+        ? draft
+        : draft.copyWith(requireLocation: existing.requireLocation);
     final updated = List<TaskSubtask>.from(_subtasks);
-    updated[index] = draft;
+    updated[index] = toSave;
     setState(() {
       _subtasks = updated;
       _savingSubtaskIndex = index;
@@ -562,15 +648,37 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       if (!mounted) return;
       setState(() {
         _task = saved;
-        _subtasks = List.of(saved.subtasks);
+        // Keep the checklist order the user sees; don't reshuffle from API payload.
+        _subtasks = _mergeSubtasksPreservingOrder(updated, saved.subtasks);
         _expandedSubtaskIndex = null;
       });
+      _stabilizeChecklistScroll(rowId);
       widget.onUpdated();
+      _stabilizeChecklistScroll(rowId);
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } finally {
       if (mounted) setState(() => _savingSubtaskIndex = null);
     }
+  }
+
+  /// Prefer local order; refresh fields from [server] by id.
+  List<TaskSubtask> _mergeSubtasksPreservingOrder(
+    List<TaskSubtask> localOrder,
+    List<TaskSubtask> server,
+  ) {
+    final byId = {for (final s in server) s.id: s};
+    final merged = <TaskSubtask>[];
+    final seen = <String>{};
+    for (final local in localOrder) {
+      final next = byId[local.id] ?? local;
+      merged.add(next);
+      seen.add(local.id);
+    }
+    for (final s in server) {
+      if (!seen.contains(s.id)) merged.add(s);
+    }
+    return merged;
   }
 
   Future<void> _confirmDeleteSubtask(int index) async {
@@ -607,13 +715,19 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
   Future<void> _deleteSubtask(int index) async {
     if (!_canEditSubtasks() || _saving || _savingSubtaskIndex != null) return;
     if (index < 0 || index >= _subtasks.length) return;
+    FocusManager.instance.primaryFocus?.unfocus();
     final updated = List<TaskSubtask>.from(_subtasks)..removeAt(index);
+    // Anchor to the row that lands at this index (or the last remaining item).
+    final anchorId = updated.isEmpty
+        ? null
+        : updated[index.clamp(0, updated.length - 1)].id;
     setState(() {
       _subtasks = updated;
       _savingSubtaskIndex = index;
       _expandedSubtaskIndex = null;
       _error = null;
     });
+    _stabilizeChecklistScroll(anchorId);
     try {
       final saved = await ref.read(tasksRepositoryProvider).updateTask(
             taskId: _task.id,
@@ -622,9 +736,11 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       if (!mounted) return;
       setState(() {
         _task = saved;
-        _subtasks = List.of(saved.subtasks);
+        _subtasks = _mergeSubtasksPreservingOrder(updated, saved.subtasks);
       });
+      _stabilizeChecklistScroll(anchorId);
       widget.onUpdated();
+      _stabilizeChecklistScroll(anchorId);
     } on ApiException catch (e) {
       if (mounted) {
         setState(() {
@@ -637,7 +753,39 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     }
   }
 
+  Future<void> _setRequireLocation(bool value) async {
+    if (_saving || _task.requireLocation == value) return;
+    final previous = _task.requireLocation;
+    final orderBefore = List<TaskSubtask>.from(_subtasks);
+    setState(() {
+      _task = _task.copyWith(requireLocation: value);
+      _error = null;
+    });
+    try {
+      final updated = await ref.read(tasksRepositoryProvider).updateTask(
+            taskId: _task.id,
+            requireLocation: value,
+          );
+      if (!mounted) return;
+      setState(() {
+        _task = updated;
+        _subtasks = _mergeSubtasksPreservingOrder(orderBefore, updated.subtasks);
+      });
+      widget.onUpdated();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _task = _task.copyWith(requireLocation: previous);
+        _error = e.message;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    }
+  }
+
   Future<void> _run(Future<Task> Function() action) async {
+    final orderBefore = List<TaskSubtask>.from(_subtasks);
     setState(() {
       _saving = true;
       _error = null;
@@ -647,7 +795,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       if (!mounted) return;
       setState(() {
         _task = updated;
-        _subtasks = List.of(updated.subtasks);
+        _subtasks = _mergeSubtasksPreservingOrder(orderBefore, updated.subtasks);
         _syncTextControllersFromTask();
       });
       widget.onUpdated();
@@ -772,6 +920,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       minChildSize: 0.45,
       maxChildSize: 0.92,
       builder: (context, scrollController) {
+        _sheetScroll = scrollController;
         return Material(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
@@ -894,6 +1043,13 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                 onAddTag: _addTag,
                 onRemoveTag: _removeTag,
                 onAssigneesChanged: (assigneeIds) => _patchTask(assigneeIds: assigneeIds),
+                onRequireLocationChanged: canToggleTaskRequireLocation(
+                  org: org,
+                  userId: currentUserId,
+                  task: _task,
+                )
+                    ? (value) => _setRequireLocation(value)
+                    : null,
                 attachments: _AttachmentsSection(
                   loading: _loadingMeta,
                   attachments: _attachments,
@@ -1009,25 +1165,24 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                   final item = _subtasks[index];
                   final expanded = _expandedSubtaskIndex == index;
                   return Column(
-                    key: ValueKey('subtask-row-${item.id}'),
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      SubtaskCompactRow(
-                        subtask: item,
-                        members: _members,
-                        expanded: expanded,
-                        enabled: !_saving && _savingSubtaskIndex == null,
-                        canComplete: canCompleteSubtasks,
-                        onToggleComplete: (value) => _toggleSubtask(index, value),
-                        onExpand: () {
-                          FocusManager.instance.primaryFocus?.unfocus();
-                          _toggleSubtaskExpanded(index);
-                        },
-                        onAssigneesChanged: (ids) =>
-                            _quickUpdateSubtaskAssignees(index, ids),
-                        onDelete: canEditSubtasks
-                            ? () => _confirmDeleteSubtask(index)
-                            : null,
+                      KeyedSubtree(
+                        key: _subtaskRowKey(item.id),
+                        child: SubtaskCompactRow(
+                          subtask: item,
+                          members: _members,
+                          expanded: expanded,
+                          enabled: !_saving && _savingSubtaskIndex == null,
+                          canComplete: canCompleteSubtasks,
+                          onToggleComplete: (value) => _toggleSubtask(index, value),
+                          onExpand: () {
+                            FocusManager.instance.primaryFocus?.unfocus();
+                            _toggleSubtaskExpanded(index);
+                          },
+                          onAssigneesChanged: (ids) =>
+                              _quickUpdateSubtaskAssignees(index, ids),
+                        ),
                       ),
                       if (expanded)
                         Padding(
@@ -1048,6 +1203,12 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                                 fallbackCreatedAt: _task.createdAt,
                                 saving: _savingSubtaskIndex == index,
                                 canComplete: canCompleteSubtasks,
+                                canEditRequireLocation: canToggleSubtaskRequireLocation(
+                                  org: org,
+                                  userId: currentUserId,
+                                  task: _task,
+                                  subtask: item,
+                                ),
                                 onRequestCompletion: ({
                                   required String subtaskId,
                                   required String subtaskTitle,
@@ -1057,6 +1218,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                                       subtaskId: subtaskId,
                                       subtaskTitle: subtaskTitle,
                                       subtaskPriority: subtaskPriority,
+                                      itemRequireLocation: item.requireLocation,
                                     ),
                                 onCancel: () => _cancelSubtaskEdit(index),
                                 onSave: (draft) => _saveSubtask(index, draft),
@@ -1129,6 +1291,7 @@ class _TaskMetaSection extends StatefulWidget {
     required this.onAddTag,
     required this.onRemoveTag,
     required this.onAssigneesChanged,
+    this.onRequireLocationChanged,
     this.attachments,
   });
 
@@ -1153,6 +1316,7 @@ class _TaskMetaSection extends StatefulWidget {
   final ValueChanged<String> onAddTag;
   final ValueChanged<String> onRemoveTag;
   final ValueChanged<List<String>> onAssigneesChanged;
+  final ValueChanged<bool>? onRequireLocationChanged;
   final Widget? attachments;
 
   @override
@@ -1501,6 +1665,16 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
             ],
           ),
           onChanged: widget.onPriorityChanged,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        RequireLocationToggle(
+          value: widget.task.requireLocation,
+          enabled: !widget.saving && widget.onRequireLocationChanged != null,
+          title: 'Require location to complete',
+          subtitle: widget.onRequireLocationChanged != null
+              ? 'Ask for GPS when subtasks on this task are marked done'
+              : 'Only the owner or task creator can change this',
+          onChanged: widget.onRequireLocationChanged,
         ),
         const SizedBox(height: AppSpacing.lg),
         _FieldLabel(text: 'Tags'),

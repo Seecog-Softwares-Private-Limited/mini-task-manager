@@ -7,8 +7,7 @@ import '../../data/models/task.dart';
 import 'assignee_picker_sheet.dart';
 import 'subtask_row_style.dart';
 
-/// Mobile compact subtask row: accent + checkbox + title + assignee circle + expand.
-/// Status / due chips stay web-only; edit those in the expanded panel.
+/// Compact subtask row: accent + checkbox (complete only) + title (opens edit) + assignees.
 class SubtaskCompactRow extends StatelessWidget {
   const SubtaskCompactRow({
     super.key,
@@ -20,7 +19,6 @@ class SubtaskCompactRow extends StatelessWidget {
     required this.onToggleComplete,
     required this.onExpand,
     required this.onAssigneesChanged,
-    this.onDelete,
   });
 
   final TaskSubtask subtask;
@@ -31,7 +29,6 @@ class SubtaskCompactRow extends StatelessWidget {
   final ValueChanged<bool> onToggleComplete;
   final VoidCallback onExpand;
   final ValueChanged<List<String>> onAssigneesChanged;
-  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -67,7 +64,7 @@ class SubtaskCompactRow extends StatelessWidget {
             Container(width: 4, color: rowStyle.accentColor),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
                 child: Row(
                   children: [
                     SizedBox(
@@ -141,40 +138,6 @@ class SubtaskCompactRow extends StatelessWidget {
                       members: assigneeMembers,
                       enabled: enabled,
                       onTap: () => _pickAssignees(context, assigneeIds),
-                    ),
-                    if (onDelete != null)
-                      IconButton(
-                        tooltip: 'Delete subtask',
-                        onPressed: enabled ? onDelete : null,
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                          minWidth: 28,
-                          minHeight: 28,
-                        ),
-                        icon: Icon(
-                          Icons.delete_outline_rounded,
-                          size: 18,
-                          color: enabled
-                              ? AppColors.danger.withValues(alpha: 0.85)
-                              : AppColors.textMuted,
-                        ),
-                      ),
-                    IconButton(
-                      onPressed: onExpand,
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(
-                        minWidth: 28,
-                        minHeight: 28,
-                      ),
-                      icon: Icon(
-                        expanded
-                            ? Icons.keyboard_arrow_up_rounded
-                            : Icons.keyboard_arrow_down_rounded,
-                        size: 20,
-                        color: AppColors.textMuted,
-                      ),
                     ),
                   ],
                 ),

@@ -80,23 +80,6 @@ class AccountSettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           SurfaceCard(
-            child: SwitchListTile.adaptive(
-              contentPadding: EdgeInsets.zero,
-              secondary: Icon(Icons.location_on_outlined, color: AppColors.primary),
-              title: const Text('Require location for subtask completion'),
-              subtitle: const Text(
-                'When on, GPS and site geofence are required to mark a subtask done. When off, location is not requested.',
-              ),
-              value: ref.watch(requireLocationForSubtaskCompletionProvider),
-              onChanged: (value) {
-                ref
-                    .read(requireLocationForSubtaskCompletionProvider.notifier)
-                    .setEnabled(value);
-              },
-            ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          SurfaceCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [

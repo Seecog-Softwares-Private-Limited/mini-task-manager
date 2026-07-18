@@ -45,6 +45,7 @@ export type SubtaskDraft = Pick<
   | "dueTime"
   | "status"
   | "priority"
+  | "requireLocation"
 >;
 
 interface SubtaskDetailPanelProps {
@@ -61,6 +62,8 @@ interface SubtaskDetailPanelProps {
   disabled?: boolean;
   /** View-only: fields read-only, attachments viewable, no save. */
   readOnly?: boolean;
+  /** Owner/admin or task/subtask creator may change require location. */
+  canEditRequireLocation?: boolean;
   saving?: boolean;
   onSave: (draft: SubtaskDraft) => void;
   /** Sync draft to parent form/state while editing (e.g. create-task flow). */
@@ -83,6 +86,7 @@ export function SubtaskDetailPanel({
   onPendingAttachmentsChange,
   disabled,
   readOnly,
+  canEditRequireLocation = false,
   saving,
   onSave,
   onDraftChange,
@@ -97,6 +101,7 @@ export function SubtaskDetailPanel({
   const descriptionRef = React.useRef<HTMLTextAreaElement>(null);
   const attachmentQueryKey = ["entity-attachments", "SUBTASK", initialDraft.id];
   const fieldsDisabled = Boolean(disabled || readOnly);
+  const locationDisabled = Boolean(fieldsDisabled || !canEditRequireLocation);
   const attachmentsManageDisabled = Boolean(disabled || readOnly);
 
   const draftsEqual = React.useCallback((a: SubtaskDraft, b: SubtaskDraft) => {
@@ -108,7 +113,8 @@ export function SubtaskDetailPanel({
       a.dueDate === b.dueDate &&
       (a.dueTime ?? "") === (b.dueTime ?? "") &&
       resolveSubtaskStatus(a) === resolveSubtaskStatus(b) &&
-      resolveSubtaskPriority(a.priority) === resolveSubtaskPriority(b.priority)
+      resolveSubtaskPriority(a.priority) === resolveSubtaskPriority(b.priority) &&
+      Boolean(a.requireLocation) === Boolean(b.requireLocation)
     );
   }, []);
 
@@ -119,6 +125,7 @@ export function SubtaskDetailPanel({
       status: resolveSubtaskStatus(initialDraft),
       completed: resolveSubtaskStatus(initialDraft) === "DONE",
       priority: resolveSubtaskPriority(initialDraft.priority),
+      requireLocation: initialDraft.requireLocation === true,
     };
     // Only reset from props when switching subtasks or when local draft is clean.
     const dirty = !draftsEqual(draft, baselineRef.current);
@@ -139,6 +146,7 @@ export function SubtaskDetailPanel({
     initialDraft.dueTime,
     initialDraft.status,
     initialDraft.priority,
+    initialDraft.requireLocation,
     draftsEqual,
   ]);
 
@@ -303,6 +311,29 @@ export function SubtaskDetailPanel({
         />
       </div>
 
+      <label
+        className={cn(
+          "flex items-start gap-2 rounded-md border border-border/50 bg-muted/10 px-2.5 py-2",
+          locationDisabled ? "cursor-not-allowed opacity-70" : "cursor-pointer"
+        )}
+      >
+        <input
+          type="checkbox"
+          className="mt-0.5 h-3.5 w-3.5 rounded border-border"
+          checked={draft.requireLocation === true}
+          disabled={locationDisabled}
+          onChange={(e) => update("requireLocation", e.target.checked)}
+        />
+        <span className="space-y-0.5">
+          <span className="block text-[12px] font-medium text-foreground">Require location</span>
+          <span className="block text-[10px] text-muted-foreground">
+            {canEditRequireLocation
+              ? "Ask for GPS when this subtask is completed"
+              : "Only the owner or creator can change this"}
+          </span>
+        </span>
+      </label>
+
       <div className="flex items-center justify-end gap-2 border-t border-border/40 pt-3">
         {readOnly ? (
           onCancel ? (
@@ -345,6 +376,7 @@ export function SubtaskDetailPanel({
                   status: resolveSubtaskStatus(draft),
                   completed: resolveSubtaskStatus(draft) === "DONE",
                   priority: resolveSubtaskPriority(draft.priority),
+                  requireLocation: draft.requireLocation === true,
                 })
               }
             >
