@@ -12,6 +12,7 @@ import '../../data/models/organization.dart';
 import '../../data/repositories/auth_repository.dart';
 import '../../data/repositories/device_tokens_repository.dart';
 import '../../data/repositories/organizations_repository.dart';
+import '../../data/repositories/users_repository.dart';
 
 enum SessionStatus {
   loading,
@@ -57,6 +58,7 @@ class SessionController extends Notifier<SessionState> {
   late AuthRepository _authRepository;
   late OrganizationsRepository _organizationsRepository;
   late DeviceTokensRepository _deviceTokensRepository;
+  late UsersRepository _usersRepository;
   late AuthStorage _authStorage;
   int _operationGeneration = 0;
   bool _restoreScheduled = false;
@@ -68,6 +70,7 @@ class SessionController extends Notifier<SessionState> {
     _authRepository = ref.watch(authRepositoryProvider);
     _organizationsRepository = ref.watch(organizationsRepositoryProvider);
     _deviceTokensRepository = ref.watch(deviceTokensRepositoryProvider);
+    _usersRepository = ref.watch(usersRepositoryProvider);
     _authStorage = ref.watch(authStorageProvider);
 
     ref.listen<int>(sessionExpiredTickProvider, (_, __) {
@@ -188,6 +191,9 @@ class SessionController extends Notifier<SessionState> {
           organizations: organizations,
         );
         unawaitedRegisterDeviceToken();
+        // Login payloads used to omit avatarUrl — refresh from /users/me.
+        // ignore: unawaited_futures
+        refreshCurrentUserProfile();
         return;
       }
       await _authStorage.writeOrgId(null);
@@ -205,6 +211,8 @@ class SessionController extends Notifier<SessionState> {
         organizations: organizations,
       );
       unawaitedRegisterDeviceToken();
+      // ignore: unawaited_futures
+      refreshCurrentUserProfile();
       return;
     }
 
@@ -234,6 +242,8 @@ class SessionController extends Notifier<SessionState> {
         organizations: organizations,
       );
       unawaitedRegisterDeviceToken();
+      // ignore: unawaited_futures
+      refreshCurrentUserProfile();
       return;
     }
 
@@ -273,6 +283,8 @@ class SessionController extends Notifier<SessionState> {
       organizations: state.organizations,
     );
     unawaitedRegisterDeviceToken();
+    // ignore: unawaited_futures
+    refreshCurrentUserProfile();
   }
 
   Future<void> refreshOrganizations() async {
@@ -324,6 +336,16 @@ class SessionController extends Notifier<SessionState> {
   Future<void> updateUser(AuthUser user) async {
     await _authStorage.writeUser(user);
     state = state.copyWith(user: user);
+  }
+
+  /// Refresh profile (incl. avatarUrl) from `/users/me` after login/restore.
+  Future<void> refreshCurrentUserProfile() async {
+    try {
+      final profile = await _usersRepository.fetchCurrentUser();
+      await updateUser(profile);
+    } catch (e) {
+      debugPrint('refreshCurrentUserProfile failed: $e');
+    }
   }
 }
 

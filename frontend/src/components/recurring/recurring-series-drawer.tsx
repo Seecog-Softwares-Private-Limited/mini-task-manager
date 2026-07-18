@@ -76,7 +76,7 @@ export interface RecurringSeriesDrawerProps {
   onDelete?: (template: RecurringTemplateSummary) => void;
   onSaveCadence?: (
     templateId: string,
-    payload: { title?: string; recurrence?: TaskRecurrenceConfig }
+    payload: { title?: string; description?: string; recurrence?: TaskRecurrenceConfig }
   ) => void;
   onOpenOccurrence?: (task: Task) => void;
 }
@@ -102,6 +102,7 @@ export function RecurringSeriesDrawer({
 }: RecurringSeriesDrawerProps) {
   const [editing, setEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
+  const [draftDescription, setDraftDescription] = useState("");
   const [draftRepeat, setDraftRepeat] = useState<RepeatType>("DAILY");
   const [draftInterval, setDraftInterval] = useState(1);
   const [draftEndType, setDraftEndType] = useState<EndType>("NEVER");
@@ -112,6 +113,7 @@ export function RecurringSeriesDrawer({
     setEditing(false);
     if (template) {
       setDraftTitle(template.title);
+      setDraftDescription(template.description ?? "");
       setDraftRepeat(template.repeatType);
       setDraftInterval(1);
       setDraftEndType(template.endType);
@@ -178,6 +180,7 @@ export function RecurringSeriesDrawer({
     };
     onSaveCadence?.(template.id, {
       title: draftTitle.trim() || undefined,
+      description: draftDescription,
       recurrence,
     });
     setEditing(false);
@@ -259,6 +262,17 @@ export function RecurringSeriesDrawer({
                     onChange={(e) => setDraftTitle(e.target.value)}
                     className="h-9 text-sm"
                     placeholder="Series title"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                    Description
+                  </label>
+                  <textarea
+                    value={draftDescription}
+                    onChange={(e) => setDraftDescription(e.target.value)}
+                    className="min-h-[72px] w-full rounded-lg border border-border/60 bg-background px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    placeholder="Optional series description"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-2">

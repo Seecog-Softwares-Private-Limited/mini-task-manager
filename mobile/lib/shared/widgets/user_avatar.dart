@@ -6,12 +6,41 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/workspace_logo.dart';
 import '../../data/models/login_response.dart';
 
-String resolveUserAvatarUrl(String apiBaseUrl, String? avatarUrl) {
-  if (avatarUrl == null || avatarUrl.isEmpty) return '';
-  if (avatarUrl.startsWith('http')) return avatarUrl;
-  final origin = apiBaseUrl.replaceAll(RegExp(r'/api/v1$'), '');
-  if (avatarUrl.startsWith('/')) return '$origin$avatarUrl';
-  return '$origin/$avatarUrl';
+/// Hosts that should be rewritten to the current API origin (migrated AWS / local).
+const _staleAvatarHosts = <String>{
+  'localhost',
+  '127.0.0.1',
+  '10.0.2.2',
+  '3.110.214.243',
+};
+
+String apiOriginFromBaseUrl(String apiBaseUrl) {
+  return apiBaseUrl.replaceAll(RegExp(r'/api/v1/?$'), '');
+}
+
+/// Resolves a stored avatar path/URL against the active API origin.
+String resolveUserAvatarUrl(String apiBaseUrl, String? avatarUrl, {String? userId}) {
+  final origin = apiOriginFromBaseUrl(apiBaseUrl);
+  final trimmed = avatarUrl?.trim() ?? '';
+
+  if (trimmed.isNotEmpty) {
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      final uri = Uri.tryParse(trimmed);
+      if (uri != null && _staleAvatarHosts.contains(uri.host)) {
+        final path = uri.path.isEmpty ? '/' : uri.path;
+        return '$origin$path${uri.hasQuery ? '?${uri.query}' : ''}';
+      }
+      return trimmed;
+    }
+    if (trimmed.startsWith('/')) return '$origin$trimmed';
+    return '$origin/$trimmed';
+  }
+
+  // Login used to omit avatarUrl — still try the public avatar endpoint by user id.
+  if (userId != null && userId.isNotEmpty) {
+    return '$origin/api/v1/users/avatar/$userId';
+  }
+  return '';
 }
 
 class UserAvatar extends ConsumerWidget {
@@ -53,7 +82,11 @@ class UserAvatar extends ConsumerWidget {
     final config = ref.watch(appConfigProvider);
     final name = user?.fullName ?? user?.email ?? '?';
     final initials = workspaceInitials(name);
-    final imageUrl = resolveUserAvatarUrl(config.apiBaseUrl, user?.avatarUrl);
+    final imageUrl = resolveUserAvatarUrl(
+      config.apiBaseUrl,
+      user?.avatarUrl,
+      userId: user?.id,
+    );
     final cacheSize = (size * MediaQuery.devicePixelRatioOf(context)).round();
 
     final Widget avatar;

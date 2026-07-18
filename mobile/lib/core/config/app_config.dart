@@ -1,7 +1,3 @@
-import 'dart:io';
-
-import 'package:flutter/foundation.dart';
-
 /// Runtime configuration for API connectivity and app metadata.
 class AppConfig {
   const AppConfig({
@@ -55,17 +51,11 @@ class AppConfig {
   ];
 
   static String _defaultBaseUrlForFlavor(String flavor) {
-    if (flavor == 'prod') {
-      return productionApiBaseUrl;
-    }
     if (flavor == 'staging') {
       return 'https://staging.your-host/api/v1';
     }
-
-    if (!kIsWeb && Platform.isAndroid) {
-      return 'http://10.0.2.2:3007/api/v1';
-    }
-    return 'http://localhost:3007/api/v1';
+    // Dev + prod both default to Hostinger VPS (not localhost / RDS).
+    return productionApiBaseUrl;
   }
 
   static String normalizeBaseUrl(String value) {

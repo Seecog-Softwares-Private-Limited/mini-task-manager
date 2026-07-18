@@ -12,6 +12,7 @@ import '../../data/models/task.dart';
 import '../../data/models/workflow.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../auth/session_controller.dart';
+import '../home/my_work_providers.dart';
 import 'create_task_sheet.dart';
 import 'kanban_providers.dart';
 import 'project_switcher.dart';
@@ -85,7 +86,16 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
             ),
           );
         },
-        data: (board) {
+        data: (rawBoard) {
+          final board = widget.embedded
+              ? _applyEmbeddedFilters(
+                  rawBoard,
+                  memberId: ref.watch(tasksMemberFilterProvider),
+                  filters: ref.watch(tasksBoardFiltersProvider),
+                  currentUserId: session.user?.id,
+                )
+              : rawBoard;
+
           if (board.statuses.isEmpty) {
             return _BoardScaffold(
               embedded: widget.embedded,
@@ -151,7 +161,7 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
                         context,
                         ref,
                         task: task,
-                        board: board,
+                        board: rawBoard,
                       ),
                     );
                   },
@@ -276,6 +286,47 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
     if (parsed == null) return AppColors.primary;
     return Color(parsed);
   }
+}
+
+ProjectBoardData _applyEmbeddedFilters(
+  ProjectBoardData board, {
+  String? memberId,
+  required TasksBoardFilters filters,
+  String? currentUserId,
+}) {
+  final hasMember = memberId != null && memberId.isNotEmpty;
+  if (!hasMember && !filters.isActive) return board;
+
+  final filtered = board.tasks
+      .where(
+        (task) => matchesTasksBoardFilters(
+          task,
+          memberId: memberId,
+          filters: filters,
+          currentUserId: currentUserId,
+        ),
+      )
+      .toList();
+
+  final tasksByStatus = <String, List<Task>>{
+    for (final status in board.statuses) status.id: <Task>[],
+  };
+  var overdueCount = 0;
+  for (final task in filtered) {
+    final statusId = task.statusId;
+    if (statusId != null && statusId.isNotEmpty) {
+      tasksByStatus.putIfAbsent(statusId, () => []).add(task);
+    }
+    if (isTaskDueOverdue(task.dueDate)) overdueCount++;
+  }
+
+  return ProjectBoardData(
+    statuses: board.statuses,
+    tasks: filtered,
+    projectName: board.projectName,
+    tasksByStatus: tasksByStatus,
+    overdueCount: overdueCount,
+  );
 }
 
 class _BoardScaffold extends StatelessWidget {

@@ -285,6 +285,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
         _showNotAssigned();
         return;
       }
+      FocusManager.instance.primaryFocus?.unfocus();
       final record = await widget.onRequestCompletion(
         subtaskId: widget.subtask.id,
         subtaskTitle: _titleController.text.trim().isEmpty

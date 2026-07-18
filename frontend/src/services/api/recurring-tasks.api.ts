@@ -91,7 +91,7 @@ export async function duplicateRecurringTemplate(
 
 export async function updateRecurringTemplate(
   templateId: string,
-  payload: { title?: string; recurrence?: TaskRecurrenceConfig }
+  payload: { title?: string; description?: string; recurrence?: TaskRecurrenceConfig }
 ): Promise<RecurringTemplateSummary> {
   const { data } = await apiClient.patch<RecurringTemplateSummary>(
     `/recurring-tasks/${templateId}`,

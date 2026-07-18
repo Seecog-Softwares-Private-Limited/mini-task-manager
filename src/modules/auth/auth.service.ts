@@ -87,6 +87,7 @@ export class AuthService {
         id: user.id,
         email: user.email,
         fullName: user.fullName,
+        avatarUrl: user.avatarUrl ?? undefined,
         isPlatformAdmin: user.isPlatformAdmin,
       },
     };
@@ -585,6 +586,7 @@ export class AuthService {
         id: user.id,
         email: user.email,
         fullName: user.fullName,
+        avatarUrl: user.avatarUrl ?? undefined,
       },
     };
   }
@@ -646,6 +648,7 @@ export class AuthService {
         id: userId,
         email,
         fullName: dto.fullName,
+        avatarUrl: undefined,
       },
       organizationId: invitation.organizationId,
     };
@@ -719,6 +722,7 @@ export class AuthService {
         id: user.id,
         email: user.email,
         fullName: user.fullName,
+        avatarUrl: user.avatarUrl ?? undefined,
         isPlatformAdmin: user.isPlatformAdmin,
       },
       organizationId: orgs[0]?.id,

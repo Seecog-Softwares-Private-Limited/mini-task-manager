@@ -170,12 +170,22 @@ export function canUserDeleteTask(
   return isUserTaskReporter(task, userId);
 }
 
-/** Full edit when owner/admin, or when assigned-by user is also assigned to the task. */
+/** Full edit when owner/admin, or when the user created the task (reporter). */
 export function canUserEditTaskFully(
   task: TaskReporterSource,
   userId: string | null | undefined,
   canEditAllTasks: boolean
 ): boolean {
   if (canEditAllTasks) return true;
-  return isUserTaskReporter(task, userId) && isUserAssignedToTask(task, userId);
+  return isUserTaskReporter(task, userId);
+}
+
+/** Title/description when owner/admin, reporter, or assignee. */
+export function canUserEditTaskTitleAndDescription(
+  task: TaskReporterSource,
+  userId: string | null | undefined,
+  canEditAllTasks: boolean
+): boolean {
+  if (canEditAllTasks) return true;
+  return isUserTaskReporter(task, userId) || isUserAssignedToTask(task, userId);
 }

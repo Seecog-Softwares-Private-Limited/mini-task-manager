@@ -120,8 +120,14 @@ export function SubtaskDetailPanel({
       completed: resolveSubtaskStatus(initialDraft) === "DONE",
       priority: resolveSubtaskPriority(initialDraft.priority),
     };
-    setDraft(normalized);
-    baselineRef.current = normalized;
+    // Only reset from props when switching subtasks or when local draft is clean.
+    const dirty = !draftsEqual(draft, baselineRef.current);
+    if (initialDraft.id !== baselineRef.current.id || !dirty) {
+      setDraft(normalized);
+      baselineRef.current = normalized;
+    }
+    // Intentionally omit `draft` from deps — we only react to parent prop changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     initialDraft.id,
     initialDraft.title,
@@ -133,6 +139,7 @@ export function SubtaskDetailPanel({
     initialDraft.dueTime,
     initialDraft.status,
     initialDraft.priority,
+    draftsEqual,
   ]);
 
   React.useEffect(() => {

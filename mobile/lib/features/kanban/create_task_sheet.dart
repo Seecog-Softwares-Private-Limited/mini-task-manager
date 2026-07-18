@@ -38,6 +38,7 @@ class CreateTaskSheet extends ConsumerStatefulWidget {
 class _CreateTaskSheetState extends ConsumerState<CreateTaskSheet> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _subtasksSectionKey = GlobalKey();
   final _subtasks = <_SubtaskDraft>[];
 
   String _priority = 'MEDIUM';
@@ -75,8 +76,21 @@ class _CreateTaskSheetState extends ConsumerState<CreateTaskSheet> {
   }
 
   void _addSubtask() {
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
+      // Keep new drafts near the Add button (top), not at the bottom of the list.
       _subtasks.insert(0, _SubtaskDraft(clientId: generateClientId()));
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _subtasksSectionKey.currentContext;
+      if (ctx != null && mounted) {
+        Scrollable.ensureVisible(
+          ctx,
+          alignment: 0.05,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
     });
   }
 
@@ -399,6 +413,7 @@ class _CreateTaskSheetState extends ConsumerState<CreateTaskSheet> {
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 Row(
+                  key: _subtasksSectionKey,
                   children: [
                     Expanded(
                       child: _SectionLabel('Subtasks'),

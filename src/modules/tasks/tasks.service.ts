@@ -53,8 +53,14 @@ function sanitizeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 200) || 'file';
 }
 
-/** Fields assignees may update on tasks assigned to them (owner can update all). */
-const ASSIGNEE_PATCH_FIELDS = new Set(['statusId', 'priority', 'subtasks']);
+/** Fields assignees may update on tasks assigned to them (owner/admin can update all). */
+const ASSIGNEE_PATCH_FIELDS = new Set([
+  'statusId',
+  'priority',
+  'subtasks',
+  'title',
+  'description',
+]);
 
 function normalizeAssigneeUserId(id: string | Buffer | null | undefined): string | null {
   const formatted = formatUuid(id as string | Buffer | null | undefined);
@@ -742,12 +748,12 @@ export class TasksService {
     const isAssignee = normalizedUserId != null && assigneeIds.includes(normalizedUserId);
     const isReporter = isTaskReporter(task, userId);
 
-    // Assigned-by user who is also assigned gets full edit access.
-    if (isReporter && isAssignee) return;
+    // Assigned-by (reporter) or assignee can update; assignees are limited to allowed fields below.
+    if (isReporter) return;
 
     if (!isAssignee) {
       throw new ForbiddenException(
-        'Only the workspace owner, task assignee, or assigned-by user (when also assigned) can update this task',
+        'Only the workspace owner, task assignee, or task creator can update this task',
       );
     }
 
@@ -755,7 +761,7 @@ export class TasksService {
     const disallowed = keys.filter((k) => !ASSIGNEE_PATCH_FIELDS.has(k));
     if (disallowed.length > 0) {
       throw new ForbiddenException(
-        'Assignees can only update task status, priority, and subtasks',
+        'Assignees can only update task title, description, status, priority, and subtasks',
       );
     }
   }

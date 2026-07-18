@@ -91,7 +91,7 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
     _occurrencesController = TextEditingController(
       text: (t?.endAfterOccurrences ?? 10).toString(),
     );
-    _descriptionController = TextEditingController();
+    _descriptionController = TextEditingController(text: t?.description ?? '');
     if (t != null) {
       _frequency =
           _frequencies.containsKey(t.repeatType) ? t.repeatType : 'WEEKLY';
@@ -237,6 +237,7 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
           templateId: widget.template!.id,
           organizationId: widget.organizationId,
           title: title,
+          description: _descriptionController.text,
           recurrence: _buildRecurrence(),
         );
       } else {
@@ -402,6 +403,19 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
                   hintText: 'e.g. Morning workout',
                 ),
               ),
+              const SizedBox(height: AppSpacing.md),
+              Text('Description', style: labelStyle),
+              const SizedBox(height: AppSpacing.xs),
+              TextField(
+                controller: _descriptionController,
+                minLines: 2,
+                maxLines: 4,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(
+                  hintText: 'Optional details for this series',
+                  alignLabelWithHint: true,
+                ),
+              ),
               if (!_isEdit) ...[
                 const SizedBox(height: AppSpacing.md),
                 Text('Priority', style: labelStyle),
@@ -417,19 +431,6 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
                           : (_) => setState(() => _priority = e.key),
                     );
                   }).toList(),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Text('Description', style: labelStyle),
-                const SizedBox(height: AppSpacing.xs),
-                TextField(
-                  controller: _descriptionController,
-                  minLines: 2,
-                  maxLines: 4,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(
-                    hintText: 'Optional details copied into every run',
-                    alignLabelWithHint: true,
-                  ),
                 ),
               ],
               const SizedBox(height: AppSpacing.md),

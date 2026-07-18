@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/api_exception.dart';
+import '../../core/preferences/app_preferences.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/client_id.dart';
 import '../../core/utils/html_plain_text.dart';
@@ -75,6 +76,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
   bool _loadingMeta = true;
   bool _postingComment = false;
   int? _savingSubtaskIndex;
+  bool _addingSubtask = false;
+  final GlobalKey _checklistAddKey = GlobalKey();
   String? _error;
   List<ProjectMember> _members = const [];
   List<_TaskAttachmentItem> _attachments = const [];
@@ -211,8 +214,13 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
   }
 
   void _syncTextControllersFromTask() {
-    _titleController.text = _task.title;
-    _descriptionController.text = stripHtmlToPlainText(_task.description);
+    // Don't wipe in-progress edits when meta reloads or other patches complete.
+    if (!_isEditingTitle) {
+      _titleController.text = _task.title;
+    }
+    if (!_isEditingDescription) {
+      _descriptionController.text = stripHtmlToPlainText(_task.description);
+    }
   }
 
   Future<void> _saveTitle() async {
@@ -413,14 +421,17 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
 
     final user = ref.read(sessionControllerProvider).user;
     if (user == null) return null;
+    FocusManager.instance.primaryFocus?.unfocus();
     final requireVideo =
         isCriticalPriority(subtaskPriority) || isCriticalPriority(_task.priority);
+    final requireLocation = ref.read(requireLocationForSubtaskCompletionProvider);
     final result = await showSubtaskCompletionSheet(
       context: context,
       subtaskTitle: subtaskTitle,
       projectId: widget.projectId,
       employee: user,
       requireVideo: requireVideo,
+      requireLocation: requireLocation,
     );
     if (result == null) return null;
 
@@ -459,7 +470,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
   }
 
   Future<void> _appendSubtask(String rawTitle) async {
-    if (_saving || _savingSubtaskIndex != null) return;
+    if (_saving || _addingSubtask || _savingSubtaskIndex != null) return;
     final title = rawTitle.trim();
     if (title.isEmpty || title.length > subtaskTitleMaxLength) return;
 
@@ -476,8 +487,20 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     ];
     setState(() {
       _subtasks = updated;
-      _saving = true;
+      _addingSubtask = true;
       _error = null;
+    });
+    // Keep the add field in view instead of jumping to the bottom of the list.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _checklistAddKey.currentContext;
+      if (ctx != null && mounted) {
+        Scrollable.ensureVisible(
+          ctx,
+          alignment: 0.1,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
     });
     try {
       final saved = await ref.read(tasksRepositoryProvider).updateTask(
@@ -497,7 +520,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
         _subtasks = previous;
       });
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) setState(() => _addingSubtask = false);
     }
   }
 
@@ -947,10 +970,13 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                 ],
                 const SizedBox(height: AppSpacing.md),
                 if (canEditSubtasks) ...[
-                  _NewSubtaskComposer(
-                    enabled: !_saving && _savingSubtaskIndex == null,
-                    loading: _saving,
-                    onSubmit: _appendSubtask,
+                  KeyedSubtree(
+                    key: _checklistAddKey,
+                    child: _NewSubtaskComposer(
+                      enabled: !_saving && !_addingSubtask && _savingSubtaskIndex == null,
+                      loading: _addingSubtask,
+                      onSubmit: _appendSubtask,
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                 ],

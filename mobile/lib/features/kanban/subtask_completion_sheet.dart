@@ -33,7 +33,9 @@ Future<SubtaskCompletionResult?> showSubtaskCompletionSheet({
   required String projectId,
   required AuthUser employee,
   required bool requireVideo,
+  bool requireLocation = false,
 }) {
+  FocusManager.instance.primaryFocus?.unfocus();
   return showModalBottomSheet<SubtaskCompletionResult>(
     context: context,
     isScrollControlled: true,
@@ -43,6 +45,7 @@ Future<SubtaskCompletionResult?> showSubtaskCompletionSheet({
       projectId: projectId,
       employee: employee,
       requireVideo: requireVideo,
+      requireLocation: requireLocation,
     ),
   );
 }
@@ -53,12 +56,14 @@ class _SubtaskCompletionSheet extends StatefulWidget {
     required this.projectId,
     required this.employee,
     required this.requireVideo,
+    required this.requireLocation,
   });
 
   final String subtaskTitle;
   final String projectId;
   final AuthUser employee;
   final bool requireVideo;
+  final bool requireLocation;
 
   @override
   State<_SubtaskCompletionSheet> createState() => _SubtaskCompletionSheetState();
@@ -66,6 +71,7 @@ class _SubtaskCompletionSheet extends StatefulWidget {
 
 class _SubtaskCompletionSheetState extends State<_SubtaskCompletionSheet> {
   final _notesController = TextEditingController();
+  final _notesFocus = FocusNode();
   final _recorder = AudioRecorder();
 
   bool _loading = true;
@@ -93,40 +99,49 @@ class _SubtaskCompletionSheetState extends State<_SubtaskCompletionSheet> {
   @override
   void dispose() {
     _notesController.dispose();
+    _notesFocus.dispose();
     _recorder.dispose();
     super.dispose();
   }
 
   Future<void> _bootstrap() async {
     try {
-      final location = await LocationService.captureCurrent();
       final deviceInfo = await DeviceInfoService.capture();
-      final geofence = await GeofenceService.validate(
-        projectId: widget.projectId,
-        latitude: location.latitude,
-        longitude: location.longitude,
-      );
-      if (!mounted) return;
-      setState(() {
-        _location = location;
-        _deviceInfo = deviceInfo;
-        _geofence = geofence;
-        _loading = false;
-        if (!geofence.valid) {
-          _error =
-              'You are outside the work site (${geofence.distanceMeters.round()} m away, limit ${geofence.radiusMeters.round()} m).';
+      CapturedLocation? location;
+      GeofenceValidation? geofence;
+      String? locationError;
+
+      if (widget.requireLocation) {
+        try {
+          location = await LocationService.captureCurrent();
+          geofence = await GeofenceService.validate(
+            projectId: widget.projectId,
+            latitude: location.latitude,
+            longitude: location.longitude,
+          );
+          if (!geofence.valid) {
+            locationError =
+                'You are outside the work site (${geofence.distanceMeters.round()} m away, limit ${geofence.radiusMeters.round()} m).';
+          }
+        } on LocationCaptureException catch (e) {
+          locationError = e.message;
         }
-      });
-    } on LocationCaptureException catch (e) {
+      }
+
       if (!mounted) return;
       setState(() {
-        _error = e.message;
+        _deviceInfo = deviceInfo;
+        _location = location;
+        _geofence = geofence;
+        _error = locationError;
         _loading = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Could not capture location: $e';
+        _error = widget.requireLocation
+            ? 'Could not capture location: $e'
+            : 'Could not prepare completion: $e';
         _loading = false;
       });
     }
@@ -134,13 +149,17 @@ class _SubtaskCompletionSheetState extends State<_SubtaskCompletionSheet> {
 
   bool get _canSubmit {
     if (_loading || _submitting) return false;
-    if (_location == null || _deviceInfo == null || _geofence == null) return false;
-    if (!_geofence!.valid) return false;
+    if (_deviceInfo == null) return false;
+    if (widget.requireLocation) {
+      if (_location == null || _geofence == null) return false;
+      if (!_geofence!.valid) return false;
+    }
     if (widget.requireVideo && _video == null) return false;
     return true;
   }
 
   Future<void> _pickPhoto({required bool before}) async {
+    _notesFocus.unfocus();
     final picked = await AttachmentPickerUtils.capturePhoto();
     if (picked == null) return;
     final renamed = PendingAttachment(
@@ -160,12 +179,14 @@ class _SubtaskCompletionSheetState extends State<_SubtaskCompletionSheet> {
   }
 
   Future<void> _pickVideo() async {
+    _notesFocus.unfocus();
     final picked = await AttachmentPickerUtils.captureVideo();
     if (picked == null) return;
     setState(() => _video = picked);
   }
 
   Future<void> _toggleVoiceRecording() async {
+    _notesFocus.unfocus();
     if (kIsWeb) {
       setState(() => _error = 'Voice notes are not supported on web.');
       return;
@@ -203,21 +224,23 @@ class _SubtaskCompletionSheetState extends State<_SubtaskCompletionSheet> {
 
   Future<void> _submit() async {
     if (!_canSubmit) return;
+    _notesFocus.unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() => _submitting = true);
-    final location = _location!;
-    final geofence = _geofence!;
+    final location = _location;
+    final geofence = _geofence;
     final record = SubtaskCompletionRecord(
       completedAt: _timestamp.toIso8601String(),
       employeeId: widget.employee.id,
       employeeName: widget.employee.fullName,
       employeeEmail: widget.employee.email,
-      latitude: location.latitude,
-      longitude: location.longitude,
-      accuracyMeters: location.accuracyMeters,
-      geofenceValid: geofence.valid,
-      geofenceDistanceMeters: geofence.distanceMeters,
-      geofenceRadiusMeters: geofence.radiusMeters,
-      geofenceSiteId: widget.projectId,
+      latitude: location?.latitude ?? 0,
+      longitude: location?.longitude ?? 0,
+      accuracyMeters: location?.accuracyMeters,
+      geofenceValid: widget.requireLocation ? (geofence?.valid ?? false) : true,
+      geofenceDistanceMeters: geofence?.distanceMeters,
+      geofenceRadiusMeters: geofence?.radiusMeters,
+      geofenceSiteId: widget.requireLocation ? widget.projectId : null,
       deviceInfo: _deviceInfo!,
       notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
       beforePhotoFileNames: _beforePhotos.map((f) => f.fileName).toList(),
@@ -243,136 +266,155 @@ class _SubtaskCompletionSheetState extends State<_SubtaskCompletionSheet> {
   @override
   Widget build(BuildContext context) {
     final timestampLabel = DateFormat('MMM d, yyyy · h:mm a').format(_timestamp.toLocal());
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
 
-    return Padding(
-      padding: EdgeInsets.only(
-        left: AppSpacing.md,
-        right: AppSpacing.md,
-        top: AppSpacing.sm,
-        bottom: MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 42,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text('Complete subtask', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            widget.subtaskTitle,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textMuted),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          if (_loading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else ...[
-            _InfoTile(
-              icon: Icons.schedule_rounded,
-              label: 'Timestamp',
-              value: timestampLabel,
-            ),
-            _InfoTile(
-              icon: Icons.person_rounded,
-              label: 'Employee',
-              value: widget.employee.fullName,
-            ),
-            _InfoTile(
-              icon: Icons.phone_android_rounded,
-              label: 'Device',
-              value: _deviceSummary(_deviceInfo),
-            ),
-            _InfoTile(
-              icon: Icons.location_on_rounded,
-              label: 'GPS',
-              value: _location == null
-                  ? 'Unavailable'
-                  : '${_location!.latitude.toStringAsFixed(5)}, ${_location!.longitude.toStringAsFixed(5)}'
-                      '${_location!.accuracyMeters != null ? ' (±${_location!.accuracyMeters!.round()} m)' : ''}',
-            ),
-            _InfoTile(
-              icon: Icons.fence_rounded,
-              label: 'Geofence',
-              value: _geofence == null
-                  ? 'Checking...'
-                  : _geofence!.valid
-                      ? 'Inside site (${_geofence!.distanceMeters.round()} m from center)'
-                      : 'Outside site (${_geofence!.distanceMeters.round()} m / ${_geofence!.radiusMeters.round()} m)',
-              valueColor: _geofence?.valid == true ? AppColors.success : AppColors.danger,
-            ),
-            const SizedBox(height: AppSpacing.md),
-            TextField(
-              controller: _notesController,
-              minLines: 2,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                labelText: 'Notes (optional)',
-                hintText: 'Add completion notes...',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Text('Photos (optional)', style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: AppSpacing.sm),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: _submitting ? null : () => _pickPhoto(before: true),
-                  icon: const Icon(Icons.photo_camera_outlined, size: 18),
-                  label: Text('Before (${_beforePhotos.length})'),
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: AppSpacing.md,
+          right: AppSpacing.md,
+          top: AppSpacing.sm,
+          bottom: bottomInset + AppSpacing.lg,
+        ),
+        child: SingleChildScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
                 ),
-                OutlinedButton.icon(
-                  onPressed: _submitting ? null : () => _pickPhoto(before: false),
-                  icon: const Icon(Icons.photo_camera_outlined, size: 18),
-                  label: Text('After (${_afterPhotos.length})'),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text('Complete subtask', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                widget.subtaskTitle,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textMuted),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              if (_loading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else ...[
+                _InfoTile(
+                  icon: Icons.schedule_rounded,
+                  label: 'Timestamp',
+                  value: timestampLabel,
                 ),
-                if (!kIsWeb)
-                  OutlinedButton.icon(
-                    onPressed: _submitting ? null : _toggleVoiceRecording,
-                    icon: Icon(
-                      _recordingVoice ? Icons.stop_rounded : Icons.mic_rounded,
-                      size: 18,
+                _InfoTile(
+                  icon: Icons.person_rounded,
+                  label: 'Employee',
+                  value: widget.employee.fullName,
+                ),
+                _InfoTile(
+                  icon: Icons.phone_android_rounded,
+                  label: 'Device',
+                  value: _deviceSummary(_deviceInfo),
+                ),
+                if (widget.requireLocation) ...[
+                  _InfoTile(
+                    icon: Icons.location_on_rounded,
+                    label: 'GPS',
+                    value: _location == null
+                        ? 'Unavailable'
+                        : '${_location!.latitude.toStringAsFixed(5)}, ${_location!.longitude.toStringAsFixed(5)}'
+                            '${_location!.accuracyMeters != null ? ' (±${_location!.accuracyMeters!.round()} m)' : ''}',
+                  ),
+                  _InfoTile(
+                    icon: Icons.fence_rounded,
+                    label: 'Geofence',
+                    value: _geofence == null
+                        ? 'Checking...'
+                        : _geofence!.valid
+                            ? 'Inside site (${_geofence!.distanceMeters.round()} m from center)'
+                            : 'Outside site (${_geofence!.distanceMeters.round()} m / ${_geofence!.radiusMeters.round()} m)',
+                    valueColor: _geofence?.valid == true ? AppColors.success : AppColors.danger,
+                  ),
+                ] else
+                  const _InfoTile(
+                    icon: Icons.location_off_rounded,
+                    label: 'Location',
+                    value: 'Not required (disabled in Account Settings)',
+                  ),
+                const SizedBox(height: AppSpacing.md),
+                TextField(
+                  controller: _notesController,
+                  focusNode: _notesFocus,
+                  minLines: 2,
+                  maxLines: 4,
+                  textInputAction: TextInputAction.done,
+                  onTapOutside: (_) => _notesFocus.unfocus(),
+                  onEditingComplete: _notesFocus.unfocus,
+                  decoration: const InputDecoration(
+                    labelText: 'Notes (optional)',
+                    hintText: 'Add completion notes...',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.md),
+                Text('Photos (optional)', style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: _submitting ? null : () => _pickPhoto(before: true),
+                      icon: const Icon(Icons.photo_camera_outlined, size: 18),
+                      label: Text('Before (${_beforePhotos.length})'),
                     ),
-                    label: Text(_recordingVoice
-                        ? 'Stop'
-                        : _voiceNote == null
-                            ? 'Voice'
-                            : 'Voice ✓'),
-                  ),
-                if (widget.requireVideo)
-                  OutlinedButton.icon(
-                    onPressed: _submitting ? null : _pickVideo,
-                    icon: const Icon(Icons.videocam_rounded, size: 18),
-                    label: Text(_video == null ? 'Video (required)' : 'Video ✓'),
-                  ),
+                    OutlinedButton.icon(
+                      onPressed: _submitting ? null : () => _pickPhoto(before: false),
+                      icon: const Icon(Icons.photo_camera_outlined, size: 18),
+                      label: Text('After (${_afterPhotos.length})'),
+                    ),
+                    if (!kIsWeb)
+                      OutlinedButton.icon(
+                        onPressed: _submitting ? null : _toggleVoiceRecording,
+                        icon: Icon(
+                          _recordingVoice ? Icons.stop_rounded : Icons.mic_rounded,
+                          size: 18,
+                        ),
+                        label: Text(_recordingVoice
+                            ? 'Stop'
+                            : _voiceNote == null
+                                ? 'Voice'
+                                : 'Voice ✓'),
+                      ),
+                    if (widget.requireVideo)
+                      OutlinedButton.icon(
+                        onPressed: _submitting ? null : _pickVideo,
+                        icon: const Icon(Icons.videocam_rounded, size: 18),
+                        label: Text(_video == null ? 'Video (required)' : 'Video ✓'),
+                      ),
+                  ],
+                ),
               ],
-            ),
-          ],
-          if (_error != null) ...[
-            const SizedBox(height: AppSpacing.sm),
-            Text(_error!, style: const TextStyle(color: AppColors.danger)),
-          ],
-          const SizedBox(height: AppSpacing.lg),
-          PrimaryButton(
-            label: _submitting ? 'Completing...' : 'Complete subtask',
-            loading: _submitting,
-            onPressed: _canSubmit ? _submit : null,
+              if (_error != null) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Text(_error!, style: const TextStyle(color: AppColors.danger)),
+              ],
+              const SizedBox(height: AppSpacing.lg),
+              PrimaryButton(
+                label: _submitting ? 'Completing...' : 'Complete subtask',
+                loading: _submitting,
+                onPressed: _canSubmit ? _submit : null,
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

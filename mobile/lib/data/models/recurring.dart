@@ -37,6 +37,7 @@ class RecurringTemplate {
     required this.upcoming,
     required this.completed,
     required this.missed,
+    this.description,
     this.completionHealth,
     this.subtaskCount,
     this.priority,
@@ -51,6 +52,7 @@ class RecurringTemplate {
 
   final String id;
   final String title;
+  final String? description;
   final String repeatType;
   final String nextDueDate;
   final bool isPaused;
@@ -89,6 +91,7 @@ class RecurringTemplate {
     return RecurringTemplate(
       id: json['id'] as String,
       title: json['title'] as String,
+      description: json['description'] as String?,
       repeatType: json['repeatType'] as String? ?? 'WEEKLY',
       nextDueDate: json['nextDueDate'] as String? ?? '',
       isPaused: parseJsonBool(json['isPaused']),
