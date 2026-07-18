@@ -232,6 +232,19 @@ class SessionController extends Notifier<SessionState> {
     final response = await _authRepository.login(email: email, password: password);
     if (_isStale(generation)) return;
 
+    await _applyLoginResponse(response, generation: generation);
+  }
+
+  /// Completes session after signup / email verification when the API returns a token.
+  Future<void> completeAuthenticatedSession(LoginResponse response) async {
+    final generation = ++_operationGeneration;
+    await _applyLoginResponse(response, generation: generation);
+  }
+
+  Future<void> _applyLoginResponse(
+    LoginResponse response, {
+    required int generation,
+  }) async {
     if (response.organizationId != null && response.organizationId!.isNotEmpty) {
       final organizations = await _organizationsRepository.fetchOrganizations();
       if (_isStale(generation)) return;

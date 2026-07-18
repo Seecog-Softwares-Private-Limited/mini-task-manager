@@ -4,6 +4,7 @@ import '../../core/api/api_client.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/auth/auth_storage.dart';
 import '../models/login_response.dart';
+import '../models/signup_result.dart';
 
 class AuthRepository {
   AuthRepository({
@@ -51,6 +52,80 @@ class AuthRepository {
   Future<String?> readToken() => _storage.readToken();
 
   Future<String?> readOrgId() => _storage.readOrgId();
+
+  Future<SignupResult> signup({
+    required String email,
+    required String fullName,
+    required String password,
+  }) async {
+    try {
+      final response = await _api.dio.post<Map<String, dynamic>>(
+        '/auth/signup',
+        data: {
+          'email': email.trim().toLowerCase(),
+          'fullName': fullName.trim(),
+          'password': password,
+        },
+      );
+      final data = response.data ?? const <String, dynamic>{};
+      final hasToken = data['accessToken'] is String &&
+          (data['accessToken'] as String).isNotEmpty &&
+          data['user'] is Map;
+
+      LoginResponse? login;
+      if (hasToken) {
+        login = LoginResponse.fromJson(data);
+        await _storage.writeToken(login.accessToken);
+        await _storage.writeUser(login.user);
+        if (login.organizationId != null) {
+          await _storage.writeOrgId(login.organizationId);
+        }
+      }
+
+      return SignupResult(
+        message: data['message'] as String? ??
+            (login != null
+                ? 'Account created. You are signed in.'
+                : 'Verification email sent. Please check your inbox.'),
+        emailVerified: data['emailVerified'] == true || login != null,
+        login: login,
+        devVerificationCode: data['devVerificationCode'] as String?,
+      );
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<LoginResponse> verifyEmail(String tokenOrCode) async {
+    try {
+      final response = await _api.dio.post<Map<String, dynamic>>(
+        '/auth/verify-email',
+        data: {'token': tokenOrCode.trim()},
+      );
+      final login = LoginResponse.fromJson(response.data!);
+      await _storage.writeToken(login.accessToken);
+      await _storage.writeUser(login.user);
+      if (login.organizationId != null) {
+        await _storage.writeOrgId(login.organizationId);
+      }
+      return login;
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<String> resendVerificationEmail(String email) async {
+    try {
+      final response = await _api.dio.post<Map<String, dynamic>>(
+        '/auth/resend-verification',
+        data: {'email': email.trim().toLowerCase()},
+      );
+      return response.data?['message'] as String? ??
+          'If an account exists, a verification email was sent.';
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
 
   Future<void> forgotPassword(String email) async {
     try {

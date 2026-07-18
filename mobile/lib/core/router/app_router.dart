@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import '../../features/auth/forgot_password_screen.dart';
 import '../../features/auth/login_screen.dart';
+import '../../features/auth/signup_screen.dart';
 import '../../features/auth/session_controller.dart';
 import '../../features/home/home_shell.dart';
 import '../../features/kanban/project_board_screen.dart';
@@ -12,6 +13,7 @@ import '../../features/workspaces/workspace_picker_screen.dart';
 
 abstract final class AppRoutes {
   static const login = '/login';
+  static const signup = '/signup';
   static const forgotPassword = '/forgot-password';
   static const workspaces = '/workspaces';
   static const home = '/';
@@ -43,7 +45,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       }
 
       if (status == SessionStatus.unauthenticated) {
-        if (path == AppRoutes.login || path == AppRoutes.forgotPassword) return null;
+        if (path == AppRoutes.login ||
+            path == AppRoutes.forgotPassword ||
+            path == AppRoutes.signup) {
+          return null;
+        }
         return AppRoutes.login;
       }
 
@@ -52,7 +58,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       }
 
       if (status == SessionStatus.authenticated) {
-        if (path == AppRoutes.login) {
+        if (path == AppRoutes.login || path == AppRoutes.signup) {
           return AppRoutes.home;
         }
         // Workspace picker is only for the post-login selection flow.
@@ -71,6 +77,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.login,
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.signup,
+        builder: (context, state) => const SignupScreen(),
       ),
       GoRoute(
         path: AppRoutes.forgotPassword,
