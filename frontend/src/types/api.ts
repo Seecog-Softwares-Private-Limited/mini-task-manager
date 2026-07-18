@@ -191,6 +191,10 @@ export interface TaskSubtask {
   priority?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   /** @deprecated Legacy workflow status id — superseded by `status`. */
   statusId?: string;
+  /** User who created this subtask (audit / permission checks). */
+  reporterId?: string | null;
+  createdAt?: string;
+  note?: string;
   /** When true, completing this subtask requires GPS/geofence. */
   requireLocation?: boolean;
 }
