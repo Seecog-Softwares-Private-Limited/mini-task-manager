@@ -34,7 +34,9 @@ class ApiException extends Equatable implements Exception {
       final isLocal = target.contains('localhost') || target.contains('127.0.0.1');
       return ApiException(
         message: kIsWeb
-            ? 'Network error. Could not reach $target. On web, use http://localhost:3007 in Server settings.'
+            ? (isLocal
+                ? 'Network error. Could not reach $target. For local Nest use http://localhost:3007, or set your VPS URL in Server settings (e.g. http://200.97.172.61:3000).'
+                : 'Network error. Could not reach $target. Check Server settings URL, CORS on the API, and that the VPS is up.')
             : isLocal
                 ? 'Network error. Could not reach $target. Start local API with: node app.js — or tap "Use production server" below.'
                 : 'Network error. Could not reach $target. Open Server settings → Test connection.',

@@ -87,6 +87,38 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Origins allowed for Flutter web (localhost) + optional CORS_ORIGIN list. */
+function isAllowedCorsOrigin(origin: string | null): boolean {
+  if (!origin) return false;
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) {
+    return true;
+  }
+  const configured = (process.env.CORS_ORIGIN ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return configured.includes(origin);
+}
+
+function applyCorsHeaders(headers: Headers, request: NextRequest): void {
+  const origin = request.headers.get("origin");
+  if (!origin || !isAllowedCorsOrigin(origin)) return;
+
+  headers.set("Access-Control-Allow-Origin", origin);
+  headers.set("Access-Control-Allow-Credentials", "true");
+  headers.set("Vary", "Origin");
+  headers.set(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+  );
+  const requested = request.headers.get("access-control-request-headers");
+  headers.set(
+    "Access-Control-Allow-Headers",
+    requested ||
+      "Content-Type, Authorization, X-Organization-Id",
+  );
+}
+
 function proxyUnavailableResponse(base: string, targetUrl: string, err: unknown, timedOut: boolean) {
   const upstreamTimeoutMs = 12_000;
   console.error("[mini-tm api proxy] fetch failed:", targetUrl, err);
@@ -167,6 +199,8 @@ async function proxy(request: NextRequest, pathSegments: string[] | undefined) {
     if (HOP_BY_HOP.has(key.toLowerCase())) return;
     outHeaders.set(key, value);
   });
+  // Ensure browser CORS works even if Nest headers were dropped by the hop.
+  applyCorsHeaders(outHeaders, request);
 
   // Buffer JSON API bodies so a mid-stream ECONNRESET does not break the browser.
   if (request.method === "HEAD") {
@@ -214,6 +248,17 @@ export async function DELETE(request: NextRequest, ctx: RouteCtx) {
   return proxy(request, ctx.params.path);
 }
 
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204 });
+export async function OPTIONS(request: NextRequest) {
+  const headers = new Headers();
+  applyCorsHeaders(headers, request);
+  // Preflight must succeed for Flutter web → VPS (:3000 proxy).
+  if (!headers.has("Access-Control-Allow-Origin")) {
+    const origin = request.headers.get("origin");
+    if (origin) {
+      // Still answer OPTIONS so the browser gets a clear CORS failure, not a network error.
+      headers.set("Vary", "Origin");
+    }
+  }
+  headers.set("Access-Control-Max-Age", "86400");
+  return new NextResponse(null, { status: 204, headers });
 }
