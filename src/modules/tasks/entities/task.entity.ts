@@ -51,6 +51,11 @@ export class TaskEntity extends BaseEntity {
     priority?: string;
     statusId?: string;
     completionRecord?: Record<string, any>;
+    reporterId?: string;
+    createdAt?: string;
+    note?: string;
+    /** When true, completing this subtask requires GPS/geofence. */
+    requireLocation?: boolean;
   }> | null;
 
   @Column({ name: 'reporter_id', type: 'binary', length: 16, transformer: uuidBinaryTransformer })
@@ -71,6 +76,10 @@ export class TaskEntity extends BaseEntity {
 
   @Column({ name: 'completed_at', type: 'timestamp', nullable: true })
   completedAt!: Date | null;
+
+  /** When true, completing subtasks on this task requires GPS/geofence. */
+  @Column({ name: 'require_location', type: 'boolean', default: false })
+  requireLocation!: boolean;
 
   @Column({ name: 'estimated_minutes', type: 'int', nullable: true })
   estimatedMinutes!: number | null;

@@ -912,6 +912,7 @@ export default function RecurringTasksPage() {
         description: data.description || undefined,
         statusId: data.statusId || statuses[0]?.id || undefined,
         priority: data.priority,
+        requireLocation: data.requireLocation === true,
         assigneeIds: data.assigneeIds?.length ? data.assigneeIds : undefined,
         assigneeId: data.assigneeIds?.[0] || undefined,
         storyPoints: data.storyPoints,
@@ -929,6 +930,8 @@ export default function RecurringTasksPage() {
             dueTime: s.dueTime || undefined,
             status: s.status ?? (s.completed ? "DONE" : "TODO"),
             priority: s.priority || undefined,
+            requireLocation:
+              s.requireLocation === true || data.requireLocation === true || undefined,
           }))
           .filter((s) => s.title.length > 0),
         recurrence:

@@ -1189,6 +1189,10 @@ export class RecurringTasksService {
     if (!template) throw new NotFoundException('Recurring template not found');
     const patch: Record<string, unknown> = {};
     if (dto.title !== undefined) patch.title = dto.title.trim() || template.title;
+    if (dto.description !== undefined) {
+      const trimmed = dto.description.trim();
+      patch.description = trimmed.length ? trimmed : null;
+    }
     if (dto.recurrence) {
       patch.repeatType = dto.recurrence.repeat ?? template.repeatType;
       patch.ruleConfig = dto.recurrence as unknown as Record<string, unknown>;

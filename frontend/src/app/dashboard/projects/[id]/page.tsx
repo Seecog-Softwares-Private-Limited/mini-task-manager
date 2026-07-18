@@ -121,6 +121,7 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
         description: data.description,
         statusId: data.statusId ?? statuses[0]?.id,
         priority: data.priority ?? "MEDIUM",
+        requireLocation: data.requireLocation === true,
         assigneeIds: data.assigneeIds?.length ? data.assigneeIds : undefined,
         assigneeId: data.assigneeIds?.[0] || undefined,
         storyPoints: data.storyPoints,
@@ -136,6 +137,8 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
             dueDate: s.dueDate || undefined,
             status: s.status ?? (s.completed ? "DONE" : "TODO"),
             priority: s.priority || undefined,
+            requireLocation:
+              s.requireLocation === true || data.requireLocation === true || undefined,
           }))
           .filter((s) => s.title.length > 0),
         recurrence:

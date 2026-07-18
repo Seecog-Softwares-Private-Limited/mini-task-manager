@@ -21,6 +21,7 @@ import 'kanban_providers.dart';
 import 'assignee_picker_sheet.dart';
 
 import 'subtask_completion_utils.dart';
+import 'require_location_toggle.dart';
 
 typedef SubtaskCompletionRequest = Future<SubtaskCompletionRecord?> Function({
   required String subtaskId,
@@ -54,6 +55,7 @@ class SubtaskDetailPanel extends ConsumerStatefulWidget {
     this.onDelete,
     this.fallbackReporterId,
     this.fallbackCreatedAt,
+    this.canEditRequireLocation = false,
   });
 
   final TaskSubtask subtask;
@@ -64,6 +66,7 @@ class SubtaskDetailPanel extends ConsumerStatefulWidget {
   final String? fallbackCreatedAt;
   final bool saving;
   final bool canComplete;
+  final bool canEditRequireLocation;
   final SubtaskCompletionRequest onRequestCompletion;
   final VoidCallback onCancel;
   final ValueChanged<TaskSubtask> onSave;
@@ -86,6 +89,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
   bool _uploadingAttachment = false;
   String? _attachmentError;
   SubtaskCompletionRecord? _completionRecord;
+  late bool _requireLocation;
 
   @override
   void initState() {
@@ -98,6 +102,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     _dueDate = widget.subtask.dueDate;
     _dueTime = widget.subtask.dueTime;
     _assigneeIds = _storedAssigneeIds(widget.subtask);
+    _requireLocation = widget.subtask.requireLocation;
     _completionRecord = widget.subtask.completionRecord;
     _loadAttachments();
   }
@@ -285,6 +290,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
         _showNotAssigned();
         return;
       }
+      FocusManager.instance.primaryFocus?.unfocus();
       final record = await widget.onRequestCompletion(
         subtaskId: widget.subtask.id,
         subtaskTitle: _titleController.text.trim().isEmpty
@@ -316,6 +322,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
           assigneeIds: _assigneeIds,
           assigneeId: _assigneeIds.isNotEmpty ? _assigneeIds.first : null,
           completionRecord: record,
+          requireLocation: _requireLocation,
         ),
       );
       return;
@@ -365,6 +372,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
         assigneeId: _assigneeIds.isNotEmpty ? _assigneeIds.first : null,
         completionRecord: completed ? record : null,
         clearCompletionRecord: !completed,
+        requireLocation: _requireLocation,
       ),
     );
   }
@@ -410,6 +418,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
             controller: _titleController,
             enabled: !widget.saving,
             maxLength: subtaskTitleMaxLength,
+            scrollPadding: EdgeInsets.zero,
             decoration: InputDecoration(
               hintText: 'Subtask title',
               counterText: '',
@@ -431,6 +440,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
             enabled: !widget.saving,
             minLines: 4,
             maxLines: 8,
+            scrollPadding: EdgeInsets.zero,
             decoration: InputDecoration(
               hintText: 'Add detailed notes...',
               alignLabelWithHint: true,
@@ -619,6 +629,21 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.warning),
             ),
           ],
+          const SizedBox(height: AppSpacing.sm),
+          RequireLocationToggle(
+            value: _requireLocation,
+            enabled: !widget.saving && widget.canEditRequireLocation,
+            title: 'Require location',
+            subtitle: widget.canEditRequireLocation
+                ? 'Ask for GPS when this subtask is completed'
+                : 'Only the owner or creator can change this',
+            onChanged: widget.canEditRequireLocation
+                ? (value) {
+                    FocusManager.instance.primaryFocus?.unfocus();
+                    setState(() => _requireLocation = value);
+                  }
+                : null,
+          ),
           if (_completionRecord != null) ...[
             const SizedBox(height: AppSpacing.md),
             _CompletionRecordCard(record: _completionRecord!),

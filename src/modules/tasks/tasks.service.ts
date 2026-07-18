@@ -53,8 +53,14 @@ function sanitizeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 200) || 'file';
 }
 
-/** Fields assignees may update on tasks assigned to them (owner can update all). */
-const ASSIGNEE_PATCH_FIELDS = new Set(['statusId', 'priority', 'subtasks']);
+/** Fields assignees may update on tasks assigned to them (owner/admin can update all). */
+const ASSIGNEE_PATCH_FIELDS = new Set([
+  'statusId',
+  'priority',
+  'subtasks',
+  'title',
+  'description',
+]);
 
 function normalizeAssigneeUserId(id: string | Buffer | null | undefined): string | null {
   const formatted = formatUuid(id as string | Buffer | null | undefined);
@@ -503,6 +509,7 @@ export class TasksService {
       parentTaskId: dto.parentTaskId ?? null,
       sprintId: dto.sprintId ?? null,
       tags: tags.length ? tags : null,
+      requireLocation: dto.requireLocation === true,
     });
 
     if (dto.recurrence && dto.recurrence.repeat && dto.recurrence.repeat !== 'NONE') {
@@ -552,6 +559,19 @@ export class TasksService {
 
     if (userId) {
       await this.assertCanUpdateTask(task, organizationId, userId, dto);
+      if (dto.requireLocation !== undefined) {
+        await this.assertCanSetTaskRequireLocation(task, organizationId, userId);
+      }
+    }
+
+    let subtasksDto = dto.subtasks;
+    if (userId && subtasksDto !== undefined) {
+      subtasksDto = await this.lockUnauthorizedSubtaskRequireLocation(
+        task,
+        organizationId,
+        userId,
+        subtasksDto,
+      );
     }
 
     const patch: Partial<TaskEntity> = {};
@@ -604,8 +624,11 @@ export class TasksService {
       const normalized = this.normalizeTags(dto.tags);
       patch.tags = normalized.length ? normalized : null;
     }
-    if (dto.subtasks !== undefined) {
-      const normalized = this.normalizeSubtasks(dto.subtasks, {
+    if (dto.requireLocation !== undefined) {
+      patch.requireLocation = dto.requireLocation === true;
+    }
+    if (subtasksDto !== undefined) {
+      const normalized = this.normalizeSubtasks(subtasksDto, {
         existing: task.subtasks,
         currentUserId: userId,
       });
@@ -742,12 +765,12 @@ export class TasksService {
     const isAssignee = normalizedUserId != null && assigneeIds.includes(normalizedUserId);
     const isReporter = isTaskReporter(task, userId);
 
-    // Assigned-by user who is also assigned gets full edit access.
-    if (isReporter && isAssignee) return;
+    // Assigned-by (reporter) or assignee can update; assignees are limited to allowed fields below.
+    if (isReporter) return;
 
     if (!isAssignee) {
       throw new ForbiddenException(
-        'Only the workspace owner, task assignee, or assigned-by user (when also assigned) can update this task',
+        'Only the workspace owner, task assignee, or task creator can update this task',
       );
     }
 
@@ -755,9 +778,59 @@ export class TasksService {
     const disallowed = keys.filter((k) => !ASSIGNEE_PATCH_FIELDS.has(k));
     if (disallowed.length > 0) {
       throw new ForbiddenException(
-        'Assignees can only update task status, priority, and subtasks',
+        'Assignees can only update task title, description, status, priority, and subtasks',
       );
     }
+  }
+
+  /** Owner/admin or task creator may set task-level requireLocation. */
+  private async assertCanSetTaskRequireLocation(
+    task: TaskEntity,
+    organizationId: string,
+    userId: string,
+  ): Promise<void> {
+    const membership = await this.organizationsService.getMembership(organizationId, userId);
+    const role = membership?.role?.toLowerCase() ?? '';
+    if (role === 'owner' || role === 'admin') return;
+    if (isTaskReporter(task, userId)) return;
+    throw new ForbiddenException(
+      'Only the workspace owner or task creator can change require location',
+    );
+  }
+
+  /**
+   * Assignees may update subtasks, but cannot change requireLocation on items
+   * they did not create (owner/admin and task creator may change any).
+   */
+  private async lockUnauthorizedSubtaskRequireLocation(
+    task: TaskEntity,
+    organizationId: string,
+    userId: string,
+    incoming: NonNullable<PatchTaskDto['subtasks']>,
+  ): Promise<NonNullable<PatchTaskDto['subtasks']>> {
+    const membership = await this.organizationsService.getMembership(organizationId, userId);
+    const role = membership?.role?.toLowerCase() ?? '';
+    if (role === 'owner' || role === 'admin' || isTaskReporter(task, userId)) {
+      return incoming;
+    }
+
+    const existingById = new Map(
+      (task.subtasks ?? [])
+        .filter((s) => !!s?.id)
+        .map((s) => [String(s.id), s] as const),
+    );
+    const normalizedUser = normalizeAssigneeUserId(userId);
+
+    return incoming.map((s) => {
+      const prior = s.id ? existingById.get(String(s.id)) : undefined;
+      // New checklist items are created by the current user — they may set location.
+      if (!prior) return s;
+      const subReporter = normalizeAssigneeUserId(prior.reporterId ?? s.reporterId);
+      const canSet = normalizedUser != null && subReporter != null && normalizedUser === subReporter;
+      if (canSet) return s;
+      const priorValue = prior.requireLocation === true;
+      return { ...s, requireLocation: priorValue };
+    });
   }
 
   private normalizeTags(
@@ -821,6 +894,7 @@ export class TasksService {
       reporterId?: string;
       createdAt?: string;
       note?: string;
+      requireLocation?: boolean;
     }>,
     context?: {
       existing?: Array<{ id?: string; reporterId?: string; createdAt?: string }> | null;
@@ -842,6 +916,7 @@ export class TasksService {
     reporterId?: string;
     createdAt?: string;
     note?: string;
+    requireLocation?: boolean;
   }> {
     if (!subtasks?.length) return [];
     const existingById = new Map(
@@ -886,6 +961,7 @@ export class TasksService {
           ...(typeof s.note === 'string' && s.note.trim().length
             ? { note: s.note.trim().slice(0, 2000) }
             : {}),
+          ...(s.requireLocation === true ? { requireLocation: true } : {}),
         };
       })
       .filter((s) => s.title.length > 0);

@@ -129,6 +129,10 @@ class PatchTaskSubtaskDto {
   @IsString()
   @MaxLength(2000)
   note?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  requireLocation?: boolean;
 }
 
 class PatchTaskTagDto {
@@ -214,6 +218,10 @@ export class PatchTaskDto {
   @ValidateNested({ each: true })
   @Type(() => PatchTaskSubtaskDto)
   subtasks?: PatchTaskSubtaskDto[];
+
+  @IsOptional()
+  @IsBoolean()
+  requireLocation?: boolean;
 
   @IsOptional()
   @ValidateNested()

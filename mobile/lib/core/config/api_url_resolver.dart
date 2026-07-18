@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -20,9 +18,11 @@ abstract final class ApiUrlResolver {
     final saved = prefs.getString(StorageKeys.apiBaseUrl)?.trim();
     if (saved != null && saved.isNotEmpty) {
       final normalized = _repairSavedUrl(prefs, saved);
-      // Stale localhost URLs from dev/debug installs must not break production APKs.
-      if (flavor == 'prod' && !kIsWeb && isLocalDevUrl(normalized)) {
-        return _preferLocalProxyOnWeb(normalizeAndMigrate(_defaultBaseUrlForFlavor(flavor)));
+      // Stale localhost / emulator URLs must not shadow Hostinger VPS.
+      if (isLocalDevUrl(normalized)) {
+        final vps = normalizeAndMigrate(AppConfig.productionApiBaseUrl);
+        prefs.setString(StorageKeys.apiBaseUrl, vps);
+        return _preferLocalProxyOnWeb(vps);
       }
       return _preferLocalProxyOnWeb(normalized);
     }
@@ -117,16 +117,10 @@ abstract final class ApiUrlResolver {
   }
 
   static String _defaultBaseUrlForFlavor(String flavor) {
-    if (flavor == 'prod') {
-      return AppConfig.productionApiBaseUrl;
-    }
     if (flavor == 'staging') {
       return 'https://staging.your-host/api/v1';
     }
-
-    if (!kIsWeb && Platform.isAndroid) {
-      return 'http://10.0.2.2:3007/api/v1';
-    }
-    return 'http://localhost:3007/api/v1';
+    // Dev + prod both default to Hostinger VPS (not localhost / RDS).
+    return AppConfig.productionApiBaseUrl;
   }
 }

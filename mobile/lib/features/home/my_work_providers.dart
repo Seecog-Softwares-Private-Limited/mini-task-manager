@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/preferences/app_preferences.dart';
 import '../../data/models/my_tasks.dart';
 import '../../data/models/paginated_result.dart';
+import '../../data/models/project_member.dart';
 import '../../data/models/task.dart';
+import '../auth/session_controller.dart';
 import '../projects/projects_providers.dart';
 import 'home_providers.dart';
 
@@ -42,6 +44,57 @@ final myWorkFilterProvider =
 /// Explicit project pick on the Tasks tab (null = follow last/first project).
 final tasksProjectIdProvider = StateProvider<String?>((ref) => null);
 
+/// Member filter on the Tasks tab (`null` / empty = all members).
+final tasksMemberFilterProvider = StateProvider<String?>((ref) => null);
+
+/// Extra board filters (priority, overdue, assigned to me, unassigned).
+class TasksBoardFilters {
+  const TasksBoardFilters({
+    this.priorities = const {},
+    this.overdueOnly = false,
+    this.assignedToMe = false,
+    this.unassignedOnly = false,
+  });
+
+  final Set<String> priorities;
+  final bool overdueOnly;
+  final bool assignedToMe;
+  final bool unassignedOnly;
+
+  static const empty = TasksBoardFilters();
+
+  bool get isActive =>
+      priorities.isNotEmpty ||
+      overdueOnly ||
+      assignedToMe ||
+      unassignedOnly;
+
+  int get activeCount {
+    var n = priorities.length;
+    if (overdueOnly) n++;
+    if (assignedToMe) n++;
+    if (unassignedOnly) n++;
+    return n;
+  }
+
+  TasksBoardFilters copyWith({
+    Set<String>? priorities,
+    bool? overdueOnly,
+    bool? assignedToMe,
+    bool? unassignedOnly,
+  }) {
+    return TasksBoardFilters(
+      priorities: priorities ?? this.priorities,
+      overdueOnly: overdueOnly ?? this.overdueOnly,
+      assignedToMe: assignedToMe ?? this.assignedToMe,
+      unassignedOnly: unassignedOnly ?? this.unassignedOnly,
+    );
+  }
+}
+
+final tasksBoardFiltersProvider =
+    StateProvider<TasksBoardFilters>((ref) => TasksBoardFilters.empty);
+
 /// Resolved project for the Tasks tab — mirrors Planner selection behavior.
 final tasksSelectedProjectIdProvider = Provider<String?>((ref) {
   final selected = ref.watch(tasksProjectIdProvider);
@@ -61,6 +114,69 @@ final tasksSelectedProjectIdProvider = Provider<String?>((ref) {
   }
   return active.first.id;
 });
+
+final projectMembersForTasksProvider = FutureProvider.autoDispose
+    .family<List<ProjectMember>, String>((ref, projectId) async {
+  final orgId = ref.watch(
+    sessionControllerProvider.select((session) => session.orgId),
+  );
+  if (orgId == null || orgId.isEmpty) return const [];
+  return ref.watch(projectsRepositoryProvider).fetchProjectMembers(
+        projectId: projectId,
+        organizationId: orgId,
+      );
+});
+
+List<String> taskAssigneeIds(Task task) {
+  if (task.assigneeIds.isNotEmpty) return task.assigneeIds;
+  final id = task.assigneeId;
+  if (id != null && id.isNotEmpty) return [id];
+  return const [];
+}
+
+bool isTaskDueOverdue(String? dueDate) {
+  if (dueDate == null || dueDate.isEmpty) return false;
+  final parsed = DateTime.tryParse(dueDate);
+  if (parsed == null) return false;
+  final local = parsed.toLocal();
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final due = DateTime(local.year, local.month, local.day);
+  return due.isBefore(today);
+}
+
+bool matchesTasksBoardFilters(
+  Task task, {
+  String? memberId,
+  required TasksBoardFilters filters,
+  String? currentUserId,
+}) {
+  final assignees = taskAssigneeIds(task);
+
+  if (memberId != null && memberId.isNotEmpty) {
+    if (!assignees.contains(memberId)) return false;
+  }
+
+  if (filters.unassignedOnly && assignees.isNotEmpty) return false;
+
+  if (filters.assignedToMe) {
+    if (currentUserId == null || currentUserId.isEmpty) return false;
+    if (!assignees.contains(currentUserId)) return false;
+  }
+
+  if (filters.priorities.isNotEmpty) {
+    final priority = task.priority.toLowerCase();
+    if (!filters.priorities.contains(priority)) return false;
+  }
+
+  if (filters.overdueOnly) {
+    final completed =
+        task.completedAt != null && task.completedAt!.trim().isNotEmpty;
+    if (completed || !isTaskDueOverdue(task.dueDate)) return false;
+  }
+
+  return true;
+}
 
 /// Tasks tab: board tasks for the selected project only.
 final myWorkProvider = FutureProvider.autoDispose<MyTasksResult>((ref) async {

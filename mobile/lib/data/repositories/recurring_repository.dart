@@ -146,6 +146,7 @@ class RecurringRepository {
     required String templateId,
     required String organizationId,
     String? title,
+    String? description,
     Map<String, dynamic>? recurrence,
   }) async {
     try {
@@ -153,6 +154,7 @@ class RecurringRepository {
         '/recurring-tasks/$templateId',
         data: {
           if (title != null) 'title': title.trim(),
+          if (description != null) 'description': description,
           if (recurrence != null) 'recurrence': recurrence,
         },
         options: _api.withOrgHeader(organizationId),

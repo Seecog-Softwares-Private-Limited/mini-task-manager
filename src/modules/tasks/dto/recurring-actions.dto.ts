@@ -37,6 +37,10 @@ export class UpdateRecurringTemplateDto {
   title?: string;
 
   @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
   @ValidateNested()
   @Type(() => TaskRecurrenceDto)
   recurrence?: TaskRecurrenceDto;

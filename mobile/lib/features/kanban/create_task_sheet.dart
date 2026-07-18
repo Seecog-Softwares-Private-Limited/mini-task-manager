@@ -12,6 +12,7 @@ import '../../data/repositories/tasks_repository.dart';
 import '../../shared/widgets/app_widgets.dart';
 import 'attachment_picker_section.dart';
 import 'kanban_providers.dart';
+import 'require_location_toggle.dart';
 
 class CreateTaskSheet extends ConsumerStatefulWidget {
   const CreateTaskSheet({
@@ -38,12 +39,14 @@ class CreateTaskSheet extends ConsumerStatefulWidget {
 class _CreateTaskSheetState extends ConsumerState<CreateTaskSheet> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _subtasksSectionKey = GlobalKey();
   final _subtasks = <_SubtaskDraft>[];
 
   String _priority = 'MEDIUM';
   String? _statusId;
   DateTime? _dueDate;
   TimeOfDay? _dueTime;
+  bool _requireLocation = false;
   final _taskAttachments = <PendingAttachment>[];
 
   bool _loading = false;
@@ -75,8 +78,21 @@ class _CreateTaskSheetState extends ConsumerState<CreateTaskSheet> {
   }
 
   void _addSubtask() {
+    FocusManager.instance.primaryFocus?.unfocus();
     setState(() {
+      // Keep new drafts near the Add button (top), not at the bottom of the list.
       _subtasks.insert(0, _SubtaskDraft(clientId: generateClientId()));
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _subtasksSectionKey.currentContext;
+      if (ctx != null && mounted) {
+        Scrollable.ensureVisible(
+          ctx,
+          alignment: 0.05,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
     });
   }
 
@@ -125,6 +141,8 @@ class _CreateTaskSheetState extends ConsumerState<CreateTaskSheet> {
           title: subtaskTitle,
           description: draft.descriptionController.text,
           priority: draft.priority,
+          // Inherit task-level setting when creating; refine per-subtask after create.
+          requireLocation: _requireLocation,
         ),
       );
     }
@@ -150,6 +168,7 @@ class _CreateTaskSheetState extends ConsumerState<CreateTaskSheet> {
         dueTime: _dueDate == null || _dueTime == null
             ? null
             : '${_dueTime!.hour.toString().padLeft(2, '0')}:${_dueTime!.minute.toString().padLeft(2, '0')}',
+        requireLocation: _requireLocation,
         subtasks: subtaskInputs,
       );
 
@@ -397,8 +416,18 @@ class _CreateTaskSheetState extends ConsumerState<CreateTaskSheet> {
                       ..addAll(items);
                   }),
                 ),
+                const SizedBox(height: AppSpacing.sm),
+                RequireLocationToggle(
+                  value: _requireLocation,
+                  enabled: !_loading,
+                  title: 'Require location to complete',
+                  subtitle:
+                      'GPS and site check when marking subtasks done on this task',
+                  onChanged: (value) => setState(() => _requireLocation = value),
+                ),
                 const SizedBox(height: AppSpacing.lg),
                 Row(
+                  key: _subtasksSectionKey,
                   children: [
                     Expanded(
                       child: _SectionLabel('Subtasks'),

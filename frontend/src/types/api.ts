@@ -99,6 +99,8 @@ export interface Task {
   tags?: Array<{ name: string; color: string }>;
   subtasks?: TaskSubtask[];
   completedAt?: string | null;
+  /** When true, completing subtasks on this task requires GPS/geofence. */
+  requireLocation?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -189,6 +191,8 @@ export interface TaskSubtask {
   priority?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   /** @deprecated Legacy workflow status id — superseded by `status`. */
   statusId?: string;
+  /** When true, completing this subtask requires GPS/geofence. */
+  requireLocation?: boolean;
 }
 
 export type EntityAttachmentType = "TASK" | "SUBTASK";

@@ -82,6 +82,10 @@ class CreateTaskSubtaskDto {
   @IsString()
   @MaxLength(10000)
   description?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  requireLocation?: boolean;
 }
 
 class CreateTaskTagDto {
@@ -161,6 +165,10 @@ export class CreateTaskDto {
   @ValidateNested({ each: true })
   @Type(() => CreateTaskSubtaskDto)
   subtasks?: CreateTaskSubtaskDto[];
+
+  @IsOptional()
+  @IsBoolean()
+  requireLocation?: boolean;
 
   @IsOptional()
   @ValidateNested()

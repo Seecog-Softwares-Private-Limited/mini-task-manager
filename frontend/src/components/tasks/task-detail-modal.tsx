@@ -35,6 +35,9 @@ import { useAuth } from "@/hooks/use-auth";
 import {
   canUserDeleteTask,
   canUserEditTaskFully,
+  canUserEditTaskTitleAndDescription,
+  canUserToggleSubtaskRequireLocation,
+  canUserToggleTaskRequireLocation,
   getTaskAssigneeIdList,
   isUserAssignedToTask,
   isUserTaskReporter,
@@ -364,10 +367,15 @@ export function TaskDetailModal({
 
   React.useEffect(() => {
     if (!task) return;
-    setEditingTitle(task.title);
-    setIsEditingTitle(false);
-    setEditingDescription(task.description ?? "");
-    setIsEditingDescription(false);
+    // Don't clobber in-progress title/description edits on refetch.
+    if (!isEditingTitle) {
+      setEditingTitle(task.title);
+      setIsEditingTitle(false);
+    }
+    if (!isEditingDescription) {
+      setEditingDescription(task.description ?? "");
+      setIsEditingDescription(false);
+    }
     setIsDescriptionExpanded(false);
     setIsEditingStoryPoints(false);
     setAddTagOpen(false);
@@ -377,7 +385,7 @@ export function TaskDetailModal({
     setRecurrenceDraft({
       repeat: task.recurrenceType && task.recurrenceType !== "NONE" ? task.recurrenceType : "NONE",
     });
-  }, [task?.id, task?.title, task?.description]);
+  }, [task?.id, task?.title, task?.description, isEditingTitle, isEditingDescription]);
 
   // task data is rendered directly — no local editing state needed for read-only fields
 
@@ -507,13 +515,23 @@ export function TaskDetailModal({
     [task, currentUserId]
   );
 
-  const canManageAssignees = isOwner || isAdmin || (isReporter && isAssignee);
+  const canManageAssignees = isOwner || isAdmin || isReporter;
 
-  /** Owner/admin or assigned-by user (when also assigned) can edit every field; other assignees get limited fields. */
+  /** Owner/admin or task creator can edit every field; assignees get limited fields. */
   const canEditAll = canUserEditTaskFully(task ?? {}, currentUserId, isOwner || isAdmin);
+  const canToggleRequireLocation = canUserToggleTaskRequireLocation(
+    task ?? {},
+    currentUserId,
+    isOwner || isAdmin
+  );
+  const canEditTitleAndDescription = canUserEditTaskTitleAndDescription(
+    task ?? {},
+    currentUserId,
+    isOwner || isAdmin
+  );
   const canDeleteTask = canUserDeleteTask(task ?? {}, currentUserId, isOwner);
-  const canEditWorkflowFields = isOwner || isAdmin || isAssignee;
-  const canEditSubtasks = canManageAssignees || isAssignee;
+  const canEditWorkflowFields = isOwner || isAdmin || isAssignee || isReporter;
+  const canEditSubtasks = canManageAssignees || isAssignee || isReporter;
   const isViewOnly = !canEditWorkflowFields;
 
   /** Subtask assignees are limited to members assigned on the parent task. */
@@ -638,13 +656,15 @@ export function TaskDetailModal({
   const updateMutation = useMutation({
     mutationFn: (payload: Parameters<typeof updateTask>[1]) => {
       const keys = Object.keys(payload);
-      const assigneeAllowed = new Set(["statusId", "priority"]);
+      const assigneeAllowed = new Set(["statusId", "priority", "title", "description", "subtasks"]);
       if (!canEditAll) {
-        if (!canEditWorkflowFields) {
+        if (!canEditWorkflowFields && !canEditTitleAndDescription) {
           return Promise.reject(new Error("You do not have permission to edit this task"));
         }
         if (keys.some((k) => !assigneeAllowed.has(k))) {
-          return Promise.reject(new Error("Only the workspace owner can edit this field"));
+          return Promise.reject(
+            new Error("You can only edit title, description, status, priority, and subtasks")
+          );
         }
       }
       return updateTask(taskId!, payload);
@@ -862,6 +882,13 @@ export function TaskDetailModal({
         ...checklist,
       ]);
       setNewCheckItem("");
+      // Keep the add field in view (avoid jumping to the bottom of a long checklist).
+      requestAnimationFrame(() => {
+        document.getElementById("task-checklist-add")?.scrollIntoView({
+          block: "nearest",
+          behavior: "smooth",
+        });
+      });
     },
     [checklist, updateSubtasksMutation]
   );
@@ -1085,7 +1112,19 @@ export function TaskDetailModal({
             )}
             {canEditWorkflowFields && !canEditAll && (
               <div className="mx-6 mt-4 rounded-lg border border-sky-500/30 bg-sky-500/10 px-4 py-2.5 text-sm text-sky-950 dark:text-sky-100 sm:mx-8">
-                Assigned to you — you can update <strong>status</strong>, <strong>priority</strong>, and <strong>subtasks</strong>. Other fields are restricted to the workspace owner or assigned-by user when also assigned.
+                {canEditTitleAndDescription
+                  ? (
+                    <>
+                      You can update <strong>title</strong>, <strong>description</strong>,{" "}
+                      <strong>status</strong>, <strong>priority</strong>, and <strong>subtasks</strong>.
+                      Assignee and schedule fields need the workspace owner/admin or task creator.
+                    </>
+                  ) : (
+                    <>
+                      Assigned to you — you can update <strong>status</strong>, <strong>priority</strong>, and{" "}
+                      <strong>subtasks</strong>. Other fields are restricted.
+                    </>
+                  )}
               </div>
             )}
             <SheetHeader className="td-modal-header-shade shrink-0 space-y-0 px-6 pb-6 pt-7 text-left sm:px-8 sm:pb-7 sm:pt-8">
@@ -1116,23 +1155,23 @@ export function TaskDetailModal({
                       id="task-detail-title"
                       className={cn(
                         "flex max-w-full items-start gap-3 rounded-xl px-1 py-1 text-left",
-                        canEditAll && "group cursor-pointer transition-colors hover:bg-background/50"
+                        canEditTitleAndDescription && "group cursor-pointer transition-colors hover:bg-background/50"
                       )}
-                      role={canEditAll ? "button" : undefined}
-                      tabIndex={canEditAll ? 0 : undefined}
-                      onClick={canEditAll ? () => setIsEditingTitle(true) : undefined}
+                      role={canEditTitleAndDescription ? "button" : undefined}
+                      tabIndex={canEditTitleAndDescription ? 0 : undefined}
+                      onClick={canEditTitleAndDescription ? () => setIsEditingTitle(true) : undefined}
                       onKeyDown={
-                        canEditAll
-                          ? undefined
-                          : (e) => {
+                        canEditTitleAndDescription
+                          ? (e) => {
                               if (e.key === "Enter") setIsEditingTitle(true);
                             }
+                          : undefined
                       }
                     >
                       <span className="min-w-0 text-balance text-2xl font-semibold leading-[1.2] tracking-[-0.025em] text-foreground md:text-[1.875rem] md:leading-[1.12]">
                         {task.title}
                       </span>
-                      {canEditAll && (
+                      {canEditTitleAndDescription && (
                         <Pencil className="mt-2 h-4 w-4 shrink-0 text-muted-foreground/50 opacity-0 transition-opacity group-hover:opacity-100" />
                       )}
                     </div>
@@ -1236,9 +1275,9 @@ export function TaskDetailModal({
                     ) : (
                       <>
                       <div
-                        onClick={canEditAll ? () => setIsEditingDescription(true) : undefined}
+                        onClick={canEditTitleAndDescription ? () => setIsEditingDescription(true) : undefined}
                         onKeyDown={
-                          canEditAll
+                          canEditTitleAndDescription
                             ? (e) => {
                                 if (e.key === "Enter" || e.key === " ") {
                                   e.preventDefault();
@@ -1247,11 +1286,11 @@ export function TaskDetailModal({
                               }
                             : undefined
                         }
-                        role={canEditAll ? "button" : undefined}
-                        tabIndex={canEditAll ? 0 : undefined}
+                        role={canEditTitleAndDescription ? "button" : undefined}
+                        tabIndex={canEditTitleAndDescription ? 0 : undefined}
                         className={cn(
                           "group -mx-1 min-h-[7.5rem] w-full rounded-xl border border-dashed border-transparent px-4 py-4 text-left transition-all",
-                          canEditAll &&
+                          canEditTitleAndDescription &&
                             "hover:border-[#E5E7EB] hover:bg-white dark:hover:border-border/50 dark:hover:bg-muted/20"
                         )}
                       >
@@ -1302,8 +1341,8 @@ export function TaskDetailModal({
                             </>
                           );
                         })()}
-                        <span className={cn("mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground/60 transition-opacity", canEditAll && "opacity-0 group-hover:opacity-100")}>
-                          {canEditAll ? (
+                        <span className={cn("mt-3 inline-flex items-center gap-1.5 text-xs text-muted-foreground/60 transition-opacity", canEditTitleAndDescription && "opacity-0 group-hover:opacity-100")}>
+                          {canEditTitleAndDescription ? (
                             <>
                               <Pencil className="h-3.5 w-3.5" /> Click to edit
                             </>
@@ -1354,7 +1393,7 @@ export function TaskDetailModal({
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <div className="flex gap-2 pb-3">
+                      <div id="task-checklist-add" className="flex gap-2 pb-3">
                         <div className="td-input-shell flex min-h-11 flex-1 items-center gap-2 rounded-2xl px-1 pl-3 transition-[box-shadow,ring-color] focus-within:ring-2 focus-within:ring-primary/20">
                           <Plus className="h-4 w-4 shrink-0 text-muted-foreground/50" aria-hidden />
                           <Input
@@ -1469,6 +1508,7 @@ export function TaskDetailModal({
                                   dueTime: item.dueTime,
                                   status: resolveSubtaskStatus(item),
                                   priority: item.priority,
+                                  requireLocation: item.requireLocation === true,
                                 }}
                                 projectId={projectId}
                                 organizationId={organizationId}
@@ -1479,6 +1519,12 @@ export function TaskDetailModal({
                                 persistAttachments
                                 disabled={!canEditSubtasks}
                                 readOnly={isViewOnly}
+                                canEditRequireLocation={canUserToggleSubtaskRequireLocation(
+                                  task ?? {},
+                                  item,
+                                  currentUserId,
+                                  isOwner || isAdmin
+                                )}
                                 saving={updateSubtasksMutation.isPending}
                                 onSave={saveSubtaskDetail}
                                 onDirtyChange={setSubtaskDraftDirty}
@@ -2175,6 +2221,28 @@ export function TaskDetailModal({
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
+
+                      <label className="flex cursor-pointer items-start gap-2.5 rounded-lg border border-border/60 bg-muted/15 px-3 py-2.5">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5 h-4 w-4 rounded border-border"
+                          checked={task.requireLocation === true}
+                          disabled={!canToggleRequireLocation || updateMutation.isPending}
+                          onChange={(e) =>
+                            updateMutation.mutate({ requireLocation: e.target.checked })
+                          }
+                        />
+                        <span className="space-y-0.5">
+                          <span className="block text-xs font-medium text-foreground">
+                            Require location to complete
+                          </span>
+                          <span className="block text-[11px] text-muted-foreground">
+                            {canToggleRequireLocation
+                              ? "GPS check when marking subtasks done on this task"
+                              : "Only the owner or task creator can change this"}
+                          </span>
+                        </span>
+                      </label>
                     </div>
                   </div>
 
