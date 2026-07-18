@@ -90,7 +90,7 @@ class ApiConnectionService {
 
   static String _hintForUrl(String url) {
     if (kIsWeb) {
-      return 'Flutter web needs CORS for localhost. On Hostinger, deploy latest API (allows localhost origins), then use http://YOUR_VPS:3000/api/v1. Or use local API: http://localhost:3007/api/v1.';
+      return 'Server unreachable (or CORS blocked). Confirm the VPS app is up (pm2 status), then use http://200.97.172.61:3000 — or local Nest at http://localhost:3007.';
     }
     if (url.contains('localhost') || url.contains('127.0.0.1')) {
       return 'Start backend from repo root: node app.js (default API port 3007).';
