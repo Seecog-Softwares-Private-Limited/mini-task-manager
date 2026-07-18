@@ -64,10 +64,11 @@ class SessionController extends Notifier<SessionState> {
 
   @override
   SessionState build() {
-    _authRepository = ref.read(authRepositoryProvider);
-    _organizationsRepository = ref.read(organizationsRepositoryProvider);
-    _deviceTokensRepository = ref.read(deviceTokensRepositoryProvider);
-    _authStorage = ref.read(authStorageProvider);
+    // Watch so login/API calls pick up Server settings URL changes immediately.
+    _authRepository = ref.watch(authRepositoryProvider);
+    _organizationsRepository = ref.watch(organizationsRepositoryProvider);
+    _deviceTokensRepository = ref.watch(deviceTokensRepositoryProvider);
+    _authStorage = ref.watch(authStorageProvider);
 
     ref.listen<int>(sessionExpiredTickProvider, (_, __) {
       _operationGeneration++;
@@ -86,8 +87,10 @@ class SessionController extends Notifier<SessionState> {
     if (!_restoreScheduled) {
       _restoreScheduled = true;
       Future.microtask(restoreSession);
+      return const SessionState(status: SessionStatus.loading);
     }
-    return const SessionState(status: SessionStatus.loading);
+    // Keep current session when only the API URL / repositories change.
+    return state;
   }
 
   bool _isStale(int generation) => generation != _operationGeneration;
