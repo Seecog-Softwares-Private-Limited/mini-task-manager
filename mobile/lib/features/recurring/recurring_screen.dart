@@ -24,49 +24,81 @@ class RecurringScreen extends ConsumerWidget {
       return const Center(child: CircularProgressIndicator());
     }
 
+    final projects = (projectsAsync.valueOrNull ?? const [])
+        .where((p) => !p.isArchived)
+        .toList();
+    final projectsLoading =
+        projectsAsync.isLoading && projectsAsync.valueOrNull == null;
+    final noProjects = !projectsLoading && projects.isEmpty;
+
+    if (noProjects) {
+      return const Padding(
+        padding: EdgeInsets.all(AppSpacing.lg),
+        child: EmptyState(
+          title: 'No projects yet',
+          message:
+              'Create a project first, then add recurring planners for it here.',
+          icon: Icons.folder_off_outlined,
+        ),
+      );
+    }
+
     return DefaultTabController(
       length: 2,
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, 0),
-            child: projectsAsync.when(
-              data: (projects) {
-                if (projects.isEmpty) {
-                  return const Text('No projects — create one in the web app.');
-                }
-                if (selectedProjectId == null) {
-                  return const LinearProgressIndicator();
-                }
-                return DropdownButtonFormField<String>(
-                  initialValue: selectedProjectId,
-                  decoration: const InputDecoration(labelText: 'Project'),
-                  items: [
-                    for (final project in projects)
-                      DropdownMenuItem(value: project.id, child: Text(project.name)),
-                  ],
-                  onChanged: (value) {
-                    ref.read(recurringProjectIdProvider.notifier).state = value;
-                    ref.invalidate(recurringSummaryProvider);
-                    ref.invalidate(recurringTemplatesProvider);
-                    ref.invalidate(recurringBoardTasksProvider);
-                  },
-                );
-              },
-              loading: () => const LinearProgressIndicator(),
-              error: (_, __) => const SizedBox.shrink(),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.sm,
+              AppSpacing.md,
+              0,
             ),
+            child: projectsLoading
+                ? const LinearProgressIndicator()
+                : selectedProjectId == null
+                    ? const LinearProgressIndicator()
+                    : DropdownButtonFormField<String>(
+                        initialValue: selectedProjectId,
+                        decoration: const InputDecoration(labelText: 'Project'),
+                        items: [
+                          for (final project in projects)
+                            DropdownMenuItem(
+                              value: project.id,
+                              child: Text(project.name),
+                            ),
+                        ],
+                        onChanged: (value) {
+                          ref.read(recurringProjectIdProvider.notifier).state =
+                              value;
+                          ref.invalidate(recurringSummaryProvider);
+                          ref.invalidate(recurringTemplatesProvider);
+                          ref.invalidate(recurringBoardTasksProvider);
+                        },
+                      ),
           ),
           summaryAsync.maybeWhen(
             data: (summary) => Padding(
               padding: const EdgeInsets.all(AppSpacing.md),
               child: Row(
                 children: [
-                  _Kpi(label: 'Due week', value: '${summary.dueThisWeek}', color: AppColors.sky),
+                  _Kpi(
+                    label: 'Due week',
+                    value: '${summary.dueThisWeek}',
+                    color: AppColors.sky,
+                  ),
                   const SizedBox(width: AppSpacing.sm),
-                  _Kpi(label: 'Overdue', value: '${summary.overdue}', color: AppColors.danger),
+                  _Kpi(
+                    label: 'Overdue',
+                    value: '${summary.overdue}',
+                    color: AppColors.danger,
+                  ),
                   const SizedBox(width: AppSpacing.sm),
-                  _Kpi(label: 'Paused', value: '${summary.paused}', color: AppColors.warning),
+                  _Kpi(
+                    label: 'Paused',
+                    value: '${summary.paused}',
+                    color: AppColors.warning,
+                  ),
                 ],
               ),
             ),
@@ -117,7 +149,10 @@ class _Kpi extends StatelessWidget {
             Text(label, style: Theme.of(context).textTheme.labelMedium),
             Text(
               value,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(color: color),
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(color: color),
             ),
           ],
         ),

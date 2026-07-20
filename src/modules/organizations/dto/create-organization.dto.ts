@@ -1,14 +1,18 @@
-import { IsString, IsOptional, MaxLength, Matches } from 'class-validator';
+import { IsString, IsOptional, MaxLength } from 'class-validator';
 
 export class CreateOrganizationDto {
   @IsString()
   @MaxLength(150)
   name!: string;
 
+  /**
+   * Optional for backward compatibility. Ignored by the service — a unique
+   * internal slug is always generated server-side.
+   */
+  @IsOptional()
   @IsString()
   @MaxLength(150)
-  @Matches(/^[a-z0-9-]+$/, { message: 'slug must be lowercase alphanumeric and hyphens only' })
-  slug!: string;
+  slug?: string;
 
   @IsOptional()
   @IsString()

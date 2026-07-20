@@ -307,7 +307,7 @@ class SessionController extends Notifier<SessionState> {
 
   Future<Organization> createWorkspace({
     required String name,
-    required String slug,
+    String? slug,
     String? logoUrl,
   }) async {
     final org = await _organizationsRepository.createOrganization(

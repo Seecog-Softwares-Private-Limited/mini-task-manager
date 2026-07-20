@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn, getInitials } from "@/lib/utils";
+import { resolveWorkspaceLogoUrl } from "@/lib/workspace-avatar-presets";
 import { Building2, Check, ChevronDown } from "lucide-react";
 
 export interface OrgSwitcherProps {
@@ -94,7 +95,9 @@ export function OrgSwitcher({
                 compact ? "h-5 w-5" : "h-8 w-8 rounded-lg"
               )}
             >
-              {currentOrg?.logoUrl && <AvatarImage src={currentOrg.logoUrl} alt="" />}
+              {currentOrg && (
+                <AvatarImage src={resolveWorkspaceLogoUrl(currentOrg.logoUrl)} alt="" />
+              )}
               <AvatarFallback
                 className={cn(
                   "bg-violet-500/10 text-violet-700 dark:text-violet-300",
@@ -137,7 +140,7 @@ export function OrgSwitcher({
                 <span className="w-4" />
               )}
               <Avatar className="h-6 w-6 shrink-0 rounded-md">
-                {org.logoUrl && <AvatarImage src={org.logoUrl} alt="" />}
+                <AvatarImage src={resolveWorkspaceLogoUrl(org.logoUrl)} alt="" />
                 <AvatarFallback className="rounded-md bg-muted text-[10px] font-medium">
                   {getInitials(org.name)}
                 </AvatarFallback>

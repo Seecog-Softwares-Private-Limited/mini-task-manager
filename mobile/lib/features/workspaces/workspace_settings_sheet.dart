@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../core/utils/slug.dart';
 import '../../data/models/organization.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../auth/session_controller.dart';
@@ -25,15 +24,12 @@ class WorkspaceSettingsSheet extends ConsumerStatefulWidget {
 
 class _WorkspaceSettingsSheetState extends ConsumerState<WorkspaceSettingsSheet> {
   final _nameController = TextEditingController();
-  final _slugController = TextEditingController();
 
   Organization? _org;
   String? _logoPreview;
   bool _loading = true;
   bool _saving = false;
   String? _error;
-  String? _slugStatus;
-  bool? _slugAvailable;
 
   bool get _isOwner => _org?.myRole?.toLowerCase() == 'owner';
   bool get _canEdit => _isOwner || _org?.myRole?.toLowerCase() == 'admin';
@@ -47,7 +43,6 @@ class _WorkspaceSettingsSheetState extends ConsumerState<WorkspaceSettingsSheet>
   @override
   void dispose() {
     _nameController.dispose();
-    _slugController.dispose();
     super.dispose();
   }
 
@@ -72,7 +67,6 @@ class _WorkspaceSettingsSheetState extends ConsumerState<WorkspaceSettingsSheet>
       final org = await ref.read(organizationsRepositoryProvider).fetchOrganization(orgId);
       if (!mounted) return;
       _nameController.text = org.name;
-      _slugController.text = org.slug;
       setState(() {
         _org = org;
         _logoPreview = org.logoUrl;
@@ -87,46 +81,12 @@ class _WorkspaceSettingsSheetState extends ConsumerState<WorkspaceSettingsSheet>
     }
   }
 
-  Future<void> _checkSlug(String slug) async {
-    if (!isValidSlug(slug)) {
-      setState(() {
-        _slugStatus = 'Use lowercase letters, numbers, and hyphens only';
-        _slugAvailable = false;
-      });
-      return;
-    }
-
-    if (_org != null && slug == _org!.slug) {
-      setState(() {
-        _slugStatus = null;
-        _slugAvailable = null;
-      });
-      return;
-    }
-
-    setState(() => _slugStatus = 'Checking availability…');
-    try {
-      final available = await ref.read(organizationsRepositoryProvider).isSlugAvailable(
-            slug,
-            excludeOrganizationId: _org?.id,
-          );
-      if (!mounted) return;
-      setState(() {
-        _slugAvailable = available;
-        _slugStatus = available ? 'Slug is available.' : 'This slug is already taken.';
-      });
-    } catch (_) {
-      if (mounted) setState(() => _slugStatus = null);
-    }
-  }
-
   bool get _hasChanges {
     final org = _org;
     if (org == null) return false;
     final name = _nameController.text.trim();
-    final slug = _slugController.text.trim().toLowerCase();
     final logoChanged = _isOwner && (_logoPreview ?? '') != (org.logoUrl ?? '');
-    return name != org.name || slug != org.slug || logoChanged;
+    return name != org.name || logoChanged;
   }
 
   Future<void> _save() async {
@@ -134,18 +94,9 @@ class _WorkspaceSettingsSheetState extends ConsumerState<WorkspaceSettingsSheet>
     if (org == null || !_canEdit) return;
 
     final name = _nameController.text.trim();
-    final slug = _slugController.text.trim().toLowerCase();
 
     if (name.isEmpty) {
       setState(() => _error = 'Workspace name is required');
-      return;
-    }
-    if (!isValidSlug(slug)) {
-      setState(() => _error = 'Use lowercase letters, numbers, and hyphens only');
-      return;
-    }
-    if (slug != org.slug && _slugAvailable == false) {
-      setState(() => _error = 'Choose an available URL slug');
       return;
     }
 
@@ -160,7 +111,6 @@ class _WorkspaceSettingsSheetState extends ConsumerState<WorkspaceSettingsSheet>
       await ref.read(sessionControllerProvider.notifier).updateWorkspace(
             orgId: org.id,
             name: name != org.name ? name : null,
-            slug: slug != org.slug ? slug : null,
             logoUrl: _isOwner && logoBefore != logoAfter ? logoAfter : null,
             clearLogo: _isOwner && logoBefore.isNotEmpty && logoAfter.isEmpty,
           );
@@ -225,7 +175,7 @@ class _WorkspaceSettingsSheetState extends ConsumerState<WorkspaceSettingsSheet>
                         Text('Workspace settings', style: Theme.of(context).textTheme.titleLarge),
                         const SizedBox(height: AppSpacing.xs),
                         Text(
-                          'Update name, URL slug, and icon.',
+                          'Update name and icon.',
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                         const SizedBox(height: AppSpacing.lg),
@@ -253,38 +203,6 @@ class _WorkspaceSettingsSheetState extends ConsumerState<WorkspaceSettingsSheet>
                           decoration: const InputDecoration(hintText: 'Workspace name'),
                           onChanged: (_) => setState(() {}),
                         ),
-                        const SizedBox(height: AppSpacing.md),
-                        Text(
-                          'URL SLUG',
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: AppColors.textMuted,
-                                letterSpacing: 0.8,
-                                fontWeight: FontWeight.w600,
-                              ),
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        TextField(
-                          controller: _slugController,
-                          enabled: _canEdit,
-                          decoration: const InputDecoration(hintText: 'url-slug'),
-                          onChanged: (value) {
-                            setState(() {});
-                            _checkSlug(value.trim().toLowerCase());
-                          },
-                        ),
-                        if (_slugStatus != null) ...[
-                          const SizedBox(height: AppSpacing.xs),
-                          Text(
-                            _slugStatus!,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: _slugAvailable == true
-                                      ? AppColors.success
-                                      : _slugAvailable == false
-                                          ? AppColors.danger
-                                          : AppColors.textMuted,
-                                ),
-                          ),
-                        ],
                         if (_error != null && _org != null) ...[
                           const SizedBox(height: AppSpacing.sm),
                           Text(

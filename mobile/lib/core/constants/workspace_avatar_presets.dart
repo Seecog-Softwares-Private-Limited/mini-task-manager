@@ -68,3 +68,12 @@ WorkspaceAvatarPreset? findPresetByDataUrl(String? dataUrl) {
   }
   return null;
 }
+
+/// Default logo applied on create and when a workspace has no custom icon.
+final WorkspaceAvatarPreset kDefaultWorkspaceAvatar = kWorkspaceAvatarPresets.first;
+
+String resolveWorkspaceLogoUrl(String? logoUrl) {
+  final trimmed = logoUrl?.trim();
+  if (trimmed == null || trimmed.isEmpty) return kDefaultWorkspaceAvatar.dataUrl;
+  return trimmed;
+}

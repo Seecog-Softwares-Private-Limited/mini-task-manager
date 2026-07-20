@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/constants/workspace_avatar_presets.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../core/utils/slug.dart';
 import '../../data/models/organization.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../auth/session_controller.dart';
@@ -24,40 +24,22 @@ class CreateWorkspaceSheet extends ConsumerStatefulWidget {
 
 class _CreateWorkspaceSheetState extends ConsumerState<CreateWorkspaceSheet> {
   final _nameController = TextEditingController();
-  final _slugController = TextEditingController();
 
-  String? _logoPreview;
-  bool _slugEdited = false;
+  String? _logoPreview = kDefaultWorkspaceAvatar.dataUrl;
   bool _loading = false;
   String? _error;
 
   @override
   void dispose() {
     _nameController.dispose();
-    _slugController.dispose();
     super.dispose();
-  }
-
-  void _onNameChanged(String value) {
-    if (_slugEdited) return;
-    final generated = nameToSlug(value);
-    _slugController.value = TextEditingValue(
-      text: generated,
-      selection: TextSelection.collapsed(offset: generated.length),
-    );
-    setState(() {});
   }
 
   Future<void> _submit() async {
     final name = _nameController.text.trim();
-    final slug = _slugController.text.trim().toLowerCase();
 
     if (name.isEmpty) {
       setState(() => _error = 'Workspace name is required');
-      return;
-    }
-    if (!isValidSlug(slug)) {
-      setState(() => _error = 'Use lowercase letters, numbers, and hyphens only');
       return;
     }
 
@@ -67,17 +49,9 @@ class _CreateWorkspaceSheetState extends ConsumerState<CreateWorkspaceSheet> {
     });
 
     try {
-      final repo = ref.read(organizationsRepositoryProvider);
-      final available = await repo.isSlugAvailable(slug);
-      if (!available) {
-        setState(() => _error = 'This URL slug is already taken');
-        return;
-      }
-
       final org = await ref.read(sessionControllerProvider.notifier).createWorkspace(
             name: name,
-            slug: slug,
-            logoUrl: _logoPreview,
+            logoUrl: resolveWorkspaceLogoUrl(_logoPreview),
           );
       widget.onCreated(org);
       if (mounted) Navigator.of(context).pop();
@@ -149,24 +123,7 @@ class _CreateWorkspaceSheetState extends ConsumerState<CreateWorkspaceSheet> {
                 decoration: const InputDecoration(
                   hintText: 'Workspace name',
                 ),
-                onChanged: _onNameChanged,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              Text(
-                'URL SLUG',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: AppColors.textMuted,
-                      letterSpacing: 0.8,
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              TextField(
-                controller: _slugController,
-                decoration: const InputDecoration(
-                  hintText: 'acme-design',
-                ),
-                onChanged: (_) => _slugEdited = true,
+                onChanged: (_) => setState(() {}),
               ),
               if (_error != null) ...[
                 const SizedBox(height: AppSpacing.sm),

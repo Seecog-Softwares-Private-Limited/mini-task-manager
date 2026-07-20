@@ -45,7 +45,9 @@ class MyWorkScreen extends ConsumerWidget {
           loading: projectsAsync.isLoading,
           onProjectSelected: (projectId) {
             ref.read(tasksProjectIdProvider.notifier).state = projectId;
-            ref.read(lastProjectIdProvider.notifier).setProjectId(projectId);
+            if (!isAllProjectsSelection(projectId)) {
+              ref.read(lastProjectIdProvider.notifier).setProjectId(projectId);
+            }
             ref.read(tasksMemberFilterProvider.notifier).state = null;
           },
         ),
@@ -103,10 +105,13 @@ class _TasksFilterBar extends ConsumerWidget {
     }
     if (projects.isEmpty) return const SizedBox.shrink();
 
-    final effectiveId = selectedProjectId != null &&
-            projects.any((p) => p.id == selectedProjectId)
-        ? selectedProjectId!
-        : projects.first.id;
+    final allProjects = isAllProjectsSelection(selectedProjectId);
+    final effectiveId = allProjects
+        ? kAllProjectsId
+        : (selectedProjectId != null &&
+                projects.any((p) => p.id == selectedProjectId)
+            ? selectedProjectId!
+            : projects.first.id);
     final memberId = ref.watch(tasksMemberFilterProvider);
     final boardFilters = ref.watch(tasksBoardFiltersProvider);
     final membersAsync = ref.watch(projectMembersForTasksProvider(effectiveId));
@@ -150,6 +155,35 @@ class _TasksFilterBar extends ConsumerWidget {
                       debugLabel: 'project',
                       value: effectiveId,
                       items: [
+                        DropdownMenuItem(
+                          value: kAllProjectsId,
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 22,
+                                height: 22,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(6),
+                                  color: AppColors.primary.withValues(alpha: 0.12),
+                                ),
+                                alignment: Alignment.center,
+                                child: const Icon(
+                                  Icons.apps_rounded,
+                                  size: 14,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  'All projects',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                         for (final project in projects)
                           DropdownMenuItem(
                             value: project.id,
@@ -170,6 +204,38 @@ class _TasksFilterBar extends ConsumerWidget {
                           ),
                       ],
                       selectedBuilder: (context) {
+                        if (isAllProjectsSelection(effectiveId)) {
+                          return Row(
+                            children: [
+                              Container(
+                                width: 22,
+                                height: 22,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(6),
+                                  color: AppColors.primary.withValues(alpha: 0.12),
+                                ),
+                                alignment: Alignment.center,
+                                child: const Icon(
+                                  Icons.apps_rounded,
+                                  size: 14,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'All projects',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                            ],
+                          );
+                        }
                         final project = projects.firstWhere(
                           (p) => p.id == effectiveId,
                           orElse: () => projects.first,

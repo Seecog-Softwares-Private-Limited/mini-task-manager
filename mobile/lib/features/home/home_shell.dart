@@ -81,8 +81,16 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
     final projectId = ref.read(recurringSelectedProjectIdProvider);
     if (projectId == null || projectId.isEmpty) {
+      final projects = ref.read(projectsProvider).valueOrNull ?? const [];
+      final hasProjects = projects.any((p) => !p.isArchived);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select a project first.')),
+        SnackBar(
+          content: Text(
+            hasProjects
+                ? 'Select a project first.'
+                : 'Create a project first, then add a planner.',
+          ),
+        ),
       );
       return;
     }

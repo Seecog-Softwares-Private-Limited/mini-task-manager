@@ -48,7 +48,7 @@ class AccountSettingsScreen extends ConsumerWidget {
             icon: Icons.business_outlined,
             iconColor: AppColors.primary,
             title: 'Workspace',
-            subtitle: 'Name, slug, icon, and subscription',
+            subtitle: 'Name, icon, and subscription',
             onTap: org == null
                 ? null
                 : () => showWorkspaceSettingsSheet(

@@ -9,7 +9,7 @@ import { Building2, Shield, Key, Webhook, Download, Lock, ArrowLeft, ArrowRight,
 const SECTIONS = [
   { href: "/dashboard/profile", title: "My Profile", description: "Your photo, name, and personal details", icon: CircleUserRound, color: "text-violet-500 bg-violet-500/10", requiredCap: null },
   { href: "/dashboard/settings/password", title: "Password", description: "Change your account password", icon: KeyRound, color: "text-sky-500 bg-sky-500/10", requiredCap: null },
-  { href: "/dashboard/settings/workspace", title: "Workspace", description: "Name, slug, subscription, danger zone", icon: Building2, color: "text-primary bg-primary/10", requiredCap: "canEditOrgSettings" as const },
+  { href: "/dashboard/settings/workspace", title: "Workspace", description: "Name, subscription, danger zone", icon: Building2, color: "text-primary bg-primary/10", requiredCap: "canEditOrgSettings" as const },
   { href: "/dashboard/settings/members", title: "Members", description: "Invite members, manage roles, transfer ownership", icon: Users, color: "text-emerald-600 bg-emerald-500/10", requiredCap: "canInviteMembers" as const },
   { href: "/dashboard/settings/permissions", title: "Roles & Permissions", description: "Role matrix and feature access", icon: Shield, color: "text-purple-500 bg-purple-500/10", requiredCap: null },
   { href: "/dashboard/settings/api-keys", title: "API Keys", description: "Create and revoke API keys", icon: Key, color: "text-amber-500 bg-amber-500/10", requiredCap: "canManageApiKeys" as const },

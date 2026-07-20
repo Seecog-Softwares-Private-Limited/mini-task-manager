@@ -15,7 +15,6 @@ import { createInvitation } from "@/services/api/invitations.api";
 import { useFirstTimeOnboarding } from "@/context/first-time-onboarding-context";
 import { useTenant } from "@/context/tenant-context";
 import { parseApiError, isRateLimited } from "@/services/api/client";
-import { nameToSlug, getInitials } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,14 +32,13 @@ import {
   Loader2,
 } from "lucide-react";
 import { WorkspaceAvatarPresetsPicker } from "@/components/workspaces/workspace-avatar-presets-picker";
+import {
+  DEFAULT_WORKSPACE_AVATAR,
+  resolveWorkspaceLogoUrl,
+} from "@/lib/workspace-avatar-presets";
 
 const STEP_1_SCHEMA = z.object({
   name: z.string().min(1, "Name is required").max(150),
-  slug: z
-    .string()
-    .min(1, "Slug is required")
-    .max(150)
-    .regex(/^[a-z0-9-]+$/, "Lowercase letters, numbers, and hyphens only"),
 });
 
 type Step1Form = z.infer<typeof STEP_1_SCHEMA>;
@@ -57,9 +55,10 @@ export function FirstTimeOnboardingStepper() {
   const { completeOnboarding, trigger } = useFirstTimeOnboarding();
   const { orgId, setOrgId } = useTenant();
   const [step, setStep] = useState(0);
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(
+    DEFAULT_WORKSPACE_AVATAR.dataUrl
+  );
   const logoFileInputRef = useRef<HTMLInputElement>(null);
-  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
   const [inviteEmails, setInviteEmails] = useState<string[]>([]);
   const [currentEmail, setCurrentEmail] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
@@ -80,11 +79,11 @@ export function FirstTimeOnboardingStepper() {
 
   const step1Form = useForm<Step1Form>({
     resolver: zodResolver(STEP_1_SCHEMA),
-    defaultValues: { name: "", slug: "" },
+    defaultValues: { name: "" },
   });
 
   const createOrgMutation = useMutation({
-    mutationFn: (payload: { name: string; slug: string; logoUrl?: string }) =>
+    mutationFn: (payload: { name: string; logoUrl?: string }) =>
       createOrganization(payload),
     onSuccess: (org) => {
       setOrgId(org.id);
@@ -121,20 +120,10 @@ export function FirstTimeOnboardingStepper() {
     closeRef.current?.focus();
   }, []);
 
-  const name = step1Form.watch("name");
-  const slug = step1Form.watch("slug");
-
-  useEffect(() => {
-    if (!slugManuallyEdited && name) {
-      step1Form.setValue("slug", nameToSlug(name));
-    }
-  }, [name, slugManuallyEdited, step1Form]);
-
   const handleStep1Submit = (values: Step1Form) => {
     createOrgMutation.mutate({
-      ...values,
-      slug: values.slug.trim().toLowerCase(),
-      logoUrl: logoPreview ?? undefined,
+      name: values.name.trim(),
+      logoUrl: resolveWorkspaceLogoUrl(logoPreview),
     });
   };
 
@@ -247,48 +236,26 @@ export function FirstTimeOnboardingStepper() {
                   </p>
                 )}
               </div>
-              <div className="space-y-2">
-                <Label>URL slug</Label>
-                <Input
-                  {...step1Form.register("slug", {
-                    onChange: () => setSlugManuallyEdited(true),
-                  })}
-                  placeholder="acme-inc"
-                />
-                {step1Form.formState.errors.slug && (
-                  <p className="text-xs text-destructive">
-                    {step1Form.formState.errors.slug.message}
-                  </p>
-                )}
-              </div>
               <div className="space-y-3">
-                <Label>Workspace icon (optional)</Label>
+                <Label>Workspace icon</Label>
                 <div className="flex items-center gap-4">
                   <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-muted">
-                    {logoPreview ? (
-                      <>
-                        <img
-                          src={logoPreview}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setLogoPreview(null);
-                            if (logoFileInputRef.current) logoFileInputRef.current.value = "";
-                          }}
-                          className="absolute inset-0 flex items-center justify-center bg-black/50 text-[10px] font-medium text-white opacity-0 transition-opacity hover:opacity-100"
-                          aria-label="Remove icon"
-                        >
-                          Clear
-                        </button>
-                      </>
-                    ) : (
-                      <span className="text-sm font-semibold text-muted-foreground">
-                        {getInitials(name) || "—"}
-                      </span>
-                    )}
+                    <img
+                      src={resolveWorkspaceLogoUrl(logoPreview)}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLogoPreview(DEFAULT_WORKSPACE_AVATAR.dataUrl);
+                        if (logoFileInputRef.current) logoFileInputRef.current.value = "";
+                      }}
+                      className="absolute inset-0 flex items-center justify-center bg-black/50 text-[10px] font-medium text-white opacity-0 transition-opacity hover:opacity-100"
+                      aria-label="Reset to default logo"
+                    >
+                      Reset
+                    </button>
                   </div>
                   <div className="flex-1 space-y-1">
                     <label className="flex cursor-pointer items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
@@ -315,7 +282,7 @@ export function FirstTimeOnboardingStepper() {
                   </div>
                 </div>
                 <WorkspaceAvatarPresetsPicker
-                  value={logoPreview}
+                  value={resolveWorkspaceLogoUrl(logoPreview)}
                   onSelectPreset={(dataUrl) => {
                     setLogoPreview(dataUrl);
                     if (logoFileInputRef.current) logoFileInputRef.current.value = "";

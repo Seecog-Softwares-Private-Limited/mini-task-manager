@@ -59,7 +59,9 @@ class WorkspaceAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final initials = workspaceInitials(name);
     final url = logoUrl?.trim();
-    final preset = findPresetByDataUrl(url);
+    final resolvedUrl =
+        (url != null && url.isNotEmpty) ? url : kDefaultWorkspaceAvatar.dataUrl;
+    final preset = findPresetByDataUrl(resolvedUrl);
 
     if (preset != null) {
       return WorkspacePresetAvatar(
@@ -78,18 +80,7 @@ class WorkspaceAvatar extends StatelessWidget {
           color: AppColors.primary.withValues(alpha: 0.12),
           border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
         ),
-        child: url != null && url.isNotEmpty
-            ? _LogoImage(url: url, initials: initials)
-            : Center(
-                child: Text(
-                  initials,
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w600,
-                    fontSize: size * 0.34,
-                  ),
-                ),
-              ),
+        child: _LogoImage(url: resolvedUrl, initials: initials),
       ),
     );
   }

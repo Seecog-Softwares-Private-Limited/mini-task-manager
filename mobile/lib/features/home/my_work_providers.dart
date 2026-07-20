@@ -9,6 +9,12 @@ import '../auth/session_controller.dart';
 import '../projects/projects_providers.dart';
 import 'home_providers.dart';
 
+/// Sentinel for Tasks tab "All projects" (workspace-wide board).
+const kAllProjectsId = '__all_projects__';
+
+bool isAllProjectsSelection(String? projectId) =>
+    projectId != null && projectId == kAllProjectsId;
+
 enum MyWorkFilter { overdue, today, week, completed, open, all }
 
 extension MyWorkFilterX on MyWorkFilter {
@@ -41,7 +47,7 @@ extension MyWorkFilterX on MyWorkFilter {
 final myWorkFilterProvider =
     StateProvider<MyWorkFilter>((ref) => MyWorkFilter.open);
 
-/// Explicit project pick on the Tasks tab (null = follow last/first project).
+/// Explicit project pick on the Tasks tab (`kAllProjectsId` = all projects).
 final tasksProjectIdProvider = StateProvider<String?>((ref) => null);
 
 /// Member filter on the Tasks tab (`null` / empty = all members).
@@ -102,6 +108,8 @@ final tasksSelectedProjectIdProvider = Provider<String?>((ref) {
   final active = projects?.where((p) => !p.isArchived).toList() ?? const [];
   if (active.isEmpty) return null;
 
+  if (isAllProjectsSelection(selected)) return kAllProjectsId;
+
   if (selected != null &&
       selected.isNotEmpty &&
       active.any((p) => p.id == selected)) {
@@ -121,6 +129,9 @@ final projectMembersForTasksProvider = FutureProvider.autoDispose
     sessionControllerProvider.select((session) => session.orgId),
   );
   if (orgId == null || orgId.isEmpty) return const [];
+  if (isAllProjectsSelection(projectId)) {
+    return ref.watch(organizationsRepositoryProvider).fetchOrgMembers(orgId);
+  }
   return ref.watch(projectsRepositoryProvider).fetchProjectMembers(
         projectId: projectId,
         organizationId: orgId,
@@ -132,6 +143,16 @@ List<String> taskAssigneeIds(Task task) {
   final id = task.assigneeId;
   if (id != null && id.isNotEmpty) return [id];
   return const [];
+}
+
+bool _assigneeListContains(List<String> assignees, String userId) {
+  final target = userId.trim().toLowerCase().replaceAll(RegExp(r'[{}-]'), '');
+  for (final id in assignees) {
+    final normalized =
+        id.trim().toLowerCase().replaceAll(RegExp(r'[{}-]'), '');
+    if (normalized == target) return true;
+  }
+  return false;
 }
 
 bool isTaskDueOverdue(String? dueDate) {
@@ -154,14 +175,14 @@ bool matchesTasksBoardFilters(
   final assignees = taskAssigneeIds(task);
 
   if (memberId != null && memberId.isNotEmpty) {
-    if (!assignees.contains(memberId)) return false;
+    if (!_assigneeListContains(assignees, memberId)) return false;
   }
 
   if (filters.unassignedOnly && assignees.isNotEmpty) return false;
 
   if (filters.assignedToMe) {
     if (currentUserId == null || currentUserId.isEmpty) return false;
-    if (!assignees.contains(currentUserId)) return false;
+    if (!_assigneeListContains(assignees, currentUserId)) return false;
   }
 
   if (filters.priorities.isNotEmpty) {
@@ -178,14 +199,16 @@ bool matchesTasksBoardFilters(
   return true;
 }
 
-/// Tasks tab: board tasks for the selected project only.
+/// Tasks tab: board tasks for the selected project (or all projects).
 final myWorkProvider = FutureProvider.autoDispose<MyTasksResult>((ref) async {
   final filter = ref.watch(myWorkFilterProvider);
   final projectId = ref.watch(tasksSelectedProjectIdProvider);
   final tasks = await ref.watch(workspaceBoardTasksProvider.future);
   final scoped = projectId == null
       ? const <Task>[]
-      : tasks.where((t) => t.projectId == projectId).toList();
+      : isAllProjectsSelection(projectId)
+          ? tasks
+          : tasks.where((t) => t.projectId == projectId).toList();
   return _myTasksFromWorkspace(scoped, filter);
 });
 

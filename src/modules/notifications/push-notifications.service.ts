@@ -102,8 +102,19 @@ export class PushNotificationsService implements OnModuleInit {
             token: row.token,
             notification: { title, body },
             data: payloadData,
-            android: { priority: 'high' },
+            android: {
+              priority: 'high',
+              notification: {
+                channelId: 'high_importance_channel',
+                sound: 'default',
+                priority: 'high',
+                defaultSound: true,
+              },
+            },
             apns: {
+              headers: {
+                'apns-priority': '10',
+              },
               payload: {
                 aps: {
                   sound: 'default',

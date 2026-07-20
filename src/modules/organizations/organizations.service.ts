@@ -20,6 +20,7 @@ import { generateUuid } from '../../common/utils/uuid.util';
 import { uuidBinaryTransformer } from '../../common/base.entity';
 import { PlanLimitService } from '../../plans/plan-limit.service';
 import { UnifiedBillingService } from '../billing/unified-billing.service';
+import { resolveWorkspaceLogoUrl } from './default-workspace-logo';
 
 @Injectable()
 export class OrganizationsService {
@@ -67,14 +68,12 @@ export class OrganizationsService {
   }
 
   async create(ownerId: string, dto: CreateOrganizationDto): Promise<OrganizationEntity> {
-    const existing = await this.organizationsRepository.findBySlug(dto.slug);
-    if (existing) {
-      throw new ConflictException('An organization with this slug already exists. Please choose a different slug.');
-    }
-
     await this.planLimitService.assertWorkspaceLimit(ownerId);
 
     const orgId = generateUuid();
+    // Internal opaque slug — not derived from name, never exposed in create UI.
+    const slug = await this.allocateUniqueSlug();
+
     let orgEntity: OrganizationEntity;
     try {
       orgEntity = await this.dataSource.transaction(async (manager) => {
@@ -83,9 +82,9 @@ export class OrganizationsService {
         const entity = orgRepo.create({
           id: orgId,
           name: dto.name,
-          slug: dto.slug,
+          slug,
           ownerId,
-          logoUrl: dto.logoUrl ?? null,
+          logoUrl: resolveWorkspaceLogoUrl(dto.logoUrl),
           isArchived: false,
         });
         await orgRepo.save(entity);
@@ -106,14 +105,49 @@ export class OrganizationsService {
         (driverError && (driverError as { errno?: number }).errno === 1062) ||
         (err instanceof Error && err.message.includes('Duplicate entry'));
       if (isDup) {
-        throw new ConflictException('An organization with this slug already exists. Please choose a different slug.');
+        // Extremely rare race — retry once with a fresh slug.
+        const retrySlug = await this.allocateUniqueSlug();
+        orgEntity = await this.dataSource.transaction(async (manager) => {
+          const orgRepo = manager.getRepository(OrganizationEntity);
+          const memberRepo = manager.getRepository(OrganizationMemberEntity);
+          const entity = orgRepo.create({
+            id: generateUuid(),
+            name: dto.name,
+            slug: retrySlug,
+            ownerId,
+            logoUrl: resolveWorkspaceLogoUrl(dto.logoUrl),
+            isArchived: false,
+          });
+          await orgRepo.save(entity);
+          const memberEntity = memberRepo.create({
+            id: generateUuid(),
+            organizationId: entity.id,
+            userId: ownerId,
+            role: 'owner',
+            status: 'ACTIVE',
+          });
+          await memberRepo.save(memberEntity);
+          return entity;
+        });
+      } else {
+        throw err;
       }
-      throw err;
     }
 
     // Provision free subscription outside transaction to avoid connection lock deadlocks
-    await this.unifiedBillingService.ensureFreeSubscription(orgId);
+    await this.unifiedBillingService.ensureFreeSubscription(orgEntity.id);
     return orgEntity;
+  }
+
+  /** Opaque unique slug (not name-based) for internal routing / FK uniqueness. */
+  private async allocateUniqueSlug(): Promise<string> {
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const candidate = `ws-${generateUuid().replace(/-/g, '')}`;
+      const existing = await this.organizationsRepository.findBySlug(candidate);
+      if (!existing) return candidate;
+    }
+    // UUID collision is effectively impossible; last resort with timestamp.
+    return `ws-${Date.now().toString(36)}${generateUuid().replace(/-/g, '').slice(0, 16)}`;
   }
 
   async getMembers(organizationId: string): Promise<OrganizationMemberEntity[]> {
@@ -151,38 +185,14 @@ export class OrganizationsService {
       }
       patch.name = trimmed;
     }
-    if (dto.slug !== undefined) {
-      const nextSlug = dto.slug.trim().toLowerCase();
-      if (!nextSlug) {
-        throw new BadRequestException('URL slug cannot be empty');
-      }
-      if (nextSlug !== org.slug) {
-        const taken = await this.organizationsRepository.findBySlug(nextSlug);
-        if (taken && taken.id !== id) {
-          throw new ConflictException('A workspace with this slug already exists. Please choose a different slug.');
-        }
-      }
-      patch.slug = nextSlug;
-    }
+    // Slug is internal-only; client updates are ignored so the UI never surfaces collisions.
     if (dto.logoUrl !== undefined) {
       const v = dto.logoUrl.trim();
       patch.logoUrl = v.length === 0 ? null : dto.logoUrl;
     }
 
     if (Object.keys(patch).length > 0) {
-      try {
-        await this.organizationsRepository.update(id, patch);
-      } catch (err) {
-        const driverError = err instanceof QueryFailedError ? (err as QueryFailedError).driverError : null;
-        const isDup =
-          (driverError && (driverError as { code?: string }).code === 'ER_DUP_ENTRY') ||
-          (driverError && (driverError as { errno?: number }).errno === 1062) ||
-          (err instanceof Error && err.message.includes('Duplicate entry'));
-        if (isDup) {
-          throw new ConflictException('A workspace with this slug already exists. Please choose a different slug.');
-        }
-        throw err;
-      }
+      await this.organizationsRepository.update(id, patch);
     }
 
     return this.organizationsRepository.findById(id);

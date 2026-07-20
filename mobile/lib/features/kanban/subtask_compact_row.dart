@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/api/api_client.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../data/models/project_member.dart';
 import '../../data/models/task.dart';
+import '../../shared/widgets/user_avatar.dart';
 import 'assignee_picker_sheet.dart';
 import 'subtask_row_style.dart';
 
@@ -234,25 +237,13 @@ class _AssigneeChip extends StatelessWidget {
   }
 }
 
-class _CircleAvatar extends StatelessWidget {
+class _CircleAvatar extends ConsumerWidget {
   const _CircleAvatar({required this.member, required this.size});
 
   final ProjectMember member;
   final double size;
 
-  @override
-  Widget build(BuildContext context) {
-    final name = member.user?.fullName.trim();
-    final label = (name != null && name.isNotEmpty)
-        ? name
-        : (member.user?.email ?? 'User');
-    final initials = label
-        .split(RegExp(r'\s+'))
-        .where((p) => p.isNotEmpty)
-        .take(2)
-        .map((p) => p[0].toUpperCase())
-        .join();
-
+  Widget _initialsAvatar(String initials) {
     return Container(
       width: size,
       height: size,
@@ -277,6 +268,58 @@ class _CircleAvatar extends StatelessWidget {
           fontSize: size * 0.34,
           height: 1,
         ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final name = member.user?.fullName.trim();
+    final label = (name != null && name.isNotEmpty)
+        ? name
+        : (member.user?.email ?? 'User');
+    final initials = label
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .take(2)
+        .map((p) => p[0].toUpperCase())
+        .join();
+
+    final config = ref.watch(appConfigProvider);
+    final imageUrl = resolveUserAvatarUrl(
+      config.apiBaseUrl,
+      member.user?.avatarUrl,
+      userId: member.userId,
+    );
+    final cacheSize = (size * MediaQuery.devicePixelRatioOf(context)).round();
+
+    if (imageUrl.isEmpty) {
+      return _initialsAvatar(initials);
+    }
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Image.network(
+        imageUrl,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        cacheWidth: cacheSize,
+        cacheHeight: cacheSize,
+        errorBuilder: (_, __, ___) => _initialsAvatar(initials),
       ),
     );
   }
