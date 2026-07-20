@@ -1,5 +1,5 @@
 /**
- * PM2 config for mini-task-manager.
+ * PM2 config for mini-task-manager (single process: API + Next via app.js).
  *
  * Prereqs:
  *   npm run build:all
@@ -7,7 +7,7 @@
  * Start:  npm run pm2:start
  * Stop:   npm run pm2:stop
  *
- * Production: set JWT_SECRET in properties.env to a non-default value, then:
+ * Production: set JWT_SECRET in properties.env, then:
  *   pm2 start ecosystem.config.cjs --env production
  */
 const path = require('path');
@@ -39,6 +39,7 @@ const localEnv = {
   NODE_ENV: 'development',
   APP_MODE: appModeFromFile,
   PORT: apiPort,
+  FRONTEND_PORT: frontendPort,
   MINI_TM_BACKEND_URL: backendUrl,
 };
 
@@ -47,48 +48,25 @@ const productionEnv = {
   NODE_ENV: 'production',
   APP_MODE: 'production',
   PORT: apiPort,
+  FRONTEND_PORT: frontendPort,
   MINI_TM_BACKEND_URL: backendUrl,
 };
 
 module.exports = {
   apps: [
     {
-      name: 'mini-task-manager-api',
+      name: 'mini-task-manager',
       cwd: ROOT,
-      script: path.join(ROOT, 'dist', 'main.js'),
+      script: path.join(ROOT, 'app.js'),
       instances: 1,
       exec_mode: 'fork',
       autorestart: true,
       watch: false,
-      max_memory_restart: '512M',
+      max_memory_restart: '1G',
       env: localEnv,
       env_production: productionEnv,
-      error_file: path.join(ROOT, 'logs', 'api-error.log'),
-      out_file: path.join(ROOT, 'logs', 'api-out.log'),
-      merge_logs: true,
-      time: true,
-    },
-    {
-      name: 'mini-task-manager-web',
-      cwd: path.join(ROOT, 'frontend'),
-      script: path.join(ROOT, 'frontend', 'node_modules', 'next', 'dist', 'bin', 'next'),
-      args: ['start', '-p', String(frontendPort)],
-      interpreter: 'node',
-      instances: 1,
-      exec_mode: 'fork',
-      autorestart: true,
-      watch: false,
-      max_memory_restart: '768M',
-      env: {
-        ...localEnv,
-        PORT: frontendPort,
-      },
-      env_production: {
-        ...productionEnv,
-        PORT: frontendPort,
-      },
-      error_file: path.join(ROOT, 'logs', 'web-error.log'),
-      out_file: path.join(ROOT, 'logs', 'web-out.log'),
+      error_file: path.join(ROOT, 'logs', 'mini-task-manager-error.log'),
+      out_file: path.join(ROOT, 'logs', 'mini-task-manager-out.log'),
       merge_logs: true,
       time: true,
     },
