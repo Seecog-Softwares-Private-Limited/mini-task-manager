@@ -11,6 +11,7 @@ import { RecurringTaskTemplatesRepository } from './repositories/recurring-task-
 import { RecurringTaskOccurrencesRepository } from './repositories/recurring-task-occurrences.repository';
 import { TasksRepository } from './repositories/tasks.repository';
 import { TasksService } from './tasks.service';
+import { TaskNotificationsService } from './task-notifications.service';
 import { ProjectsRepository } from '../projects/repositories/projects.repository';
 import type { TaskEntity } from './entities/task.entity';
 import { generateUuid } from '../../common/utils/uuid.util';
@@ -114,6 +115,7 @@ export class RecurringTasksService {
     private readonly projectsRepository: ProjectsRepository,
     @Inject(forwardRef(() => TasksService))
     private readonly tasksService: TasksService,
+    private readonly taskNotifications: TaskNotificationsService,
   ) {}
 
   /** Resolve the canonical project/org pair required by tasks FK constraints. */
@@ -1123,6 +1125,8 @@ export class RecurringTasksService {
     await this.tasksRepository.update(task.id, { subtasks } as never);
     const refreshed = await this.tasksRepository.findByIdAndOrganization(taskId, organizationId);
     if (!refreshed) throw new NotFoundException('Recurring task not found');
+    // Notify newly assigned subtask members (same path as PATCH /tasks).
+    this.taskNotifications.scheduleOnUpdate(task, refreshed, template.createdBy);
     return refreshed;
   }
 

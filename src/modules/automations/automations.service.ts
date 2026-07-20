@@ -129,7 +129,26 @@ export class AutomationsService {
       case 'assign': {
         const assigneeId = String(cfg.assigneeId ?? '');
         if (!assigneeId) return;
-        await this.tasksRepository.update(params.taskId, { assigneeId });
+        const before = await this.tasksRepository.findById(params.taskId);
+        await this.tasksRepository.update(params.taskId, {
+          assigneeId,
+          assigneeIds: [assigneeId],
+        } as never);
+        const after = await this.tasksRepository.findById(params.taskId);
+        if (before && after) {
+          const title = after.title || 'Task';
+          await this.notificationsService.createNotification(
+            assigneeId,
+            `Task assigned: ${title}`,
+            `An automation assigned you to "${title}".`,
+            {
+              type: 'task_assigned',
+              taskId: after.id,
+              projectId: after.projectId,
+              open: 'alerts',
+            },
+          );
+        }
         break;
       }
       case 'set_status':

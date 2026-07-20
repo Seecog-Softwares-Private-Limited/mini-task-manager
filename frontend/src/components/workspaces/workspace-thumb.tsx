@@ -1,7 +1,8 @@
 "use client";
 
 import type { Organization } from "@/types/api";
-import { cn, getInitials, getWorkspaceAvatarGradient } from "@/lib/utils";
+import { resolveWorkspaceLogoUrl } from "@/lib/workspace-avatar-presets";
+import { cn } from "@/lib/utils";
 
 const sizeClasses = {
   sm: "h-6 w-6 rounded-md text-[10px]",
@@ -28,25 +29,19 @@ export function WorkspaceThumb({
   className?: string;
   active?: boolean;
 }) {
-  const gradient = getWorkspaceAvatarGradient(workspace.name);
+  const logoSrc = resolveWorkspaceLogoUrl(workspace.logoUrl);
 
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center justify-center overflow-hidden font-bold tracking-tight",
+        "inline-flex shrink-0 items-center justify-center overflow-hidden bg-white font-bold tracking-tight dark:bg-muted",
         sizeClasses[size],
         sizeBorders[size],
-        workspace.logoUrl
-          ? "bg-white dark:bg-muted"
-          : cn("bg-gradient-to-br text-white", gradient, active && "shadow-md shadow-violet-500/20"),
+        active && "shadow-md shadow-violet-500/20",
         className
       )}
     >
-      {workspace.logoUrl ? (
-        <img src={workspace.logoUrl} alt="" className="h-full w-full object-contain p-0.5" />
-      ) : (
-        getInitials(workspace.name)
-      )}
+      <img src={logoSrc} alt="" className="h-full w-full object-contain p-0.5" />
     </span>
   );
 }

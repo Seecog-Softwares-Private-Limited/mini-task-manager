@@ -10,6 +10,7 @@ import { WorkspaceThumb } from "@/components/workspaces/workspace-thumb";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CompanyBrandModal } from "@/components/dashboard/company-brand-modal";
 import { useCompanyFontSize } from "@/hooks/use-company-font-size";
+import { resolveWorkspaceLogoUrl } from "@/lib/workspace-avatar-presets";
 import { cn } from "@/lib/utils";
 
 interface SidebarCompanyBrandProps {
@@ -96,10 +97,7 @@ export function SidebarCompanyBrand({
       <WorkspaceThumb
         workspace={companyOrg}
         size="md"
-        className={cn(
-          "h-9 w-9 shrink-0 rounded-lg text-xs shadow-sm",
-          !companyOrg.logoUrl && "gradient-bg text-white"
-        )}
+        className="h-9 w-9 shrink-0 rounded-lg text-xs shadow-sm"
       />
     ) : (
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/70 bg-muted text-muted-foreground">
@@ -115,12 +113,12 @@ export function SidebarCompanyBrand({
         )}
         style={embedded ? undefined : { aspectRatio: "16/9" }}
       >
-        {companyOrg?.logoUrl ? (
-          <img src={companyOrg.logoUrl} alt={companyOrg.name} className="h-full w-full object-contain p-1" />
-        ) : companyOrg ? (
-          <span className="flex h-full w-full items-center justify-center text-sm font-bold text-white gradient-bg">
-            {companyOrg.name.slice(0, 2).toUpperCase()}
-          </span>
+        {companyOrg ? (
+          <img
+            src={resolveWorkspaceLogoUrl(companyOrg.logoUrl)}
+            alt={companyOrg.name}
+            className="h-full w-full object-contain p-1"
+          />
         ) : (
           <span className="flex h-full w-full items-center justify-center text-muted-foreground">
             <Building2 className="h-5 w-5" />

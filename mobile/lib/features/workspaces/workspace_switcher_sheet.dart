@@ -169,14 +169,7 @@ class _WorkspaceSwitcherSheetState extends ConsumerState<WorkspaceSwitcherSheet>
                             ),
                             const SizedBox(width: AppSpacing.sm),
                             Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(org.name, style: Theme.of(context).textTheme.titleMedium),
-                                  const SizedBox(height: 2),
-                                  Text(org.slug, style: Theme.of(context).textTheme.bodyMedium),
-                                ],
-                              ),
+                              child: Text(org.name, style: Theme.of(context).textTheme.titleMedium),
                             ),
                             if (org.myRole != null)
                               StatusChip(label: org.myRole!, color: AppColors.sky),

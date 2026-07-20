@@ -9,7 +9,6 @@ import { useQuery, useMutation, useQueryClient, useQueries } from "@tanstack/rea
 import {
   fetchOrganizations,
   createOrganization,
-  checkSlugAvailable,
   updateOrganization,
   deleteOrganization,
   fetchOrgHealthData,
@@ -48,12 +47,12 @@ import { WorkspaceFilterChips } from "@/components/workspaces/workspace-filter-c
 import { WorkspaceEmptyState } from "@/components/workspaces/workspace-empty-state";
 import { WorkspaceCard } from "@/components/workspaces/workspace-card";
 import type { Organization } from "@/types/api";
-import { cn, getInitials, nameToSlug } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { DEFAULT_WORKSPACE_AVATAR, resolveWorkspaceLogoUrl } from "@/lib/workspace-avatar-presets";
 import { PendingWorkspaceInvitations } from "@/components/members/pending-workspace-invitations";
 
 const schema = z.object({
   name: z.string().min(1).max(150),
-  slug: z.string().min(1).max(150).regex(/^[a-z0-9-]+$/, "Lowercase letters, numbers, and hyphens only"),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -67,11 +66,11 @@ export default function WorkspacesPage() {
   /** When set, the same modal as "New workspace" opens pre-filled for editing. */
   const [editingOrg, setEditingOrg] = useState<Organization | null>(null);
   const workspaceModalOpen = createModalOpen || !!editingOrg;
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(
+    DEFAULT_WORKSPACE_AVATAR.dataUrl
+  );
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const logoFileInputRef = useRef<HTMLInputElement>(null);
-  const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
-  const [debouncedSlug, setDebouncedSlug] = useState("");
   const [filter, setFilter] = useState<FilterType>("all");
   const [previewOrg, setPreviewOrg] = useState<Organization | null>(null);
   const [orgPendingDelete, setOrgPendingDelete] = useState<Organization | null>(null);
@@ -137,7 +136,7 @@ export default function WorkspacesPage() {
       queryClient.invalidateQueries({ queryKey: ["organizations"] });
       queryClient.invalidateQueries({ queryKey: ["onboarding-status"] });
       reset();
-      setLogoPreview(null);
+      setLogoPreview(DEFAULT_WORKSPACE_AVATAR.dataUrl);
       if (logoFileInputRef.current) logoFileInputRef.current.value = "";
       setCreateModalOpen(false);
       setEditingOrg(null);
@@ -150,17 +149,15 @@ export default function WorkspacesPage() {
       payload,
     }: {
       id: string;
-      payload: { name?: string; slug?: string; logoUrl?: string };
+      payload: { name?: string; logoUrl?: string };
     }) => updateOrganization(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["organizations"] });
       queryClient.invalidateQueries({ queryKey: ["organization"] });
       queryClient.invalidateQueries({ queryKey: ["onboarding-status"] });
       reset();
-      setLogoPreview(null);
+      setLogoPreview(DEFAULT_WORKSPACE_AVATAR.dataUrl);
       if (logoFileInputRef.current) logoFileInputRef.current.value = "";
-      setSlugManuallyEdited(false);
-      setDebouncedSlug("");
       setCreateModalOpen(false);
       setEditingOrg(null);
       router.refresh();
@@ -202,60 +199,22 @@ export default function WorkspacesPage() {
     },
   });
 
-  const { register, handleSubmit, reset, watch, setValue, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { name: "", slug: "" },
+    defaultValues: { name: "" },
   });
-
-  const name = watch("name");
-  const slug = watch("slug");
-
-  // Auto-generate slug from name when creating only (not when editing)
-  useEffect(() => {
-    if (!workspaceModalOpen || editingOrg) return;
-    if (slugManuallyEdited) return;
-    const generated = nameToSlug(name);
-    if (generated) setValue("slug", generated);
-  }, [name, workspaceModalOpen, editingOrg, slugManuallyEdited, setValue]);
 
   // Pre-fill form when opening edit modal
   useEffect(() => {
     if (!editingOrg) return;
     reset({
       name: editingOrg.name,
-      slug: editingOrg.slug,
     });
-    setLogoPreview(editingOrg.logoUrl ?? null);
-    setSlugManuallyEdited(true);
+    setLogoPreview(resolveWorkspaceLogoUrl(editingOrg.logoUrl));
     if (logoFileInputRef.current) logoFileInputRef.current.value = "";
   }, [editingOrg?.id, reset]);
 
-  // Debounce slug for availability check
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
-  useEffect(() => {
-    if (!workspaceModalOpen) return;
-    debounceRef.current = setTimeout(() => {
-      const trimmed = slug.trim().toLowerCase();
-      if (trimmed && /^[a-z0-9-]+$/.test(trimmed)) {
-        setDebouncedSlug(trimmed);
-      } else {
-        setDebouncedSlug("");
-      }
-    }, 400);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [slug, workspaceModalOpen]);
-
-  const { data: slugAvailability, isLoading: slugCheckLoading } = useQuery({
-    queryKey: ["organizations", "slug-available", debouncedSlug, editingOrg?.id ?? "new"],
-    queryFn: () => checkSlugAvailable(debouncedSlug, editingOrg?.id),
-    enabled: !!debouncedSlug && workspaceModalOpen,
-    staleTime: 30_000,
-  });
-
   const watchedName = watch("name");
-  const watchedSlug = watch("slug");
 
   const isEditingOrgOwner = editingOrg?.myRole?.toLowerCase() === "owner";
 
@@ -263,22 +222,20 @@ export default function WorkspacesPage() {
     if (!editingOrg) return true;
     return (
       watchedName.trim() !== editingOrg.name ||
-      watchedSlug.trim().toLowerCase() !== editingOrg.slug ||
-      (isEditingOrgOwner && (logoPreview ?? "") !== (editingOrg.logoUrl ?? ""))
+      (isEditingOrgOwner &&
+        resolveWorkspaceLogoUrl(logoPreview) !== resolveWorkspaceLogoUrl(editingOrg.logoUrl))
     );
-  }, [editingOrg, watchedName, watchedSlug, logoPreview, isEditingOrgOwner]);
+  }, [editingOrg, watchedName, logoPreview, isEditingOrgOwner]);
 
   function onSubmit(values: FormData) {
     if (editingOrg) {
-      const payload: { name?: string; slug?: string; logoUrl?: string } = {};
+      const payload: { name?: string; logoUrl?: string } = {};
       if (values.name.trim() !== editingOrg.name) payload.name = values.name.trim();
-      const newSlug = values.slug.trim().toLowerCase();
-      if (newSlug !== editingOrg.slug) payload.slug = newSlug;
       if (isEditingOrgOwner) {
-        const before = editingOrg.logoUrl ?? "";
-        const after = logoPreview ?? "";
+        const before = resolveWorkspaceLogoUrl(editingOrg.logoUrl);
+        const after = resolveWorkspaceLogoUrl(logoPreview);
         if (before !== after) {
-          payload.logoUrl = after === "" ? "" : after;
+          payload.logoUrl = after;
         }
       }
       if (Object.keys(payload).length === 0) return;
@@ -286,13 +243,10 @@ export default function WorkspacesPage() {
       return;
     }
     createOrgMutation.mutate({
-      ...values,
-      slug: values.slug.trim().toLowerCase(),
-      logoUrl: logoPreview ?? undefined,
+      name: values.name.trim(),
+      logoUrl: resolveWorkspaceLogoUrl(logoPreview),
     });
   }
-
-  const isSlugTaken = !!(debouncedSlug && slugAvailability?.available === false);
 
   function canEditWorkspace(org: Organization) {
     const r = org.myRole?.toLowerCase() ?? "";
@@ -327,8 +281,17 @@ export default function WorkspacesPage() {
   }
 
   function clearLogo() {
-    setLogoPreview(null);
+    setLogoPreview(DEFAULT_WORKSPACE_AVATAR.dataUrl);
     if (logoFileInputRef.current) logoFileInputRef.current.value = "";
+  }
+
+  function openCreateWorkspace() {
+    setEditingOrg(null);
+    reset({ name: "" });
+    setLogoPreview(DEFAULT_WORKSPACE_AVATAR.dataUrl);
+    setCropSrc(null);
+    if (logoFileInputRef.current) logoFileInputRef.current.value = "";
+    setCreateModalOpen(true);
   }
 
   function selectPresetAvatar(dataUrl: string) {
@@ -346,10 +309,7 @@ export default function WorkspacesPage() {
           </p>
         </div>
         <Button
-          onClick={() => {
-            setEditingOrg(null);
-            setCreateModalOpen(true);
-          }}
+          onClick={openCreateWorkspace}
           size="sm"
           className="h-9 w-full rounded-lg bg-gradient-to-r from-violet-600 via-indigo-600 to-fuchsia-600 px-4 text-sm font-medium text-white shadow-[0_4px_14px_-4px_rgba(109,40,217,0.55)] transition-all duration-200 hover:-translate-y-px hover:shadow-[0_6px_18px_-4px_rgba(109,40,217,0.6)] sm:w-auto sm:shrink-0"
         >
@@ -378,10 +338,7 @@ export default function WorkspacesPage() {
           {organizations.length === 0 && !isLoading ? (
             <WorkspaceEmptyState
               variant="none"
-              onCreate={() => {
-                setEditingOrg(null);
-                setCreateModalOpen(true);
-              }}
+              onCreate={openCreateWorkspace}
             />
           ) : isLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
@@ -518,11 +475,9 @@ export default function WorkspacesPage() {
             setCreateModalOpen(false);
             setEditingOrg(null);
             reset();
-            setLogoPreview(null);
+            setLogoPreview(DEFAULT_WORKSPACE_AVATAR.dataUrl);
             setCropSrc(null);
             if (logoFileInputRef.current) logoFileInputRef.current.value = "";
-            setSlugManuallyEdited(false);
-            setDebouncedSlug("");
           }
         }}
       >
@@ -541,7 +496,7 @@ export default function WorkspacesPage() {
             </DialogTitle>
             <DialogDescription>
               {editingOrg
-                ? "Update name, URL slug, and icon. Subscription and danger zone stay under Settings → Workspace."
+                ? "Update name and icon. Subscription and danger zone stay under Settings → Workspace."
                 : "Create a new workspace to collaborate with your team."}
             </DialogDescription>
           </DialogHeader>
@@ -554,24 +509,20 @@ export default function WorkspacesPage() {
                   <Label>Workspace icon</Label>
                   <div className="flex items-center gap-4">
                     <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-muted bg-muted/50">
-                      {logoPreview ? (
-                        <>
-                          <img src={logoPreview} alt="Logo preview" className="h-full w-full object-cover" />
-                          {canChangeLogo && (
-                            <button
-                              type="button"
-                              onClick={clearLogo}
-                              className="absolute inset-0 flex items-center justify-center bg-black/50 text-white opacity-0 transition-opacity hover:opacity-100"
-                              aria-label="Remove logo"
-                            >
-                              <span className="text-xs font-medium">Remove</span>
-                            </button>
-                          )}
-                        </>
-                      ) : (
-                        <span className="text-lg font-semibold text-muted-foreground">
-                          {getInitials(watch("name")) || "—"}
-                        </span>
+                      <img
+                        src={resolveWorkspaceLogoUrl(logoPreview)}
+                        alt="Logo preview"
+                        className="h-full w-full object-cover"
+                      />
+                      {canChangeLogo && (
+                        <button
+                          type="button"
+                          onClick={clearLogo}
+                          className="absolute inset-0 flex items-center justify-center bg-black/50 text-white opacity-0 transition-opacity hover:opacity-100"
+                          aria-label="Reset to default logo"
+                        >
+                          <span className="text-xs font-medium">Reset</span>
+                        </button>
                       )}
                     </div>
                     <div className="flex-1 space-y-1">
@@ -586,7 +537,7 @@ export default function WorkspacesPage() {
                               onChange={handleLogoChange}
                             />
                             <ImagePlus className="h-4 w-4" />
-                            <span>{logoPreview ? "Change" : "Upload"} image</span>
+                            <span>Upload image</span>
                           </label>
                           <p className="text-xs text-muted-foreground/80">PNG, JPG up to 100KB. Optional.</p>
                         </>
@@ -599,7 +550,10 @@ export default function WorkspacesPage() {
                     </div>
                   </div>
                   {canChangeLogo && (
-                    <WorkspaceAvatarPresetsPicker value={logoPreview} onSelectPreset={selectPresetAvatar} />
+                    <WorkspaceAvatarPresetsPicker
+                      value={resolveWorkspaceLogoUrl(logoPreview)}
+                      onSelectPreset={selectPresetAvatar}
+                    />
                   )}
                 </div>
               );
@@ -608,50 +562,6 @@ export default function WorkspacesPage() {
               <Label htmlFor="modal-name">Name</Label>
               <Input id="modal-name" {...register("name")} placeholder="Acme Inc" />
               {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="modal-slug">URL Slug</Label>
-                {slugManuallyEdited && name && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setValue("slug", nameToSlug(name));
-                      setSlugManuallyEdited(false);
-                    }}
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    Sync from name
-                  </button>
-                )}
-              </div>
-              <Input
-                id="modal-slug"
-                {...register("slug", {
-                  onChange: () => setSlugManuallyEdited(true),
-                })}
-                placeholder="acme-inc"
-                className={cn(
-                  debouncedSlug &&
-                    (slugAvailability?.available === false
-                      ? "border-destructive focus-visible:ring-destructive"
-                      : slugAvailability?.available === true
-                        ? "border-emerald-500/50 focus-visible:ring-emerald-500/50"
-                        : undefined)
-                )}
-              />
-              {errors.slug && <p className="text-xs text-destructive">{errors.slug.message}</p>}
-              {debouncedSlug && !errors.slug && (
-                <p className="text-xs">
-                  {slugCheckLoading ? (
-                    <span className="text-muted-foreground">Checking availability…</span>
-                  ) : slugAvailability?.available === false ? (
-                    <span className="text-destructive">This slug is already taken.</span>
-                  ) : slugAvailability?.available === true ? (
-                    <span className="text-emerald-600 dark:text-emerald-400">Slug is available.</span>
-                  ) : null}
-                </p>
-              )}
             </div>
             {createOrgMutation.error && !editingOrg && (
               <p className="text-xs text-destructive">
@@ -671,11 +581,9 @@ export default function WorkspacesPage() {
                   setCreateModalOpen(false);
                   setEditingOrg(null);
                   reset();
-                  setLogoPreview(null);
+                  setLogoPreview(DEFAULT_WORKSPACE_AVATAR.dataUrl);
                   setCropSrc(null);
                   if (logoFileInputRef.current) logoFileInputRef.current.value = "";
-                  setSlugManuallyEdited(false);
-                  setDebouncedSlug("");
                 }}
               >
                 Cancel
@@ -685,7 +593,6 @@ export default function WorkspacesPage() {
                 disabled={
                   createOrgMutation.isPending ||
                   updateOrgMutation.isPending ||
-                  isSlugTaken ||
                   !!(editingOrg && (!hasEditChanges || !watchedName.trim()))
                 }
               >

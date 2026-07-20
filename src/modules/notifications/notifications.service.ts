@@ -30,12 +30,25 @@ export class NotificationsService {
     return { count };
   }
 
-  async createNotification(userId: string, title: string, message: string): Promise<void> {
+  /**
+   * Persist in-app notification and push to all registered Android/iOS devices.
+   * Optional `data` is delivered to FCM for deep-link / client routing.
+   */
+  async createNotification(
+    userId: string,
+    title: string,
+    message: string,
+    data?: Record<string, string>,
+  ): Promise<void> {
     await this.notificationsRepository.create({ userId, title, message });
 
-    // Fire-and-forget push so callers are unchanged and API latency stays low.
-    void this.pushNotifications
-      .sendToUser(userId, title || 'Notification', message || '')
-      .catch(() => undefined);
+    // Await so assignment flows reliably reach devices before the request ends.
+    // sendToUser never throws; invalid tokens are cleaned up inside.
+    await this.pushNotifications.sendToUser(
+      userId,
+      title || 'Notification',
+      message || '',
+      data,
+    );
   }
 }

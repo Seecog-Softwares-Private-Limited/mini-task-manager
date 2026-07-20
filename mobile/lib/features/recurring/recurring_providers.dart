@@ -24,13 +24,27 @@ final recurringAnalyticsRangeProvider = StateProvider<int>((ref) => 30);
 final recurringAnalyticsProvider =
     FutureProvider<RecurringAnalytics>((ref) async {
   final session = ref.watch(sessionControllerProvider);
+  final empty = RecurringAnalytics(
+    rangeDays: ref.watch(recurringAnalyticsRangeProvider),
+    overall: const RecurringAnalyticsOverall(
+      habits: 0,
+      totalRuns: 0,
+      completed: 0,
+      missed: 0,
+      skipped: 0,
+      successRate: 0,
+      bestStreak: 0,
+    ),
+    habits: const [],
+  );
+
   if (session.status != SessionStatus.authenticated) {
-    throw StateError('Session not ready');
+    return empty;
   }
 
   final orgId = session.orgId;
   if (orgId == null || orgId.isEmpty) {
-    throw StateError('No workspace selected');
+    return empty;
   }
 
   final projectId = ref.watch(recurringSelectedProjectIdProvider);
@@ -44,49 +58,71 @@ final recurringAnalyticsProvider =
     );
   } catch (_) {
     // Analytics route may be missing on older backends — don't break Home.
-    return RecurringAnalytics(
-      rangeDays: days,
-      overall: const RecurringAnalyticsOverall(
-        habits: 0,
-        totalRuns: 0,
-        completed: 0,
-        missed: 0,
-        skipped: 0,
-        successRate: 0,
-        bestStreak: 0,
-      ),
-      habits: const [],
-    );
+    return empty;
   }
 });
 
 /// Resolves the active project immediately from cache/selection (no async init).
+/// Returns null when projects are still loading or the workspace has none.
 final recurringSelectedProjectIdProvider = Provider<String?>((ref) {
-  final selected = ref.watch(recurringProjectIdProvider);
-  if (selected != null && selected.isNotEmpty) return selected;
+  final projectsAsync = ref.watch(projectsProvider);
+  final projects = projectsAsync.valueOrNull;
+  // Still loading — callers should show a brief loader, not treat as empty forever.
+  if (projects == null && projectsAsync.isLoading) return null;
 
-  final projects = ref.watch(projectsProvider).valueOrNull;
-  if (projects == null || projects.isEmpty) return null;
+  final active = (projects ?? const [])
+      .where((p) => !p.isArchived)
+      .toList(growable: false);
+  if (active.isEmpty) return null;
+
+  final selected = ref.watch(recurringProjectIdProvider);
+  if (selected != null &&
+      selected.isNotEmpty &&
+      active.any((p) => p.id == selected)) {
+    return selected;
+  }
 
   final lastId = ref.read(lastProjectIdProvider);
-  for (final project in projects) {
+  for (final project in active) {
     if (project.id == lastId) return project.id;
   }
-  return projects.first.id;
+  return active.first.id;
 });
 
 final recurringSummaryProvider = FutureProvider<RecurringSummary>((ref) async {
   final session = ref.watch(sessionControllerProvider);
   if (session.status != SessionStatus.authenticated) {
-    throw StateError('Session not ready');
+    return const RecurringSummary(
+      totalRecurringTasks: 0,
+      dueThisWeek: 0,
+      overdue: 0,
+      completedThisMonth: 0,
+      paused: 0,
+    );
   }
 
   final orgId = session.orgId;
   if (orgId == null || orgId.isEmpty) {
-    throw StateError('No workspace selected');
+    return const RecurringSummary(
+      totalRecurringTasks: 0,
+      dueThisWeek: 0,
+      overdue: 0,
+      completedThisMonth: 0,
+      paused: 0,
+    );
   }
 
   final projectId = ref.watch(recurringSelectedProjectIdProvider);
+  if (projectId == null || projectId.isEmpty) {
+    return const RecurringSummary(
+      totalRecurringTasks: 0,
+      dueThisWeek: 0,
+      overdue: 0,
+      completedThisMonth: 0,
+      paused: 0,
+    );
+  }
+
   final repo = ref.watch(recurringRepositoryProvider);
   return repo.fetchSummary(organizationId: orgId, projectId: projectId);
 });
@@ -95,15 +131,19 @@ final recurringTemplatesProvider =
     FutureProvider<List<RecurringTemplate>>((ref) async {
   final session = ref.watch(sessionControllerProvider);
   if (session.status != SessionStatus.authenticated) {
-    throw StateError('Session not ready');
+    return const [];
   }
 
   final orgId = session.orgId;
   if (orgId == null || orgId.isEmpty) {
-    throw StateError('No workspace selected');
+    return const [];
   }
 
   final projectId = ref.watch(recurringSelectedProjectIdProvider);
+  if (projectId == null || projectId.isEmpty) {
+    return const [];
+  }
+
   final repo = ref.watch(recurringRepositoryProvider);
   return repo.fetchTemplates(organizationId: orgId, projectId: projectId);
 });

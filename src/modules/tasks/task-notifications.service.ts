@@ -217,9 +217,15 @@ export class TaskNotificationsService {
           assigneeId,
           `Task assigned: ${task.title}`,
           `${context.assignerName} assigned you to "${task.title}"${context.projectName ? ` in ${context.projectName}` : ''}.`,
+          {
+            type: 'task_assigned',
+            taskId: task.id,
+            projectId: task.projectId,
+            open: 'alerts',
+          },
         )
         .then(() => markNotified(assigneeId))
-        .catch((err) => this.logger.warn(`In-app notification failed: ${err}`));
+        .catch((err) => this.logger.warn(`In-app/push notification failed: ${err}`));
     }
 
     return notified;
@@ -258,8 +264,15 @@ export class TaskNotificationsService {
         assigneeId,
         `Subtask assigned: ${subtask.title}`,
         `${context.assignerName} assigned you subtask "${subtask.title}" on "${task.title}"${context.projectName ? ` in ${context.projectName}` : ''}.`,
+        {
+          type: 'subtask_assigned',
+          taskId: task.id,
+          projectId: task.projectId,
+          subtaskId: String(subtask.id ?? ''),
+          open: 'alerts',
+        },
       )
-      .catch((err) => this.logger.warn(`In-app notification failed: ${err}`));
+      .catch((err) => this.logger.warn(`In-app/push notification failed: ${err}`));
 
     return sent ?? assigneeId;
   }
@@ -295,8 +308,14 @@ export class TaskNotificationsService {
           assigneeId,
           `Subtasks added: ${task.title}`,
           `${context.assignerName} added ${addedSubtasks.length} subtask(s) to "${task.title}".`,
+          {
+            type: 'subtasks_added',
+            taskId: task.id,
+            projectId: task.projectId,
+            open: 'alerts',
+          },
         )
-        .catch((err) => this.logger.warn(`In-app notification failed: ${err}`));
+        .catch((err) => this.logger.warn(`In-app/push notification failed: ${err}`));
     }
   }
 

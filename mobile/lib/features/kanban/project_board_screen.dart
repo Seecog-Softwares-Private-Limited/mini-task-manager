@@ -67,6 +67,7 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
     final session = ref.watch(sessionControllerProvider);
     final orgId = session.orgId;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final allProjects = isAllProjectsSelection(widget.projectId);
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0B1220) : const Color(0xFFF1F5F9),
@@ -100,8 +101,8 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
             return _BoardScaffold(
               embedded: widget.embedded,
               header: widget.embedded
-                  ? const _BoardTitleHeader(
-                      title: 'Board',
+                  ? _BoardTitleHeader(
+                      title: allProjects ? 'All projects' : 'Board',
                       subtitle: 'No workflow columns',
                     )
                   : ProjectSwitcher(
@@ -174,7 +175,7 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
             embedded: widget.embedded,
             header: widget.embedded
                 ? _BoardTitleHeader(
-                    title: 'Board',
+                    title: allProjects ? 'All projects' : 'Board',
                     subtitle:
                         '$totalTasks tasks · ${board.statuses.length} columns',
                   )
@@ -213,14 +214,16 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
           );
         },
       ),
-      floatingActionButton: boardAsync.maybeWhen(
-        data: (board) => orgId == null || board.statuses.isEmpty
-            ? null
-            : _CreateTaskFab(
-                onPressed: () => _openCreateTask(context, ref, board, orgId),
-              ),
-        orElse: () => null,
-      ),
+      floatingActionButton: allProjects
+          ? null
+          : boardAsync.maybeWhen(
+              data: (board) => orgId == null || board.statuses.isEmpty
+                  ? null
+                  : _CreateTaskFab(
+                      onPressed: () => _openCreateTask(context, ref, board, orgId),
+                    ),
+              orElse: () => null,
+            ),
     );
   }
 
@@ -263,6 +266,13 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
     required Task task,
     required ProjectBoardData board,
   }) async {
+    final allProjects = isAllProjectsSelection(widget.projectId);
+    final projectId = allProjects ? task.projectId : widget.projectId;
+    final statuses = allProjects
+        ? await ref.read(projectWorkflowStatusesProvider(projectId).future)
+        : board.statuses;
+
+    if (!context.mounted) return;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -270,9 +280,14 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
       builder: (sheetContext) {
         return TaskDetailSheet(
           task: task,
-          statuses: board.statuses,
-          projectId: widget.projectId,
-          onUpdated: () => ref.invalidate(projectBoardProvider(widget.projectId)),
+          statuses: statuses,
+          projectId: projectId,
+          onUpdated: () {
+            ref.invalidate(projectBoardProvider(widget.projectId));
+            if (allProjects) {
+              ref.invalidate(projectBoardProvider(projectId));
+            }
+          },
         );
       },
     );
@@ -297,6 +312,15 @@ ProjectBoardData _applyEmbeddedFilters(
   final hasMember = memberId != null && memberId.isNotEmpty;
   if (!hasMember && !filters.isActive) return board;
 
+  // Preserve column placement from the source board (important for All projects
+  // where column ids are synthetic and differ from task.statusId).
+  final taskColumn = <String, String>{};
+  for (final status in board.statuses) {
+    for (final task in board.tasksForStatus(status.id)) {
+      taskColumn[task.id] = status.id;
+    }
+  }
+
   final filtered = board.tasks
       .where(
         (task) => matchesTasksBoardFilters(
@@ -313,9 +337,9 @@ ProjectBoardData _applyEmbeddedFilters(
   };
   var overdueCount = 0;
   for (final task in filtered) {
-    final statusId = task.statusId;
-    if (statusId != null && statusId.isNotEmpty) {
-      tasksByStatus.putIfAbsent(statusId, () => []).add(task);
+    final columnId = taskColumn[task.id] ?? task.statusId;
+    if (columnId != null && columnId.isNotEmpty) {
+      tasksByStatus.putIfAbsent(columnId, () => []).add(task);
     }
     if (isTaskDueOverdue(task.dueDate)) overdueCount++;
   }

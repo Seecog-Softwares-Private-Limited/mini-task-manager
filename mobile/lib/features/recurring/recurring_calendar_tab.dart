@@ -14,6 +14,7 @@ import '../../shared/widgets/app_widgets.dart';
 import '../auth/session_controller.dart';
 import '../kanban/kanban_providers.dart';
 import '../kanban/task_detail_sheet.dart';
+import '../projects/projects_providers.dart';
 import 'recurring_providers.dart';
 
 /// How far ahead we project upcoming (not-yet-materialized) recurring runs.
@@ -258,14 +259,44 @@ class _RecurringCalendarTabState extends ConsumerState<RecurringCalendarTab> {
 
   @override
   Widget build(BuildContext context) {
+    final projectsAsync = ref.watch(projectsProvider);
     final projectId = ref.watch(recurringSelectedProjectIdProvider);
     final tasksAsync = ref.watch(recurringBoardTasksProvider);
     final tasks = tasksAsync.valueOrNull ?? const <Task>[];
     final loadingTasks = tasksAsync.isLoading && tasks.isEmpty;
     final taskError = tasksAsync.hasError && tasks.isEmpty ? tasksAsync.error : null;
 
-    if (projectId == null) {
+    final projectsLoading =
+        projectsAsync.isLoading && projectsAsync.valueOrNull == null;
+    final projects = (projectsAsync.valueOrNull ?? const [])
+        .where((p) => !p.isArchived)
+        .toList();
+
+    if (projectsLoading) {
       return const Center(child: CircularProgressIndicator());
+    }
+
+    if (projects.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(AppSpacing.lg),
+        child: EmptyState(
+          title: 'No projects yet',
+          message:
+              'Create a project first, then your recurring calendar will appear here.',
+          icon: Icons.folder_off_outlined,
+        ),
+      );
+    }
+
+    if (projectId == null) {
+      return const Padding(
+        padding: EdgeInsets.all(AppSpacing.lg),
+        child: EmptyState(
+          title: 'Select a project',
+          message: 'Choose a project above to view its planner calendar.',
+          icon: Icons.folder_open_outlined,
+        ),
+      );
     }
 
     if (taskError != null) {

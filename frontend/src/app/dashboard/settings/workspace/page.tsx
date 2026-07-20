@@ -12,7 +12,6 @@ import {
   fetchOrganizations,
   updateOrganization,
   deleteOrganization,
-  checkSlugAvailable,
 } from "@/services/api/organizations.api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,13 +32,15 @@ import {
   ImagePlus,
   Loader2,
 } from "lucide-react";
-import { cn, getInitials } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { OrgSettingsTabs } from "@/components/settings/org-settings-tabs";
 import { WorkspaceAvatarPresetsPicker } from "@/components/workspaces/workspace-avatar-presets-picker";
 import { LogoCropModal } from "@/components/workspaces/logo-crop-modal";
 import { parseApiError, isRateLimited } from "@/services/api/client";
-
-const SLUG_REGEX = /^[a-z0-9-]+$/;
+import {
+  DEFAULT_WORKSPACE_AVATAR,
+  resolveWorkspaceLogoUrl,
+} from "@/lib/workspace-avatar-presets";
 
 export default function WorkspaceSettingsPage() {
   const router = useRouter();
@@ -48,13 +49,10 @@ export default function WorkspaceSettingsPage() {
   const { orgId, setOrgId } = useTenant();
   const planContext = usePlanOptional();
   const [name, setName] = useState("");
-  const [slug, setSlug] = useState("");
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [debouncedSlug, setDebouncedSlug] = useState("");
   const logoFileInputRef = useRef<HTMLInputElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
   const { data: org, isLoading } = useQuery({
     queryKey: ["organization", orgId ?? ""],
@@ -65,33 +63,10 @@ export default function WorkspaceSettingsPage() {
   useEffect(() => {
     if (!org) return;
     setName(org.name);
-    setSlug(org.slug);
-    setLogoPreview(org.logoUrl ?? null);
-  }, [org?.id, org?.name, org?.slug, org?.logoUrl]);
-
-  useEffect(() => {
-    if (!orgId || !org) return;
-    debounceRef.current = setTimeout(() => {
-      const t = slug.trim().toLowerCase();
-      if (t && SLUG_REGEX.test(t)) setDebouncedSlug(t);
-      else setDebouncedSlug("");
-    }, 400);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [slug, orgId, org]);
-
-  const { data: slugAvailability, isLoading: slugCheckLoading } = useQuery({
-    queryKey: ["organizations", "slug-available", debouncedSlug, orgId],
-    queryFn: () => checkSlugAvailable(debouncedSlug, orgId!),
-    enabled: !!debouncedSlug && !!orgId && !!org,
-    staleTime: 30_000,
-  });
+    setLogoPreview(resolveWorkspaceLogoUrl(org.logoUrl));
+  }, [org?.id, org?.name, org?.logoUrl]);
 
   const isOwner = org?.myRole?.toLowerCase() === "owner";
-
-  const slugInvalid = slug.trim().length > 0 && !SLUG_REGEX.test(slug.trim().toLowerCase());
-  const isSlugTaken = !!(debouncedSlug && !slugInvalid && slugAvailability?.available === false);
 
   const archiveMutation = useMutation({
     mutationFn: (isArchived: boolean) => updateOrganization(orgId!, { isArchived }),
@@ -119,7 +94,7 @@ export default function WorkspaceSettingsPage() {
   });
 
   const updateDetailsMutation = useMutation({
-    mutationFn: (payload: { name?: string; slug?: string; logoUrl?: string }) =>
+    mutationFn: (payload: { name?: string; logoUrl?: string }) =>
       updateOrganization(orgId!, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["organization", orgId!] });
@@ -132,8 +107,8 @@ export default function WorkspaceSettingsPage() {
   const hasChanges =
     !!org &&
     (name.trim() !== org.name ||
-      slug.trim().toLowerCase() !== org.slug ||
-      (isOwner && (logoPreview ?? "") !== (org.logoUrl ?? "")));
+      (isOwner &&
+        resolveWorkspaceLogoUrl(logoPreview) !== resolveWorkspaceLogoUrl(org.logoUrl)));
 
   function handleLogoFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -148,7 +123,7 @@ export default function WorkspaceSettingsPage() {
   }
 
   function clearLogo() {
-    setLogoPreview(null);
+    setLogoPreview(DEFAULT_WORKSPACE_AVATAR.dataUrl);
     if (logoFileInputRef.current) logoFileInputRef.current.value = "";
   }
 
@@ -158,14 +133,13 @@ export default function WorkspaceSettingsPage() {
 
   function handleSaveDetails() {
     if (!org || !orgId) return;
-    const payload: { name?: string; slug?: string; logoUrl?: string } = {};
+    const payload: { name?: string; logoUrl?: string } = {};
     if (name.trim() !== org.name) payload.name = name.trim();
-    if (slug.trim().toLowerCase() !== org.slug) payload.slug = slug.trim().toLowerCase();
     if (isOwner) {
-      const before = org.logoUrl ?? "";
-      const after = logoPreview ?? "";
+      const before = resolveWorkspaceLogoUrl(org.logoUrl);
+      const after = resolveWorkspaceLogoUrl(logoPreview);
       if (before !== after) {
-        payload.logoUrl = after === "" ? "" : after;
+        payload.logoUrl = after;
       }
     }
     if (Object.keys(payload).length === 0) return;
@@ -223,8 +197,6 @@ export default function WorkspaceSettingsPage() {
   const saveDisabled =
     !hasChanges ||
     !name.trim() ||
-    slugInvalid ||
-    isSlugTaken ||
     updateDetailsMutation.isPending;
 
   return (
@@ -232,7 +204,7 @@ export default function WorkspaceSettingsPage() {
       <OrgSettingsTabs />
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Workspace</h1>
-        <p className="mt-1 text-muted-foreground">Update name, URL slug, icon, and view subscription.</p>
+        <p className="mt-1 text-muted-foreground">Update name, icon, and view subscription.</p>
       </div>
 
       <Card>
@@ -257,24 +229,20 @@ export default function WorkspaceSettingsPage() {
                 </Label>
                 <div className="flex items-center gap-4">
                   <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-muted bg-muted/50">
-                    {logoPreview ? (
-                      <>
-                        <img src={logoPreview} alt="" className="h-full w-full object-cover" />
-                        {isOwner && (
-                          <button
-                            type="button"
-                            onClick={clearLogo}
-                            className="absolute inset-0 flex items-center justify-center bg-black/50 text-xs font-medium text-white opacity-0 transition-opacity hover:opacity-100"
-                            aria-label="Remove icon"
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </>
-                    ) : (
-                      <span className="text-lg font-semibold text-muted-foreground">
-                        {getInitials(name) || "—"}
-                      </span>
+                    <img
+                      src={resolveWorkspaceLogoUrl(logoPreview)}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                    {isOwner && (
+                      <button
+                        type="button"
+                        onClick={clearLogo}
+                        className="absolute inset-0 flex items-center justify-center bg-black/50 text-xs font-medium text-white opacity-0 transition-opacity hover:opacity-100"
+                        aria-label="Reset to default logo"
+                      >
+                        Reset
+                      </button>
                     )}
                   </div>
                   <div className="flex-1 space-y-1">
@@ -289,7 +257,7 @@ export default function WorkspaceSettingsPage() {
                             onChange={handleLogoFile}
                           />
                           <ImagePlus className="h-4 w-4" />
-                          <span>{logoPreview ? "Change" : "Upload"} image</span>
+                          <span>Upload image</span>
                         </label>
                         <p className="text-xs text-muted-foreground/80">PNG, JPG up to 100KB. Optional.</p>
                       </>
@@ -302,7 +270,10 @@ export default function WorkspaceSettingsPage() {
                   </div>
                 </div>
                 {isOwner && (
-                  <WorkspaceAvatarPresetsPicker value={logoPreview} onSelectPreset={selectPresetAvatar} />
+                  <WorkspaceAvatarPresetsPicker
+                    value={resolveWorkspaceLogoUrl(logoPreview)}
+                    onSelectPreset={selectPresetAvatar}
+                  />
                 )}
               </div>
 
@@ -317,41 +288,6 @@ export default function WorkspaceSettingsPage() {
                   disabled={!canEditOrgSettings}
                   placeholder="Workspace name"
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="org-slug" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  URL slug
-                </Label>
-                <Input
-                  id="org-slug"
-                  value={slug}
-                  onChange={(e) => setSlug(e.target.value)}
-                  disabled={!canEditOrgSettings}
-                  placeholder="url-slug"
-                  className={cn(
-                    debouncedSlug &&
-                      !slugInvalid &&
-                      (isSlugTaken
-                        ? "border-destructive focus-visible:ring-destructive"
-                        : slugAvailability?.available === true
-                          ? "border-emerald-500/50 focus-visible:ring-emerald-500/50"
-                          : undefined)
-                  )}
-                />
-                {slugInvalid && (
-                  <p className="text-xs text-destructive">Lowercase letters, numbers, and hyphens only.</p>
-                )}
-                {debouncedSlug && !slugInvalid && (
-                  <p className="text-xs">
-                    {slugCheckLoading ? (
-                      <span className="text-muted-foreground">Checking availability…</span>
-                    ) : isSlugTaken ? (
-                      <span className="text-destructive">This slug is already taken.</span>
-                    ) : slugAvailability?.available === true ? (
-                      <span className="text-emerald-600 dark:text-emerald-400">Slug is available.</span>
-                    ) : null}
-                  </p>
-                )}
               </div>
 
               {canEditOrgSettings && (

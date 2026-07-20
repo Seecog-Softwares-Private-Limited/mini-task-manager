@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../auth/session_controller.dart';
+import '../projects/projects_providers.dart';
 import 'recurring_actions.dart';
 import 'recurring_editor_sheet.dart';
 import 'recurring_planner_sheet.dart';
@@ -36,11 +37,41 @@ class RecurringSeriesTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final projectsAsync = ref.watch(projectsProvider);
     final projectId = ref.watch(recurringSelectedProjectIdProvider);
     final templatesAsync = ref.watch(recurringTemplatesProvider);
 
-    if (projectId == null) {
+    final projectsLoading =
+        projectsAsync.isLoading && projectsAsync.valueOrNull == null;
+    final projects = (projectsAsync.valueOrNull ?? const [])
+        .where((p) => !p.isArchived)
+        .toList();
+
+    if (projectsLoading) {
       return const Center(child: CircularProgressIndicator());
+    }
+
+    if (projects.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(AppSpacing.lg),
+        child: EmptyState(
+          title: 'No projects yet',
+          message:
+              'Create a project first, then add recurring planners for it here.',
+          icon: Icons.folder_off_outlined,
+        ),
+      );
+    }
+
+    if (projectId == null) {
+      return const Padding(
+        padding: EdgeInsets.all(AppSpacing.lg),
+        child: EmptyState(
+          title: 'Select a project',
+          message: 'Choose a project above to view its recurring planners.',
+          icon: Icons.folder_open_outlined,
+        ),
+      );
     }
 
     return templatesAsync.when(

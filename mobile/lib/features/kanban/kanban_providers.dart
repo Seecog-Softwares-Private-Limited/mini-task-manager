@@ -8,6 +8,7 @@ import '../../data/repositories/attachments_repository.dart';
 import '../../data/repositories/tasks_repository.dart';
 import '../../data/repositories/workflows_repository.dart';
 import '../auth/session_controller.dart';
+import '../home/my_work_providers.dart';
 import '../projects/projects_providers.dart';
 
 class ProjectBoardData {
@@ -54,6 +55,10 @@ final projectBoardProvider =
   );
   if (orgId == null || orgId.isEmpty) {
     throw StateError('No workspace selected');
+  }
+
+  if (isAllProjectsSelection(projectId)) {
+    return _buildAllProjectsBoard(ref, orgId);
   }
 
   final workflowsRepo = ref.watch(workflowsRepositoryProvider);
@@ -110,6 +115,141 @@ final projectBoardProvider =
     overdueCount: overdueCount,
   );
 });
+
+/// Workspace-wide board: columns by status type, tasks from every active project.
+Future<ProjectBoardData> _buildAllProjectsBoard(Ref ref, String orgId) async {
+  final projects = await ref.watch(projectsProvider.future);
+  final active = projects.where((p) => !p.isArchived).toList();
+  final workflowsRepo = ref.watch(workflowsRepositoryProvider);
+  final tasksRepo = ref.watch(tasksRepositoryProvider);
+
+  final statusById = <String, WorkflowStatus>{};
+  final allTasks = <Task>[];
+
+  for (final project in active) {
+    var workflows = await workflowsRepo.fetchByProject(project.id);
+    if (workflows.isEmpty) {
+      await workflowsRepo.createDefaultWorkflow(project.id);
+      workflows = await workflowsRepo.fetchByProject(project.id);
+    }
+    if (workflows.isEmpty) continue;
+
+    final workflow = workflows.firstWhere(
+      (item) => item.isDefault,
+      orElse: () => workflows.first,
+    );
+    final statuses = await workflowsRepo.fetchStatuses(workflow.id);
+    for (final status in statuses) {
+      statusById[status.id] = status;
+    }
+
+    final projectTasks = await tasksRepo.fetchAllByProject(
+      projectId: project.id,
+      organizationId: orgId,
+    );
+    allTasks.addAll(projectTasks.where((task) => !isRecurringTask(task)));
+  }
+
+  const typeOrder = <String>['todo', 'in_progress', 'review', 'done', 'cancelled'];
+  const typeLabels = <String, String>{
+    'todo': 'To Do',
+    'in_progress': 'In Progress',
+    'review': 'Review',
+    'done': 'Done',
+    'cancelled': 'Cancelled',
+  };
+  const typeColors = <String, String>{
+    'todo': '#94A3B8',
+    'in_progress': '#3B82F6',
+    'review': '#A855F7',
+    'done': '#22C55E',
+    'cancelled': '#EF4444',
+  };
+
+  final usedTypes = <String>{};
+  for (final task in allTasks) {
+    final statusId = task.statusId;
+    if (statusId == null || statusId.isEmpty) {
+      usedTypes.add('todo');
+      continue;
+    }
+    final status = statusById[statusId];
+    usedTypes.add(_normalizeStatusType(status?.type, status?.name));
+  }
+  if (usedTypes.isEmpty) {
+    usedTypes.addAll(['todo', 'in_progress', 'done']);
+  }
+
+  final orderedTypes = [
+    ...typeOrder.where(usedTypes.contains),
+    ...usedTypes.where((t) => !typeOrder.contains(t)),
+  ];
+
+  final statuses = <WorkflowStatus>[
+    for (var i = 0; i < orderedTypes.length; i++)
+      WorkflowStatus(
+        id: 'all:${orderedTypes[i]}',
+        workflowId: 'all-projects',
+        name: typeLabels[orderedTypes[i]] ?? _titleCase(orderedTypes[i]),
+        position: i,
+        type: orderedTypes[i],
+        color: typeColors[orderedTypes[i]],
+      ),
+  ];
+
+  final tasksByStatus = <String, List<Task>>{
+    for (final status in statuses) status.id: <Task>[],
+  };
+  var overdueCount = 0;
+  for (final task in allTasks) {
+    final real = task.statusId == null ? null : statusById[task.statusId];
+    final type = _normalizeStatusType(real?.type, real?.name);
+    final bucketId = 'all:$type';
+    tasksByStatus.putIfAbsent(bucketId, () => []).add(task);
+    if (_isTaskOverdue(task.dueDate)) {
+      overdueCount++;
+    }
+  }
+
+  return ProjectBoardData(
+    statuses: statuses,
+    tasks: allTasks,
+    projectName: 'All projects',
+    tasksByStatus: tasksByStatus,
+    overdueCount: overdueCount,
+  );
+}
+
+String _normalizeStatusType(String? type, String? name) {
+  final raw = (type ?? '').trim().toLowerCase().replaceAll(' ', '_');
+  if (raw.isNotEmpty) {
+    if (raw.contains('progress') || raw == 'doing' || raw == 'active') {
+      return 'in_progress';
+    }
+    if (raw.contains('review') || raw == 'qa') return 'review';
+    if (raw.contains('done') || raw == 'complete' || raw == 'completed') {
+      return 'done';
+    }
+    if (raw.contains('cancel')) return 'cancelled';
+    if (raw.contains('todo') || raw == 'open' || raw == 'backlog') return 'todo';
+    return raw;
+  }
+  final label = (name ?? '').trim().toLowerCase();
+  if (label.contains('progress') || label.contains('doing')) return 'in_progress';
+  if (label.contains('review')) return 'review';
+  if (label.contains('done') || label.contains('complete')) return 'done';
+  if (label.contains('cancel')) return 'cancelled';
+  return 'todo';
+}
+
+String _titleCase(String value) {
+  if (value.isEmpty) return value;
+  return value
+      .split('_')
+      .where((part) => part.isNotEmpty)
+      .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+      .join(' ');
+}
 
 /// Lightweight cached statuses for task detail — avoids loading the full board.
 final projectWorkflowStatusesProvider =

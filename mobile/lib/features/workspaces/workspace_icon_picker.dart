@@ -94,10 +94,13 @@ class WorkspaceIconPicker extends StatelessWidget {
                                 color: AppColors.textMuted,
                               ),
                         ),
-                        if (logoPreview != null)
+                        if (logoPreview != null &&
+                            logoPreview != kDefaultWorkspaceAvatar.dataUrl)
                           TextButton(
-                            onPressed: uploading ? null : () => onLogoChanged(null),
-                            child: const Text('Remove icon'),
+                            onPressed: uploading
+                                ? null
+                                : () => onLogoChanged(kDefaultWorkspaceAvatar.dataUrl),
+                            child: const Text('Reset to default'),
                           ),
                       ],
                     )

@@ -68,6 +68,6 @@ import { OrgEventsModule } from '../org-events/org-events.module';
     RecurringTasksCron,
     TimeTrackingService,
   ],
-  exports: [TasksService, TasksRepository],
+  exports: [TasksService, TasksRepository, TaskNotificationsService],
 })
 export class TasksModule {}

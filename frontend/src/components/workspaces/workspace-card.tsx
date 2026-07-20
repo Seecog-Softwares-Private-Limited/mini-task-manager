@@ -386,10 +386,6 @@ export function WorkspaceCard({
               )}
             </div>
 
-            <p className="mt-1 truncate font-mono text-[11px] text-muted-foreground/80" title={org.slug}>
-              {org.slug}
-            </p>
-
             <div className="mt-2.5 flex min-h-[20px] flex-wrap items-center gap-1">
               <span
                 className={cn(

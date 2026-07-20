@@ -5,7 +5,8 @@ import { fetchTasksByProject } from "@/services/api/tasks.api";
 
 export interface CreateOrganizationPayload {
   name: string;
-  slug: string;
+  /** Optional; ignored by API — unique slug is generated server-side. */
+  slug?: string;
   logoUrl?: string;
 }
 

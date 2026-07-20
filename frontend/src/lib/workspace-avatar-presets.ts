@@ -43,6 +43,15 @@ export const WORKSPACE_AVATAR_PRESETS: WorkspaceAvatarPreset[] = PRESET_DEFS.map
   })
 );
 
+/** Default logo applied on create and when a workspace has no custom icon. */
+export const DEFAULT_WORKSPACE_AVATAR: WorkspaceAvatarPreset =
+  WORKSPACE_AVATAR_PRESETS[0]!;
+
+export function resolveWorkspaceLogoUrl(logoUrl?: string | null): string {
+  const trimmed = logoUrl?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : DEFAULT_WORKSPACE_AVATAR.dataUrl;
+}
+
 export function findPresetByDataUrl(dataUrl: string | null): WorkspaceAvatarPreset | undefined {
   if (!dataUrl) return undefined;
   return WORKSPACE_AVATAR_PRESETS.find((p) => p.dataUrl === dataUrl);

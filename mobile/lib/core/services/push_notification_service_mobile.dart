@@ -41,9 +41,21 @@ class PushNotificationService {
     await _setupLocalNotifications();
     await _requestPermission();
 
+    // iOS: show banner/sound while app is in foreground (assignment pushes).
+    await _messaging!.setForegroundNotificationPresentationOptions(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    // iOS requires an APNs token before FCM token is available on device.
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      await _waitForApnsToken();
+    }
+
     // getToken() can hang indefinitely on iOS Simulator (no APNs).
     try {
-      _token = await _messaging!.getToken().timeout(const Duration(seconds: 5));
+      _token = await _messaging!.getToken().timeout(const Duration(seconds: 8));
       debugPrint('FCM TOKEN: $_token');
     } catch (e) {
       debugPrint('FCM getToken skipped: $e');
@@ -73,11 +85,28 @@ class PushNotificationService {
     }
   }
 
+  Future<void> _waitForApnsToken() async {
+    for (var i = 0; i < 20; i++) {
+      try {
+        final apns = await _messaging!.getAPNSToken();
+        if (apns != null && apns.isNotEmpty) {
+          debugPrint('APNs token ready');
+          return;
+        }
+      } catch (e) {
+        debugPrint('APNs token poll: $e');
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
+    debugPrint('APNs token not ready yet — FCM token may be delayed on iOS');
+  }
+
   Future<void> _requestPermission() async {
     final settings = await _messaging!.requestPermission(
       alert: true,
       badge: true,
       sound: true,
+      provisional: false,
     );
     debugPrint('FCM permission: ${settings.authorizationStatus}');
 
@@ -89,7 +118,11 @@ class PushNotificationService {
 
   Future<void> _setupLocalNotifications() async {
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosInit = DarwinInitializationSettings();
+    const iosInit = DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
     await _local!.initialize(
       settings: const InitializationSettings(android: androidInit, iOS: iosInit),
       onDidReceiveNotificationResponse: (_) => onOpenAlerts?.call(),
@@ -111,6 +144,10 @@ class PushNotificationService {
     final notification = message.notification;
     if (notification == null || _local == null) return;
 
+    // On iOS, system already presents when setForegroundNotificationPresentationOptions
+    // is enabled — avoid duplicate local notifications.
+    if (defaultTargetPlatform == TargetPlatform.iOS) return;
+
     await _local!.show(
       id: notification.hashCode,
       title: notification.title,
@@ -130,7 +167,15 @@ class PushNotificationService {
   }
 
   Future<String?> getToken() async {
-    _token ??= await _messaging?.getToken();
+    if (_token != null && _token!.isNotEmpty) return _token;
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      await _waitForApnsToken();
+    }
+    try {
+      _token = await _messaging?.getToken().timeout(const Duration(seconds: 8));
+    } catch (e) {
+      debugPrint('FCM getToken retry skipped: $e');
+    }
     return _token;
   }
 
