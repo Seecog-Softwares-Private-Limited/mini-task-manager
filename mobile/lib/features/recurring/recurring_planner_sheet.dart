@@ -13,6 +13,7 @@ import '../auth/session_controller.dart';
 import '../kanban/kanban_providers.dart';
 import '../kanban/task_detail_sheet.dart';
 import 'recurring_actions.dart';
+import 'recurring_editor_sheet.dart';
 import 'recurring_providers.dart';
 
 Future<void> showRecurringPlannerSheet({
@@ -145,7 +146,11 @@ class _RecurringPlannerSheetState extends ConsumerState<_RecurringPlannerSheet> 
                         onPressed: () => _togglePause(ref, resume: false),
                         child: const Text('Pause'),
                       ),
-                    if (canManageRecurring(ref))
+                    if (canManageRecurring(ref)) ...[
+                      TextButton(
+                        onPressed: _editSeries,
+                        child: const Text('Edit'),
+                      ),
                       TextButton(
                         onPressed: _deleteSeries,
                         style: TextButton.styleFrom(
@@ -153,6 +158,7 @@ class _RecurringPlannerSheetState extends ConsumerState<_RecurringPlannerSheet> 
                         ),
                         child: const Text('Delete'),
                       ),
+                    ],
                   ],
                 ),
               ],
@@ -252,6 +258,22 @@ class _RecurringPlannerSheetState extends ConsumerState<_RecurringPlannerSheet> 
     }
     ref.invalidate(recurringTemplatesProvider);
     ref.invalidate(recurringSummaryProvider);
+  }
+
+  Future<void> _editSeries() async {
+    final orgId = ref.read(sessionControllerProvider).orgId;
+    if (orgId == null || !canManageRecurring(ref)) return;
+    final saved = await showRecurringEditorSheet(
+      context: context,
+      organizationId: orgId,
+      projectId: projectId,
+      template: template,
+    );
+    if (!saved || !mounted) return;
+    ref.invalidate(recurringTemplatesProvider);
+    ref.invalidate(recurringSummaryProvider);
+    ref.invalidate(recurringTemplateHistoryProvider(template.id));
+    Navigator.of(context).pop();
   }
 
   Future<void> _deleteSeries() async {

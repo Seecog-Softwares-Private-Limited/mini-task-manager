@@ -21,3 +21,9 @@ uploads/
 **/.env
 **/.env.*
 backups/
+
+# Firebase Admin credentials (keep only on servers / local; never commit)
+config/firebase-service-account.json
+config/firebase-service.json
+*-firebase-adminsdk-*.json
+config/firebase-service-account.json
