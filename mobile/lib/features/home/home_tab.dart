@@ -114,13 +114,29 @@ class HomeTab extends ConsumerWidget {
                   onTap: () => onNavigateTab(3),
                 ),
               ),
-              const SizedBox(width: AppSpacing.sm),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
               Expanded(
                 child: _QuickAction(
                   icon: Icons.folder_open_rounded,
                   label: 'Projects',
                   color: AppColors.primary,
                   onTap: () => onNavigateTab(2),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: _QuickAction(
+                  icon: Icons.apartment_rounded,
+                  label: 'Workspace',
+                  color: AppColors.success,
+                  onTap: () => showWorkspaceSwitcherSheet(
+                    context: context,
+                    ref: ref,
+                  ),
                 ),
               ),
             ],

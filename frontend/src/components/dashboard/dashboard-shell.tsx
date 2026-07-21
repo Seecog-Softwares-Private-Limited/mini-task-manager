@@ -18,11 +18,12 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { HeaderContextGreeting } from "@/components/dashboard/header-context-greeting";
 import { HeaderAccountMenu } from "@/components/dashboard/header-account-menu";
+import { FeedbackTriggerButton } from "@/components/feedbacks/feedback-trigger-button";
 import type { AppRole } from "@/hooks/use-auth";
 import {
   LayoutDashboard, Building2, FolderKanban, ListTodo, Bell,
   CreditCard, Activity, BarChart3, ClipboardList, Settings,
-  Menu, PanelLeftClose, PanelLeft, Sparkles, Shield, Repeat,
+  Menu, PanelLeftClose, PanelLeft, Sparkles, Shield, Repeat, MessageSquareHeart,
 } from "lucide-react";
 
 const nav: {
@@ -40,6 +41,7 @@ const nav: {
   { href: "/dashboard/projects", label: "Projects", icon: FolderKanban, section: "workspace" },
   { href: "/dashboard/tasks", label: "Tasks", icon: ListTodo, section: "workspace" },
   { href: "/dashboard/recurring-tasks", label: "Recurring Tasks", icon: Repeat, section: "workspace" },
+  { href: "/dashboard/feedbacks", label: "Feedbacks", icon: MessageSquareHeart, section: "workspace" },
   { href: "/dashboard/notifications", label: "Notifications", icon: Bell, section: "reporting" },
   { href: "/dashboard/activity", label: "Activity", icon: Activity, section: "reporting" },
   { href: "/dashboard/audit", label: "Audit Logs", icon: ClipboardList, adminOnly: true, section: "reporting" },
@@ -59,6 +61,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     pathname === "/dashboard/activity" ||
     pathname === "/dashboard/audit" ||
     pathname === "/dashboard/notifications" ||
+    pathname === "/dashboard/feedbacks" ||
     pathname.includes("/board");
   const { hasRole } = useAuth();
   const { isPlatformAdmin } = usePlatformAdmin();
@@ -134,6 +137,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
           <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
             <WorkspaceProgressBadge className="hidden lg:inline-flex" />
+            <FeedbackTriggerButton />
             <CommandPalette />
             <NotificationCenter />
             <ThemeToggle />

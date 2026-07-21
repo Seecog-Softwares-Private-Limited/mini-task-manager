@@ -30,6 +30,7 @@ import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { SavedViewsModule } from './modules/saved-views/saved-views.module';
 import { ExportModule } from './modules/export/export.module';
 import { OrgEventsModule } from './modules/org-events/org-events.module';
+import { FeedbacksModule } from './modules/feedbacks/feedbacks.module';
 import { RootController } from './root.controller';
 
 @Module({
@@ -68,6 +69,7 @@ import { RootController } from './root.controller';
     SavedViewsModule,
     ExportModule,
     OrgEventsModule,
+    FeedbacksModule,
   ],
 })
 export class AppModule {}
