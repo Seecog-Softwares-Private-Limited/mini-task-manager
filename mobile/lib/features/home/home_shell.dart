@@ -15,6 +15,7 @@ import '../recurring/recurring_actions.dart';
 import '../recurring/recurring_editor_sheet.dart';
 import '../recurring/recurring_providers.dart';
 import '../recurring/recurring_screen.dart';
+import '../feedback/feedback_form_sheet.dart';
 import 'home_tab.dart';
 import 'my_work_providers.dart';
 import 'my_work_screen.dart';
@@ -160,6 +161,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
     return Scaffold(
       appBar: AppBar(
+        titleSpacing: 16,
         title: Text(_titleForIndex(_index)),
         actions: [
           IconButton(
@@ -169,6 +171,22 @@ class _HomeShellState extends ConsumerState<HomeShell> {
           ),
           const HeaderAccountMenu(),
         ],
+        flexibleSpace: SafeArea(
+          child: Align(
+            alignment: Alignment.center,
+            child: IconButton(
+              tooltip: 'Send feedback',
+              onPressed: () => showFeedbackFormSheet(context: context, ref: ref),
+              icon: ShaderMask(
+                blendMode: BlendMode.srcIn,
+                shaderCallback: (bounds) => const LinearGradient(
+                  colors: [AppColors.primary, AppColors.primaryGradientEnd],
+                ).createShader(bounds),
+                child: const Icon(Icons.auto_awesome_rounded),
+              ),
+            ),
+          ),
+        ),
       ),
       body: IndexedStack(index: _index, children: pages),
       floatingActionButton: _fabForTab(

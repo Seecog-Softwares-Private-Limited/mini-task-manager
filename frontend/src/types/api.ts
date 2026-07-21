@@ -264,6 +264,26 @@ export interface Notification {
   createdAt: string;
 }
 
+export interface FeedbackMedia {
+  id: string;
+  fileName: string;
+  mimeType: string | null;
+  fileSize: number;
+  url: string;
+}
+
+export interface Feedback {
+  id: string;
+  organizationId: string;
+  userId: string;
+  authorName: string | null;
+  title: string;
+  description: string;
+  media: FeedbackMedia[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Plan {
   id: string;
   slug: string;

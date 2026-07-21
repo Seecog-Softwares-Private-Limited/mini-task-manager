@@ -7,6 +7,7 @@ import '../../features/auth/forgot_password_screen.dart';
 import '../../features/auth/login_screen.dart';
 import '../../features/auth/signup_screen.dart';
 import '../../features/auth/session_controller.dart';
+import '../../features/feedback/feedbacks_screen.dart';
 import '../../features/home/home_shell.dart';
 import '../../features/kanban/project_board_screen.dart';
 import '../../features/workspaces/workspace_picker_screen.dart';
@@ -17,6 +18,7 @@ abstract final class AppRoutes {
   static const forgotPassword = '/forgot-password';
   static const workspaces = '/workspaces';
   static const home = '/';
+  static const feedbacks = '/feedbacks';
   static String projectBoard(String projectId) => '/projects/$projectId/board';
 
   /// Leaves the kanban board, returning to the previous screen or home.
@@ -102,6 +104,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             },
           ),
         ],
+      ),
+      GoRoute(
+        path: AppRoutes.feedbacks,
+        builder: (context, state) => const FeedbacksScreen(),
       ),
     ],
   );

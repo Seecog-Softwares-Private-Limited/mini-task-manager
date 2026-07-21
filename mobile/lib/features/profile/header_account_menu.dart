@@ -43,6 +43,8 @@ class HeaderAccountMenu extends ConsumerWidget {
             await Navigator.of(context).push(
               MaterialPageRoute<void>(builder: (_) => const MyProfileScreen()),
             );
+          case _AccountAction.feedbacks:
+            if (context.mounted) context.push(AppRoutes.feedbacks);
           case _AccountAction.accountSettings:
             onOpenProfileTab?.call();
             await Navigator.of(context).push(
@@ -99,6 +101,10 @@ class HeaderAccountMenu extends ConsumerWidget {
           child: _MenuRow(icon: Icons.person_outline_rounded, label: 'My Profile'),
         ),
         const PopupMenuItem(
+          value: _AccountAction.feedbacks,
+          child: _MenuRow(icon: Icons.auto_awesome_rounded, label: 'Feedbacks'),
+        ),
+        const PopupMenuItem(
           value: _AccountAction.accountSettings,
           child: _MenuRow(icon: Icons.settings_outlined, label: 'Account Settings'),
         ),
@@ -124,7 +130,7 @@ class HeaderAccountMenu extends ConsumerWidget {
   }
 }
 
-enum _AccountAction { myProfile, accountSettings, security, logout }
+enum _AccountAction { myProfile, feedbacks, accountSettings, security, logout }
 
 class _MenuRow extends StatelessWidget {
   const _MenuRow({
