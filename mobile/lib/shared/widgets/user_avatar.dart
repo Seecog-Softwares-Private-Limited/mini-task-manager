@@ -19,7 +19,7 @@ String apiOriginFromBaseUrl(String apiBaseUrl) {
 }
 
 /// Resolves a stored avatar path/URL against the active API origin.
-String resolveUserAvatarUrl(String apiBaseUrl, String? avatarUrl, {String? userId}) {
+String resolveUserAvatarUrl(String apiBaseUrl, String? avatarUrl) {
   final origin = apiOriginFromBaseUrl(apiBaseUrl);
   final trimmed = avatarUrl?.trim() ?? '';
 
@@ -36,10 +36,8 @@ String resolveUserAvatarUrl(String apiBaseUrl, String? avatarUrl, {String? userI
     return '$origin/$trimmed';
   }
 
-  // Login used to omit avatarUrl — still try the public avatar endpoint by user id.
-  if (userId != null && userId.isNotEmpty) {
-    return '$origin/api/v1/users/avatar/$userId';
-  }
+  // Prefer an explicit avatar URL. Do not probe /users/avatar/:id — missing
+  // avatars 404 and spam the browser console on every list render.
   return '';
 }
 
@@ -85,7 +83,6 @@ class UserAvatar extends ConsumerWidget {
     final imageUrl = resolveUserAvatarUrl(
       config.apiBaseUrl,
       user?.avatarUrl,
-      userId: user?.id,
     );
     final cacheSize = (size * MediaQuery.devicePixelRatioOf(context)).round();
 

@@ -30,23 +30,57 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-function isAllowedMime(mimetype: string): boolean {
-  if (!mimetype) return false;
-  return (
-    mimetype.startsWith('image/') ||
-    mimetype.startsWith('text/') ||
-    mimetype === 'application/pdf' ||
-    mimetype === 'application/json' ||
-    mimetype.startsWith('application/zip') ||
-    mimetype === 'application/x-zip-compressed' ||
-    mimetype === 'application/vnd.ms-excel' ||
-    mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-    mimetype === 'application/vnd.ms-excel.sheet.macroenabled.12' ||
-    mimetype === 'application/vnd.oasis.opendocument.spreadsheet' ||
-    mimetype === 'application/msword' ||
-    mimetype === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-    mimetype === 'text/csv'
-  );
+function normalizeMime(mimetype: string): string {
+  return mimetype.split(';')[0]?.trim().toLowerCase() || '';
+}
+
+function isAllowedMime(mimetype: string, fileName?: string | null): boolean {
+  const mime = normalizeMime(mimetype);
+  if (mime) {
+    if (
+      mime.startsWith('image/') ||
+      mime.startsWith('audio/') ||
+      mime.startsWith('video/') ||
+      mime.startsWith('text/') ||
+      mime === 'application/pdf' ||
+      mime === 'application/json' ||
+      mime.startsWith('application/zip') ||
+      mime === 'application/x-zip-compressed' ||
+      mime === 'application/vnd.ms-excel' ||
+      mime === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      mime === 'application/vnd.ms-excel.sheet.macroenabled.12' ||
+      mime === 'application/vnd.oasis.opendocument.spreadsheet' ||
+      mime === 'application/msword' ||
+      mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      mime === 'text/csv'
+    ) {
+      return true;
+    }
+  }
+
+  const ext = fileName?.split('.').pop()?.toLowerCase() ?? '';
+  return [
+    'png',
+    'jpg',
+    'jpeg',
+    'gif',
+    'webp',
+    'bmp',
+    'svg',
+    'pdf',
+    'txt',
+    'csv',
+    'json',
+    'md',
+    'm4a',
+    'mp3',
+    'aac',
+    'wav',
+    'ogg',
+    'webm',
+    'mp4',
+    'mov',
+  ].includes(ext);
 }
 
 function sanitizeFileName(name: string): string {
@@ -1014,7 +1048,9 @@ export class TasksService {
     const task = await this.tasksRepository.findByIdAndOrganization(taskId, organizationId);
     if (!task) throw new NotFoundException('Task not found');
     if (file.size > MAX_FILE_SIZE) throw new ForbiddenException('File too large (max 10MB)');
-    if (!isAllowedMime(file.mimetype || '')) throw new ForbiddenException('File type not allowed');
+    if (!isAllowedMime(file.mimetype || '', file.originalname)) {
+      throw new ForbiddenException('File type not allowed');
+    }
 
     await this.planLimitService.assertStorageLimit(userId, file.size);
 

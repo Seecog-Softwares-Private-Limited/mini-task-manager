@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef } from "react";
-import { Paperclip, Upload, X } from "lucide-react";
+import { useRef, useState } from "react";
+import { Mic, Paperclip, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -17,6 +17,7 @@ import {
 import { normalizePastedScreenshotFile } from "@/lib/screenshot-filename";
 import { generateClientId } from "@/lib/generate-client-id";
 import type { PendingSubtaskAttachment } from "@/components/tasks/subtasks/subtask-attachments-section";
+import { VoiceNoteRecorderDialog } from "@/components/tasks/voice-note-recorder-dialog";
 
 interface SubtaskComposerAttachmentsProps {
   attachments: PendingSubtaskAttachment[];
@@ -71,6 +72,7 @@ export function SubtaskComposerAttachments({
   pasteFlash,
 }: SubtaskComposerAttachmentsProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [voiceOpen, setVoiceOpen] = useState(false);
 
   function addFiles(files: FileList | File[]) {
     onChange(appendAttachmentFiles(attachments, files));
@@ -107,8 +109,19 @@ export function SubtaskComposerAttachments({
           <Paperclip className="h-3 w-3" />
           Attach
         </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={disabled}
+          className="h-7 gap-1 rounded-md px-2 text-[10px] transition-all duration-200"
+          onClick={() => setVoiceOpen(true)}
+        >
+          <Mic className="h-3 w-3" />
+          Voice
+        </Button>
         <span className="text-[10px] text-muted-foreground/80">
-          Paste screenshots or upload files.
+          Paste screenshots, upload files, or record a voice note.
         </span>
         {pasteFlash ? (
           <span className="animate-in fade-in text-[10px] font-medium text-emerald-600 duration-200 dark:text-emerald-400">
@@ -162,6 +175,12 @@ export function SubtaskComposerAttachments({
           })}
         </div>
       ) : null}
+
+      <VoiceNoteRecorderDialog
+        open={voiceOpen}
+        onOpenChange={setVoiceOpen}
+        onRecorded={(file) => addFiles([file])}
+      />
     </div>
   );
 }

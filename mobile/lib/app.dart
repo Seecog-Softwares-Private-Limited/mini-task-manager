@@ -11,6 +11,7 @@ import 'core/router/app_router.dart';
 import 'core/services/push_nav.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/theme/app_theme.dart';
+import 'features/auth/session_controller.dart';
 import 'firebase_bootstrap.dart';
 
 Future<void> bootstrap() async {
@@ -43,12 +44,11 @@ Future<void> _postLaunchInit(SharedPreferences prefs) async {
   }
 
   try {
-    await initializeFirebaseAndPush().timeout(const Duration(seconds: 8));
+    await initializeFirebaseAndPush().timeout(const Duration(seconds: 12));
   } catch (e, st) {
     debugPrint('Firebase/FCM post-launch init failed: $e\n$st');
   }
 }
-
 
 class MiniTaskManagerApp extends ConsumerStatefulWidget {
   const MiniTaskManagerApp({super.key});
@@ -57,14 +57,32 @@ class MiniTaskManagerApp extends ConsumerStatefulWidget {
   ConsumerState<MiniTaskManagerApp> createState() => _MiniTaskManagerAppState();
 }
 
-class _MiniTaskManagerAppState extends ConsumerState<MiniTaskManagerApp> {
+class _MiniTaskManagerAppState extends ConsumerState<MiniTaskManagerApp>
+    with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Safe on web: stub PushNotificationService never touches Firebase.
     PushNotificationService.instance.onOpenAlerts = () {
       requestOpenAlertsTab(ref);
     };
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    final session = ref.read(sessionControllerProvider);
+    if (session.status != SessionStatus.authenticated) return;
+    // Re-register whenever the app returns to foreground so token rotations
+    // and first-time permission grants still reach the API.
+    unawaited(ref.read(sessionControllerProvider.notifier).unawaitedRegisterDeviceToken());
   }
 
   @override

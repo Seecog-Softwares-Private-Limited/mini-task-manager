@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/utils/client_id.dart';
 import '../../data/models/pending_attachment.dart';
+import '../../shared/voice_dictation/voice_note_recorder_sheet.dart';
 import 'attachment_file_meta.dart';
 
 class AttachmentPickerUtils {
@@ -112,39 +113,52 @@ class AttachmentUploadActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      crossAxisAlignment: WrapCrossAlignment.center,
+    final actions = <Widget>[
+      _ActionChip(
+        icon: Icons.photo_camera_rounded,
+        label: 'Camera',
+        onTap: uploading || disabled
+            ? null
+            : () => _handle(AttachmentPickerUtils.capturePhoto),
+      ),
+      _ActionChip(
+        icon: Icons.attach_file_rounded,
+        label: 'File',
+        onTap: uploading || disabled
+            ? null
+            : () => _handle(AttachmentPickerUtils.pickFile),
+      ),
+      if (showGallery && !compact)
+        _ActionChip(
+          icon: Icons.photo_library_rounded,
+          label: 'Gallery',
+          onTap: uploading || disabled
+              ? null
+              : () => _handle(AttachmentPickerUtils.pickFromGallery),
+        ),
+      _ActionChip(
+        icon: Icons.mic_rounded,
+        label: 'Voice',
+        onTap: uploading || disabled
+            ? null
+            : () => _handle(() => showVoiceNoteRecorderSheet(context)),
+      ),
+    ];
+
+    return Row(
       children: [
-        _ActionChip(
-          icon: Icons.photo_camera_rounded,
-          label: 'Camera',
-          onTap: uploading || disabled
-              ? null
-              : () => _handle(AttachmentPickerUtils.capturePhoto),
-        ),
-        _ActionChip(
-          icon: Icons.attach_file_rounded,
-          label: 'File',
-          onTap: uploading || disabled
-              ? null
-              : () => _handle(AttachmentPickerUtils.pickFile),
-        ),
-        if (showGallery && !compact)
-          _ActionChip(
-            icon: Icons.photo_library_rounded,
-            label: 'Gallery',
-            onTap: uploading || disabled
-                ? null
-                : () => _handle(AttachmentPickerUtils.pickFromGallery),
-          ),
-        if (uploading)
+        for (var i = 0; i < actions.length; i++) ...[
+          if (i > 0) const SizedBox(width: 6),
+          Expanded(child: actions[i]),
+        ],
+        if (uploading) ...[
+          const SizedBox(width: 8),
           const SizedBox(
             width: 18,
             height: 18,
             child: CircularProgressIndicator(strokeWidth: 2),
           ),
+        ],
       ],
     );
   }
@@ -180,26 +194,52 @@ class AttachmentPickerSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        Row(
           children: [
-            _ActionChip(
-              icon: Icons.attach_file_rounded,
-              label: 'File',
-              onTap: disabled ? null : () => _addAttachment(AttachmentPickerUtils.pickFile),
-            ),
-            _ActionChip(
-              icon: Icons.photo_camera_rounded,
-              label: 'Camera',
-              onTap: disabled ? null : () => _addAttachment(AttachmentPickerUtils.capturePhoto),
-            ),
-            if (!compact)
-              _ActionChip(
-                icon: Icons.photo_library_rounded,
-                label: 'Gallery',
-                onTap: disabled ? null : () => _addAttachment(AttachmentPickerUtils.pickFromGallery),
+            Expanded(
+              child: _ActionChip(
+                icon: Icons.photo_camera_rounded,
+                label: 'Camera',
+                onTap: disabled
+                    ? null
+                    : () => _addAttachment(AttachmentPickerUtils.capturePhoto),
               ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: _ActionChip(
+                icon: Icons.attach_file_rounded,
+                label: 'File',
+                onTap: disabled
+                    ? null
+                    : () => _addAttachment(AttachmentPickerUtils.pickFile),
+              ),
+            ),
+            if (!compact) ...[
+              const SizedBox(width: 6),
+              Expanded(
+                child: _ActionChip(
+                  icon: Icons.photo_library_rounded,
+                  label: 'Gallery',
+                  onTap: disabled
+                      ? null
+                      : () =>
+                          _addAttachment(AttachmentPickerUtils.pickFromGallery),
+                ),
+              ),
+            ],
+            const SizedBox(width: 6),
+            Expanded(
+              child: _ActionChip(
+                icon: Icons.mic_rounded,
+                label: 'Voice',
+                onTap: disabled
+                    ? null
+                    : () => _addAttachment(
+                          () => showVoiceNoteRecorderSheet(context),
+                        ),
+              ),
+            ),
           ],
         ),
         if (attachments.isNotEmpty) ...[
@@ -209,6 +249,29 @@ class AttachmentPickerSection extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 6),
               child: _AttachmentRow(
                 fileName: file.fileName,
+                mimeType: file.mimeType,
+                onTap: disabled
+                    ? null
+                    : () {
+                        final isAudio =
+                            file.mimeType?.toLowerCase().startsWith('audio/') == true ||
+                                file.fileName.toLowerCase().contains('voice-');
+                        if (!isAudio || file.bytes == null) return;
+                        showPendingVoiceNotePlayerDialog(
+                          context,
+                          attachment: file,
+                          onRemove: () => _remove(file.clientId),
+                          onReRecord: () async {
+                            final without = attachments
+                                .where((a) => a.clientId != file.clientId)
+                                .toList();
+                            onChanged(without);
+                            final picked = await showVoiceNoteRecorderSheet(context);
+                            if (picked == null) return;
+                            onChanged([...without, picked]);
+                          },
+                        );
+                      },
                 onRemove: disabled ? null : () => _remove(file.clientId),
               ),
             ),
@@ -232,11 +295,20 @@ class _ActionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ActionChip(
-      avatar: Icon(icon, size: 16),
-      label: Text(label),
+    return OutlinedButton.icon(
       onPressed: onTap,
-      visualDensity: VisualDensity.compact,
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        visualDensity: VisualDensity.compact,
+        minimumSize: const Size(0, 36),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      icon: Icon(icon, size: 15),
+      label: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
     );
   }
 }
@@ -245,41 +317,64 @@ class _AttachmentRow extends StatelessWidget {
   const _AttachmentRow({
     required this.fileName,
     required this.onRemove,
+    this.mimeType,
+    this.onTap,
   });
 
   final String fileName;
+  final String? mimeType;
   final VoidCallback? onRemove;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+    final isAudio = mimeType?.toLowerCase().startsWith('audio/') == true ||
+        fileName.toLowerCase().endsWith('.m4a') ||
+        fileName.toLowerCase().endsWith('.mp3') ||
+        fileName.toLowerCase().endsWith('.aac') ||
+        fileName.toLowerCase().endsWith('.wav') ||
+        fileName.toLowerCase().endsWith('.ogg') ||
+        fileName.toLowerCase().startsWith('voice-');
+
+    return Material(
+      color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: isAudio ? onTap : null,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.insert_drive_file_rounded, size: 16),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              fileName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: 0.5)),
           ),
-          if (onRemove != null)
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-              icon: const Icon(Icons.close_rounded, size: 18),
-              onPressed: onRemove,
-            ),
-        ],
+          child: Row(
+            children: [
+              Icon(
+                isAudio ? Icons.play_circle_filled_rounded : Icons.insert_drive_file_rounded,
+                size: 18,
+                color: isAudio ? Theme.of(context).colorScheme.primary : null,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  isAudio ? 'Voice note — tap to play' : fileName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+              if (onRemove != null)
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                  onPressed: onRemove,
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }

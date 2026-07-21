@@ -24,64 +24,88 @@ class PushNotificationService {
   OpenAlertsCallback? onOpenAlerts;
   String? _token;
   bool _initialized = false;
+  Completer<void>? _readyCompleter;
 
   void Function(String token)? onTokenRefresh;
+  VoidCallback? onInitialized;
 
   String? get token => _token;
 
+  /// Completes when [initialize] finishes (success or failure).
+  Future<void> get ready {
+    if (_initialized && (_readyCompleter == null || _readyCompleter!.isCompleted)) {
+      return Future<void>.value();
+    }
+    _readyCompleter ??= Completer<void>();
+    return _readyCompleter!.future;
+  }
+
   Future<void> initialize() async {
     if (_initialized) return;
+    _readyCompleter ??= Completer<void>();
     _initialized = true;
 
-    _messaging = FirebaseMessaging.instance;
-    _local = FlutterLocalNotificationsPlugin();
-
-    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
-    await _setupLocalNotifications();
-    await _requestPermission();
-
-    // iOS: show banner/sound while app is in foreground (assignment pushes).
-    await _messaging!.setForegroundNotificationPresentationOptions(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-
-    // iOS requires an APNs token before FCM token is available on device.
-    if (defaultTargetPlatform == TargetPlatform.iOS) {
-      await _waitForApnsToken();
-    }
-
-    // getToken() can hang indefinitely on iOS Simulator (no APNs).
     try {
-      _token = await _messaging!.getToken().timeout(const Duration(seconds: 8));
-      debugPrint('FCM TOKEN: $_token');
-    } catch (e) {
-      debugPrint('FCM getToken skipped: $e');
-    }
+      _messaging = FirebaseMessaging.instance;
+      _local = FlutterLocalNotificationsPlugin();
 
-    _messaging!.onTokenRefresh.listen((newToken) {
-      _token = newToken;
-      debugPrint('FCM TOKEN refreshed: $newToken');
-      onTokenRefresh?.call(newToken);
-    });
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-    FirebaseMessaging.onMessage.listen(_showForegroundNotification);
+      await _setupLocalNotifications();
+      await _requestPermission();
 
-    FirebaseMessaging.onMessageOpenedApp.listen((_) {
-      onOpenAlerts?.call();
-    });
+      // iOS: show banner/sound while app is in foreground (assignment pushes).
+      await _messaging!.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
 
-    try {
-      final initial = await _messaging!
-          .getInitialMessage()
-          .timeout(const Duration(seconds: 2));
-      if (initial != null) {
-        Future.microtask(() => onOpenAlerts?.call());
+      // iOS requires an APNs token before FCM token is available on device.
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        await _waitForApnsToken();
       }
-    } catch (e) {
-      debugPrint('FCM getInitialMessage skipped: $e');
+
+      // getToken() can hang indefinitely on iOS Simulator (no APNs).
+      try {
+        _token = await _messaging!.getToken().timeout(const Duration(seconds: 8));
+        debugPrint('FCM TOKEN: $_token');
+      } catch (e) {
+        debugPrint('FCM getToken skipped: $e');
+      }
+
+      _messaging!.onTokenRefresh.listen((newToken) {
+        _token = newToken;
+        debugPrint('FCM TOKEN refreshed: $newToken');
+        onTokenRefresh?.call(newToken);
+      });
+
+      FirebaseMessaging.onMessage.listen(_showForegroundNotification);
+
+      FirebaseMessaging.onMessageOpenedApp.listen((_) {
+        onOpenAlerts?.call();
+      });
+
+      try {
+        final initial = await _messaging!
+            .getInitialMessage()
+            .timeout(const Duration(seconds: 2));
+        if (initial != null) {
+          Future.microtask(() => onOpenAlerts?.call());
+        }
+      } catch (e) {
+        debugPrint('FCM getInitialMessage skipped: $e');
+      }
+    } finally {
+      if (!(_readyCompleter?.isCompleted ?? true)) {
+        _readyCompleter!.complete();
+      }
+      // Let session re-register after cold-start race with restoreSession.
+      try {
+        onInitialized?.call();
+      } catch (e) {
+        debugPrint('Push onInitialized callback failed: $e');
+      }
     }
   }
 
@@ -167,12 +191,21 @@ class PushNotificationService {
   }
 
   Future<String?> getToken() async {
+    // Wait for initialize() so restoreSession doesn't race past FCM setup.
+    try {
+      await ready.timeout(const Duration(seconds: 12));
+    } catch (_) {
+      debugPrint('FCM ready wait timed out');
+    }
+
     if (_token != null && _token!.isNotEmpty) return _token;
+    if (_messaging == null) return null;
+
     if (defaultTargetPlatform == TargetPlatform.iOS) {
       await _waitForApnsToken();
     }
     try {
-      _token = await _messaging?.getToken().timeout(const Duration(seconds: 8));
+      _token = await _messaging!.getToken().timeout(const Duration(seconds: 8));
     } catch (e) {
       debugPrint('FCM getToken retry skipped: $e');
     }

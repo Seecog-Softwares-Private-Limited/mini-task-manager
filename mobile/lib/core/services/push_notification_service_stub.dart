@@ -10,11 +10,17 @@ class PushNotificationService {
 
   OpenAlertsCallback? onOpenAlerts;
   void Function(String token)? onTokenRefresh;
+  VoidCallback? onInitialized;
 
   String? get token => null;
 
+  Future<void> get ready => Future<void>.value();
+
   Future<void> initialize() async {
     debugPrint('PushNotificationService: skipped on this platform (no FCM).');
+    try {
+      onInitialized?.call();
+    } catch (_) {}
   }
 
   Future<String?> getToken() async => null;

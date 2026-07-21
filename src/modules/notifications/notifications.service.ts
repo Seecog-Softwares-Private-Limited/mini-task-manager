@@ -1,10 +1,13 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { NotificationsRepository } from './repositories/notifications.repository';
 import { PaginationQueryDto, PaginatedResult, paginate } from '../../common/pagination';
 import { PushNotificationsService } from './push-notifications.service';
+import { formatUuid } from '../../common/utils/uuid.util';
 
 @Injectable()
 export class NotificationsService {
+  private readonly logger = new Logger(NotificationsService.name);
+
   constructor(
     private readonly notificationsRepository: NotificationsRepository,
     private readonly pushNotifications: PushNotificationsService,
@@ -40,15 +43,29 @@ export class NotificationsService {
     message: string,
     data?: Record<string, string>,
   ): Promise<void> {
-    await this.notificationsRepository.create({ userId, title, message });
+    const normalizedUserId = formatUuid(userId) ?? userId;
 
-    // Await so assignment flows reliably reach devices before the request ends.
+    await this.notificationsRepository.create({
+      userId: normalizedUserId,
+      title,
+      message,
+    });
+
+    // Await so assignment flows reliably reach every registered device.
     // sendToUser never throws; invalid tokens are cleaned up inside.
-    await this.pushNotifications.sendToUser(
-      userId,
-      title || 'Notification',
-      message || '',
-      data,
-    );
+    try {
+      await this.pushNotifications.sendToUser(
+        normalizedUserId,
+        title || 'Notification',
+        message || '',
+        data,
+      );
+    } catch (err) {
+      this.logger.error(
+        `Unexpected push failure for user ${normalizedUserId}: ${
+          err instanceof Error ? err.message : err
+        }`,
+      );
+    }
   }
 }

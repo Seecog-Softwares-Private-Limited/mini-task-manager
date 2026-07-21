@@ -500,13 +500,26 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     if (result == null) return null;
 
     final orgId = ref.read(sessionControllerProvider).orgId ?? '';
-    for (final file in result.attachments) {
-      await ref.read(attachmentsRepositoryProvider).uploadSubtaskAttachment(
-            subtaskId: subtaskId,
-            taskId: _task.id,
-            organizationId: orgId,
-            file: file,
-          );
+    try {
+      for (final file in result.attachments) {
+        await ref.read(attachmentsRepositoryProvider).uploadSubtaskAttachment(
+              subtaskId: subtaskId,
+              taskId: _task.id,
+              organizationId: orgId,
+              file: file,
+            );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Could not upload attachments: $e',
+            ),
+          ),
+        );
+      }
+      return null;
     }
     return result.record;
   }

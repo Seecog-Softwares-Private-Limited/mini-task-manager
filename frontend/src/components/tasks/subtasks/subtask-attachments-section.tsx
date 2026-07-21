@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Paperclip, Upload } from "lucide-react";
+import { Mic, Paperclip, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
@@ -22,6 +22,7 @@ import {
   AttachmentPreviewModal,
   type AttachmentPreviewTarget,
 } from "@/components/tasks/subtasks/attachment-preview-modal";
+import { VoiceNoteRecorderDialog } from "@/components/tasks/voice-note-recorder-dialog";
 import { generateClientId } from "@/lib/generate-client-id";
 
 export type PendingSubtaskAttachment = {
@@ -73,6 +74,7 @@ export function SubtaskAttachmentsSection({
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const sectionRef = React.useRef<HTMLDivElement>(null);
   const [previewTarget, setPreviewTarget] = React.useState<AttachmentPreviewTarget | null>(null);
+  const [voiceOpen, setVoiceOpen] = React.useState(false);
   const [focused, setFocused] = React.useState(false);
   const [thumbById, setThumbById] = React.useState<Record<string, string>>({});
 
@@ -252,7 +254,7 @@ export function SubtaskAttachmentsSection({
           <Paperclip className="h-3.5 w-3.5" />
           {sectionLabel}
         </Label>
-        <div>
+        <div className="flex items-center gap-1.5">
           <input
             ref={fileInputRef}
             type="file"
@@ -273,6 +275,17 @@ export function SubtaskAttachmentsSection({
           >
             <Upload className="mr-1.5 h-3.5 w-3.5" />
             Upload
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs"
+            disabled={disabled}
+            onClick={() => setVoiceOpen(true)}
+          >
+            <Mic className="mr-1.5 h-3.5 w-3.5" />
+            Voice
           </Button>
         </div>
       </div>
@@ -333,6 +346,11 @@ export function SubtaskAttachmentsSection({
       <AttachmentPreviewModal
         target={previewTarget}
         onClose={() => setPreviewTarget(null)}
+      />
+      <VoiceNoteRecorderDialog
+        open={voiceOpen}
+        onOpenChange={setVoiceOpen}
+        onRecorded={(file) => void handleFiles([file])}
       />
     </div>
   );

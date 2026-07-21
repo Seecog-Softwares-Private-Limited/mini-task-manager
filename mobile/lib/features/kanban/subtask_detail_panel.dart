@@ -114,6 +114,25 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(covariant SubtaskDetailPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.subtask.id != widget.subtask.id) {
+      _completionRecord = widget.subtask.completionRecord;
+      _loadAttachments();
+      return;
+    }
+    final wasDone = isSubtaskDone(oldWidget.subtask);
+    final isDone = isSubtaskDone(widget.subtask);
+    if (!wasDone && isDone) {
+      _completionRecord = widget.subtask.completionRecord;
+      _status = 'DONE';
+      _loadAttachments();
+    } else if (oldWidget.subtask.completionRecord != widget.subtask.completionRecord) {
+      _completionRecord = widget.subtask.completionRecord;
+    }
+  }
+
   Future<void> _loadAttachments() async {
     setState(() {
       _loadingAttachments = true;

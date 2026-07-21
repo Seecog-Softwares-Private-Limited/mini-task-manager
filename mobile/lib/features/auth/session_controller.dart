@@ -85,6 +85,13 @@ class SessionController extends Notifier<SessionState> {
           unawaitedRegisterDeviceToken();
         }
       };
+      // FCM initializes after first frame; re-register once it is ready so
+      // cold-start restoreSession does not miss the token.
+      PushNotificationService.instance.onInitialized = () {
+        if (state.status == SessionStatus.authenticated) {
+          unawaitedRegisterDeviceToken();
+        }
+      };
     }
 
     if (!_restoreScheduled) {
@@ -111,8 +118,16 @@ class SessionController extends Notifier<SessionState> {
     final platform = pushPlatformName();
     if (platform != 'android' && platform != 'ios') return;
 
-    final fcmToken = await PushNotificationService.instance.getToken();
-    if (fcmToken == null || fcmToken.isEmpty) return;
+    String? fcmToken;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      fcmToken = await PushNotificationService.instance.getToken();
+      if (fcmToken != null && fcmToken.isNotEmpty) break;
+      await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+    }
+    if (fcmToken == null || fcmToken.isEmpty) {
+      debugPrint('registerDeviceToken: no FCM token yet; push will not work until token is available');
+      return;
+    }
 
     String? deviceId;
     try {
@@ -125,6 +140,7 @@ class SessionController extends Notifier<SessionState> {
       platform: platform,
       deviceId: deviceId,
     );
+    debugPrint('registerDeviceToken: registered FCM token for $platform');
   }
 
   Future<void> unregisterDeviceToken() async {

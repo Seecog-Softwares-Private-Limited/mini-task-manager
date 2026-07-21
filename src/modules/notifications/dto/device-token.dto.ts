@@ -3,7 +3,7 @@ import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validat
 export class RegisterDeviceTokenDto {
   @IsString()
   @IsNotEmpty()
-  @MaxLength(512)
+  @MaxLength(1024)
   token!: string;
 
   @IsString()
@@ -19,6 +19,6 @@ export class RegisterDeviceTokenDto {
 export class DeleteDeviceTokenDto {
   @IsString()
   @IsNotEmpty()
-  @MaxLength(512)
+  @MaxLength(1024)
   token!: string;
 }

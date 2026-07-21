@@ -71,10 +71,10 @@ class ApiException extends Equatable implements Exception {
 
   static String? _friendlyHttpMessage(int? status) {
     return switch (status) {
-      400 => 'Could not open this attachment.',
+      400 => 'Bad request.',
       401 => 'Your session expired. Please sign in again.',
-      403 => 'You do not have permission to view this attachment.',
-      404 => 'Attachment not found.',
+      403 => 'This action was blocked by the server.',
+      404 => 'Not found.',
       _ => null,
     };
   }
