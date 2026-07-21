@@ -1,21 +1,20 @@
-import 'dart:io';
+import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:record/record.dart';
 
 import '../../core/services/device_info_service.dart';
 import '../../core/services/geofence_service.dart';
 import '../../core/services/location_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../core/utils/client_id.dart';
 import '../../data/models/login_response.dart';
 import '../../data/models/pending_attachment.dart';
 import '../../data/models/subtask_completion_record.dart';
+import '../../shared/voice_dictation/voice_note_recorder_sheet.dart';
 import '../../shared/widgets/app_widgets.dart';
 import 'attachment_picker_section.dart';
+import 'voice_note_player.dart';
 
 class SubtaskCompletionResult {
   const SubtaskCompletionResult({
@@ -40,6 +39,7 @@ Future<SubtaskCompletionResult?> showSubtaskCompletionSheet({
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
+    useRootNavigator: true,
     builder: (context) => _SubtaskCompletionSheet(
       subtaskTitle: subtaskTitle,
       projectId: projectId,
@@ -72,7 +72,6 @@ class _SubtaskCompletionSheet extends StatefulWidget {
 class _SubtaskCompletionSheetState extends State<_SubtaskCompletionSheet> {
   final _notesController = TextEditingController();
   final _notesFocus = FocusNode();
-  final _recorder = AudioRecorder();
 
   bool _loading = true;
   bool _submitting = false;
@@ -85,9 +84,8 @@ class _SubtaskCompletionSheetState extends State<_SubtaskCompletionSheet> {
 
   final List<PendingAttachment> _beforePhotos = [];
   final List<PendingAttachment> _afterPhotos = [];
-  PendingAttachment? _voiceNote;
+  final List<PendingAttachment> _voiceNotes = [];
   PendingAttachment? _video;
-  bool _recordingVoice = false;
 
   @override
   void initState() {
@@ -100,51 +98,48 @@ class _SubtaskCompletionSheetState extends State<_SubtaskCompletionSheet> {
   void dispose() {
     _notesController.dispose();
     _notesFocus.dispose();
-    _recorder.dispose();
     super.dispose();
   }
 
   Future<void> _bootstrap() async {
+    Map<String, dynamic> deviceInfo = const {'platform': 'unknown'};
     try {
-      final deviceInfo = await DeviceInfoService.capture();
-      CapturedLocation? location;
-      GeofenceValidation? geofence;
-      String? locationError;
-
-      if (widget.requireLocation) {
-        try {
-          location = await LocationService.captureCurrent();
-          geofence = await GeofenceService.validate(
-            projectId: widget.projectId,
-            latitude: location.latitude,
-            longitude: location.longitude,
-          );
-          if (!geofence.valid) {
-            locationError =
-                'You are outside the work site (${geofence.distanceMeters.round()} m away, limit ${geofence.radiusMeters.round()} m).';
-          }
-        } on LocationCaptureException catch (e) {
-          locationError = e.message;
-        }
-      }
-
-      if (!mounted) return;
-      setState(() {
-        _deviceInfo = deviceInfo;
-        _location = location;
-        _geofence = geofence;
-        _error = locationError;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = widget.requireLocation
-            ? 'Could not capture location: $e'
-            : 'Could not prepare completion: $e';
-        _loading = false;
-      });
+      deviceInfo = await DeviceInfoService.capture();
+    } catch (_) {
+      // Keep a minimal payload so Complete stays usable.
     }
+
+    CapturedLocation? location;
+    GeofenceValidation? geofence;
+    String? locationError;
+
+    if (widget.requireLocation) {
+      try {
+        location = await LocationService.captureCurrent();
+        geofence = await GeofenceService.validate(
+          projectId: widget.projectId,
+          latitude: location.latitude,
+          longitude: location.longitude,
+        );
+        if (!geofence.valid) {
+          locationError =
+              'You are outside the work site (${geofence.distanceMeters.round()} m away, limit ${geofence.radiusMeters.round()} m).';
+        }
+      } on LocationCaptureException catch (e) {
+        locationError = e.message;
+      } catch (e) {
+        locationError = 'Could not capture location: $e';
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _deviceInfo = deviceInfo;
+      _location = location;
+      _geofence = geofence;
+      _error = locationError;
+      _loading = false;
+    });
   }
 
   bool get _canSubmit {
@@ -156,6 +151,24 @@ class _SubtaskCompletionSheetState extends State<_SubtaskCompletionSheet> {
     }
     if (widget.requireVideo && _video == null) return false;
     return true;
+  }
+
+  String? get _submitBlockedReason {
+    if (_loading) return 'Still preparing…';
+    if (_submitting) return null;
+    if (_deviceInfo == null) return 'Device info missing. Close and try again.';
+    if (widget.requireLocation) {
+      if (_location == null || _geofence == null) {
+        return 'Location is required to complete this subtask.';
+      }
+      if (!_geofence!.valid) {
+        return 'Move inside the work site to complete this subtask.';
+      }
+    }
+    if (widget.requireVideo && _video == null) {
+      return 'Attach a video to complete this critical subtask.';
+    }
+    return null;
   }
 
   Future<void> _pickPhoto({required bool before}) async {
@@ -185,82 +198,92 @@ class _SubtaskCompletionSheetState extends State<_SubtaskCompletionSheet> {
     setState(() => _video = picked);
   }
 
-  Future<void> _toggleVoiceRecording() async {
+  Future<void> _recordVoiceNote() async {
     _notesFocus.unfocus();
-    if (kIsWeb) {
-      setState(() => _error = 'Voice notes are not supported on web.');
+    final picked = await showVoiceNoteRecorderSheet(context);
+    if (picked == null || !mounted) return;
+    final raw = picked.bytes;
+    if (raw == null || raw.isEmpty) {
+      setState(() => _error = 'Voice note was empty. Please record again.');
       return;
     }
-    if (_recordingVoice) {
-      final path = await _recorder.stop();
-      setState(() => _recordingVoice = false);
-      if (path == null || path.isEmpty) return;
-      final bytes = await File(path).readAsBytes();
-      setState(() {
-        _voiceNote = PendingAttachment(
-          clientId: generateClientId(),
-          fileName: 'voice-${DateTime.now().toIso8601String().replaceAll(':', '-')}.m4a',
-          bytes: bytes,
-          path: path,
-          mimeType: 'audio/mp4',
-        );
-      });
-      return;
-    }
-
-    final hasPermission = await _recorder.hasPermission();
-    if (!hasPermission) {
-      setState(() => _error = 'Microphone permission is required for voice notes.');
-      return;
-    }
-    final stamp = DateTime.now().toIso8601String().replaceAll(':', '-');
-    final path = '${Directory.systemTemp.path}/voice-$stamp.m4a';
-    await _recorder.start(const RecordConfig(encoder: AudioEncoder.aacLc), path: path);
+    // Own a stable copy so web blob views cannot clear later.
+    final stable = PendingAttachment(
+      clientId: picked.clientId,
+      fileName: picked.fileName,
+      path: picked.path,
+      bytes: Uint8List.fromList(raw),
+      mimeType: picked.mimeType,
+    );
     setState(() {
-      _recordingVoice = true;
+      _voiceNotes.add(stable);
       _error = null;
     });
   }
 
+  void _removeVoiceNote(String clientId) {
+    setState(() {
+      _voiceNotes.removeWhere((n) => n.clientId == clientId);
+    });
+  }
+
   Future<void> _submit() async {
+    final blocked = _submitBlockedReason;
+    if (blocked != null) {
+      setState(() => _error = blocked);
+      return;
+    }
     if (!_canSubmit) return;
     _notesFocus.unfocus();
     FocusManager.instance.primaryFocus?.unfocus();
-    setState(() => _submitting = true);
-    final location = _location;
-    final geofence = _geofence;
-    final record = SubtaskCompletionRecord(
-      completedAt: _timestamp.toIso8601String(),
-      employeeId: widget.employee.id,
-      employeeName: widget.employee.fullName,
-      employeeEmail: widget.employee.email,
-      latitude: location?.latitude ?? 0,
-      longitude: location?.longitude ?? 0,
-      accuracyMeters: location?.accuracyMeters,
-      geofenceValid: widget.requireLocation ? (geofence?.valid ?? false) : true,
-      geofenceDistanceMeters: geofence?.distanceMeters,
-      geofenceRadiusMeters: geofence?.radiusMeters,
-      geofenceSiteId: widget.requireLocation ? widget.projectId : null,
-      deviceInfo: _deviceInfo!,
-      notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
-      beforePhotoFileNames: _beforePhotos.map((f) => f.fileName).toList(),
-      afterPhotoFileNames: _afterPhotos.map((f) => f.fileName).toList(),
-      voiceNoteFileName: _voiceNote?.fileName,
-      videoFileName: _video?.fileName,
-    );
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      final location = _location;
+      final geofence = _geofence;
+      final record = SubtaskCompletionRecord(
+        completedAt: _timestamp.toIso8601String(),
+        employeeId: widget.employee.id,
+        employeeName: widget.employee.fullName,
+        employeeEmail: widget.employee.email,
+        latitude: location?.latitude ?? 0,
+        longitude: location?.longitude ?? 0,
+        accuracyMeters: location?.accuracyMeters,
+        geofenceValid: widget.requireLocation ? (geofence?.valid ?? false) : true,
+        geofenceDistanceMeters: geofence?.distanceMeters,
+        geofenceRadiusMeters: geofence?.radiusMeters,
+        geofenceSiteId: widget.requireLocation ? widget.projectId : null,
+        deviceInfo: _deviceInfo ?? const {'platform': 'unknown'},
+        notes: _notesController.text.trim().isEmpty
+            ? null
+            : _notesController.text.trim(),
+        beforePhotoFileNames: _beforePhotos.map((f) => f.fileName).toList(),
+        afterPhotoFileNames: _afterPhotos.map((f) => f.fileName).toList(),
+        voiceNoteFileName:
+            _voiceNotes.isEmpty ? null : _voiceNotes.first.fileName,
+        videoFileName: _video?.fileName,
+      );
 
-    final attachments = <PendingAttachment>[
-      ..._beforePhotos,
-      ..._afterPhotos,
-      if (_voiceNote != null) _voiceNote!,
-      if (_video != null) _video!,
-    ];
+      final attachments = <PendingAttachment>[
+        ..._beforePhotos,
+        ..._afterPhotos,
+        ..._voiceNotes,
+        if (_video != null) _video!,
+      ];
 
-    if (!mounted) return;
-    Navigator.pop(
-      context,
-      SubtaskCompletionResult(record: record, attachments: attachments),
-    );
+      if (!mounted) return;
+      Navigator.of(context).pop(
+        SubtaskCompletionResult(record: record, attachments: attachments),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _error = 'Could not complete: $e';
+      });
+    }
   }
 
   @override
@@ -270,7 +293,7 @@ class _SubtaskCompletionSheetState extends State<_SubtaskCompletionSheet> {
 
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
-      behavior: HitTestBehavior.opaque,
+      behavior: HitTestBehavior.deferToChild,
       child: Padding(
         padding: EdgeInsets.only(
           left: AppSpacing.md,
@@ -352,6 +375,7 @@ class _SubtaskCompletionSheetState extends State<_SubtaskCompletionSheet> {
                 TextField(
                   controller: _notesController,
                   focusNode: _notesFocus,
+                  enabled: !_submitting,
                   minLines: 2,
                   maxLines: 4,
                   textInputAction: TextInputAction.done,
@@ -364,53 +388,145 @@ class _SubtaskCompletionSheetState extends State<_SubtaskCompletionSheet> {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                Text('Photos (optional)', style: Theme.of(context).textTheme.titleSmall),
+                Text('Attachments (optional)', style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: AppSpacing.sm),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                Row(
                   children: [
-                    OutlinedButton.icon(
-                      onPressed: _submitting ? null : () => _pickPhoto(before: true),
-                      icon: const Icon(Icons.photo_camera_outlined, size: 18),
-                      label: Text('Before (${_beforePhotos.length})'),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: _submitting ? null : () => _pickPhoto(before: false),
-                      icon: const Icon(Icons.photo_camera_outlined, size: 18),
-                      label: Text('After (${_afterPhotos.length})'),
-                    ),
-                    if (!kIsWeb)
-                      OutlinedButton.icon(
-                        onPressed: _submitting ? null : _toggleVoiceRecording,
-                        icon: Icon(
-                          _recordingVoice ? Icons.stop_rounded : Icons.mic_rounded,
-                          size: 18,
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _submitting ? null : () => _pickPhoto(before: true),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          visualDensity: VisualDensity.compact,
                         ),
-                        label: Text(_recordingVoice
-                            ? 'Stop'
-                            : _voiceNote == null
-                                ? 'Voice'
-                                : 'Voice ✓'),
+                        icon: const Icon(Icons.photo_camera_outlined, size: 16),
+                        label: Text(
+                          'Before (${_beforePhotos.length})',
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
                       ),
-                    if (widget.requireVideo)
-                      OutlinedButton.icon(
-                        onPressed: _submitting ? null : _pickVideo,
-                        icon: const Icon(Icons.videocam_rounded, size: 18),
-                        label: Text(_video == null ? 'Video (required)' : 'Video ✓'),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _submitting ? null : () => _pickPhoto(before: false),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        icon: const Icon(Icons.photo_camera_outlined, size: 16),
+                        label: Text(
+                          'After (${_afterPhotos.length})',
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
                       ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _submitting ? null : _recordVoiceNote,
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        icon: const Icon(Icons.mic_rounded, size: 16),
+                        label: Text(
+                          'Voice (${_voiceNotes.length})',
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                    ),
+                    if (widget.requireVideo) ...[
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _submitting ? null : _pickVideo,
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          icon: const Icon(Icons.videocam_rounded, size: 16),
+                          label: Text(
+                            _video == null ? 'Video' : 'Video ✓',
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
+                if (_voiceNotes.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  ..._voiceNotes.map((note) {
+                    final bytes = note.bytes;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: bytes == null || bytes.isEmpty
+                                ? Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 10,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.background,
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: AppColors.border),
+                                    ),
+                                    child: Text(
+                                      note.fileName,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(color: AppColors.textMuted),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  )
+                                : VoiceNotePlayer(
+                                    key: ValueKey(note.clientId),
+                                    bytes: bytes,
+                                    mimeType: note.mimeType ?? 'audio/webm',
+                                    fileName: note.fileName,
+                                    compact: true,
+                                  ),
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            tooltip: 'Delete voice note',
+                            visualDensity: VisualDensity.compact,
+                            onPressed: _submitting
+                                ? null
+                                : () => _removeVoiceNote(note.clientId),
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
               ],
               if (_error != null) ...[
                 const SizedBox(height: AppSpacing.sm),
                 Text(_error!, style: const TextStyle(color: AppColors.danger)),
+              ] else if (!_canSubmit && !_loading && _submitBlockedReason != null) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  _submitBlockedReason!,
+                  style: const TextStyle(color: AppColors.danger),
+                ),
               ],
               const SizedBox(height: AppSpacing.lg),
               PrimaryButton(
                 label: _submitting ? 'Completing...' : 'Complete subtask',
                 loading: _submitting,
-                onPressed: _canSubmit ? _submit : null,
+                onPressed: _canSubmit ? () => _submit() : null,
               ),
             ],
           ),

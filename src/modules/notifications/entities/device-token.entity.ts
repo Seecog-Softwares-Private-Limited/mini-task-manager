@@ -21,7 +21,7 @@ export class DeviceTokenEntity {
   @Column({ name: 'user_id', type: 'binary', length: 16, transformer: uuidBinaryTransformer })
   userId!: string;
 
-  @Column({ type: 'varchar', length: 512 })
+  @Column({ type: 'varchar', length: 1024 })
   token!: string;
 
   @Column({ type: 'varchar', length: 16 })

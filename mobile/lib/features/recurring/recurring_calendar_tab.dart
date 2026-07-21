@@ -883,7 +883,6 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
           autofocus: true,
           maxLines: 4,
           maxLength: 2000,
-          textCapitalization: TextCapitalization.sentences,
           decoration: const InputDecoration(
             hintText: 'Why was this done / not done today?',
             border: OutlineInputBorder(),

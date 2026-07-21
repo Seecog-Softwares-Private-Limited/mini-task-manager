@@ -278,7 +278,6 @@ class _CreateTaskSheetState extends ConsumerState<CreateTaskSheet> {
                 TextField(
                   controller: _titleController,
                   autofocus: true,
-                  textCapitalization: TextCapitalization.sentences,
                   decoration: const InputDecoration(hintText: 'What needs to be done?'),
                 ),
                 const SizedBox(height: AppSpacing.md),
@@ -287,7 +286,6 @@ class _CreateTaskSheetState extends ConsumerState<CreateTaskSheet> {
                   controller: _descriptionController,
                   minLines: 3,
                   maxLines: 6,
-                  textCapitalization: TextCapitalization.sentences,
                   decoration: const InputDecoration(
                     hintText: 'Add details, links, or notes…',
                     alignLabelWithHint: true,
@@ -558,7 +556,6 @@ class _SubtaskEditorCard extends StatelessWidget {
           TextField(
             controller: draft.titleController,
             enabled: !disabled,
-            textCapitalization: TextCapitalization.sentences,
             decoration: const InputDecoration(hintText: 'Subtask title'),
             onChanged: (_) => onChanged(),
           ),
@@ -568,7 +565,6 @@ class _SubtaskEditorCard extends StatelessWidget {
             enabled: !disabled,
             minLines: 2,
             maxLines: 4,
-            textCapitalization: TextCapitalization.sentences,
             decoration: const InputDecoration(hintText: 'Subtask description (optional)'),
             onChanged: (_) => onChanged(),
           ),

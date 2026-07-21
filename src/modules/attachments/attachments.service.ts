@@ -30,26 +30,62 @@ function sanitizeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 200) || 'file';
 }
 
-function isAllowedMime(mimetype: string): boolean {
-  if (!mimetype) return false;
-  const allowed = [
-    'image/',
-    'text/',
-    'application/pdf',
-    'application/json',
-    'application/zip',
-    'application/x-zip-compressed',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'application/vnd.ms-excel.sheet.macroenabled.12',
-    'application/vnd.oasis.opendocument.spreadsheet',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'text/csv',
-  ];
-  return allowed.some((prefix) =>
-    prefix.endsWith('/') ? mimetype.startsWith(prefix) : mimetype === prefix,
-  );
+function normalizeMime(mimetype: string): string {
+  return mimetype.split(';')[0]?.trim().toLowerCase() || '';
+}
+
+function isAllowedMime(mimetype: string, fileName?: string | null): boolean {
+  const mime = normalizeMime(mimetype);
+  if (mime) {
+    const allowed = [
+      'image/',
+      'audio/',
+      'video/',
+      'text/',
+      'application/pdf',
+      'application/json',
+      'application/zip',
+      'application/x-zip-compressed',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel.sheet.macroenabled.12',
+      'application/vnd.oasis.opendocument.spreadsheet',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/csv',
+    ];
+    if (
+      allowed.some((prefix) =>
+        prefix.endsWith('/') ? mime.startsWith(prefix) : mime === prefix,
+      )
+    ) {
+      return true;
+    }
+  }
+
+  const ext = fileName?.split('.').pop()?.toLowerCase() ?? '';
+  return [
+    'png',
+    'jpg',
+    'jpeg',
+    'gif',
+    'webp',
+    'bmp',
+    'svg',
+    'pdf',
+    'txt',
+    'csv',
+    'json',
+    'md',
+    'm4a',
+    'mp3',
+    'aac',
+    'wav',
+    'ogg',
+    'webm',
+    'mp4',
+    'mov',
+  ].includes(ext);
 }
 
 function isPreviewableMime(
@@ -102,7 +138,13 @@ export class AttachmentsService {
   ): Promise<AttachmentEntity> {
     if (!file) throw new BadRequestException('File is required');
     if (file.size > MAX_FILE_SIZE) throw new ForbiddenException('File too large (max 10MB)');
-    if (!isAllowedMime(file.mimetype || '')) throw new ForbiddenException('File type not allowed');
+    if (!isAllowedMime(file.mimetype || '', file.originalname)) {
+      throw new ForbiddenException(
+        `File type not allowed (${file.mimetype || 'unknown'}${
+          file.originalname ? `, ${file.originalname}` : ''
+        })`,
+      );
+    }
 
     const context = await this.resolveEntityContext(
       entityType,
@@ -157,7 +199,7 @@ export class AttachmentsService {
       entityId,
       originalFileName: displayName,
       storedFileName,
-      mimeType: file.mimetype || null,
+      mimeType: normalizeMime(file.mimetype || '') || file.mimetype || null,
       fileExtension: ext.replace(/^\./, '') || null,
       fileSize: file.size,
       storageProvider: 'local',

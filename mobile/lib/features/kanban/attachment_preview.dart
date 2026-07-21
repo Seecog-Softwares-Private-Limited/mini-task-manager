@@ -15,6 +15,7 @@ import 'attachment_file_meta.dart';
 import 'attachment_file_opener.dart';
 import 'attachment_preview_view.dart';
 import 'kanban_providers.dart';
+import 'voice_note_player.dart';
 import '../auth/session_controller.dart';
 
 Future<void> previewTaskAttachment({
@@ -450,6 +451,11 @@ class _AttachmentPreviewDialogState extends ConsumerState<_AttachmentPreviewDial
             _textContent = _decodeText(bytes);
             _loading = false;
           });
+        case AttachmentPreviewKind.audio:
+          setState(() {
+            _bytes = bytes;
+            _loading = false;
+          });
         case AttachmentPreviewKind.unsupported:
           setState(() => _loading = false);
       }
@@ -517,6 +523,16 @@ class _AttachmentPreviewDialogState extends ConsumerState<_AttachmentPreviewDial
   }
 
   Widget _buildPreviewBody(double previewHeight) {
+    if (_kind == AttachmentPreviewKind.audio && _bytes != null) {
+      return Center(
+        child: VoiceNotePlayer(
+          bytes: _bytes!,
+          mimeType: _mimeType,
+          fileName: widget.attachment.fileName,
+        ),
+      );
+    }
+
     if (_kind == AttachmentPreviewKind.text && _textContent != null) {
       return _TextPreviewBody(content: _textContent!);
     }

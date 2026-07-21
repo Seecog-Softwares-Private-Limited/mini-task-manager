@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Paperclip, Upload } from "lucide-react";
+import { Mic, Paperclip, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
@@ -25,6 +25,7 @@ import {
   AttachmentPreviewModal,
   type AttachmentPreviewTarget,
 } from "@/components/tasks/subtasks/attachment-preview-modal";
+import { VoiceNoteRecorderDialog } from "@/components/tasks/voice-note-recorder-dialog";
 import { generateClientId } from "@/lib/generate-client-id";
 import { cn } from "@/lib/utils";
 import type { PendingSubtaskAttachment } from "@/components/tasks/subtasks/subtask-attachments-section";
@@ -64,6 +65,7 @@ export function TaskAttachmentsSection({
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const sectionRef = React.useRef<HTMLDivElement>(null);
   const [previewTarget, setPreviewTarget] = React.useState<AttachmentPreviewTarget | null>(null);
+  const [voiceOpen, setVoiceOpen] = React.useState(false);
   const [focused, setFocused] = React.useState(false);
   const [dragOver, setDragOver] = React.useState(false);
   const [thumbById, setThumbById] = React.useState<Record<string, string>>({});
@@ -262,7 +264,7 @@ export function TaskAttachmentsSection({
           <Paperclip className="h-3.5 w-3.5" />
           {createDrawer ? "Attachments" : "Task attachments"}
         </Label>
-        <div>
+        <div className="flex items-center gap-1.5">
           <input
             ref={fileInputRef}
             type="file"
@@ -286,6 +288,20 @@ export function TaskAttachmentsSection({
           >
             <Upload className="mr-1.5 h-3.5 w-3.5" />
             Upload
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={cn(
+              "h-7 text-[11px] transition-all duration-200",
+              createDrawer && "rounded-md border-border/55"
+            )}
+            disabled={disabled}
+            onClick={() => setVoiceOpen(true)}
+          >
+            <Mic className="mr-1.5 h-3.5 w-3.5" />
+            Voice
           </Button>
         </div>
       </div>
@@ -357,6 +373,11 @@ export function TaskAttachmentsSection({
       <AttachmentPreviewModal
         target={previewTarget}
         onClose={() => setPreviewTarget(null)}
+      />
+      <VoiceNoteRecorderDialog
+        open={voiceOpen}
+        onOpenChange={setVoiceOpen}
+        onRecorded={(file) => void handleFiles([file])}
       />
     </div>
   );

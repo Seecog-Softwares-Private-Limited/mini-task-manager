@@ -100,10 +100,10 @@ export class TaskNotificationsService {
       const previous = beforeSubtasks.find((item) => item.id === subtask.id);
       const previousAssignees = previous ? this.getSubtaskAssigneeIds(previous) : [];
       const nextAssignees = this.getSubtaskAssigneeIds(subtask);
+      // Always notify newly assigned subtask members (even if they also got
+      // task_assigned in this same update) so every assignment sends a push.
       const newlyAssigned = this.getNewIds(previousAssignees, nextAssignees).filter(
-        (assigneeId) =>
-          !this.isSameUser(assigneeId, actorUserId) &&
-          !notifiedUserIds.has(normalizeUserIdForCompare(assigneeId) ?? ''),
+        (assigneeId) => !this.isSameUser(assigneeId, actorUserId),
       );
 
       for (const assigneeId of newlyAssigned) {
@@ -212,20 +212,22 @@ export class TaskNotificationsService {
         markNotified(assigneeId);
       }
       // Push/in-app notification should not depend on SMTP success.
-      await this.notificationsService
-        .createNotification(
+      try {
+        await this.notificationsService.createNotification(
           assigneeId,
           `Task assigned: ${task.title}`,
           `${context.assignerName} assigned you to "${task.title}"${context.projectName ? ` in ${context.projectName}` : ''}.`,
           {
             type: 'task_assigned',
-            taskId: task.id,
-            projectId: task.projectId,
+            taskId: String(task.id),
+            projectId: String(task.projectId),
             open: 'alerts',
           },
-        )
-        .then(() => markNotified(assigneeId))
-        .catch((err) => this.logger.warn(`In-app/push notification failed: ${err}`));
+        );
+        markNotified(assigneeId);
+      } catch (err) {
+        this.logger.warn(`In-app/push notification failed: ${err}`);
+      }
     }
 
     return notified;
@@ -259,20 +261,22 @@ export class TaskNotificationsService {
     });
 
     // Push/in-app notification for subtask assignee (independent of email).
-    await this.notificationsService
-      .createNotification(
+    try {
+      await this.notificationsService.createNotification(
         assigneeId,
         `Subtask assigned: ${subtask.title}`,
         `${context.assignerName} assigned you subtask "${subtask.title}" on "${task.title}"${context.projectName ? ` in ${context.projectName}` : ''}.`,
         {
           type: 'subtask_assigned',
-          taskId: task.id,
-          projectId: task.projectId,
+          taskId: String(task.id),
+          projectId: String(task.projectId),
           subtaskId: String(subtask.id ?? ''),
           open: 'alerts',
         },
-      )
-      .catch((err) => this.logger.warn(`In-app/push notification failed: ${err}`));
+      );
+    } catch (err) {
+      this.logger.warn(`In-app/push notification failed: ${err}`);
+    }
 
     return sent ?? assigneeId;
   }

@@ -289,7 +289,6 @@ class _CircleAvatar extends ConsumerWidget {
     final imageUrl = resolveUserAvatarUrl(
       config.apiBaseUrl,
       member.user?.avatarUrl,
-      userId: member.userId,
     );
     final cacheSize = (size * MediaQuery.devicePixelRatioOf(context)).round();
 

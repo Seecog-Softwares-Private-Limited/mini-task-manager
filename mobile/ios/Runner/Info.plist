@@ -55,7 +55,7 @@
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Capture your location when completing subtasks on site.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Record optional voice notes when completing subtasks.</string>
+	<string>Record voice notes for task and subtask attachments.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Pick photos for task and subtask attachments.</string>
 	<key>UIBackgroundModes</key>

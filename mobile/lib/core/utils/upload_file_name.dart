@@ -18,6 +18,7 @@ String buildDefaultUploadFileName({String? mimeType, DateTime? timestamp}) {
   final stamp = DateFormat('yyyy-MM-dd HH.mm.ss').format(timestamp ?? DateTime.now());
   final mime = mimeType?.toLowerCase() ?? '';
   if (mime.startsWith('video/')) return 'Video $stamp.mp4';
+  if (mime.startsWith('audio/')) return 'Voice note $stamp.m4a';
   if (mime == 'application/pdf') return 'Document $stamp.pdf';
   return 'Photo $stamp.jpg';
 }

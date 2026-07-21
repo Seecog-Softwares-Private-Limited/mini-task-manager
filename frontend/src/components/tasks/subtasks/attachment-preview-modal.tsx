@@ -34,10 +34,12 @@ import {
   formatAttachmentDisplayName,
   friendlyAttachmentLoadError,
   inferMimeTypeFromFileName,
+  isAudioMime,
   isImageMime,
   isPdfMime,
   isTextPreviewMime,
 } from "@/lib/attachment-file-meta";
+import { VoiceNotePlayer } from "@/components/tasks/voice-note-player";
 
 const PREVIEW_Z = "z-[270]";
 
@@ -139,6 +141,7 @@ export function AttachmentPreviewModal({ target, onClose }: AttachmentPreviewMod
   const isImage = isImageMime(resolvedMime, fileName);
   const isPdf = isPdfMime(resolvedMime, fileName);
   const isText = isTextPreviewMime(resolvedMime, fileName);
+  const isAudio = isAudioMime(resolvedMime, rawFileName);
   const isOfficeDocument = isOfficeDocumentPreviewable(resolvedMime, fileName);
 
   React.useEffect(() => {
@@ -243,6 +246,14 @@ export function AttachmentPreviewModal({ target, onClose }: AttachmentPreviewMod
           return;
         }
 
+        if (isAudio) {
+          const blob = ensurePreviewBlob(rawBlob, resolvedMime, rawFileName);
+          const url = URL.createObjectURL(blob);
+          revoked = url;
+          setBlobUrl(url);
+          return;
+        }
+
         finishUnsupported("Preview is not available for this file type.");
       } catch (err) {
         finishUnsupported(
@@ -265,7 +276,7 @@ export function AttachmentPreviewModal({ target, onClose }: AttachmentPreviewMod
       cancelled = true;
       if (revoked) URL.revokeObjectURL(revoked);
     };
-  }, [target, fileName, resolvedMime, isImage, isPdf, isText, isOfficeDocument]);
+  }, [target, fileName, rawFileName, resolvedMime, isImage, isPdf, isText, isAudio, isOfficeDocument]);
 
   const handleDownload = async () => {
     try {
@@ -411,6 +422,10 @@ export function AttachmentPreviewModal({ target, onClose }: AttachmentPreviewMod
                 className="max-h-[min(70vh,600px)] max-w-full object-contain transition-transform duration-200"
                 style={{ transform: `scale(${zoom})` }}
               />
+            ) : isAudio && blobUrl ? (
+              <div className="w-full max-w-md">
+                <VoiceNotePlayer src={blobUrl} />
+              </div>
             ) : null}
           </div>
         </Dialog.Content>

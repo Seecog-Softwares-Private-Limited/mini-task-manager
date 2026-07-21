@@ -398,7 +398,6 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
               TextField(
                 controller: _titleController,
                 autofocus: !_isEdit,
-                textCapitalization: TextCapitalization.sentences,
                 decoration: const InputDecoration(
                   hintText: 'e.g. Morning workout',
                 ),
@@ -410,7 +409,6 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
                 controller: _descriptionController,
                 minLines: 2,
                 maxLines: 4,
-                textCapitalization: TextCapitalization.sentences,
                 decoration: const InputDecoration(
                   hintText: 'Optional details for this series',
                   alignLabelWithHint: true,
@@ -765,7 +763,6 @@ class _ChecklistEditor extends StatelessWidget {
                   child: TextField(
                     controller: items[i].titleController,
                     enabled: enabled,
-                    textCapitalization: TextCapitalization.sentences,
                     decoration: InputDecoration(
                       isDense: true,
                       hintText: 'Checklist item ${i + 1}',

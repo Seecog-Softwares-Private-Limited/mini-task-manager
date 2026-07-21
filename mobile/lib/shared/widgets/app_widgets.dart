@@ -42,6 +42,8 @@ class PrimaryButton extends StatelessWidget {
             ),
           );
 
+    // Avoid Colors.transparent on ElevatedButton — on Flutter web it often
+    // drops hit-testing, so the gradient looks tappable but clicks do nothing.
     final button = Opacity(
       opacity: enabled ? 1 : 0.5,
       child: DecoratedBox(
@@ -59,20 +61,21 @@ class PrimaryButton extends StatelessWidget {
                 ]
               : const [],
         ),
-        child: ElevatedButton(
-          onPressed: enabled ? onPressed : null,
-          style: ElevatedButton.styleFrom(
-            elevation: 0,
-            backgroundColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            foregroundColor: Colors.white,
-            disabledForegroundColor: Colors.white,
-            disabledBackgroundColor: Colors.transparent,
-            minimumSize: Size(0, height),
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            shape: RoundedRectangleBorder(borderRadius: radius),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: radius,
+          child: InkWell(
+            onTap: enabled ? onPressed : null,
+            borderRadius: radius,
+            child: SizedBox(
+              height: height,
+              width: expand ? double.infinity : null,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Center(child: child),
+              ),
+            ),
           ),
-          child: child,
         ),
       ),
     );
