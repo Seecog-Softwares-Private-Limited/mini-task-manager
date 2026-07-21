@@ -115,6 +115,7 @@ export class RecurringTasksService {
     private readonly projectsRepository: ProjectsRepository,
     @Inject(forwardRef(() => TasksService))
     private readonly tasksService: TasksService,
+    @Inject(forwardRef(() => TaskNotificationsService))
     private readonly taskNotifications: TaskNotificationsService,
   ) {}
 
