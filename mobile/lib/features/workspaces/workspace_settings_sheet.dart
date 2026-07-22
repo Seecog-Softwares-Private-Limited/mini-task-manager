@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/messaging/app_messenger.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../data/models/organization.dart';
@@ -218,6 +219,14 @@ class _WorkspaceSettingsSheetState extends ConsumerState<WorkspaceSettingsSheet>
                             onPressed: !_hasChanges || _saving ? null : _save,
                           ),
                         ],
+                        const SizedBox(height: AppSpacing.sm),
+                        SecondaryButton(
+                          label: 'Plans & Pricing',
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            openPlansBillingScreen();
+                          },
+                        ),
                       ],
                     ),
                   ),
