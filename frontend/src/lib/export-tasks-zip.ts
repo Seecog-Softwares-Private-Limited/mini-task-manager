@@ -231,7 +231,7 @@ export async function exportTasksToZipFile(
   zip.file(
     "README.txt",
     [
-      "Mini Task Manager — project task export",
+      "OpsPick — project task export",
       "",
       "Contents:",
       "- tasks.csv — task details (open in Excel or re-import)",

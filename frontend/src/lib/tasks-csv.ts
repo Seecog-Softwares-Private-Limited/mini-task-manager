@@ -179,7 +179,7 @@ export function parseTasksCsvContent(content: string): {
     return {
       rows: [],
       errors: [
-        'Missing "Title" column. Use a CSV exported from Mini Task Manager (Export CSV).',
+        'Missing "Title" column. Use a CSV exported from OpsPick (Export CSV).',
       ],
     };
   }

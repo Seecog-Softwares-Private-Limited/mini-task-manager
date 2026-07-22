@@ -33,7 +33,7 @@ export class SmsService {
 
     try {
       await this.client.messages.create({
-        body: `Your Mini Task Manager verification code is: ${code}. Valid for 10 minutes.`,
+        body: `Your OpsPick verification code is: ${code}. Valid for 10 minutes.`,
         from: this.fromNumber,
         to: normalized,
       });

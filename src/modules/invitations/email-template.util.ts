@@ -41,7 +41,7 @@ function emailLogo(): string {
   </tr>
 </table>
 <p style="margin:0 0 4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.14em;color:${BRAND.textLight};">
-  Mini Task Manager
+  OpsPick
 </p>`.trim();
 }
 
@@ -158,7 +158,7 @@ export function emailPlainTextInvite(
   directAppUrl: string,
 ): string {
   const direct = directAppUrl || acceptUrl;
-  return `${inviterName} invited you to join ${organizationName} as ${role} on Mini Task Manager.
+  return `${inviterName} invited you to join ${organizationName} as ${role} on OpsPick.
 
 If this email is in Spam, mark it as "Not spam" first — then open:
 
@@ -221,7 +221,7 @@ export function emailInvitationBody(params: {
   You&apos;re invited!
 </h1>
 <p style="text-align:center;color:${BRAND.textMuted};font-size:15px;line-height:1.6;margin:0 0 28px;">
-  Join your team and start collaborating on Mini Task Manager
+  Join your team and start collaborating on OpsPick
 </p>
 <div style="background:${BRAND.footerBg};border:1px solid ${BRAND.cardBorder};border-radius:16px;padding:24px;margin:0 0 8px;text-align:center;">
   <p style="margin:0 0 6px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.12em;color:${BRAND.textLight};">
@@ -573,7 +573,7 @@ export function emailLayout(bodyHtml: string): string {
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
   <meta name="supported-color-schemes" content="light">
-  <title>Mini Task Manager</title>
+  <title>OpsPick</title>
 </head>
 <body style="margin:0;padding:0;background-color:${BRAND.bg};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:${BRAND.bg};">
@@ -600,7 +600,7 @@ export function emailLayout(bodyHtml: string): string {
           <tr>
             <td style="padding:20px 32px;background-color:${BRAND.footerBg};border-top:1px solid ${BRAND.cardBorder};text-align:center;">
               <p style="margin:0 0 4px;font-size:12px;color:${BRAND.textLight};">
-                &copy; Mini Task Manager
+                &copy; OpsPick
               </p>
               <p style="margin:0;font-size:11px;color:#cbd5e1;">
                 Organize work. Ship faster.

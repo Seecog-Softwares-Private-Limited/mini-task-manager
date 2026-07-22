@@ -1,6 +1,6 @@
 # Google Play Store Release Checklist
 
-Use this checklist when publishing **Mini Task Manager** (`com.seecog.minitaskmanager.mini_task_manager`).
+Use this checklist when publishing **OpsPick** (`com.seecog.minitaskmanager.mini_task_manager`).
 
 ---
 

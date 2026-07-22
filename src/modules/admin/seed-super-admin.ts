@@ -83,7 +83,7 @@ async function main() {
     await dataSource.query(`
       INSERT INTO platform_settings (setting_key, setting_value)
       VALUES
-        ('platform_name', JSON_OBJECT('value', 'Mini Task Manager')),
+        ('platform_name', JSON_OBJECT('value', 'OpsPick')),
         ('registration', JSON_OBJECT('enabled', true)),
         ('security', JSON_OBJECT('mfaRequired', false)),
         ('smtp', JSON_OBJECT('configured', false)),

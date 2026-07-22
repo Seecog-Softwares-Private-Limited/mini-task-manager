@@ -30,7 +30,7 @@ export const configuration = () => {
       port: smtpPort,
       user: process.env.SMTP_USER || '',
       pass: process.env.SMTP_PASS || '',
-      from: process.env.SMTP_FROM || 'noreply@minitaskmanager.local',
+      from: process.env.SMTP_FROM || 'noreply@opspick.com',
       provider: resolveSmtpProvider(smtpHost, smtpPort),
       region: process.env.AWS_SES_REGION?.trim() || undefined,
       /** When true (default), verify SMTP on startup and log failures. */
@@ -41,7 +41,7 @@ export const configuration = () => {
             port: parseInt(process.env.SMTP_FALLBACK_PORT || '587', 10),
             user: process.env.SMTP_FALLBACK_USER || '',
             pass: process.env.SMTP_FALLBACK_PASS || '',
-            from: process.env.SMTP_FALLBACK_FROM || process.env.SMTP_FROM || 'noreply@minitaskmanager.local',
+            from: process.env.SMTP_FALLBACK_FROM || process.env.SMTP_FROM || 'noreply@opspick.com',
           }
         : undefined,
     },

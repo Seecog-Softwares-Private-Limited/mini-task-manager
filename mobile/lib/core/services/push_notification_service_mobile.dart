@@ -155,7 +155,7 @@ class PushNotificationService {
     const channel = AndroidNotificationChannel(
       'high_importance_channel',
       'High Importance Notifications',
-      description: 'Task Manager alerts',
+      description: 'OpsPick alerts',
       importance: Importance.high,
     );
     await _local!
@@ -180,7 +180,7 @@ class PushNotificationService {
         android: AndroidNotificationDetails(
           'high_importance_channel',
           'High Importance Notifications',
-          channelDescription: 'Task Manager alerts',
+          channelDescription: 'OpsPick alerts',
           importance: Importance.high,
           priority: Priority.high,
           icon: '@mipmap/ic_launcher',

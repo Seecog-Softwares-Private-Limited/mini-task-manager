@@ -86,7 +86,7 @@ export async function parseTasksZipFile(file: File): Promise<ParsedTasksZip> {
   if (!csvEntry) {
     return {
       rows: [],
-      errors: ['ZIP must contain "tasks.csv" (export from Mini Task Manager → Export ZIP).'],
+      errors: ['ZIP must contain "tasks.csv" (export from OpsPick → Export ZIP).'],
       mediaByExportKey: new Map(),
       mediaItemsByExportKey: new Map(),
     };

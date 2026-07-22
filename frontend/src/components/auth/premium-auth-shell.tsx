@@ -131,7 +131,7 @@ export function AuthBrandPanel() {
     <div className="auth-brand-enter w-full">
       <AuthAppLogo variant="light" className="mb-6" />
       <h2 className="text-2xl font-semibold tracking-tight text-foreground xl:text-[1.75rem]">
-        Mini Task Manager
+        OpsPick
       </h2>
       <p className="mt-2 max-w-[16rem] text-sm leading-relaxed text-muted-foreground">
         Organize work. Ship faster.
@@ -232,7 +232,7 @@ export function PremiumAuthCard({
           {isCompact ? (
             <div className="mb-5 flex items-center gap-2.5 lg:hidden">
               <AuthAppLogo variant="light" className="h-9 w-9" />
-              <span className="text-sm font-semibold text-foreground">Mini Task Manager</span>
+              <span className="text-sm font-semibold text-foreground">OpsPick</span>
             </div>
           ) : null}
           <h1

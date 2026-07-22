@@ -1,6 +1,6 @@
 const TESTIMONIALS = [
   {
-    quote: "MiniTask replaced three tools for us. Our sprint velocity improved 40% in the first month, and the team actually enjoys using it.",
+    quote: "OpsPick replaced three tools for us. Our sprint velocity improved 40% in the first month, and the team actually enjoys using it.",
     name: "Sarah Chen",
     role: "Engineering Lead",
     company: "Northwind Labs",
@@ -14,7 +14,7 @@ const TESTIMONIALS = [
     initials: "MR",
   },
   {
-    quote: "Clean, fast, and no bloat. We evaluated Linear, Jira, and Asana — MiniTask hit the sweet spot for our startup's pace and budget.",
+    quote: "Clean, fast, and no bloat. We evaluated Linear, Jira, and Asana — OpsPick hit the sweet spot for our startup's pace and budget.",
     name: "Emily Watson",
     role: "CEO",
     company: "Acme Startup",
@@ -29,7 +29,7 @@ export function TestimonialsSection() {
         <div className="lp-reveal mx-auto max-w-2xl text-center mb-14">
           <span className="lp-section-label">Testimonials</span>
           <h2 className="lp-heading mt-4">Loved by teams everywhere</h2>
-          <p className="lp-body-lg mt-3">See why fast-moving teams choose MiniTask.</p>
+          <p className="lp-body-lg mt-3">See why fast-moving teams choose OpsPick.</p>
         </div>
 
         <div className="grid md:grid-cols-3 gap-4">

@@ -146,7 +146,7 @@ export function ImportTasksCsvModal({
             Import tasks from CSV
           </DialogTitle>
           <DialogDescription>
-            Import a file exported from Mini Task Manager into{" "}
+            Import a file exported from OpsPick into{" "}
             <strong className="text-foreground">{projectName}</strong>. Task IDs and
             project names in the file are ignored — new tasks are created in this project.
           </DialogDescription>

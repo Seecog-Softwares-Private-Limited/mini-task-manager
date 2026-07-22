@@ -18,7 +18,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Is my data secure?",
-    a: "MiniTask includes role-based access control, API key management, audit logs, and organization-level security. Data is encrypted in transit and at rest.",
+    a: "OpsPick includes role-based access control, API key management, audit logs, and organization-level security. Data is encrypted in transit and at rest.",
   },
   {
     q: "Can I import data from other tools?",

@@ -1,4 +1,4 @@
-# Login flow — deep analysis (Mini Task Manager)
+# Login flow — deep analysis (OpsPick)
 
 This document explains how email/password login works, what broke in the past, and how to debug it.
 

@@ -14,7 +14,7 @@ export default function SuperAdminSettingsPage() {
     queryKey: ["super-admin", "settings"],
     queryFn: fetchSuperAdminSettings,
   });
-  const [platformName, setPlatformName] = useState("Mini Task Manager");
+  const [platformName, setPlatformName] = useState("OpsPick");
   const [saving, setSaving] = useState(false);
 
   async function save() {

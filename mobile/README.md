@@ -1,4 +1,4 @@
-# Mini Task Manager — Flutter Mobile
+# OpsPick — Flutter Mobile
 
 Native Flutter client for Android and iOS. Talks directly to the NestJS API (`/api/v1`) with JWT auth and `X-Organization-Id` tenant headers — same contract as the web app.
 
