@@ -31,9 +31,9 @@ export function Navbar() {
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "lp-nav-glass" : "bg-transparent"}`}>
       <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6 lg:px-8" aria-label="Main navigation">
-        <Link href="/" className="flex items-center gap-2.5 group" aria-label="MiniTask home">
+        <Link href="/" className="flex items-center gap-2.5 group" aria-label="OpsPick home">
           <IconLogo className="h-9 w-9 transition-transform duration-200 group-hover:scale-105" />
-          <span className="text-[1.0625rem] font-semibold tracking-tight text-foreground">MiniTask</span>
+          <span className="text-[1.0625rem] font-semibold tracking-tight text-foreground">OpsPick</span>
         </Link>
 
         <div className="hidden md:flex items-center gap-0.5">

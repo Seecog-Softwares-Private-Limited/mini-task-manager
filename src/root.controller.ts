@@ -12,7 +12,7 @@ export class RootController {
   @Public()
   root() {
     return {
-      message: 'Mini Task Manager API',
+      message: 'OpsPick API',
       api: '/api/v1',
       openapi: '/api/v1/openapi.yaml',
       docs: `Use the API at /api/v1. Frontend: http://localhost:${process.env.FRONTEND_PORT || '3001'}`,

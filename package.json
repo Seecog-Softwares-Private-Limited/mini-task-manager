@@ -1,7 +1,7 @@
 {
   "name": "mini-task-manager",
   "version": "1.0.0",
-  "description": "Task Manager SaaS - Production-grade NestJS backend",
+  "description": "OpsPick — Production-grade NestJS backend",
   "scripts": {
     "build": "nest build",
     "build:frontend": "cd frontend && npm run build",

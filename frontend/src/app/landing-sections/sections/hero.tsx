@@ -21,7 +21,7 @@ function DashboardMockup() {
           <div className="h-2.5 w-2.5 rounded-full bg-emerald-400/80" />
         </div>
         <div className="ml-3 flex-1 rounded-md bg-background px-3 py-1 text-[11px] text-muted-foreground border border-border/60">
-          app.minitask.io/dashboard
+          app.opspick.com/dashboard
         </div>
       </div>
       <div className="p-5 sm:p-6">

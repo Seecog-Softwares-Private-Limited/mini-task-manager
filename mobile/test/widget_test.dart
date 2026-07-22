@@ -17,12 +17,12 @@ void main() {
         overrides: [
           sharedPreferencesProvider.overrideWithValue(prefs),
         ],
-        child: const MiniTaskManagerApp(),
+        child: const OpsPickApp(),
       ),
     );
     await tester.pumpAndSettle();
 
     expect(find.text('Sign in'), findsOneWidget);
-    expect(find.text('Mini Task Manager'), findsOneWidget);
+    expect(find.text('OpsPick'), findsOneWidget);
   });
 }

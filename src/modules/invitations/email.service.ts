@@ -186,7 +186,7 @@ export class EmailService implements OnModuleInit {
     await this.deliver({
       kind: 'verification',
       to,
-      subject: 'Verify your email - Mini Task Manager',
+      subject: 'Verify your email - OpsPick',
       text: emailPlainTextWithLink(
         `Hi ${fullName}, thanks for signing up! Verify your email by visiting:`,
         verifyUrl,
@@ -209,7 +209,7 @@ export class EmailService implements OnModuleInit {
     await this.deliver({
       kind: 'password-reset',
       to,
-      subject: 'Reset your password - Mini Task Manager',
+      subject: 'Reset your password - OpsPick',
       text: emailPlainTextWithLink(`Hi ${fullName}, reset your password by visiting:`, resetUrl),
       html: emailLayout(emailPasswordResetBody({ fullName, resetUrl })),
     });
@@ -217,12 +217,12 @@ export class EmailService implements OnModuleInit {
 
   async sendEmailChangeVerification(payload: EmailChangePayload): Promise<void> {
     const { to, fullName, shortCode } = payload;
-    const appHint = 'the Mini Task Manager app (Profile → Change email)';
+    const appHint = 'the OpsPick app (Profile → Change email)';
 
     await this.deliver({
       kind: 'email-change',
       to,
-      subject: 'Confirm your new email - Mini Task Manager',
+      subject: 'Confirm your new email - OpsPick',
       text: [
         `Hi ${fullName},`,
         '',
@@ -301,7 +301,7 @@ ${emailExpiryNote('1 hour')}
 
   private formatFromAddress(): string {
     const fromRaw = this.smtp.from;
-    return fromRaw.includes('<') ? fromRaw : `"Mini Task Manager" <${fromRaw}>`;
+    return fromRaw.includes('<') ? fromRaw : `"OpsPick" <${fromRaw}>`;
   }
 
   private async deliver(params: {
@@ -322,7 +322,7 @@ ${emailExpiryNote('1 hour')}
       text,
       ...(replyTo ? { replyTo } : {}),
       headers: {
-        'X-Mailer': 'Mini Task Manager',
+        'X-Mailer': 'OpsPick',
         'X-Priority': '3',
       },
     };
@@ -345,7 +345,7 @@ ${emailExpiryNote('1 hour')}
       if (this.fallbackTransporter && this.smtp.fallback) {
         const fallbackFrom = this.smtp.fallback.from.includes('<')
           ? this.smtp.fallback.from
-          : `"Mini Task Manager" <${this.smtp.fallback.from}>`;
+          : `"OpsPick" <${this.smtp.fallback.from}>`;
         this.logger.warn(
           `Retrying ${kind} email to ${to} via fallback SMTP ${this.smtp.fallback.host}:${this.smtp.fallback.port}`,
         );

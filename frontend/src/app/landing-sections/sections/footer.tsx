@@ -23,7 +23,7 @@ export function Footer() {
           <div className="sm:col-span-2">
             <Link href="/" className="inline-flex items-center gap-2.5">
               <IconLogo className="h-9 w-9" />
-              <span className="text-[1.0625rem] font-semibold text-foreground tracking-tight">MiniTask</span>
+              <span className="text-[1.0625rem] font-semibold text-foreground tracking-tight">OpsPick</span>
             </Link>
             <p className="mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">
               Project management built for teams that move fast. Kanban, Scrum, automations, and collaboration in one workspace.
@@ -47,7 +47,7 @@ export function Footer() {
         </div>
 
         <div className="mt-10 pt-6 border-t border-border/60 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} MiniTask. All rights reserved.</p>
+          <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} OpsPick. All rights reserved.</p>
           <p className="text-sm text-muted-foreground">Built for teams who ship.</p>
         </div>
       </div>

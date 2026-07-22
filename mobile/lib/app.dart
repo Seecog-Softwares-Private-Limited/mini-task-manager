@@ -26,7 +26,7 @@ Future<void> bootstrap() async {
       overrides: [
         sharedPreferencesProvider.overrideWithValue(prefs),
       ],
-      child: const MiniTaskManagerApp(),
+      child: const OpsPickApp(),
     ),
   );
 
@@ -50,14 +50,14 @@ Future<void> _postLaunchInit(SharedPreferences prefs) async {
   }
 }
 
-class MiniTaskManagerApp extends ConsumerStatefulWidget {
-  const MiniTaskManagerApp({super.key});
+class OpsPickApp extends ConsumerStatefulWidget {
+  const OpsPickApp({super.key});
 
   @override
-  ConsumerState<MiniTaskManagerApp> createState() => _MiniTaskManagerAppState();
+  ConsumerState<OpsPickApp> createState() => _OpsPickAppState();
 }
 
-class _MiniTaskManagerAppState extends ConsumerState<MiniTaskManagerApp>
+class _OpsPickAppState extends ConsumerState<OpsPickApp>
     with WidgetsBindingObserver {
   @override
   void initState() {
@@ -91,7 +91,7 @@ class _MiniTaskManagerAppState extends ConsumerState<MiniTaskManagerApp>
     final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp.router(
-      title: 'Mini Task Manager',
+      title: 'OpsPick',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),

@@ -68,7 +68,7 @@ async function main(): Promise<void> {
         token: row.token,
         notification: {
           title: 'Test push',
-          body: `Mini Task Manager test (${row.platform}) — app can be closed.`,
+          body: `OpsPick test (${row.platform}) — app can be closed.`,
         },
         data: {
           open: 'alerts',

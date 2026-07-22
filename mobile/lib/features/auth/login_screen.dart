@@ -240,7 +240,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                         const SizedBox(height: AppSpacing.sm),
                         Text(
-                          'Mini Task Manager',
+                          'OpsPick',
                           style: Theme.of(context).textTheme.displaySmall,
                         ),
                         const SizedBox(height: AppSpacing.xs),

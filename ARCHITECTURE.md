@@ -1,4 +1,4 @@
-# Task Manager SaaS – Backend Architecture
+# OpsPick SaaS – Backend Architecture
 
 Production-grade NestJS structure derived **strictly** from the V1 MySQL migration. No schema redesign; module boundaries follow database tables and relationships.
 

@@ -11,8 +11,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Mini Task Manager",
-  description: "SaaS Task Manager – organize your work with ease",
+  title: "OpsPick",
+  description: "OpsPick – organize your work with ease",
   icons: {
     icon: "/icon.svg",
   },

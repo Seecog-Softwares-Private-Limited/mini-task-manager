@@ -1,4 +1,4 @@
-# mini-task-manager
+# OpsPick
 
 ## First-time Setup (New Clone)
 

@@ -14,7 +14,7 @@ class AppConfig {
     const flavor = String.fromEnvironment('FLAVOR', defaultValue: 'dev');
     return AppConfig(
       apiBaseUrl: apiBaseUrl,
-      appName: 'Mini Task Manager',
+      appName: 'OpsPick',
       flavor: flavor,
     );
   }
@@ -30,7 +30,7 @@ class AppConfig {
 
     return AppConfig(
       apiBaseUrl: baseUrl,
-      appName: 'Mini Task Manager',
+      appName: 'OpsPick',
       flavor: flavor,
     );
   }

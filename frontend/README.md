@@ -1,6 +1,6 @@
-# Mini Task Manager — Frontend
+# OpsPick — Frontend
 
-Next.js 14 (App Router) SaaS frontend for the Mini Task Manager backend.
+Next.js 14 (App Router) SaaS frontend for the OpsPick backend.
 
 ## Stack
 

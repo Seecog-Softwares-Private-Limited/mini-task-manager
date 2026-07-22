@@ -1,9 +1,9 @@
 openapi: 3.0.3
 info:
-  title: Mini Task Manager API
+  title: OpsPick API
   version: 1.0.0
   description: |
-    REST API for Mini Task Manager. Authenticate with JWT (`Authorization: Bearer <token>`)
+    REST API for OpsPick. Authenticate with JWT (`Authorization: Bearer <token>`)
     or API key (`Authorization: Bearer mtm_...`). Organization-scoped routes require
     `X-Organization-Id` header.
 servers:

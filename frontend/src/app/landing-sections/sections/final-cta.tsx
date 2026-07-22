@@ -8,7 +8,7 @@ export function FinalCtaSection() {
         <div className="lp-reveal">
           <h2 className="lp-heading">Ready to ship faster?</h2>
           <p className="lp-body-lg mt-3 mx-auto max-w-lg">
-            Join teams using MiniTask to organize work, track progress, and deliver results — without the complexity.
+            Join teams using OpsPick to organize work, track progress, and deliver results — without the complexity.
           </p>
 
           <div className="mt-7 flex flex-col sm:flex-row items-center justify-center gap-3">

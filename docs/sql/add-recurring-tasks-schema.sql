@@ -1,4 +1,4 @@
--- Mini Task Manager
+-- OpsPick
 -- Recurring tasks schema patch (MySQL 8+)
 -- Safe to run multiple times (idempotent checks included).
 

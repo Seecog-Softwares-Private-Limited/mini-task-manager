@@ -196,7 +196,7 @@ export default function UserPlansPage() {
         key: rz.keyId,
         amount: rz.amount,
         currency: rz.currency,
-        name: "Mini Task Manager",
+        name: "OpsPick",
         description: `${planLabel} plan — monthly`,
         order_id: rz.orderId,
         redirect: false,

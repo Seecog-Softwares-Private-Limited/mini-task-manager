@@ -33,7 +33,7 @@ export function BenefitsSection() {
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-start">
           <div className="lp-reveal">
-            <span className="lp-section-label">Why MiniTask</span>
+            <span className="lp-section-label">Why OpsPick</span>
             <h2 className="lp-heading mt-4">
               Built for teams that{" "}
               <span className="gradient-text">move fast</span>

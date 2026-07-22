@@ -74,7 +74,7 @@ export function ImportTasksZipModal({
     const isZip =
       file.name.toLowerCase().endsWith(".zip") || file.type === "application/zip";
     if (!isZip) {
-      setParseErrors(["Please choose a .zip file exported from Mini Task Manager."]);
+      setParseErrors(["Please choose a .zip file exported from OpsPick."]);
       return;
     }
     const parsed = await parseTasksZipFile(file);
@@ -160,7 +160,7 @@ export function ImportTasksZipModal({
             Import tasks from ZIP
           </DialogTitle>
           <DialogDescription>
-            Import a ZIP exported from Mini Task Manager into{" "}
+            Import a ZIP exported from OpsPick into{" "}
             <strong className="text-foreground">{projectName}</strong>. Tasks and images in the{" "}
             <code className="text-xs">media/</code> folders are recreated in this project.
           </DialogDescription>
