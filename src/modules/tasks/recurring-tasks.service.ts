@@ -1243,9 +1243,24 @@ export class RecurringTasksService {
     } as never);
   }
 
-  async updateTemplate(templateId: string, organizationId: string, dto: UpdateRecurringTemplateDto) {
+  async updateTemplate(
+    templateId: string,
+    organizationId: string,
+    dto: UpdateRecurringTemplateDto,
+    actorUserId: string,
+  ) {
     const template = await this.templatesRepository.findByIdAndOrganization(templateId, organizationId);
     if (!template) throw new NotFoundException('Recurring template not found');
+
+    const beforeAssigneeIds = template.assigneeIds?.length
+      ? [...template.assigneeIds]
+      : template.assigneeId
+        ? [template.assigneeId]
+        : [];
+    const beforeSubtasks = template.templateSubtasks?.length
+      ? template.templateSubtasks.map((s) => ({ ...s }))
+      : [];
+
     const patch: Record<string, unknown> = {};
     if (dto.title !== undefined) patch.title = dto.title.trim() || template.title;
     if (dto.description !== undefined) {
@@ -1272,7 +1287,133 @@ export class RecurringTasksService {
       patch.templateSubtasks = normalizeTemplateSubtasks(dto.subtasks);
     }
     await this.templatesRepository.update(template.id, patch as any);
-    return this.templatesRepository.findById(template.id);
+    const updated = await this.templatesRepository.findById(template.id);
+    if (!updated) throw new NotFoundException('Recurring template not found');
+
+    const assigneesChanged = dto.assigneeIds !== undefined;
+    const checklistChanged = dto.subtasks !== undefined;
+    if (assigneesChanged || checklistChanged) {
+      const syncedTaskIds = await this.syncPendingOccurrenceAssignmentsFromTemplate({
+        beforeTemplate: template,
+        afterTemplate: updated,
+        actorUserId,
+        syncAssignees: assigneesChanged,
+        syncChecklist: checklistChanged,
+      });
+
+      // No open run to carry the assignment — still push for newly assigned people.
+      if (syncedTaskIds.length === 0) {
+        this.taskNotifications.scheduleTemplateAssignment({
+          actorUserId,
+          projectId: updated.projectId,
+          templateId: updated.id,
+          title: updated.title,
+          beforeAssigneeIds,
+          afterAssigneeIds: updated.assigneeIds?.length
+            ? updated.assigneeIds
+            : updated.assigneeId
+              ? [updated.assigneeId]
+              : [],
+          beforeSubtasks,
+          afterSubtasks: updated.templateSubtasks ?? [],
+        });
+      }
+    }
+
+    return updated;
+  }
+
+  /**
+   * Mirror planner assignee / checklist assignee changes onto PENDING occurrence
+   * tasks so current runs stay in sync and assignment pushes fire via scheduleOnUpdate.
+   */
+  private async syncPendingOccurrenceAssignmentsFromTemplate(params: {
+    beforeTemplate: import('./entities/recurring-task-template.entity').RecurringTaskTemplateEntity;
+    afterTemplate: import('./entities/recurring-task-template.entity').RecurringTaskTemplateEntity;
+    actorUserId: string;
+    syncAssignees: boolean;
+    syncChecklist: boolean;
+  }): Promise<string[]> {
+    const { afterTemplate, actorUserId, syncAssignees, syncChecklist } = params;
+    const occurrences = await this.occurrencesRepository.findByTemplate(afterTemplate.id);
+    const pending = occurrences.filter((o) => o.state === 'PENDING' && !!o.taskId);
+    const syncedTaskIds: string[] = [];
+
+    for (const occurrence of pending) {
+      const taskId = occurrence.taskId;
+      if (!taskId) continue;
+      const task = await this.tasksRepository.findById(taskId);
+      if (!task) continue;
+
+      const patch: Partial<TaskEntity> = {};
+      if (syncAssignees) {
+        const ids = afterTemplate.assigneeIds?.length
+          ? [...afterTemplate.assigneeIds]
+          : afterTemplate.assigneeId
+            ? [afterTemplate.assigneeId]
+            : [];
+        patch.assigneeIds = ids.length ? ids : null;
+        patch.assigneeId = ids[0] ?? null;
+      }
+
+      if (syncChecklist) {
+        const templateSubs = afterTemplate.templateSubtasks ?? [];
+        const existing = (task.subtasks ?? []).map((s) => ({ ...s }));
+        const usedExisting = new Set<number>();
+
+        const merged: NonNullable<TaskEntity['subtasks']> = [];
+        for (const templateSub of templateSubs) {
+          const titleKey = String(templateSub.title ?? '').trim().toLowerCase();
+          const matchIndex = existing.findIndex(
+            (item, index) =>
+              !usedExisting.has(index) &&
+              String(item.title ?? '').trim().toLowerCase() === titleKey,
+          );
+          const assigneeIds = templateSub.assigneeIds?.length
+            ? [...templateSub.assigneeIds]
+            : templateSub.assigneeId
+              ? [templateSub.assigneeId]
+              : [];
+
+          if (matchIndex >= 0) {
+            usedExisting.add(matchIndex);
+            const current = existing[matchIndex];
+            const next = {
+              ...current,
+              title: templateSub.title,
+              ...(templateSub.dueTime ? { dueTime: templateSub.dueTime } : {}),
+              ...(templateSub.priority ? { priority: templateSub.priority } : {}),
+            } as NonNullable<TaskEntity['subtasks']>[number];
+            delete next.assigneeId;
+            delete next.assigneeIds;
+            if (assigneeIds.length) {
+              next.assigneeIds = assigneeIds;
+              next.assigneeId = assigneeIds[0];
+            }
+            merged.push(next);
+          } else {
+            const runDueDate = task.dueDate ? String(task.dueDate).slice(0, 10) : nowYmd();
+            const [cloned] = cloneTemplateSubtasksForOccurrence([templateSub], runDueDate);
+            if (cloned) merged.push(cloned);
+          }
+        }
+
+        // Keep unmatched existing items (in-progress run-specific steps).
+        for (let i = 0; i < existing.length; i++) {
+          if (!usedExisting.has(i)) merged.push(existing[i]);
+        }
+        patch.subtasks = merged.length ? merged : null;
+      }
+
+      if (Object.keys(patch).length === 0) continue;
+      await this.tasksRepository.update(task.id, patch as never);
+      const refreshed = await this.tasksRepository.findById(task.id);
+      if (!refreshed) continue;
+      this.taskNotifications.scheduleOnUpdate(task, refreshed, actorUserId);
+      syncedTaskIds.push(task.id);
+    }
+
+    return syncedTaskIds;
   }
 }
 

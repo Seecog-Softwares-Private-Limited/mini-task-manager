@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/api/api_exception.dart';
-import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../data/models/pending_attachment.dart';
@@ -94,7 +92,6 @@ class _FeedbackFormSheetState extends ConsumerState<FeedbackFormSheet> {
             description: description,
             files: _attachments,
           );
-      ref.invalidate(feedbacksListProvider);
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -220,15 +217,6 @@ class _FeedbackFormSheetState extends ConsumerState<FeedbackFormSheet> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Text('Submit'),
-            ),
-            TextButton(
-              onPressed: _loading
-                  ? null
-                  : () {
-                      Navigator.of(context).pop();
-                      context.push(AppRoutes.feedbacks);
-                    },
-              child: const Text('View all feedbacks'),
             ),
           ],
         ),

@@ -18,7 +18,6 @@ import { buildTasksPageHref } from "@/lib/tasks-page-href";
 import {
   LayoutDashboard, Building2, FolderKanban, ListTodo, Bell,
   CreditCard, Activity, BarChart3, ClipboardList, Settings, Search, Repeat,
-  MessageSquareHeart,
 } from "lucide-react";
 
 const navItems: { href: string; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
@@ -27,7 +26,6 @@ const navItems: { href: string; label: string; icon: React.ComponentType<{ class
   { href: "/dashboard/projects", label: "Projects", icon: FolderKanban },
   { href: "/dashboard/tasks", label: "Tasks", icon: ListTodo },
   { href: "/dashboard/recurring-tasks", label: "Recurring Tasks", icon: Repeat },
-  { href: "/dashboard/feedbacks", label: "Feedbacks", icon: MessageSquareHeart },
   { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
   { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
   { href: "/dashboard/activity", label: "Activity", icon: Activity },

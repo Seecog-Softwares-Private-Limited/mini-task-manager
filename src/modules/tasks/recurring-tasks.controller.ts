@@ -3,6 +3,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
 import { TenantId } from '../../common/decorators/tenant.decorator';
+import { CurrentUserId } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { RecurringTasksService } from './recurring-tasks.service';
@@ -92,9 +93,10 @@ export class RecurringTasksController {
   async updateTemplate(
     @Param('id') id: string,
     @TenantId() organizationId: string,
+    @CurrentUserId() userId: string,
     @Body() dto: UpdateRecurringTemplateDto,
   ) {
-    return this.recurringTasksService.updateTemplate(id, organizationId, dto);
+    return this.recurringTasksService.updateTemplate(id, organizationId, dto, userId);
   }
 
   @UseGuards(RolesGuard)

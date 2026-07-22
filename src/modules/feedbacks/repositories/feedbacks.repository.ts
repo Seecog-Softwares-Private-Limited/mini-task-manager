@@ -12,21 +12,16 @@ export class FeedbacksRepository {
     private readonly repo: Repository<FeedbackEntity>,
   ) {}
 
-  async findById(id: string, organizationId: string): Promise<FeedbackEntity | null> {
+  async findById(id: string, organizationId?: string): Promise<FeedbackEntity | null> {
     return this.repo.findOne({
-      where: { id, organizationId },
-      relations: ['user'],
+      where: organizationId ? { id, organizationId } : { id },
+      relations: ['user', 'organization'],
     });
   }
 
-  async findByOrganization(
-    organizationId: string,
-    page: number,
-    limit: number,
-  ): Promise<[FeedbackEntity[], number]> {
+  async findAll(page: number, limit: number): Promise<[FeedbackEntity[], number]> {
     return this.repo.findAndCount({
-      where: { organizationId },
-      relations: ['user'],
+      relations: ['user', 'organization'],
       order: { createdAt: 'DESC' },
       skip: getSkip(page, limit),
       take: limit,

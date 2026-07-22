@@ -1178,7 +1178,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                     child: Text(
-                      'This run has passed. You can only mark items done or undone.',
+                      'This run has passed. You can still open items to edit details and attachments; adding or deleting checklist items is locked.',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: AppColors.textMuted,
                           ),
@@ -1234,8 +1234,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                   ),
                 ...List.generate(_subtasks.length, (index) {
                   final item = _subtasks[index];
-                  final expanded =
-                      !isPastRecurringRun && _expandedSubtaskIndex == index;
+                  final expanded = _expandedSubtaskIndex == index;
+                  final canExpandSubtask = canEditSubtasks;
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -1247,7 +1247,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                           expanded: expanded,
                           enabled: !_saving && _savingSubtaskIndex == null,
                           canComplete: canCompleteSubtasks,
-                          canExpand: allowChecklistStructureEdit,
+                          canExpand: canExpandSubtask,
                           // Run checklist is for checking off work — no assignee editing.
                           canChangeAssignees:
                               allowChecklistStructureEdit && !isRunChecklist,
@@ -1255,7 +1255,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                               allowChecklistStructureEdit && !isRunChecklist,
                           onToggleComplete: (value) => _toggleSubtask(index, value),
                           onExpand: () {
-                            if (!allowChecklistStructureEdit) return;
+                            if (!canExpandSubtask) return;
                             FocusManager.instance.primaryFocus?.unfocus();
                             _toggleSubtaskExpanded(index);
                           },

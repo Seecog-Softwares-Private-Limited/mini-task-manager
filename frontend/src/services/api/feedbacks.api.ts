@@ -1,21 +1,7 @@
 import { apiClient } from "@/services/api/client";
 import type { Feedback, PaginatedResult } from "@/types/api";
 
-export async function fetchFeedbacks(
-  page = 1,
-  limit = 20
-): Promise<PaginatedResult<Feedback>> {
-  const { data } = await apiClient.get<PaginatedResult<Feedback>>("/feedbacks", {
-    params: { page, limit },
-  });
-  return data;
-}
-
-export async function fetchFeedback(id: string): Promise<Feedback> {
-  const { data } = await apiClient.get<Feedback>(`/feedbacks/${id}`);
-  return data;
-}
-
+/** Customer submit only — listing is super-admin. */
 export async function createFeedback(input: {
   title: string;
   description: string;
@@ -31,10 +17,25 @@ export async function createFeedback(input: {
   return data;
 }
 
-export async function openFeedbackMedia(feedbackId: string, mediaId: string, fileName: string) {
-  const { data } = await apiClient.get<Blob>(`/feedbacks/${feedbackId}/media/${mediaId}`, {
-    responseType: "blob",
+export async function fetchSuperAdminFeedbacks(
+  page = 1,
+  limit = 20
+): Promise<PaginatedResult<Feedback>> {
+  const { data } = await apiClient.get<PaginatedResult<Feedback>>("/super-admin/feedbacks", {
+    params: { page, limit },
   });
+  return data;
+}
+
+export async function openSuperAdminFeedbackMedia(
+  feedbackId: string,
+  mediaId: string,
+  fileName: string
+) {
+  const { data } = await apiClient.get<Blob>(
+    `/super-admin/feedbacks/${feedbackId}/media/${mediaId}`,
+    { responseType: "blob" }
+  );
   const url = URL.createObjectURL(data);
   const anchor = document.createElement("a");
   anchor.href = url;

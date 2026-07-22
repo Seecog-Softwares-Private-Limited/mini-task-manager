@@ -287,8 +287,10 @@ export interface FeedbackMedia {
 export interface Feedback {
   id: string;
   organizationId: string;
+  organizationName?: string | null;
   userId: string;
   authorName: string | null;
+  authorEmail?: string | null;
   title: string;
   description: string;
   media: FeedbackMedia[];

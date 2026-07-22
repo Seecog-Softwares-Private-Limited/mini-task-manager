@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { MessageSquarePlus, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FeedbackFormDialog } from "@/components/feedbacks/feedback-form-dialog";
 import { cn } from "@/lib/utils";
@@ -12,6 +11,7 @@ type FeedbackTriggerButtonProps = {
   showLabel?: boolean;
 };
 
+/** Header control for customers to submit feedback (visible to super admins only after submit). */
 export function FeedbackTriggerButton({
   className,
   showLabel = false,
@@ -41,16 +41,5 @@ export function FeedbackTriggerButton({
       </Button>
       <FeedbackFormDialog open={open} onOpenChange={setOpen} />
     </>
-  );
-}
-
-export function FeedbacksNavLink({ className }: { className?: string }) {
-  return (
-    <Button asChild variant="outline" size="sm" className={cn("gap-1.5", className)}>
-      <Link href="/dashboard/feedbacks">
-        <MessageSquarePlus className="h-4 w-4" />
-        View feedbacks
-      </Link>
-    </Button>
   );
 }

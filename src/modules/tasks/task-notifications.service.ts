@@ -45,6 +45,39 @@ export class TaskNotificationsService {
     this.schedule({ actorUserId, before, after });
   }
 
+  /**
+   * Notify when a planner template's series assignees or checklist assignees change.
+   * Used when there is no pending occurrence task to carry the assignment.
+   */
+  scheduleTemplateAssignment(params: {
+    actorUserId: string;
+    projectId: string;
+    templateId: string;
+    title: string;
+    beforeAssigneeIds?: string[] | null;
+    afterAssigneeIds?: string[] | null;
+    beforeSubtasks?: Array<{
+      id?: string;
+      title: string;
+      assigneeId?: string;
+      assigneeIds?: string[];
+    }> | null;
+    afterSubtasks?: Array<{
+      id?: string;
+      title: string;
+      assigneeId?: string;
+      assigneeIds?: string[];
+    }> | null;
+    linkTaskId?: string;
+  }): void {
+    this.runTemplateAssignment(params).catch((err) =>
+      this.logger.error(
+        `Planner assignment notification failed: ${err instanceof Error ? err.message : err}`,
+        err instanceof Error ? err.stack : undefined,
+      ),
+    );
+  }
+
   schedule(params: {
     actorUserId: string;
     after: TaskEntity;
@@ -87,17 +120,25 @@ export class TaskNotificationsService {
       });
     }
 
-    const beforeSubtasks = before?.subtasks ?? [];
-    const afterSubtasks = after.subtasks ?? [];
-    if (afterSubtasks.length === 0 && !isCreate) return;
+    const beforeSubtasks = this.coerceSubtasks(before?.subtasks);
+    const afterSubtasks = this.coerceSubtasks(after.subtasks);
+    if (afterSubtasks.length === 0) return;
 
-    const beforeSubtaskIds = new Set(beforeSubtasks.map((subtask) => subtask.id));
+    const beforeSubtaskIdKeys = new Set(
+      beforeSubtasks
+        .map((subtask) => normalizeUserIdForCompare(subtask.id))
+        .filter((id): id is string => !!id),
+    );
     const addedSubtasks = isCreate
       ? afterSubtasks
-      : afterSubtasks.filter((subtask) => !beforeSubtaskIds.has(subtask.id));
+      : afterSubtasks.filter((subtask) => {
+          const key = normalizeUserIdForCompare(subtask.id);
+          return !key || !beforeSubtaskIdKeys.has(key);
+        });
 
-    for (const subtask of afterSubtasks) {
-      const previous = beforeSubtasks.find((item) => item.id === subtask.id);
+    for (let index = 0; index < afterSubtasks.length; index++) {
+      const subtask = afterSubtasks[index];
+      const previous = this.findPreviousSubtask(beforeSubtasks, subtask, index);
       const previousAssignees = previous ? this.getSubtaskAssigneeIds(previous) : [];
       const nextAssignees = this.getSubtaskAssigneeIds(subtask);
       // Always notify newly assigned subtask members (even if they also got
@@ -139,12 +180,125 @@ export class TaskNotificationsService {
     }
   }
 
+  private async runTemplateAssignment(params: {
+    actorUserId: string;
+    projectId: string;
+    templateId: string;
+    title: string;
+    beforeAssigneeIds?: string[] | null;
+    afterAssigneeIds?: string[] | null;
+    beforeSubtasks?: Array<{
+      id?: string;
+      title: string;
+      assigneeId?: string;
+      assigneeIds?: string[];
+    }> | null;
+    afterSubtasks?: Array<{
+      id?: string;
+      title: string;
+      assigneeId?: string;
+      assigneeIds?: string[];
+    }> | null;
+    linkTaskId?: string;
+  }): Promise<void> {
+    const {
+      actorUserId,
+      projectId,
+      templateId,
+      title,
+      linkTaskId,
+    } = params;
+    const beforeAssignees = this.normalizeIdList(params.beforeAssigneeIds);
+    const afterAssignees = this.normalizeIdList(params.afterAssigneeIds);
+    const newAssigneeIds = this.getNewIds(beforeAssignees, afterAssignees).filter(
+      (id) => !this.isSameUser(id, actorUserId),
+    );
+
+    const assigner = await this.usersService.findById(actorUserId);
+    const assignerName = assigner?.fullName || assigner?.email || 'Someone';
+    const project = await this.projectsService.findById(projectId);
+    const projectName = project?.name;
+    const projectSuffix = projectName ? ` in ${projectName}` : '';
+    const taskIdForLink = linkTaskId ? String(linkTaskId) : '';
+
+    for (const assigneeId of newAssigneeIds) {
+      try {
+        await this.notificationsService.createNotification(
+          assigneeId,
+          `Task assigned: ${title}`,
+          `${assignerName} assigned you to planner "${title}"${projectSuffix}.`,
+          {
+            type: 'task_assigned',
+            taskId: taskIdForLink,
+            projectId: String(projectId),
+            templateId: String(templateId),
+            open: 'alerts',
+          },
+        );
+      } catch (err) {
+        this.logger.warn(`Planner task assignment push failed: ${err}`);
+      }
+    }
+
+    const beforeSubtasks = this.coerceSubtasks(params.beforeSubtasks);
+    const afterSubtasks = this.coerceSubtasks(params.afterSubtasks);
+    for (let index = 0; index < afterSubtasks.length; index++) {
+      const subtask = afterSubtasks[index];
+      const previous = this.findPreviousSubtask(beforeSubtasks, subtask, index);
+      const previousAssignees = previous ? this.getSubtaskAssigneeIds(previous) : [];
+      const nextAssignees = this.getSubtaskAssigneeIds(subtask);
+      const newlyAssigned = this.getNewIds(previousAssignees, nextAssignees).filter(
+        (id) => !this.isSameUser(id, actorUserId),
+      );
+      for (const assigneeId of newlyAssigned) {
+        try {
+          await this.notificationsService.createNotification(
+            assigneeId,
+            `Subtask assigned: ${subtask.title}`,
+            `${assignerName} assigned you checklist item "${subtask.title}" on planner "${title}"${projectSuffix}.`,
+            {
+              type: 'subtask_assigned',
+              taskId: taskIdForLink,
+              projectId: String(projectId),
+              templateId: String(templateId),
+              subtaskId: String(subtask.id ?? ''),
+              open: 'alerts',
+            },
+          );
+        } catch (err) {
+          this.logger.warn(`Planner checklist assignment push failed: ${err}`);
+        }
+      }
+    }
+  }
+
   private getTaskAssigneeIds(task: TaskEntity): string[] {
-    const raw = task.assigneeIds ?? (task.assigneeId ? [task.assigneeId] : []);
+    return this.normalizeIdList(
+      task.assigneeIds ?? (task.assigneeId ? [task.assigneeId] : []),
+    );
+  }
+
+  private getSubtaskAssigneeIds(
+    subtask: {
+      assigneeId?: string;
+      assigneeIds?: string[];
+    },
+  ): string[] {
+    return this.normalizeIdList(
+      subtask.assigneeIds?.length
+        ? subtask.assigneeIds
+        : subtask.assigneeId
+          ? [subtask.assigneeId]
+          : [],
+    );
+  }
+
+  private normalizeIdList(raw?: Array<string | Buffer> | string[] | null): string[] {
+    if (!raw?.length) return [];
     const seen = new Set<string>();
     const ids: string[] = [];
     for (const id of raw) {
-      const key = normalizeUserIdForCompare(String(id));
+      const key = normalizeUserIdForCompare(id);
       if (!key || seen.has(key)) continue;
       seen.add(key);
       ids.push(formatUuid(id) ?? String(id).trim());
@@ -152,23 +306,71 @@ export class TaskNotificationsService {
     return ids;
   }
 
-  private getSubtaskAssigneeIds(
-    subtask: NonNullable<TaskEntity['subtasks']>[number],
-  ): string[] {
-    const raw = subtask.assigneeIds?.length
-      ? subtask.assigneeIds
-      : subtask.assigneeId
-        ? [subtask.assigneeId]
-        : [];
-    const seen = new Set<string>();
-    const ids: string[] = [];
-    for (const id of raw) {
-      const key = normalizeUserIdForCompare(String(id));
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-      ids.push(formatUuid(id) ?? String(id).trim());
+  private coerceSubtasks(
+    raw: unknown,
+  ): Array<{
+    id?: string;
+    title: string;
+    completed?: boolean;
+    assigneeId?: string;
+    assigneeIds?: string[];
+  }> {
+    if (!raw) return [];
+    let value = raw;
+    if (typeof value === 'string') {
+      try {
+        value = JSON.parse(value);
+      } catch {
+        return [];
+      }
     }
-    return ids;
+    if (!Array.isArray(value)) return [];
+    return value.filter(
+      (item): item is {
+        id?: string;
+        title: string;
+        completed?: boolean;
+        assigneeId?: string;
+        assigneeIds?: string[];
+      } => !!item && typeof item === 'object' && typeof (item as { title?: unknown }).title === 'string',
+    );
+  }
+
+  private findPreviousSubtask(
+    beforeSubtasks: Array<{
+      id?: string;
+      title: string;
+      assigneeId?: string;
+      assigneeIds?: string[];
+    }>,
+    subtask: {
+      id?: string;
+      title: string;
+    },
+    index: number,
+  ): {
+    id?: string;
+    title: string;
+    assigneeId?: string;
+    assigneeIds?: string[];
+  } | undefined {
+    const afterKey = normalizeUserIdForCompare(subtask.id);
+    if (afterKey) {
+      const byId = beforeSubtasks.find(
+        (item) => normalizeUserIdForCompare(item.id) === afterKey,
+      );
+      if (byId) return byId;
+    }
+
+    const titleKey = subtask.title.trim().toLowerCase();
+    if (!titleKey) return undefined;
+
+    const sameIndex = beforeSubtasks[index];
+    if (sameIndex && sameIndex.title.trim().toLowerCase() === titleKey) {
+      return sameIndex;
+    }
+
+    return beforeSubtasks.find((item) => item.title.trim().toLowerCase() === titleKey);
   }
 
   private getNewIds(before: string[], after: string[]): string[] {
@@ -194,7 +396,6 @@ export class TaskNotificationsService {
     assignerUserId: string,
     notifyAssigneeIds: string[],
   ): Promise<string[]> {
-    const context = await this.buildTaskEmailContext(task, assignerUserId);
     const notified: string[] = [];
     const markNotified = (id: string) => {
       if (!notified.some((item) => this.isSameUser(item, id))) {
@@ -202,21 +403,28 @@ export class TaskNotificationsService {
       }
     };
 
+    let assignerName = 'Someone';
+    let projectName: string | undefined;
+    try {
+      const [assigner, project] = await Promise.all([
+        this.usersService.findById(assignerUserId),
+        this.projectsService.findById(task.projectId),
+      ]);
+      assignerName = assigner?.fullName || assigner?.email || 'Someone';
+      projectName = project?.name;
+    } catch (err) {
+      this.logger.warn(`Failed to resolve assigner/project for task push: ${err}`);
+    }
+
     for (const assigneeId of notifyAssigneeIds) {
       if (this.isSameUser(assigneeId, assignerUserId)) continue;
-      const sent = await this.sendTaskEmailToUser(assigneeId, context, {
-        emailSubject: `Task assigned: ${task.title}`,
-        headline: 'Task Assigned to You',
-      });
-      if (sent) {
-        markNotified(assigneeId);
-      }
-      // Push/in-app notification should not depend on SMTP success.
+
+      // Push/in-app first — must not depend on email/SMTP or attachment lookups.
       try {
         await this.notificationsService.createNotification(
           assigneeId,
           `Task assigned: ${task.title}`,
-          `${context.assignerName} assigned you to "${task.title}"${context.projectName ? ` in ${context.projectName}` : ''}.`,
+          `${assignerName} assigned you to "${task.title}"${projectName ? ` in ${projectName}` : ''}.`,
           {
             type: 'task_assigned',
             taskId: String(task.id),
@@ -228,6 +436,16 @@ export class TaskNotificationsService {
       } catch (err) {
         this.logger.warn(`In-app/push notification failed: ${err}`);
       }
+
+      try {
+        const context = await this.buildTaskEmailContext(task, assignerUserId);
+        await this.sendTaskEmailToUser(assigneeId, context, {
+          emailSubject: `Task assigned: ${task.title}`,
+          headline: 'Task Assigned to You',
+        });
+      } catch (err) {
+        this.logger.warn(`Task assignment email failed: ${err}`);
+      }
     }
 
     return notified;
@@ -235,37 +453,37 @@ export class TaskNotificationsService {
 
   private async notifySubtaskAssignee(
     task: TaskEntity,
-    subtask: NonNullable<TaskEntity['subtasks']>[number],
+    subtask: {
+      id?: string;
+      title: string;
+      dueDate?: string;
+      assigneeId?: string;
+      assigneeIds?: string[];
+    },
     assignerUserId: string,
     assigneeId: string,
   ): Promise<string | null> {
     if (!assigneeId || this.isSameUser(assigneeId, assignerUserId)) return null;
 
-    const context = await this.buildTaskEmailContext(task, assignerUserId);
-    const projectLine = context.projectName
-      ? ` in <strong>${escapeHtml(context.projectName)}</strong>`
-      : '';
+    let assignerName = 'Someone';
+    let projectName: string | undefined;
+    try {
+      const [assigner, project] = await Promise.all([
+        this.usersService.findById(assignerUserId),
+        this.projectsService.findById(task.projectId),
+      ]);
+      assignerName = assigner?.fullName || assigner?.email || 'Someone';
+      projectName = project?.name;
+    } catch (err) {
+      this.logger.warn(`Failed to resolve assigner/project for subtask push: ${err}`);
+    }
 
-    const sent = await this.sendTaskEmailToUser(assigneeId, context, {
-      emailSubject: `Subtask assigned: ${subtask.title}`,
-      headline: 'Subtask Assigned to You',
-      introHtml: `<p style="text-align:center;color:#64748b;font-size:15px;line-height:1.6;margin:0 0 20px;">
-  Hi <strong>{{assigneeName}}</strong>, <strong>${escapeHtml(context.assignerName)}</strong> assigned you a subtask${projectLine}.
-</p>`,
-      cardLabel: 'Subtask',
-      highlightTitle: subtask.title,
-      parentTaskTitle: task.title,
-      dueDateLabel: subtask.dueDate
-        ? formatTaskDueDateLabel(subtask.dueDate)
-        : context.dueDateLabel,
-    });
-
-    // Push/in-app notification for subtask assignee (independent of email).
+    // Push/in-app first — independent of email context / SMTP.
     try {
       await this.notificationsService.createNotification(
         assigneeId,
         `Subtask assigned: ${subtask.title}`,
-        `${context.assignerName} assigned you subtask "${subtask.title}" on "${task.title}"${context.projectName ? ` in ${context.projectName}` : ''}.`,
+        `${assignerName} assigned you subtask "${subtask.title}" on "${task.title}"${projectName ? ` in ${projectName}` : ''}.`,
         {
           type: 'subtask_assigned',
           taskId: String(task.id),
@@ -278,14 +496,40 @@ export class TaskNotificationsService {
       this.logger.warn(`In-app/push notification failed: ${err}`);
     }
 
-    return sent ?? assigneeId;
+    try {
+      const context = await this.buildTaskEmailContext(task, assignerUserId);
+      const projectLine = context.projectName
+        ? ` in <strong>${escapeHtml(context.projectName)}</strong>`
+        : '';
+      await this.sendTaskEmailToUser(assigneeId, context, {
+        emailSubject: `Subtask assigned: ${subtask.title}`,
+        headline: 'Subtask Assigned to You',
+        introHtml: `<p style="text-align:center;color:#64748b;font-size:15px;line-height:1.6;margin:0 0 20px;">
+  Hi <strong>{{assigneeName}}</strong>, <strong>${escapeHtml(context.assignerName)}</strong> assigned you a subtask${projectLine}.
+</p>`,
+        cardLabel: 'Subtask',
+        highlightTitle: subtask.title,
+        parentTaskTitle: task.title,
+        dueDateLabel: subtask.dueDate
+          ? formatTaskDueDateLabel(subtask.dueDate)
+          : context.dueDateLabel,
+      });
+    } catch (err) {
+      this.logger.warn(`Subtask assignment email failed: ${err}`);
+    }
+
+    return assigneeId;
   }
 
   private async notifyTaskAssigneesAboutSubtasks(
     task: TaskEntity,
     assignerUserId: string,
     assigneeIds: string[],
-    addedSubtasks: NonNullable<TaskEntity['subtasks']>,
+    addedSubtasks: Array<{
+      id?: string;
+      title: string;
+      completed?: boolean;
+    }>,
   ): Promise<void> {
     const context = await this.buildTaskEmailContext(task, assignerUserId);
     const focusSubtasks = addedSubtasks.map((subtask) => ({

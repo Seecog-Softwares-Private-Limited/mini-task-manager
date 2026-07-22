@@ -781,7 +781,9 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
                               organizationId: widget.organizationId,
                               saving: false,
                               canComplete: false,
-                              templateMode: true,
+                              // Full editor (attachments/camera/etc) when the series already exists.
+                              templateMode: widget.template?.id == null ||
+                                  widget.template!.id.isEmpty,
                               onRequestCompletion: ({
                                 required String subtaskId,
                                 required String subtaskTitle,

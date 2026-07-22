@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** Short alias for the dashboard feedbacks list. */
+/** Feedback list moved to the super-admin portal. */
 export default function FeedbacksAliasPage() {
-  redirect("/dashboard/feedbacks");
+  redirect("/dashboard");
 }

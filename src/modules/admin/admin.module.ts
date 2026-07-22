@@ -24,6 +24,7 @@ import { PlanEntity } from '../billing/entities/plan.entity';
 import { SubscriptionEntity } from '../billing/entities/subscription.entity';
 import { InvoiceEntity } from '../billing/entities/invoice.entity';
 import { PlansModule } from '../../plans/plans.module';
+import { FeedbacksModule } from '../feedbacks/feedbacks.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { PlansModule } from '../../plans/plans.module';
     OrganizationsModule,
     BillingModule,
     PlansModule,
+    FeedbacksModule,
     TypeOrmModule.forFeature([
       SuperAdminEntity,
       PlatformSettingEntity,
