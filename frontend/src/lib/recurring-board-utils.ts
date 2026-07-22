@@ -280,7 +280,7 @@ export function pickBestOccurrence(
   const overdueSet = new Set(overdueTaskIds);
   const byDue = (a: Task, b: Task) =>
     String(a.dueDate ?? "").localeCompare(String(b.dueDate ?? ""));
-  const incomplete = tasks.filter((t) => !doneStatusIds.has(t.statusId));
+  const incomplete = tasks.filter((t) => !doneStatusIds.has(t.statusId ?? ""));
   const pool = incomplete.length ? incomplete : tasks;
   const overdue = pool.filter((t) => overdueSet.has(t.id));
   if (overdue.length) return [...overdue].sort(byDue)[0] ?? null;
