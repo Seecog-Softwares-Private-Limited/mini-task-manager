@@ -870,59 +870,6 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
     }
   }
 
-  Future<void> _editSubtaskNote(Task task, int subIndex) async {
-    final ti = _tasks.indexWhere((t) => t.id == task.id);
-    if (ti < 0) return;
-    final sub = _tasks[ti].subtasks[subIndex];
-    final controller = TextEditingController(text: sub.note ?? '');
-    final result = await showDialog<String?>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(sub.title, maxLines: 2, overflow: TextOverflow.ellipsis),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLines: 4,
-          maxLength: 2000,
-          decoration: const InputDecoration(
-            hintText: 'Why was this done / not done today?',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(null),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
-            child: const Text('Save note'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (result == null) return; // cancelled
-
-    final prevTask = _tasks[ti];
-    final subs = List<TaskSubtask>.from(prevTask.subtasks);
-    subs[subIndex] = subs[subIndex].copyWith(
-      note: result.isEmpty ? null : result,
-      clearNote: result.isEmpty,
-    );
-    setState(() => _tasks[ti] = prevTask.copyWith(subtasks: subs));
-    try {
-      await ref
-          .read(tasksRepositoryProvider)
-          .updateTask(taskId: task.id, subtasks: subs);
-      widget.onChanged();
-      _snack(result.isEmpty ? 'Note cleared' : 'Note saved');
-    } catch (error) {
-      if (mounted) setState(() => _tasks[ti] = prevTask);
-      _snack('Could not save note: ${_msg(error)}');
-    }
-  }
-
   Future<void> _confirmDeleteSubtask(Task task, int subIndex) async {
     if (_busy) return;
     final ti = _tasks.indexWhere((t) => t.id == task.id);
@@ -1405,7 +1352,7 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
                       _SubtaskRow(
                         subtask: task.subtasks[i],
                         onToggle: (value) => _toggleSubtask(task, i, value),
-                        onEditNote: () => _editSubtaskNote(task, i),
+                        onEdit: () => widget.onOpenDetails(task),
                         onDelete: () => _confirmDeleteSubtask(task, i),
                         enabled: !_busy,
                         allowStructureEdit: !isPastDay,
@@ -1415,7 +1362,7 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
                       child: Text(
-                        'This day has passed. You can only mark items done or undone.',
+                        'This day has passed. Open Edit on an item for details and attachments; you can still mark items done or undone.',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                               color: AppColors.textMuted,
                             ),
@@ -1517,7 +1464,7 @@ class _SubtaskRow extends StatelessWidget {
   const _SubtaskRow({
     required this.subtask,
     required this.onToggle,
-    required this.onEditNote,
+    required this.onEdit,
     required this.onDelete,
     required this.enabled,
     this.allowStructureEdit = true,
@@ -1525,7 +1472,7 @@ class _SubtaskRow extends StatelessWidget {
 
   final TaskSubtask subtask;
   final ValueChanged<bool> onToggle;
-  final VoidCallback onEditNote;
+  final VoidCallback onEdit;
   final VoidCallback onDelete;
   final bool enabled;
   final bool allowStructureEdit;
@@ -1601,8 +1548,7 @@ class _SubtaskRow extends StatelessWidget {
                   const SizedBox(width: 4),
                   _DoneAtChip(label: doneAtLabel),
                 ],
-                if (allowStructureEdit)
-                  PopupMenuButton<_SubtaskMenuAction>(
+                PopupMenuButton<_SubtaskMenuAction>(
                     tooltip: 'More',
                     enabled: enabled,
                     padding: EdgeInsets.zero,
@@ -1612,21 +1558,22 @@ class _SubtaskRow extends StatelessWidget {
                     ),
                     onSelected: (action) {
                       switch (action) {
-                        case _SubtaskMenuAction.note:
-                          onEditNote();
+                        case _SubtaskMenuAction.edit:
+                          onEdit();
                         case _SubtaskMenuAction.delete:
-                          onDelete();
+                          if (allowStructureEdit) onDelete();
                       }
                     },
                     itemBuilder: (context) => [
-                      PopupMenuItem(
-                        value: _SubtaskMenuAction.note,
-                        child: Text(hasNote ? 'Edit note' : 'Add note'),
-                      ),
                       const PopupMenuItem(
-                        value: _SubtaskMenuAction.delete,
-                        child: Text('Delete'),
+                        value: _SubtaskMenuAction.edit,
+                        child: Text('Edit'),
                       ),
+                      if (allowStructureEdit)
+                        const PopupMenuItem(
+                          value: _SubtaskMenuAction.delete,
+                          child: Text('Delete'),
+                        ),
                     ],
                   ),
               ],
@@ -1680,7 +1627,7 @@ class _DoneAtChip extends StatelessWidget {
   }
 }
 
-enum _SubtaskMenuAction { note, delete }
+enum _SubtaskMenuAction { edit, delete }
 
 /// Read-only card for a projected upcoming run (not yet a real task).
 class _ProjectedRunCard extends StatelessWidget {

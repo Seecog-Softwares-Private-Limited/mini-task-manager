@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { generateClientId } from "@/lib/generate-client-id";
 import type { TaskRecurrenceConfig } from "@/types/api";
@@ -33,9 +34,14 @@ import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-sel
 import { getSubtaskAssigneeIds } from "@/lib/subtask-assignees";
 import {
   SubtaskPrioritySelector,
-  type SubtaskPriority,
 } from "@/components/tasks/subtask-priority-selector";
 import type { SubtaskItem } from "@/components/tasks/create-task/subtasks-editor";
+import {
+  processSubtaskComposerPaste,
+  SubtaskComposerAttachments,
+} from "@/components/tasks/create-task/subtask-composer-attachments";
+import type { PendingSubtaskAttachment } from "@/components/tasks/subtasks/subtask-attachments-section";
+import { useToast } from "@/components/ui/use-toast";
 
 const FIELD_LABEL = "text-[11px] font-medium leading-none text-muted-foreground";
 const SELECT_CLASS =
@@ -691,6 +697,11 @@ interface PlannerChecklistProps {
   remove: UseFieldArrayRemove;
   errors: FieldErrors<any>;
   disabled?: boolean;
+  pendingAttachmentsBySubtask?: Record<string, PendingSubtaskAttachment[]>;
+  onPendingAttachmentsChange?: (
+    subtaskKey: string,
+    items: PendingSubtaskAttachment[]
+  ) => void;
 }
 
 export function PlannerChecklist({
@@ -702,9 +713,13 @@ export function PlannerChecklist({
   append,
   remove,
   disabled,
+  pendingAttachmentsBySubtask = {},
+  onPendingAttachmentsChange,
 }: PlannerChecklistProps) {
+  const { toast } = useToast();
   const [draft, setDraft] = useState("");
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const [pasteFlashByKey, setPasteFlashByKey] = useState<Record<string, boolean>>({});
 
   const addItem = () => {
     const title = draft.trim();
@@ -729,6 +744,9 @@ export function PlannerChecklist({
     });
   };
 
+  const attachmentKeyFor = (index: number, current?: SubtaskItem, fieldId?: string) =>
+    current?.id || fieldId || `planner-subtask-${index}`;
+
   return (
     <div className="space-y-2.5">
       {fields.length > 0 ? (
@@ -736,6 +754,8 @@ export function PlannerChecklist({
           {fields.map((field, index) => {
             const isOpen = expanded.has(index);
             const current = values?.[index];
+            const attachmentKey = attachmentKeyFor(index, current, field.id);
+            const pendingAttachments = pendingAttachmentsBySubtask[attachmentKey] ?? [];
             return (
               <li
                 key={field.id}
@@ -765,7 +785,7 @@ export function PlannerChecklist({
                     className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
                     disabled={disabled}
                     onClick={() => toggleExpanded(index)}
-                    aria-label="More options"
+                    aria-label="Edit checklist item"
                     aria-expanded={isOpen}
                   >
                     <ChevronDown
@@ -778,20 +798,54 @@ export function PlannerChecklist({
                     size="icon"
                     className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
                     disabled={disabled}
-                    onClick={() => remove(index)}
+                    onClick={() => {
+                      onPendingAttachmentsChange?.(attachmentKey, []);
+                      remove(index);
+                    }}
                     aria-label="Remove item"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
                 </div>
                 {isOpen ? (
-                  <div className="space-y-2.5 border-t border-border/45 px-2.5 py-2.5">
-                    <Input
-                      {...register(`subtasks.${index}.description` as const)}
-                      placeholder="Description (optional)"
-                      disabled={disabled}
-                      className="h-8 text-sm"
-                    />
+                  <div
+                    className="space-y-2.5 border-t border-border/45 px-2.5 py-2.5"
+                    onPaste={(e) => {
+                      if (!onPendingAttachmentsChange) return;
+                      processSubtaskComposerPaste(
+                        e,
+                        pendingAttachments,
+                        (items) => onPendingAttachmentsChange(attachmentKey, items),
+                        {
+                          disabled,
+                          onError: (message) =>
+                            toast({
+                              title: "Could not paste image",
+                              description: message,
+                              variant: "error",
+                            }),
+                          onSuccess: () => {
+                            setPasteFlashByKey((prev) => ({ ...prev, [attachmentKey]: true }));
+                            window.setTimeout(() => {
+                              setPasteFlashByKey((prev) => ({ ...prev, [attachmentKey]: false }));
+                            }, 2000);
+                          },
+                        }
+                      );
+                    }}
+                  >
+                    <div className="space-y-1.5">
+                      <Label className="text-[11px] font-medium text-muted-foreground">
+                        Description
+                      </Label>
+                      <Textarea
+                        {...register(`subtasks.${index}.description` as const)}
+                        placeholder="Add detailed notes…"
+                        disabled={disabled}
+                        rows={4}
+                        className="min-h-[96px] resize-y text-sm"
+                      />
+                    </div>
                     <div className="flex flex-wrap items-center gap-2">
                       <SubtaskPrioritySelector
                         value={current?.priority ?? "MEDIUM"}
@@ -807,9 +861,11 @@ export function PlannerChecklist({
                         value={getSubtaskAssigneeIds(current ?? {})}
                         onChange={(assigneeIds) => {
                           const normalized = getSubtaskAssigneeIds({ assigneeIds });
-                          setValue(`subtasks.${index}.assigneeIds` as const, normalized.length ? normalized : undefined, {
-                            shouldDirty: true,
-                          });
+                          setValue(
+                            `subtasks.${index}.assigneeIds` as const,
+                            normalized.length ? normalized : undefined,
+                            { shouldDirty: true }
+                          );
                           setValue(`subtasks.${index}.assigneeId` as const, normalized[0], {
                             shouldDirty: true,
                           });
@@ -823,6 +879,16 @@ export function PlannerChecklist({
                       setValue={setValue}
                       disabled={disabled}
                     />
+                    {onPendingAttachmentsChange ? (
+                      <SubtaskComposerAttachments
+                        attachments={pendingAttachments}
+                        onChange={(items) =>
+                          onPendingAttachmentsChange(attachmentKey, items)
+                        }
+                        disabled={disabled}
+                        pasteFlash={Boolean(pasteFlashByKey[attachmentKey])}
+                      />
+                    ) : null}
                   </div>
                 ) : null}
               </li>

@@ -648,6 +648,10 @@ export function CreateTaskModal({
                     remove={remove}
                     errors={errors}
                     disabled={isSubmitting}
+                    pendingAttachmentsBySubtask={pendingSubtaskAttachments}
+                    onPendingAttachmentsChange={(key, items) =>
+                      setPendingSubtaskAttachments((prev) => ({ ...prev, [key]: items }))
+                    }
                   />
                 </PlannerSectionCard>
 

@@ -55,29 +55,30 @@ export class FeedbacksService {
     private readonly configService: ConfigService<Configuration>,
   ) {}
 
-  async findAll(
-    organizationId: string,
+  async findAllForSuperAdmin(
     query: PaginationQueryDto,
   ): Promise<PaginatedResult<FeedbackResponseDto>> {
     const page = query?.page ?? 1;
     const limit = query?.limit ?? 20;
-    const [data, total] = await this.feedbacksRepository.findByOrganization(
-      organizationId,
-      page,
-      limit,
-    );
+    const [data, total] = await this.feedbacksRepository.findAll(page, limit);
     return paginate(
-      data.map((item) => FeedbackResponseDto.fromEntity(item)),
+      data.map((item) =>
+        FeedbackResponseDto.fromEntity(item, {
+          mediaBasePath: `/super-admin/feedbacks/${item.id}/media`,
+        }),
+      ),
       total,
       page,
       limit,
     );
   }
 
-  async findOne(id: string, organizationId: string): Promise<FeedbackResponseDto> {
-    const entity = await this.feedbacksRepository.findById(id, organizationId);
+  async findOneForSuperAdmin(id: string): Promise<FeedbackResponseDto> {
+    const entity = await this.feedbacksRepository.findById(id);
     if (!entity) throw new NotFoundException('Feedback not found');
-    return FeedbackResponseDto.fromEntity(entity);
+    return FeedbackResponseDto.fromEntity(entity, {
+      mediaBasePath: `/super-admin/feedbacks/${entity.id}/media`,
+    });
   }
 
   async create(
@@ -142,12 +143,11 @@ export class FeedbacksService {
     return FeedbackResponseDto.fromEntity(entity);
   }
 
-  async getMediaFile(
+  async getMediaFileForSuperAdmin(
     feedbackId: string,
     mediaId: string,
-    organizationId: string,
   ): Promise<{ path: string; fileName: string; mimeType: string | null }> {
-    const entity = await this.feedbacksRepository.findById(feedbackId, organizationId);
+    const entity = await this.feedbacksRepository.findById(feedbackId);
     if (!entity) throw new NotFoundException('Feedback not found');
 
     const meta = (entity.media ?? []).find((m) => m.id === mediaId);

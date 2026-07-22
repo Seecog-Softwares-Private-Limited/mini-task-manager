@@ -5,6 +5,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { updateTask } from "@/services/api/tasks.api";
@@ -16,8 +17,12 @@ import {
   formatSubtaskProgressLabel,
   getOccurrenceSubtaskProgress,
 } from "@/lib/recurring-subtask-utils";
-import { resolveSubtaskStatus, subtaskWithCompleted } from "@/lib/subtask-status";
-import { getSubtaskRowClassName, getSubtaskRowStyle } from "@/lib/subtask-row-style";
+import {
+  resolveSubtaskStatus,
+  subtaskWithCompleted,
+  subtaskWithStatus,
+  type SubtaskStatus,
+} from "@/lib/subtask-status";
 import { EXEC_PLANNER } from "@/lib/executive-planner-theme";
 import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-selector";
 import { getSubtaskAssigneeIds, withSubtaskAssignees } from "@/lib/subtask-assignees";
@@ -25,10 +30,14 @@ import {
   SubtaskPrioritySelector,
   type SubtaskPriority,
 } from "@/components/tasks/subtask-priority-selector";
+import { SubtaskCompactRow } from "@/components/tasks/subtasks/subtask-compact-row";
+import {
+  SubtaskDetailPanel,
+  type SubtaskDraft,
+} from "@/components/tasks/subtasks/subtask-detail-panel";
+import { useTenant } from "@/context/tenant-context";
 import type { Task, TaskSubtask } from "@/types/api";
-import { CalendarDays, Check, ListChecks, Plus, Trash2 } from "lucide-react";
-import { UserAvatar } from "@/components/ui/user-avatar";
-import { formatRunTime } from "@/lib/recurrence-preview";
+import { CalendarDays, Check, ListChecks, Plus } from "lucide-react";
 
 interface RecurringSubtaskChecklistProps {
   task: Task | undefined;
@@ -55,6 +64,7 @@ export function RecurringSubtaskChecklist({
 }: RecurringSubtaskChecklistProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { orgId } = useTenant();
   const ensureAttemptedRef = useRef<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
@@ -62,6 +72,8 @@ export function RecurringSubtaskChecklist({
   const [draftAssigneeIds, setDraftAssigneeIds] = useState<string[]>([]);
   const [draftDueDate, setDraftDueDate] = useState("");
   const [draftPriority, setDraftPriority] = useState<SubtaskPriority>("MEDIUM");
+  const [expandedSubtaskId, setExpandedSubtaskId] = useState<string | null>(null);
+  const [subtaskDraftDirty, setSubtaskDraftDirty] = useState(false);
 
   const ensureMutation = useMutation({
     mutationFn: () => ensureRecurringOccurrenceSubtasks(taskId!),
@@ -115,6 +127,7 @@ export function RecurringSubtaskChecklist({
   const subtasks = task?.subtasks ?? [];
   const progress = useMemo(() => getOccurrenceSubtaskProgress(subtasks), [subtasks]);
   const allDone = allOccurrenceSubtasksDone(subtasks);
+  const projectId = task?.projectId ?? "";
 
   if (ensureMutation.isPending && subtasks.length === 0) {
     return (
@@ -134,6 +147,11 @@ export function RecurringSubtaskChecklist({
       s.id === subtaskId ? subtaskWithCompleted(s, !s.completed) : s
     );
     updateMutation.mutate(next);
+  }
+
+  function patchSubtasks(mapper: (s: TaskSubtask) => TaskSubtask) {
+    if (readOnly || !task) return;
+    updateMutation.mutate(subtasks.map(mapper));
   }
 
   function resetComposer() {
@@ -170,7 +188,33 @@ export function RecurringSubtaskChecklist({
 
   function deleteSubtask(subtaskId: string) {
     if (readOnly || !task) return;
+    if (expandedSubtaskId === subtaskId) setExpandedSubtaskId(null);
     updateMutation.mutate(subtasks.filter((s) => s.id !== subtaskId));
+  }
+
+  function saveSubtaskDetail(draft: SubtaskDraft) {
+    if (readOnly || !task) return;
+    const next = subtasks.map((s) =>
+      s.id === draft.id
+        ? withSubtaskAssignees(
+            {
+              ...s,
+              title: draft.title,
+              description: draft.description,
+              completed: draft.completed,
+              dueDate: draft.dueDate,
+              dueTime: draft.dueTime,
+              status: draft.status,
+              priority: draft.priority,
+              requireLocation: draft.requireLocation,
+            },
+            getSubtaskAssigneeIds(draft)
+          )
+        : s
+    );
+    updateMutation.mutate(next);
+    setSubtaskDraftDirty(false);
+    setExpandedSubtaskId(null);
   }
 
   return (
@@ -212,71 +256,79 @@ export function RecurringSubtaskChecklist({
           <ul className="space-y-1.5" aria-label="Occurrence subtasks">
             {subtasks.map((s) => {
               const done = s.completed || resolveSubtaskStatus(s) === "DONE";
-              const rowInput = {
-                status: resolveSubtaskStatus(s),
-                completed: done,
-                dueDate: s.dueDate,
-                dueTime: s.dueTime,
-              };
-              const assigneeIds = getSubtaskAssigneeIds(s);
-              const timeLabel = formatRunTime(s.dueTime);
+              const expanded = expandedSubtaskId === s.id;
               return (
-                <li
-                  key={s.id}
-                  className={cn(
-                    "group flex items-start gap-2.5 rounded-lg border px-2.5 py-2 transition-all duration-200",
-                    getSubtaskRowClassName(rowInput)
-                  )}
-                  style={getSubtaskRowStyle(rowInput)}
-                >
-                  <input
-                    type="checkbox"
-                    checked={done}
-                    disabled={readOnly || updateMutation.isPending}
-                    onChange={() => toggleSubtask(s.id)}
-                    className="mt-0.5 h-4 w-4 shrink-0 rounded border-input accent-primary transition-transform duration-150 checked:scale-105"
-                    aria-label={`Mark "${s.title}" ${done ? "incomplete" : "complete"}`}
+                <li key={s.id} className="space-y-0">
+                  <SubtaskCompactRow
+                    title={s.title}
+                    completed={done}
+                    status={resolveSubtaskStatus(s)}
+                    dueDate={s.dueDate}
+                    dueTime={s.dueTime}
+                    assigneeId={s.assigneeId}
+                    assigneeIds={s.assigneeIds}
+                    projectId={projectId}
+                    organizationId={orgId ?? undefined}
+                    expanded={expanded}
+                    editDisabled={readOnly || updateMutation.isPending}
+                    onToggleComplete={() => toggleSubtask(s.id)}
+                    onStatusChange={(nextStatus: SubtaskStatus) => {
+                      patchSubtasks((item) =>
+                        item.id === s.id ? subtaskWithStatus(item, nextStatus) : item
+                      );
+                    }}
+                    onAssigneeChange={(nextAssigneeIds) => {
+                      patchSubtasks((item) =>
+                        item.id === s.id ? withSubtaskAssignees(item, nextAssigneeIds) : item
+                      );
+                    }}
+                    onDueDateChange={(dueDate, dueTime) => {
+                      patchSubtasks((item) =>
+                        item.id === s.id ? { ...item, dueDate, dueTime } : item
+                      );
+                    }}
+                    onRowClick={() => {
+                      if (subtaskDraftDirty && expandedSubtaskId && expandedSubtaskId !== s.id) {
+                        toast({
+                          title: "Save or cancel the open subtask first",
+                          variant: "error",
+                        });
+                        return;
+                      }
+                      setExpandedSubtaskId(expanded ? null : s.id);
+                      setSubtaskDraftDirty(false);
+                    }}
+                    onDelete={() => deleteSubtask(s.id)}
                   />
-                  <div className="min-w-0 flex-1">
-                    <span
-                      className={cn(
-                        "block text-sm leading-snug transition-all duration-300",
-                        done && "text-muted-foreground line-through decoration-emerald-500/40"
-                      )}
-                    >
-                      {s.title}
-                    </span>
-                    {(s.dueDate || timeLabel) && (
-                      <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                        {[s.dueDate, timeLabel].filter(Boolean).join(" · ")}
-                      </span>
-                    )}
-                  </div>
-                  {assigneeIds.length > 0 ? (
-                    <div className="flex shrink-0 -space-x-1.5 pt-0.5">
-                      {assigneeIds.slice(0, 2).map((id) => (
-                        <UserAvatar
-                          key={id}
-                          userId={id}
-                          name="User"
-                          className="h-6 w-6 border border-background ring-1 ring-border/50"
-                          fallbackClassName="text-[8px]"
-                        />
-                      ))}
-                    </div>
-                  ) : null}
-                  {!readOnly ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0 text-muted-foreground/70 hover:bg-destructive/10 hover:text-destructive"
-                      disabled={updateMutation.isPending}
-                      onClick={() => deleteSubtask(s.id)}
-                      aria-label={`Delete "${s.title}"`}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                  {expanded ? (
+                    <SubtaskDetailPanel
+                      draft={{
+                        id: s.id,
+                        title: s.title,
+                        description: s.description,
+                        completed: done,
+                        assigneeId: s.assigneeId,
+                        assigneeIds: s.assigneeIds ?? getSubtaskAssigneeIds(s),
+                        dueDate: s.dueDate,
+                        dueTime: s.dueTime,
+                        status: resolveSubtaskStatus(s),
+                        priority: s.priority,
+                        requireLocation: s.requireLocation === true,
+                      }}
+                      projectId={projectId}
+                      organizationId={orgId ?? undefined}
+                      taskId={taskId ?? undefined}
+                      persistAttachments
+                      disabled={readOnly || updateMutation.isPending}
+                      readOnly={readOnly}
+                      saving={updateMutation.isPending}
+                      onSave={saveSubtaskDetail}
+                      onDirtyChange={setSubtaskDraftDirty}
+                      onCancel={() => {
+                        setSubtaskDraftDirty(false);
+                        setExpandedSubtaskId(null);
+                      }}
+                    />
                   ) : null}
                 </li>
               );
@@ -307,12 +359,13 @@ export function RecurringSubtaskChecklist({
                   disabled={updateMutation.isPending}
                   className="h-9 text-sm"
                 />
-                <Input
+                <Textarea
                   value={draftDescription}
                   onChange={(e) => setDraftDescription(e.target.value)}
-                  placeholder="Subtask description (optional)"
+                  placeholder="Description (optional)"
                   disabled={updateMutation.isPending}
-                  className="h-9 text-sm"
+                  rows={3}
+                  className="min-h-[72px] resize-y text-sm"
                 />
                 <div className="flex flex-wrap items-center gap-2">
                   <SubtaskPrioritySelector
@@ -323,7 +376,7 @@ export function RecurringSubtaskChecklist({
                   />
                   <span className="text-[11px] text-muted-foreground">Assignee</span>
                   <SubtaskAssigneeSelector
-                    projectId={task?.projectId ?? ""}
+                    projectId={projectId}
                     value={draftAssigneeIds}
                     onChange={setDraftAssigneeIds}
                     disabled={updateMutation.isPending}

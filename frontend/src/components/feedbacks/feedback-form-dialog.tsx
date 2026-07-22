@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import {
   Camera,
   ClipboardPaste,
@@ -38,7 +38,6 @@ type FeedbackFormDialogProps = {
 
 export function FeedbackFormDialog({ open, onOpenChange }: FeedbackFormDialogProps) {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -54,8 +53,7 @@ export function FeedbackFormDialog({ open, onOpenChange }: FeedbackFormDialogPro
 
   const mutation = useMutation({
     mutationFn: createFeedback,
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["feedbacks"] });
+    onSuccess: () => {
       toast({ title: "Feedback submitted", variant: "success" });
       reset();
       onOpenChange(false);

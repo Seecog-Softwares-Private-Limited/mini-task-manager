@@ -9,8 +9,12 @@ import {
   Put,
   Query,
   Req,
+  Res,
+  StreamableFile,
   UseGuards,
 } from '@nestjs/common';
+import { createReadStream } from 'fs';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PlatformAdminGuard } from './guards/platform-admin.guard';
 import { SuperAdminService } from './super-admin.service';
@@ -31,6 +35,9 @@ import { PlanConfigurationsService } from '../../plans/plan-configurations.servi
 import { CouponCodesService } from '../../plans/coupon-codes.service';
 import { normalizePlanSlug } from '../../config/plans.config';
 import { SkipThrottle } from '@nestjs/throttler';
+import { PaginationQueryDto } from '../../common/pagination';
+import { FeedbacksService } from '../feedbacks/feedbacks.service';
+import { FeedbackResponseDto } from '../feedbacks/dto/feedback-response.dto';
 
 @Controller('super-admin')
 @UseGuards(JwtAuthGuard, PlatformAdminGuard)
@@ -40,6 +47,7 @@ export class SuperAdminController {
     private readonly superAdminService: SuperAdminService,
     private readonly planConfigurationsService: PlanConfigurationsService,
     private readonly couponCodesService: CouponCodesService,
+    private readonly feedbacksService: FeedbacksService,
   ) {}
 
   @Get('dashboard')
@@ -203,6 +211,31 @@ export class SuperAdminController {
     @Body() dto: SuperAdminStopImpersonationDto,
   ) {
     return this.superAdminService.stopImpersonation(req.user.userId, dto.sessionId);
+  }
+
+  @Get('feedbacks')
+  feedbacks(@Query() query: PaginationQueryDto) {
+    return this.feedbacksService.findAllForSuperAdmin(query);
+  }
+
+  @Get('feedbacks/:id/media/:mediaId')
+  async feedbackMedia(
+    @Param('id') id: string,
+    @Param('mediaId') mediaId: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const file = await this.feedbacksService.getMediaFileForSuperAdmin(id, mediaId);
+    if (file.mimeType) res.setHeader('Content-Type', file.mimeType);
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${encodeURIComponent(file.fileName)}"`,
+    );
+    return new StreamableFile(createReadStream(file.path));
+  }
+
+  @Get('feedbacks/:id')
+  feedbackById(@Param('id') id: string): Promise<FeedbackResponseDto> {
+    return this.feedbacksService.findOneForSuperAdmin(id);
   }
 }
 

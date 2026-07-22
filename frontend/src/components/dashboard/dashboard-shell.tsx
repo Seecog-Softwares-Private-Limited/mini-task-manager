@@ -23,7 +23,7 @@ import type { AppRole } from "@/hooks/use-auth";
 import {
   LayoutDashboard, Building2, FolderKanban, ListTodo, Bell,
   CreditCard, Activity, BarChart3, ClipboardList, Settings,
-  Menu, PanelLeftClose, PanelLeft, Sparkles, Shield, Repeat, MessageSquareHeart,
+  Menu, PanelLeftClose, PanelLeft, Sparkles, Shield, Repeat,
 } from "lucide-react";
 
 const nav: {
@@ -41,7 +41,6 @@ const nav: {
   { href: "/dashboard/projects", label: "Projects", icon: FolderKanban, section: "workspace" },
   { href: "/dashboard/tasks", label: "Tasks", icon: ListTodo, section: "workspace" },
   { href: "/dashboard/recurring-tasks", label: "Recurring Tasks", icon: Repeat, section: "workspace" },
-  { href: "/dashboard/feedbacks", label: "Feedbacks", icon: MessageSquareHeart, section: "workspace" },
   { href: "/dashboard/notifications", label: "Notifications", icon: Bell, section: "reporting" },
   { href: "/dashboard/activity", label: "Activity", icon: Activity, section: "reporting" },
   { href: "/dashboard/audit", label: "Audit Logs", icon: ClipboardList, adminOnly: true, section: "reporting" },
@@ -61,7 +60,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     pathname === "/dashboard/activity" ||
     pathname === "/dashboard/audit" ||
     pathname === "/dashboard/notifications" ||
-    pathname === "/dashboard/feedbacks" ||
     pathname.includes("/board");
   const { hasRole } = useAuth();
   const { isPlatformAdmin } = usePlatformAdmin();
