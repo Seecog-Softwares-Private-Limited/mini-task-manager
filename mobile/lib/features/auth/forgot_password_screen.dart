@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/branding/opspick_logo.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../shared/widgets/app_widgets.dart';
@@ -75,11 +76,12 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const OpsPickLogo(size: 52),
+                  const SizedBox(height: AppSpacing.md),
                   Text(
                     'Enter your email and we will send reset instructions.',
                     style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
+                  ),                  const SizedBox(height: AppSpacing.md),
                   TextField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,

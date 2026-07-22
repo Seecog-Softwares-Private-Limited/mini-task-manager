@@ -17,7 +17,6 @@ import '../../data/models/task_attachment.dart';
 import '../../data/models/task_comment.dart';
 import '../../data/repositories/attachments_repository.dart';
 import '../../data/models/workflow.dart';
-import '../../shared/widgets/app_widgets.dart';
 import '../../shared/widgets/user_avatar.dart';
 import '../auth/session_controller.dart';
 import '../kanban/kanban_providers.dart';
@@ -26,10 +25,20 @@ import 'subtask_completion_sheet.dart';
 import 'subtask_completion_utils.dart';
 import 'subtask_compact_row.dart';
 import 'subtask_detail_panel.dart';
+import 'new_subtask_composer.dart';
 import 'attachment_picker_section.dart';
 import 'attachment_preview.dart';
 import 'assignee_picker_sheet.dart';
 import 'require_location_toggle.dart';
+
+/// How much of the task detail UI to show.
+enum TaskDetailMode {
+  /// Full task editor (title, details, attachments, assignees, checklist, comments).
+  full,
+
+  /// Recurring run: checklist + delete run only.
+  runChecklist,
+}
 
 class _TaskAttachmentItem {
   const _TaskAttachmentItem({
@@ -49,6 +58,7 @@ class TaskDetailSheet extends ConsumerStatefulWidget {
     required this.projectId,
     required this.onUpdated,
     this.onDeleted,
+    this.mode = TaskDetailMode.full,
   });
 
   final Task task;
@@ -56,6 +66,7 @@ class TaskDetailSheet extends ConsumerStatefulWidget {
   final String projectId;
   final VoidCallback onUpdated;
   final VoidCallback? onDeleted;
+  final TaskDetailMode mode;
 
   @override
   ConsumerState<TaskDetailSheet> createState() => _TaskDetailSheetState();
@@ -854,7 +865,13 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       widget.onUpdated();
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Task deleted')),
+        SnackBar(
+          content: Text(
+            widget.mode == TaskDetailMode.runChecklist
+                ? 'Run deleted'
+                : 'Task deleted',
+          ),
+        ),
       );
     } on ApiException catch (error) {
       if (mounted) setState(() => _error = error.message);
@@ -864,14 +881,18 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
   }
 
   Future<void> _confirmDeleteTask() async {
+    final isRun = widget.mode == TaskDetailMode.runChecklist;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Delete task'),
+          title: Text(isRun ? 'Delete run' : 'Delete task'),
           content: Text(
-            'Permanently delete "${_task.title.trim().isEmpty ? 'this task' : _task.title}"? '
-            'This cannot be undone.',
+            isRun
+                ? 'Permanently delete this run for "${_task.title.trim().isEmpty ? 'this planner' : _task.title}"? '
+                    'The recurring series will continue creating future runs.'
+                : 'Permanently delete "${_task.title.trim().isEmpty ? 'this task' : _task.title}"? '
+                    'This cannot be undone.',
           ),
           actions: [
             TextButton(
@@ -883,7 +904,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                 backgroundColor: AppColors.danger,
               ),
               onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('Delete'),
+              child: Text(isRun ? 'Delete run' : 'Delete'),
             ),
           ],
         );
@@ -900,36 +921,45 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     final currentUserId = session.user?.id;
     final orgId = session.orgId ?? '';
     final org = ref.watch(selectedOrgProvider);
-    final canEditTitleAndDescription = canEditTaskTitleAndDescription(
-      org: org,
-      userId: currentUserId,
-      task: _task,
-      members: _members,
-    );
+    final isRunChecklist = widget.mode == TaskDetailMode.runChecklist;
+    final isPastRecurringRun = _task.recurringTemplateId != null &&
+        _task.recurringTemplateId!.isNotEmpty &&
+        _isPastRunDue(_task.dueDate);
+    // Past recurring runs: only toggle checklist done/undone.
+    final canEditTitleAndDescription = !isPastRecurringRun &&
+        canEditTaskTitleAndDescription(
+          org: org,
+          userId: currentUserId,
+          task: _task,
+          members: _members,
+        );
     final canEditSubtasks = canEditTaskSubtasks(
       org: org,
       userId: currentUserId,
       task: _task,
     );
-    final canEditWorkflowFields = canEditTaskWorkflowFields(
-      org: org,
-      userId: currentUserId,
-      task: _task,
-      members: _members,
-    );
+    final canEditWorkflowFields = !isPastRecurringRun &&
+        canEditTaskWorkflowFields(
+          org: org,
+          userId: currentUserId,
+          task: _task,
+          members: _members,
+        );
+    final allowChecklistStructureEdit = canEditSubtasks && !isPastRecurringRun;
     final canCompleteSubtasks = canEditSubtasks;
-    final canDelete = canDeleteTask(
-      org: org,
-      userId: currentUserId,
-      task: _task,
-    );
+    final canDelete = !isPastRecurringRun &&
+        canDeleteTask(
+          org: org,
+          userId: currentUserId,
+          task: _task,
+        );
     final checklistDone = _subtasks.where((s) => s.completed).length;
     final checklistTotal = _subtasks.length;
     final checklistPercent =
         checklistTotal == 0 ? 0 : ((checklistDone / checklistTotal) * 100).round();
     return DraggableScrollableSheet(
       expand: false,
-      initialChildSize: 0.78,
+      initialChildSize: isRunChecklist ? 0.62 : 0.78,
       minChildSize: 0.45,
       maxChildSize: 0.92,
       builder: (context, scrollController) {
@@ -957,72 +987,74 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
-              if (canEditTitleAndDescription && _isEditingTitle)
-                TextField(
-                  controller: _titleController,
-                  focusNode: _titleFocusNode,
-                  autofocus: true,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                  decoration: InputDecoration(
-                    hintText: 'Task title',
-                    filled: true,
-                    fillColor: Theme.of(context)
-                        .colorScheme
-                        .surfaceContainerHighest
-                        .withValues(alpha: 0.35),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
+              if (!isRunChecklist) ...[
+                if (canEditTitleAndDescription && _isEditingTitle)
+                  TextField(
+                    controller: _titleController,
+                    focusNode: _titleFocusNode,
+                    autofocus: true,
+                    style: Theme.of(context).textTheme.headlineSmall,
+                    decoration: InputDecoration(
+                      hintText: 'Task title',
+                      filled: true,
+                      fillColor: Theme.of(context)
+                          .colorScheme
+                          .surfaceContainerHighest
+                          .withValues(alpha: 0.35),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
+                        ),
                       ),
                     ),
-                    enabledBorder: OutlineInputBorder(
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _commitTitleEdit(),
+                    onEditingComplete: _commitTitleEdit,
+                  )
+                else if (canEditTitleAndDescription)
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _startEditingTitle,
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(
-                        color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
-                      ),
-                    ),
-                  ),
-                  textInputAction: TextInputAction.done,
-                  onSubmitted: (_) => _commitTitleEdit(),
-                  onEditingComplete: _commitTitleEdit,
-                )
-              else if (canEditTitleAndDescription)
-                Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: _startEditingTitle,
-                    borderRadius: BorderRadius.circular(12),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.xs,
-                        vertical: AppSpacing.xs,
-                      ),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              _task.title,
-                              style: Theme.of(context).textTheme.headlineSmall,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.xs,
+                          vertical: AppSpacing.xs,
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _task.title,
+                                style: Theme.of(context).textTheme.headlineSmall,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: AppSpacing.sm),
-                          Icon(
-                            Icons.edit_outlined,
-                            size: 18,
-                            color: AppColors.textMuted.withValues(alpha: 0.7),
-                          ),
-                        ],
+                            const SizedBox(width: AppSpacing.sm),
+                            Icon(
+                              Icons.edit_outlined,
+                              size: 18,
+                              color: AppColors.textMuted.withValues(alpha: 0.7),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
+                  )
+                else
+                  Text(
+                    _task.title,
+                    style: Theme.of(context).textTheme.headlineSmall,
                   ),
-                )
-              else
-                Text(
-                  _task.title,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
+              ],
               if (_saving)
                 const Padding(
                   padding: EdgeInsets.only(top: AppSpacing.sm),
@@ -1033,115 +1065,129 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                   padding: const EdgeInsets.only(top: AppSpacing.sm),
                   child: Text(_error!, style: const TextStyle(color: AppColors.danger)),
                 ),
-              const SizedBox(height: AppSpacing.lg),
-              _TaskMetaSection(
-                task: _task,
-                statuses: widget.statuses,
-                currentUserId: currentUserId,
-                members: _members,
-                saving: _saving,
-                canEditDetails: canEditTitleAndDescription,
-                canEditWorkflowFields: canEditWorkflowFields,
-                isEditingDescription: _isEditingDescription,
-                descriptionController: _descriptionController,
-                descriptionFocusNode: _descriptionFocusNode,
-                onStartEditingDescription: _startEditingDescription,
-                onCommitDescription: _commitDescriptionEdit,
-                onStatusChanged: (statusId) => _patchTask(statusId: statusId),
-                onPriorityChanged: (priority) => _patchTask(priority: priority),
-                onPickDueDate: _pickDueDate,
-                onPickDueTime: _pickDueTime,
-                onClearDueDate: _clearDueDate,
-                onClearDueTime: _clearDueTime,
-                onAddTag: _addTag,
-                onRemoveTag: _removeTag,
-                onAssigneesChanged: (assigneeIds) => _patchTask(assigneeIds: assigneeIds),
-                onRequireLocationChanged: canToggleTaskRequireLocation(
-                  org: org,
-                  userId: currentUserId,
-                  task: _task,
-                )
-                    ? (value) => _setRequireLocation(value)
-                    : null,
-                attachments: _AttachmentsSection(
-                  loading: _loadingMeta,
-                  attachments: _attachments,
-                  organizationId: orgId,
-                  taskId: _task.id,
-                  disabled: _saving,
-                  onAttachmentsChanged: (items) => setState(() => _attachments = items),
-                ),
-              ),
-              if (canEditSubtasks || _subtasks.isNotEmpty) ...[
+              if (!isRunChecklist) ...[
                 const SizedBox(height: AppSpacing.lg),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
+                _TaskMetaSection(
+                  task: _task,
+                  statuses: widget.statuses,
+                  currentUserId: currentUserId,
+                  members: _members,
+                  saving: _saving,
+                  canEditDetails: canEditTitleAndDescription,
+                  canEditWorkflowFields: canEditWorkflowFields,
+                  isEditingDescription: _isEditingDescription,
+                  descriptionController: _descriptionController,
+                  descriptionFocusNode: _descriptionFocusNode,
+                  onStartEditingDescription: _startEditingDescription,
+                  onCommitDescription: _commitDescriptionEdit,
+                  onStatusChanged: (statusId) => _patchTask(statusId: statusId),
+                  onPriorityChanged: (priority) => _patchTask(priority: priority),
+                  onPickDueDate: _pickDueDate,
+                  onPickDueTime: _pickDueTime,
+                  onClearDueDate: _clearDueDate,
+                  onClearDueTime: _clearDueTime,
+                  onAddTag: _addTag,
+                  onRemoveTag: _removeTag,
+                  onAssigneesChanged: (assigneeIds) => _patchTask(assigneeIds: assigneeIds),
+                  onRequireLocationChanged: canToggleTaskRequireLocation(
+                    org: org,
+                    userId: currentUserId,
+                    task: _task,
+                  )
+                      ? (value) => _setRequireLocation(value)
+                      : null,
+                  attachments: _AttachmentsSection(
+                    loading: _loadingMeta,
+                    attachments: _attachments,
+                    organizationId: orgId,
+                    taskId: _task.id,
+                    disabled: _saving || isPastRecurringRun,
+                    onAttachmentsChanged: (items) => setState(() => _attachments = items),
+                  ),
+                ),
+              ],
+              if (canEditSubtasks || _subtasks.isNotEmpty || isRunChecklist) ...[
+                if (!isRunChecklist) ...[
+                  const SizedBox(height: AppSpacing.lg),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.check_box_outlined,
+                          size: 18,
+                          color: AppColors.primary,
+                        ),
                       ),
-                      child: const Icon(
-                        Icons.check_box_outlined,
-                        size: 18,
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Checklist', style: Theme.of(context).textTheme.titleMedium),
+                            Text(
+                              'Subtasks, owners, and dates',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppColors.textMuted,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (checklistTotal > 0)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              '$checklistDone/$checklistTotal done',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                            ),
+                            Text(
+                              '$checklistPercent%',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppColors.textMuted,
+                                  ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                  if (checklistTotal > 0) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(999),
+                      child: LinearProgressIndicator(
+                        value: checklistDone / checklistTotal,
+                        minHeight: 8,
+                        backgroundColor: AppColors.border.withValues(alpha: 0.5),
                         color: AppColors.primary,
                       ),
                     ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Checklist', style: Theme.of(context).textTheme.titleMedium),
-                          Text(
-                            'Subtasks, owners, and dates',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: AppColors.textMuted,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (checklistTotal > 0)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            '$checklistDone/$checklistTotal done',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                          Text(
-                            '$checklistPercent%',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: AppColors.textMuted,
-                                ),
-                          ),
-                        ],
-                      ),
                   ],
-                ),
-                if (checklistTotal > 0) ...[
-                  const SizedBox(height: AppSpacing.sm),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(999),
-                    child: LinearProgressIndicator(
-                      value: checklistDone / checklistTotal,
-                      minHeight: 8,
-                      backgroundColor: AppColors.border.withValues(alpha: 0.5),
-                      color: AppColors.primary,
+                  const SizedBox(height: AppSpacing.md),
+                ],
+                if (isPastRecurringRun)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: Text(
+                      'This run has passed. You can only mark items done or undone.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.textMuted,
+                          ),
                     ),
                   ),
-                ],
-                const SizedBox(height: AppSpacing.md),
-                if (canEditSubtasks) ...[
+                if (allowChecklistStructureEdit) ...[
                   KeyedSubtree(
                     key: _checklistAddKey,
-                    child: _NewSubtaskComposer(
+                    child: NewSubtaskComposer(
                       enabled: !_saving && !_addingSubtask && _savingSubtaskIndex == null,
                       loading: _addingSubtask,
                       onSubmit: _appendSubtask,
@@ -1149,7 +1195,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                   ),
                   const SizedBox(height: AppSpacing.sm),
                 ],
-                if (_subtasks.isEmpty && canEditSubtasks)
+                if (_subtasks.isEmpty && allowChecklistStructureEdit)
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(AppSpacing.md),
@@ -1158,7 +1204,19 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                       border: Border.all(color: AppColors.border.withValues(alpha: 0.8)),
                     ),
                     child: Text(
-                      'Break work into smaller steps. Each subtask can have its own files and camera photos.',
+                      isRunChecklist
+                          ? 'No checklist items on this run yet.'
+                          : 'Break work into smaller steps. Each subtask can have its own files and camera photos.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.textMuted,
+                          ),
+                    ),
+                  ),
+                if (_subtasks.isEmpty && isPastRecurringRun)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                    child: Text(
+                      'No checklist items on this run.',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: AppColors.textMuted,
                           ),
@@ -1176,7 +1234,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                   ),
                 ...List.generate(_subtasks.length, (index) {
                   final item = _subtasks[index];
-                  final expanded = _expandedSubtaskIndex == index;
+                  final expanded =
+                      !isPastRecurringRun && _expandedSubtaskIndex == index;
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -1188,13 +1247,24 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                           expanded: expanded,
                           enabled: !_saving && _savingSubtaskIndex == null,
                           canComplete: canCompleteSubtasks,
+                          canExpand: allowChecklistStructureEdit,
+                          // Run checklist is for checking off work — no assignee editing.
+                          canChangeAssignees:
+                              allowChecklistStructureEdit && !isRunChecklist,
+                          showUnassignedChip:
+                              allowChecklistStructureEdit && !isRunChecklist,
                           onToggleComplete: (value) => _toggleSubtask(index, value),
                           onExpand: () {
+                            if (!allowChecklistStructureEdit) return;
                             FocusManager.instance.primaryFocus?.unfocus();
                             _toggleSubtaskExpanded(index);
                           },
-                          onAssigneesChanged: (ids) =>
-                              _quickUpdateSubtaskAssignees(index, ids),
+                          onAssigneesChanged: (ids) {
+                            if (!allowChecklistStructureEdit || isRunChecklist) {
+                              return;
+                            }
+                            _quickUpdateSubtaskAssignees(index, ids);
+                          },
                         ),
                       ),
                       if (expanded)
@@ -1235,7 +1305,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                                     ),
                                 onCancel: () => _cancelSubtaskEdit(index),
                                 onSave: (draft) => _saveSubtask(index, draft),
-                                onDelete: canEditSubtasks
+                                onDelete: allowChecklistStructureEdit
                                     ? () => _confirmDeleteSubtask(index)
                                     : null,
                               ),
@@ -1257,7 +1327,11 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.delete_outline_rounded),
-                  label: Text(_deleting ? 'Deleting…' : 'Delete task'),
+                  label: Text(
+                    _deleting
+                        ? 'Deleting…'
+                        : (isRunChecklist ? 'Delete run' : 'Delete task'),
+                  ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.danger,
                     side: BorderSide(color: AppColors.danger.withValues(alpha: 0.45)),
@@ -1265,14 +1339,16 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                   ),
                 ),
               ],
-              const SizedBox(height: AppSpacing.lg),
-              _CommentsSection(
-                loading: _loadingMeta,
-                comments: _comments,
-                controller: _commentController,
-                posting: _postingComment,
-                onPost: _addComment,
-              ),
+              if (!isRunChecklist) ...[
+                const SizedBox(height: AppSpacing.lg),
+                _CommentsSection(
+                  loading: _loadingMeta,
+                  comments: _comments,
+                  controller: _commentController,
+                  posting: _postingComment,
+                  onPost: _addComment,
+                ),
+              ],
             ],
           ),
         );
@@ -2027,36 +2103,47 @@ class _MemberAvatar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final apiBaseUrl = ref.watch(appConfigProvider).apiBaseUrl;
     final imageUrl = _avatarImageUrl(apiBaseUrl, member);
-    return CircleAvatar(
-      radius: size / 2,
-      backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-      child: imageUrl.isEmpty
-          ? Text(
-              _initials(member.name),
+    final initials = _initials(member.name);
+    if (imageUrl.isEmpty) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: AppColors.primary.withValues(alpha: 0.12),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          initials,
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: size * 0.34,
+          ),
+        ),
+      );
+    }
+    return ClipOval(
+      child: Image.network(
+        imageUrl,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return Container(
+            width: size,
+            height: size,
+            color: AppColors.primary.withValues(alpha: 0.12),
+            alignment: Alignment.center,
+            child: Text(
+              initials,
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: size * 0.34,
               ),
-            )
-          : ClipOval(
-              child: Image.network(
-                imageUrl,
-                width: size,
-                height: size,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Center(
-                    child: Text(
-                      _initials(member.name),
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: size * 0.34,
-                      ),
-                    ),
-                  );
-                },
-              ),
             ),
+          );
+        },
+      ),
     );
   }
 }
@@ -2091,6 +2178,15 @@ class _MemberView {
 DateTime? _parseDueDate(String? raw) {
   if (raw == null || raw.isEmpty) return null;
   return DateTime.tryParse(raw);
+}
+
+bool _isPastRunDue(String? rawDueDate) {
+  final due = _parseDueDate(rawDueDate);
+  if (due == null) return false;
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final dueDay = DateTime(due.year, due.month, due.day);
+  return dueDay.isBefore(today);
 }
 
 bool _isDueDateOverdue(DateTime dueDate, [String? dueTime]) {
@@ -2427,85 +2523,6 @@ class _CommentsSection extends StatelessWidget {
                 ),
               ),
       ],
-    );
-  }
-}
-
-class _NewSubtaskComposer extends StatefulWidget {
-  const _NewSubtaskComposer({
-    required this.enabled,
-    required this.loading,
-    required this.onSubmit,
-  });
-
-  final bool enabled;
-  final bool loading;
-  final Future<void> Function(String title) onSubmit;
-
-  @override
-  State<_NewSubtaskComposer> createState() => _NewSubtaskComposerState();
-}
-
-class _NewSubtaskComposerState extends State<_NewSubtaskComposer> {
-  final _controller = TextEditingController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    final title = _controller.text.trim();
-    if (title.isEmpty || !widget.enabled || widget.loading) return;
-    await widget.onSubmit(title);
-    if (mounted) _controller.clear();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<TextEditingValue>(
-      valueListenable: _controller,
-      builder: (context, value, _) {
-        final canSubmit = widget.enabled && !widget.loading && value.text.trim().isNotEmpty;
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _controller,
-                enabled: widget.enabled,
-                maxLength: subtaskTitleMaxLength,
-                decoration: InputDecoration(
-                  hintText: 'Add an item…',
-                  counterText: '',
-                  prefixIcon: Icon(
-                    Icons.add_rounded,
-                    color: AppColors.textMuted.withValues(alpha: 0.7),
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 14,
-                  ),
-                ),
-                onSubmitted: (_) => _submit(),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            PrimaryButton(
-              label: 'Add',
-              expand: false,
-              height: 44,
-              borderRadius: 12,
-              loading: widget.loading,
-              onPressed: canSubmit ? _submit : null,
-            ),
-          ],
-        );
-      },
     );
   }
 }

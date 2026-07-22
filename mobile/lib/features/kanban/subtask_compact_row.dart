@@ -22,6 +22,9 @@ class SubtaskCompactRow extends StatelessWidget {
     required this.onToggleComplete,
     required this.onExpand,
     required this.onAssigneesChanged,
+    this.canExpand = true,
+    this.canChangeAssignees = true,
+    this.showUnassignedChip = true,
   });
 
   final TaskSubtask subtask;
@@ -32,6 +35,15 @@ class SubtaskCompactRow extends StatelessWidget {
   final ValueChanged<bool> onToggleComplete;
   final VoidCallback onExpand;
   final ValueChanged<List<String>> onAssigneesChanged;
+
+  /// When false, title is display-only (no expand-to-edit).
+  final bool canExpand;
+
+  /// When false, assignee avatars are not tappable.
+  final bool canChangeAssignees;
+
+  /// When false, hide the person+ chip if nobody is assigned.
+  final bool showUnassignedChip;
 
   @override
   Widget build(BuildContext context) {
@@ -44,6 +56,8 @@ class SubtaskCompactRow extends StatelessWidget {
         .map(_findMember)
         .whereType<ProjectMember>()
         .toList();
+    final showAssignees =
+        assigneeMembers.isNotEmpty || (showUnassignedChip && canChangeAssignees);
 
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -97,10 +111,12 @@ class SubtaskCompactRow extends StatelessWidget {
                         color: Colors.transparent,
                         child: InkWell(
                           borderRadius: BorderRadius.circular(8),
-                          onTap: () {
-                            FocusManager.instance.primaryFocus?.unfocus();
-                            onExpand();
-                          },
+                          onTap: !canExpand
+                              ? null
+                              : () {
+                                  FocusManager.instance.primaryFocus?.unfocus();
+                                  onExpand();
+                                },
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
                               vertical: 6,
@@ -136,12 +152,14 @@ class SubtaskCompactRow extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    _AssigneeChip(
-                      members: assigneeMembers,
-                      enabled: enabled,
-                      onTap: () => _pickAssignees(context, assigneeIds),
-                    ),
+                    if (showAssignees) ...[
+                      const SizedBox(width: 6),
+                      _AssigneeChip(
+                        members: assigneeMembers,
+                        enabled: enabled && canChangeAssignees,
+                        onTap: () => _pickAssignees(context, assigneeIds),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -310,15 +328,16 @@ class _CircleAvatar extends ConsumerWidget {
           ),
         ],
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Image.network(
-        imageUrl,
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-        cacheWidth: cacheSize,
-        cacheHeight: cacheSize,
-        errorBuilder: (_, __, ___) => _initialsAvatar(initials),
+      child: ClipOval(
+        child: Image.network(
+          imageUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          cacheWidth: cacheSize,
+          cacheHeight: cacheSize,
+          errorBuilder: (_, __, ___) => _initialsAvatar(initials),
+        ),
       ),
     );
   }

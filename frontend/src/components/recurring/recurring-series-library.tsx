@@ -404,7 +404,7 @@ function SeriesRow({
                 <>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem disabled={isMutating} onClick={() => onEdit(template)}>
-                    <Pencil className="mr-2 h-3.5 w-3.5" /> Edit planner
+                    <Pencil className="mr-2 h-3.5 w-3.5" /> Edit recurring task
                   </DropdownMenuItem>
                   {status === "ACTIVE" ? (
                     <DropdownMenuItem

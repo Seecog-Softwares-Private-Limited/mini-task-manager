@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/branding/opspick_logo.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -177,11 +178,12 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const OpsPickLogo(size: 52),
+        const SizedBox(height: AppSpacing.sm),
         Text(
           'Join OpsPick',
           style: Theme.of(context).textTheme.headlineSmall,
-        ),
-        const SizedBox(height: AppSpacing.xs),
+        ),        const SizedBox(height: AppSpacing.xs),
         Text(
           'Create an account to start managing projects from your phone.',
           style: Theme.of(context).textTheme.bodyMedium,

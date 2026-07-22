@@ -713,6 +713,14 @@ export class TasksService {
       await this.recurringTasksService.updateRecurrenceFromTask(taskId, organizationId, dto.recurrence);
     }
 
+    if (task.recurringTemplateId && subtasksDto !== undefined) {
+      await this.recurringTasksService.syncTemplateChecklistFromTaskSubtasks(
+        task.recurringTemplateId,
+        organizationId,
+        (patch.subtasks ?? []) as NonNullable<TaskEntity['subtasks']>,
+      );
+    }
+
     if (task.recurringTemplateId && statusChanged) {
       const done = await this.isDoneStatus(task.projectId, organizationId, nextStatusId);
       await this.recurringTasksService.syncOccurrenceCompletionFromTaskStatus(taskId, done);

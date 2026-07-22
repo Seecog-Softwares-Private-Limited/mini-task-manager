@@ -147,7 +147,10 @@ class RecurringRepository {
     required String organizationId,
     String? title,
     String? description,
+    String? priority,
+    List<String>? assigneeIds,
     Map<String, dynamic>? recurrence,
+    List<Map<String, dynamic>>? subtasks,
   }) async {
     try {
       await _api.dio.patch<Map<String, dynamic>>(
@@ -155,7 +158,10 @@ class RecurringRepository {
         data: {
           if (title != null) 'title': title.trim(),
           if (description != null) 'description': description,
+          if (priority != null) 'priority': priority,
+          if (assigneeIds != null) 'assigneeIds': assigneeIds,
           if (recurrence != null) 'recurrence': recurrence,
+          if (subtasks != null) 'subtasks': subtasks,
         },
         options: _api.withOrgHeader(organizationId),
       );

@@ -26,17 +26,19 @@ export function escapeHtml(text: string): string {
     .replace(/"/g, '&quot;');
 }
 
-import { isLocalhostUrl } from '../../common/utils/frontend-url.util';
+import { getFrontendUrl, isLocalhostUrl } from '../../common/utils/frontend-url.util';
 
 export { isLocalhostUrl };
 
 function emailLogo(): string {
+  const logoUrl = escapeHtml(`${getFrontendUrl()}/branding/opspick-logo.png`);
   return `
 <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center" style="margin:0 auto 8px;">
   <tr>
-    <td align="center" width="56" height="56" bgcolor="${BRAND.violet}"
-        style="width:56px;height:56px;border-radius:16px;background-color:${BRAND.violet};">
-      <span style="font-size:22px;font-weight:700;color:#ffffff;line-height:56px;">M</span>
+    <td align="center" width="56" height="56"
+        style="width:56px;height:56px;border-radius:16px;background-color:#ffffff;border:1px solid ${BRAND.cardBorder};overflow:hidden;">
+      <img src="${logoUrl}" width="56" height="56" alt="OpsPick"
+           style="display:block;width:56px;height:56px;border:0;border-radius:16px;object-fit:contain;" />
     </td>
   </tr>
 </table>

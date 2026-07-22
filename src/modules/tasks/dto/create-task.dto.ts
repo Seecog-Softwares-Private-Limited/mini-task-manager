@@ -26,7 +26,7 @@ const normalizeCreateDueDate = ({ value }: { value: unknown }) => {
   return value;
 };
 
-class CreateTaskSubtaskDto {
+export class CreateTaskSubtaskDto {
   @IsOptional()
   @IsString()
   id?: string;

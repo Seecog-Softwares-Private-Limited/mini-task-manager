@@ -7,6 +7,7 @@ import '../../core/api/api_exception.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/branding/opspick_logo.dart';
 import '../../core/config/api_base_url_controller.dart';
 import '../../core/config/api_reachability_probe.dart';
 import '../../core/config/app_config.dart';
@@ -233,12 +234,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        StatusChip(
-                          label: 'Mobile',
-                          color: AppColors.violet,
-                          background: AppColors.violet.withValues(alpha: 0.1),
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
+                        Row(
+                          children: [
+                            const OpsPickLogo(size: 52),
+                            const SizedBox(width: AppSpacing.sm),
+                            Flexible(
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: StatusChip(
+                                  label: 'Mobile',
+                                  color: AppColors.violet,
+                                  background: AppColors.violet.withValues(alpha: 0.1),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),                        const SizedBox(height: AppSpacing.sm),
                         Text(
                           'OpsPick',
                           style: Theme.of(context).textTheme.displaySmall,

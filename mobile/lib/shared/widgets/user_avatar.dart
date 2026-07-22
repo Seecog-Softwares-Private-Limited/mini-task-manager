@@ -90,15 +90,19 @@ class UserAvatar extends ConsumerWidget {
     if (imageUrl.isEmpty) {
       avatar = _initialsAvatar(initials);
     } else {
-      avatar = ClipOval(
-        child: Image.network(
-          imageUrl,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          cacheWidth: cacheSize,
-          cacheHeight: cacheSize,
-          errorBuilder: (_, __, ___) => _initialsAvatar(initials),
+      avatar = SizedBox(
+        width: size,
+        height: size,
+        child: ClipOval(
+          child: Image.network(
+            imageUrl,
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            cacheWidth: cacheSize,
+            cacheHeight: cacheSize,
+            errorBuilder: (_, __, ___) => _initialsAvatar(initials),
+          ),
         ),
       );
     }

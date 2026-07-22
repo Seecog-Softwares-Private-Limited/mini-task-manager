@@ -269,3 +269,20 @@ export function dedupeRecurringBoardTasks(tasks: Task[]): Task[] {
   }
   return Array.from(byKey.values());
 }
+
+/** Prefer overdue, then soonest incomplete run — used to open Edit recurring task. */
+export function pickBestOccurrence(
+  tasks: Task[],
+  overdueTaskIds: string[] = [],
+  doneStatusIds: Set<string> = new Set()
+): Task | null {
+  if (!tasks.length) return null;
+  const overdueSet = new Set(overdueTaskIds);
+  const byDue = (a: Task, b: Task) =>
+    String(a.dueDate ?? "").localeCompare(String(b.dueDate ?? ""));
+  const incomplete = tasks.filter((t) => !doneStatusIds.has(t.statusId));
+  const pool = incomplete.length ? incomplete : tasks;
+  const overdue = pool.filter((t) => overdueSet.has(t.id));
+  if (overdue.length) return [...overdue].sort(byDue)[0] ?? null;
+  return [...pool].sort(byDue)[0] ?? null;
+}

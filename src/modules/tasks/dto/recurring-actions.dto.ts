@@ -1,7 +1,8 @@
-import { IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsArray, IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
 import { Type } from 'class-transformer';
 import { IsInt, Min, Max, ValidateNested } from 'class-validator';
 import { TaskRecurrenceDto } from './recurrence.dto';
+import { CreateTaskSubtaskDto } from './create-task.dto';
 
 export class CompleteRecurringTaskDto {
   @IsIn(['ONLY_THIS', 'THIS_AND_PREVIOUS_PENDING', 'STOP_SERIES_PERMANENTLY'])
@@ -41,8 +42,24 @@ export class UpdateRecurringTemplateDto {
   description?: string;
 
   @IsOptional()
+  @IsIn(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'])
+  priority?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  assigneeIds?: string[];
+
+  @IsOptional()
   @ValidateNested()
   @Type(() => TaskRecurrenceDto)
   recurrence?: TaskRecurrenceDto;
+
+  /** Replaces the planner checklist template for future runs. */
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateTaskSubtaskDto)
+  subtasks?: CreateTaskSubtaskDto[];
 }
 

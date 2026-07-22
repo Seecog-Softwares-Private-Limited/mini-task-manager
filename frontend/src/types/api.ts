@@ -146,13 +146,25 @@ export interface RecurringTemplateSummary {
   lastRunState?: "PENDING" | "COMPLETED" | "SKIPPED" | null;
   completionHealth?: number;
   subtaskCount?: number;
+  templateSubtasks?: Array<{
+    id: string;
+    title: string;
+    completed?: boolean;
+    dueTime?: string | null;
+    dueOffsetDays?: number | null;
+    priority?: string;
+    status?: string;
+  }>;
   assigneeId?: string | null;
   assigneeIds?: string[] | null;
   priority?: string;
   createdBy?: string;
   startDueDate?: string;
   endType: "NEVER" | "ON_DATE" | "AFTER_OCCURRENCES";
+  endDate?: string | null;
+  endAfterOccurrences?: number | null;
   createDaysBeforeDue: number;
+  ruleConfig?: TaskRecurrenceConfig | null;
 }
 
 export interface RecurringTaskSummary {

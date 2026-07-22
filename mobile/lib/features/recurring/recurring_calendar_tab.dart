@@ -241,6 +241,7 @@ class _RecurringCalendarTabState extends ConsumerState<RecurringCalendarTab> {
           task: task,
           statuses: statuses,
           projectId: projectId,
+          mode: TaskDetailMode.runChecklist,
           onUpdated: () {
             ref.invalidate(recurringBoardTasksProvider);
             ref.invalidate(recurringSummaryProvider);
@@ -1279,6 +1280,8 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
     final total = task.subtasks.length;
     final done = task.completedSubtasks;
     final isExpanded = _expanded.contains(task.id);
+    final dayKey = DateTime(widget.day.year, widget.day.month, widget.day.day);
+    final isPastDay = dayKey.isBefore(todayKey);
     final canMarkDone =
         !_busy && !_isDone(task) && (total == 0 || done == total);
     final progress = total == 0 ? 0.0 : done / total;
@@ -1405,8 +1408,19 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
                         onEditNote: () => _editSubtaskNote(task, i),
                         onDelete: () => _confirmDeleteSubtask(task, i),
                         enabled: !_busy,
+                        allowStructureEdit: !isPastDay,
                       ),
                   const SizedBox(height: 8),
+                  if (isPastDay)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                      child: Text(
+                        'This day has passed. You can only mark items done or undone.',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: AppColors.textMuted,
+                            ),
+                      ),
+                    ),
                   Row(
                     children: [
                       Expanded(
@@ -1426,16 +1440,18 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      _RunIconAction(
-                        tooltip: 'Snooze',
-                        icon: Icons.snooze_rounded,
-                        onPressed: _busy ? null : () => _snooze(task),
-                      ),
-                      _RunIconAction(
-                        tooltip: 'Skip',
-                        icon: Icons.skip_next_rounded,
-                        onPressed: _busy ? null : () => _skip(task),
-                      ),
+                      if (!isPastDay) ...[
+                        _RunIconAction(
+                          tooltip: 'Snooze',
+                          icon: Icons.snooze_rounded,
+                          onPressed: _busy ? null : () => _snooze(task),
+                        ),
+                        _RunIconAction(
+                          tooltip: 'Skip',
+                          icon: Icons.skip_next_rounded,
+                          onPressed: _busy ? null : () => _skip(task),
+                        ),
+                      ],
                       _RunIconAction(
                         tooltip: 'Details',
                         icon: Icons.open_in_new_rounded,
@@ -1504,6 +1520,7 @@ class _SubtaskRow extends StatelessWidget {
     required this.onEditNote,
     required this.onDelete,
     required this.enabled,
+    this.allowStructureEdit = true,
   });
 
   final TaskSubtask subtask;
@@ -1511,6 +1528,7 @@ class _SubtaskRow extends StatelessWidget {
   final VoidCallback onEditNote;
   final VoidCallback onDelete;
   final bool enabled;
+  final bool allowStructureEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -1583,33 +1601,34 @@ class _SubtaskRow extends StatelessWidget {
                   const SizedBox(width: 4),
                   _DoneAtChip(label: doneAtLabel),
                 ],
-                PopupMenuButton<_SubtaskMenuAction>(
-                  tooltip: 'More',
-                  enabled: enabled,
-                  padding: EdgeInsets.zero,
-                  icon: Icon(
-                    Icons.more_horiz_rounded,
-                    color: AppColors.textMuted.withValues(alpha: 0.9),
+                if (allowStructureEdit)
+                  PopupMenuButton<_SubtaskMenuAction>(
+                    tooltip: 'More',
+                    enabled: enabled,
+                    padding: EdgeInsets.zero,
+                    icon: Icon(
+                      Icons.more_horiz_rounded,
+                      color: AppColors.textMuted.withValues(alpha: 0.9),
+                    ),
+                    onSelected: (action) {
+                      switch (action) {
+                        case _SubtaskMenuAction.note:
+                          onEditNote();
+                        case _SubtaskMenuAction.delete:
+                          onDelete();
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: _SubtaskMenuAction.note,
+                        child: Text(hasNote ? 'Edit note' : 'Add note'),
+                      ),
+                      const PopupMenuItem(
+                        value: _SubtaskMenuAction.delete,
+                        child: Text('Delete'),
+                      ),
+                    ],
                   ),
-                  onSelected: (action) {
-                    switch (action) {
-                      case _SubtaskMenuAction.note:
-                        onEditNote();
-                      case _SubtaskMenuAction.delete:
-                        onDelete();
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: _SubtaskMenuAction.note,
-                      child: Text(hasNote ? 'Edit note' : 'Add note'),
-                    ),
-                    const PopupMenuItem(
-                      value: _SubtaskMenuAction.delete,
-                      child: Text('Delete'),
-                    ),
-                  ],
-                ),
               ],
             ),
           ),

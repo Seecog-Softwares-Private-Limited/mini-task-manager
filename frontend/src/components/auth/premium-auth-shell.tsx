@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { OpsPickWordmark } from "@/components/brand/opspick-logo";
 
 export const authInputClass = cn(
   "h-11 rounded-lg border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground",
@@ -91,49 +92,11 @@ export function AuthMethodTabs({
   );
 }
 
-function AuthAppLogo({ className, variant = "light" }: { className?: string; variant?: "light" | "dark" }) {
-  const isDark = variant === "dark";
-  return (
-    <div
-      className={cn(
-        "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
-        isDark
-          ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
-          : "bg-white ring-1 ring-border shadow-sm",
-        className
-      )}
-    >
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <rect
-          x="5"
-          y="7"
-          width="14"
-          height="15"
-          rx="2"
-          fill="hsl(var(--primary))"
-          fillOpacity={isDark ? 0.15 : 0.1}
-        />
-        <rect x="8" y="4" width="8" height="4" rx="1.5" fill="hsl(var(--primary))" fillOpacity={isDark ? 0.2 : 0.15} />
-        <path
-          d="M8.5 14.5L11 17l5.5-7"
-          stroke="hsl(var(--primary))"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </div>
-  );
-}
-
 export function AuthBrandPanel() {
   return (
     <div className="auth-brand-enter w-full">
-      <AuthAppLogo variant="light" className="mb-6" />
-      <h2 className="text-2xl font-semibold tracking-tight text-foreground xl:text-[1.75rem]">
-        OpsPick
-      </h2>
-      <p className="mt-2 max-w-[16rem] text-sm leading-relaxed text-muted-foreground">
+      <OpsPickWordmark className="mb-5" logoClassName="h-11 w-11" priority />
+      <p className="max-w-[16rem] text-sm leading-relaxed text-muted-foreground">
         Organize work. Ship faster.
       </p>
     </div>
@@ -230,9 +193,8 @@ export function PremiumAuthCard({
             </div>
           ) : null}
           {isCompact ? (
-            <div className="mb-5 flex items-center gap-2.5 lg:hidden">
-              <AuthAppLogo variant="light" className="h-9 w-9" />
-              <span className="text-sm font-semibold text-foreground">OpsPick</span>
+            <div className="mb-5 lg:hidden">
+              <OpsPickWordmark logoClassName="h-9 w-9" priority />
             </div>
           ) : null}
           <h1
