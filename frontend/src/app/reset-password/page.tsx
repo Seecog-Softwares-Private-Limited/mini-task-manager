@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Lock, Eye, EyeOff, CheckCircle2 } from "lucide-react";
+import { OpsPickLogo } from "@/components/brand/opspick-logo";
 
 const schema = z
   .object({
@@ -99,8 +100,8 @@ function ResetPasswordForm() {
     <div className="relative w-full max-w-md animate-scale-in">
       <div className="glass-card p-8 sm:p-10">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl gradient-bg shadow-lg shadow-primary/25">
-            <Lock className="h-7 w-7 text-white" />
+          <div className="mx-auto mb-4 flex justify-center">
+            <OpsPickLogo className="h-14 w-14" priority />
           </div>
           <h1 className="text-2xl font-bold tracking-tight">Reset password</h1>
           <p className="mt-2 text-sm text-muted-foreground">

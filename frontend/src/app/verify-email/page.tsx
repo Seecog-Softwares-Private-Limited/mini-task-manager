@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CheckCircle2 } from "lucide-react";
+import { OpsPickLogo } from "@/components/brand/opspick-logo";
 
 function completeLoginAndRedirect(router: ReturnType<typeof useRouter>) {
   window.dispatchEvent(new CustomEvent("auth:login"));
@@ -95,8 +96,8 @@ function VerifyEmailContent() {
     <div className="relative w-full max-w-md animate-scale-in">
       <div className="glass-card p-8 sm:p-10">
         <div className="text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/20">
-            <CheckCircle2 className="h-7 w-7 text-primary" />
+          <div className="mx-auto mb-4 flex justify-center">
+            <OpsPickLogo className="h-14 w-14" priority />
           </div>
           <h1 className="text-2xl font-bold tracking-tight">Verify your email</h1>
           <p className="mt-2 text-sm text-muted-foreground">

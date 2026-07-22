@@ -28,7 +28,7 @@ export async function fetchRecurringBoard(
 export async function syncRecurringBoard(projectId: string): Promise<{ materialized: number; repaired: number }> {
   const { data } = await apiClient.post<{ materialized: number; repaired: number }>(
     "/recurring-tasks/sync",
-    null,
+    {},
     { params: { projectId } }
   );
   return data;
@@ -91,7 +91,22 @@ export async function duplicateRecurringTemplate(
 
 export async function updateRecurringTemplate(
   templateId: string,
-  payload: { title?: string; description?: string; recurrence?: TaskRecurrenceConfig }
+  payload: {
+    title?: string;
+    description?: string;
+    priority?: string;
+    assigneeIds?: string[];
+    recurrence?: TaskRecurrenceConfig;
+    subtasks?: Array<{
+      id?: string;
+      title: string;
+      completed?: boolean;
+      dueTime?: string;
+      dueOffsetDays?: number;
+      priority?: string;
+      status?: string;
+    }>;
+  }
 ): Promise<RecurringTemplateSummary> {
   const { data } = await apiClient.patch<RecurringTemplateSummary>(
     `/recurring-tasks/${templateId}`,

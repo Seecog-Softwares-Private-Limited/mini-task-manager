@@ -74,9 +74,23 @@ export interface RecurringSeriesDrawerProps {
   onPause?: (templateId: string) => void;
   onResume?: (templateId: string) => void;
   onDelete?: (template: RecurringTemplateSummary) => void;
+  /** Opens the full recurring task detail editor (run details). */
+  onEditRecurringTask?: (template: RecurringTemplateSummary) => void;
   onSaveCadence?: (
     templateId: string,
-    payload: { title?: string; description?: string; recurrence?: TaskRecurrenceConfig }
+    payload: {
+      title?: string;
+      description?: string;
+      recurrence?: TaskRecurrenceConfig;
+      subtasks?: Array<{
+        id?: string;
+        title: string;
+        completed?: boolean;
+        dueTime?: string;
+        priority?: string;
+        status?: string;
+      }>;
+    }
   ) => void;
   onOpenOccurrence?: (task: Task) => void;
 }
@@ -97,6 +111,7 @@ export function RecurringSeriesDrawer({
   onPause,
   onResume,
   onDelete,
+  onEditRecurringTask,
   onSaveCadence,
   onOpenOccurrence,
 }: RecurringSeriesDrawerProps) {
@@ -108,6 +123,9 @@ export function RecurringSeriesDrawer({
   const [draftEndType, setDraftEndType] = useState<EndType>("NEVER");
   const [draftEndDate, setDraftEndDate] = useState("");
   const [draftEndAfter, setDraftEndAfter] = useState(10);
+  const [draftChecklist, setDraftChecklist] = useState<
+    Array<{ id?: string; title: string; dueTime: string }>
+  >([]);
 
   useEffect(() => {
     setEditing(false);
@@ -115,10 +133,21 @@ export function RecurringSeriesDrawer({
       setDraftTitle(template.title);
       setDraftDescription(template.description ?? "");
       setDraftRepeat(template.repeatType);
-      setDraftInterval(1);
+      setDraftInterval(
+        Math.max(1, Number((template.ruleConfig as { interval?: number } | null)?.interval) || 1)
+      );
       setDraftEndType(template.endType);
-      setDraftEndDate("");
-      setDraftEndAfter(10);
+      setDraftEndDate(
+        template.endDate ? String(template.endDate).slice(0, 10) : ""
+      );
+      setDraftEndAfter(template.endAfterOccurrences ?? 10);
+      setDraftChecklist(
+        (template.templateSubtasks ?? []).map((s) => ({
+          id: s.id,
+          title: s.title,
+          dueTime: s.dueTime ?? "",
+        }))
+      );
     }
   }, [template?.id]);
 
@@ -169,19 +198,31 @@ export function RecurringSeriesDrawer({
 
   function handleSave() {
     if (!template) return;
+    const existingRule = (template.ruleConfig ?? {}) as TaskRecurrenceConfig;
     const recurrence: TaskRecurrenceConfig = {
+      ...existingRule,
       repeat: draftRepeat,
       interval: Math.max(1, Number(draftInterval) || 1),
       endType: draftEndType,
-      ...(draftEndType === "ON_DATE" && draftEndDate ? { endDate: draftEndDate } : {}),
+      ...(draftEndType === "ON_DATE" && draftEndDate ? { endDate: draftEndDate } : { endDate: undefined }),
       ...(draftEndType === "AFTER_OCCURRENCES"
         ? { endAfterOccurrences: Math.max(1, Number(draftEndAfter) || 1) }
-        : {}),
+        : { endAfterOccurrences: undefined }),
     };
     onSaveCadence?.(template.id, {
       title: draftTitle.trim() || undefined,
       description: draftDescription,
       recurrence,
+      subtasks: draftChecklist
+        .map((item) => ({
+          id: item.id,
+          title: item.title.trim(),
+          completed: false,
+          status: "TODO",
+          priority: "MEDIUM",
+          ...(item.dueTime.trim() ? { dueTime: item.dueTime.trim() } : {}),
+        }))
+        .filter((item) => item.title.length > 0),
     });
     setEditing(false);
   }
@@ -200,11 +241,11 @@ export function RecurringSeriesDrawer({
               {template.title}
             </SheetTitle>
             <SheetDescription className="text-xs leading-relaxed">
-              Recurring series · manage the schedule and its runs
+              Open Edit recurring task for full run details, or edit the schedule below
             </SheetDescription>
           </SheetHeader>
 
-          <div className="mt-3 flex flex-wrap gap-1.5">
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
             <Badge variant="outline" className={cn("gap-1 text-[10px]", theme.ribbon)}>
               <Repeat className="h-3 w-3" />
               {toRecurrenceLabel(template.repeatType)}
@@ -230,14 +271,27 @@ export function RecurringSeriesDrawer({
             <Badge variant="outline" className="text-[10px] tabular-nums">
               {template.completed} completed
             </Badge>
+            {!readOnly && !editing && onEditRecurringTask ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="ml-auto h-7 gap-1 px-2 text-xs"
+                onClick={() => onEditRecurringTask(template)}
+              >
+                <Pencil className="h-3 w-3" />
+                Edit recurring task
+              </Button>
+            ) : null}
           </div>
         </div>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
-          {/* Schedule / edit cadence */}
+          {/* Schedule / edit planner */}
           <section className={cn(EXEC_PLANNER.paperCard, "p-3")}>
             <div className="flex items-center justify-between">
-              <h3 className={EXEC_PLANNER.sectionLabel}>Schedule</h3>
+              <h3 className={EXEC_PLANNER.sectionLabel}>
+                {editing ? "Edit schedule" : "Schedule"}
+              </h3>
               {!readOnly && !editing ? (
                 <Button
                   size="sm"
@@ -246,7 +300,7 @@ export function RecurringSeriesDrawer({
                   onClick={() => setEditing(true)}
                 >
                   <Pencil className="h-3 w-3" />
-                  Edit cadence
+                  Edit schedule
                 </Button>
               ) : null}
             </div>
@@ -340,10 +394,83 @@ export function RecurringSeriesDrawer({
                   />
                 ) : null}
                 <p className="text-[10px] leading-relaxed text-muted-foreground">
-                  Changing the frequency reschedules future runs. Advanced patterns
-                  (specific weekdays / monthly rules) are kept from the original
-                  series unless you change the frequency here.
+                  Changing the frequency reschedules future runs. Checklist changes
+                  apply to new runs (existing runs keep their current checklist).
                 </p>
+                <div className="space-y-2 rounded-lg border border-border/50 bg-muted/20 p-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-medium text-muted-foreground">
+                      Checklist
+                    </label>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 px-2 text-xs"
+                      onClick={() =>
+                        setDraftChecklist((prev) => [
+                          ...prev,
+                          { title: "", dueTime: "" },
+                        ])
+                      }
+                    >
+                      Add item
+                    </Button>
+                  </div>
+                  {draftChecklist.length === 0 ? (
+                    <p className="text-[11px] text-muted-foreground">
+                      No checklist items yet.
+                    </p>
+                  ) : (
+                    <ul className="space-y-2">
+                      {draftChecklist.map((item, index) => (
+                        <li key={item.id ?? `new-${index}`} className="flex gap-2">
+                          <Input
+                            value={item.title}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setDraftChecklist((prev) =>
+                                prev.map((row, i) =>
+                                  i === index ? { ...row, title: value } : row
+                                )
+                              );
+                            }}
+                            className="h-9 flex-1 text-sm"
+                            placeholder={`Checklist item ${index + 1}`}
+                          />
+                          <Input
+                            type="time"
+                            value={item.dueTime}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setDraftChecklist((prev) =>
+                                prev.map((row, i) =>
+                                  i === index ? { ...row, dueTime: value } : row
+                                )
+                              );
+                            }}
+                            className="h-9 w-[7.5rem] text-sm"
+                            aria-label={`Due time for item ${index + 1}`}
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            className="h-9 px-2 text-destructive"
+                            onClick={() =>
+                              setDraftChecklist((prev) =>
+                                prev.filter((_, i) => i !== index)
+                              )
+                            }
+                            aria-label={`Remove checklist item ${index + 1}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
                 <div className="flex items-center justify-end gap-2">
                   <Button
                     size="sm"
@@ -489,7 +616,7 @@ export function RecurringSeriesDrawer({
         {/* Footer actions */}
         {!readOnly ? (
           <div className="shrink-0 space-y-2 border-t border-border/45 bg-muted/10 p-4">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               {template.isPaused ? (
                 <Button
                   size="sm"
@@ -498,7 +625,7 @@ export function RecurringSeriesDrawer({
                   onClick={() => onResume?.(template.id)}
                 >
                   <Play className="h-3.5 w-3.5" />
-                  Resume series
+                  Resume
                 </Button>
               ) : (
                 <Button
@@ -509,9 +636,19 @@ export function RecurringSeriesDrawer({
                   onClick={() => onPause?.(template.id)}
                 >
                   <Pause className="h-3.5 w-3.5" />
-                  Pause series
+                  Pause
                 </Button>
               )}
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5"
+                disabled={isMutating || editing || !onEditRecurringTask}
+                onClick={() => onEditRecurringTask?.(template)}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Edit
+              </Button>
               <Button
                 size="sm"
                 variant="outline"
@@ -520,7 +657,7 @@ export function RecurringSeriesDrawer({
                 onClick={() => onDelete?.(template)}
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                Delete series
+                Delete
               </Button>
             </div>
             {template.isPaused ? (

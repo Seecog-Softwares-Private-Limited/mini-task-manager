@@ -5,11 +5,17 @@ import 'package:intl/intl.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/utils/client_id.dart';
 import '../../data/models/project_member.dart';
 import '../../data/models/recurring.dart';
+import '../../data/models/task.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../auth/session_controller.dart';
 import '../kanban/assignee_picker_sheet.dart';
+import '../kanban/kanban_providers.dart';
+import '../kanban/new_subtask_composer.dart';
+import '../kanban/subtask_compact_row.dart';
+import '../kanban/subtask_detail_panel.dart';
 import '../projects/projects_providers.dart';
 import 'recurring_actions.dart';
 import 'recurring_providers.dart';
@@ -31,13 +37,6 @@ const _priorities = <String, String>{
 // 0=Sun ... 6=Sat (matches backend weeklyDays convention).
 const _weekdayLabels = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const _weekdayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-class _ChecklistDraft {
-  _ChecklistDraft() : titleController = TextEditingController();
-  final TextEditingController titleController;
-  TimeOfDay? dueTime;
-  void dispose() => titleController.dispose();
-}
 
 class RecurringEditorSheet extends ConsumerStatefulWidget {
   const RecurringEditorSheet({
@@ -72,7 +71,8 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
   DateTime? _endDate;
   TimeOfDay? _dueTime;
 
-  final List<_ChecklistDraft> _checklist = [];
+  final List<TaskSubtask> _checklist = [];
+  int? _expandedSubtaskIndex;
   List<ProjectMember> _members = const [];
   List<String> _assigneeIds = [];
 
@@ -95,6 +95,9 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
     if (t != null) {
       _frequency =
           _frequencies.containsKey(t.repeatType) ? t.repeatType : 'WEEKLY';
+      _priority =
+          _priorities.containsKey(t.priority) ? t.priority! : 'MEDIUM';
+      _assigneeIds = List<String>.from(t.assigneeIds);
       _weeklyDays.addAll(t.weeklyDays);
       _startDate = DateTime.tryParse(t.startDueDate ?? '') ?? DateTime.now();
       _endType = t.endType ?? 'NEVER';
@@ -114,13 +117,80 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
           _dueTime = TimeOfDay(hour: hour, minute: minute);
         }
       }
+      for (final item in t.templateSubtasks) {
+        final title = item.title.trim();
+        if (title.isEmpty) continue;
+        _checklist.add(
+          TaskSubtask(
+            id: (item.id != null && item.id!.isNotEmpty)
+                ? item.id!
+                : generateClientId(),
+            title: title,
+            completed: false,
+            status: 'TODO',
+            priority: item.priority ?? 'MEDIUM',
+            description: item.description,
+            dueTime: item.dueTime,
+            assigneeIds: item.assigneeIds,
+            assigneeId: item.assigneeId ??
+                (item.assigneeIds.isNotEmpty ? item.assigneeIds.first : null),
+          ),
+        );
+      }
     }
     if (_weeklyDays.isEmpty) {
       _weeklyDays.add(DateTime.now().weekday % 7);
     }
     _endDate ??= DateTime.now().add(const Duration(days: 90));
-    if (!_isEdit) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _loadMembers());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadMembers();
+      if (_isEdit && _checklist.isEmpty) {
+        _hydrateChecklistFromRun();
+      }
+    });
+  }
+
+  Future<void> _hydrateChecklistFromRun() async {
+    try {
+      final repo = ref.read(recurringRepositoryProvider);
+      final history = await repo.fetchTemplateHistory(
+        templateId: widget.template!.id,
+        organizationId: widget.organizationId,
+      );
+      final withTask = history
+          .where((o) => o.taskId != null && o.taskId!.isNotEmpty)
+          .toList()
+        ..sort((a, b) => a.sequenceNumber.compareTo(b.sequenceNumber));
+      if (withTask.isEmpty) return;
+      final task = await ref
+          .read(tasksRepositoryProvider)
+          .fetchTask(withTask.first.taskId!);
+      if (!mounted || _checklist.isNotEmpty || task.subtasks.isEmpty) return;
+      setState(() {
+        for (final item in task.subtasks) {
+          final title = item.title.trim();
+          if (title.isEmpty) continue;
+          _checklist.add(
+            TaskSubtask(
+              id: item.id.isNotEmpty ? item.id : generateClientId(),
+              title: title,
+              completed: false,
+              status: 'TODO',
+              priority: item.priority ?? 'MEDIUM',
+              description: item.description,
+              dueTime: item.dueTime,
+              assigneeIds: item.assigneeIds.isNotEmpty
+                  ? item.assigneeIds
+                  : (item.assigneeId != null && item.assigneeId!.isNotEmpty
+                      ? [item.assigneeId!]
+                      : const []),
+              assigneeId: item.assigneeId,
+            ),
+          );
+        }
+      });
+    } catch (_) {
+      // Optional hydration — ignore failures.
     }
   }
 
@@ -142,9 +212,6 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
     _intervalController.dispose();
     _occurrencesController.dispose();
     _descriptionController.dispose();
-    for (final item in _checklist) {
-      item.dispose();
-    }
     super.dispose();
   }
 
@@ -194,20 +261,84 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
   List<Map<String, dynamic>> _buildSubtasks() {
     final result = <Map<String, dynamic>>[];
     for (final item in _checklist) {
-      final title = item.titleController.text.trim();
+      final title = item.title.trim();
       if (title.isEmpty) continue;
-      final time = item.dueTime;
+      final assigneeIds = item.assigneeIds.isNotEmpty
+          ? item.assigneeIds
+          : (item.assigneeId != null && item.assigneeId!.isNotEmpty
+              ? [item.assigneeId!]
+              : <String>[]);
       result.add({
+        'id': item.id,
         'title': title,
         'completed': false,
         'status': 'TODO',
-        'priority': 'MEDIUM',
-        if (time != null)
-          'dueTime':
-              '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
+        'priority': item.priority ?? 'MEDIUM',
+        if (item.description != null && item.description!.trim().isNotEmpty)
+          'description': item.description,
+        if (assigneeIds.isNotEmpty) 'assigneeIds': assigneeIds,
+        if (assigneeIds.isNotEmpty) 'assigneeId': assigneeIds.first,
+        if (item.dueTime != null && item.dueTime!.trim().isNotEmpty)
+          'dueTime': item.dueTime,
       });
     }
     return result;
+  }
+
+  Future<void> _appendChecklistItem(String rawTitle) async {
+    final title = rawTitle.trim();
+    if (title.isEmpty || title.length > subtaskTitleMaxLength || _loading) {
+      return;
+    }
+    setState(() {
+      _checklist.insert(
+        0,
+        TaskSubtask(
+          id: generateClientId(),
+          title: title,
+          completed: false,
+          status: 'TODO',
+          priority: 'MEDIUM',
+        ),
+      );
+      _expandedSubtaskIndex = 0;
+    });
+  }
+
+  void _toggleChecklistExpanded(int index) {
+    setState(() {
+      _expandedSubtaskIndex =
+          _expandedSubtaskIndex == index ? null : index;
+    });
+  }
+
+  void _saveChecklistItem(int index, TaskSubtask updated) {
+    setState(() {
+      _checklist[index] = updated;
+      _expandedSubtaskIndex = null;
+    });
+  }
+
+  void _deleteChecklistItem(int index) {
+    setState(() {
+      _checklist.removeAt(index);
+      if (_expandedSubtaskIndex == index) {
+        _expandedSubtaskIndex = null;
+      } else if (_expandedSubtaskIndex != null &&
+          _expandedSubtaskIndex! > index) {
+        _expandedSubtaskIndex = _expandedSubtaskIndex! - 1;
+      }
+    });
+  }
+
+  void _quickUpdateChecklistAssignees(int index, List<String> assigneeIds) {
+    final item = _checklist[index];
+    setState(() {
+      _checklist[index] = item.copyWith(
+        assigneeIds: assigneeIds,
+        assigneeId: assigneeIds.isNotEmpty ? assigneeIds.first : null,
+      );
+    });
   }
 
   Future<void> _submit() async {
@@ -238,7 +369,10 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
           organizationId: widget.organizationId,
           title: title,
           description: _descriptionController.text,
+          priority: _priority,
+          assigneeIds: _assigneeIds,
           recurrence: _buildRecurrence(),
+          subtasks: _buildSubtasks(),
         );
       } else {
         await repo.createRecurringSeries(
@@ -379,7 +513,7 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
                 children: [
                   Expanded(
                     child: Text(
-                      _isEdit ? 'Edit recurring series' : 'New recurring series',
+                      _isEdit ? 'Edit planner' : 'New recurring series',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.w700,
                           ),
@@ -414,23 +548,21 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
                   alignLabelWithHint: true,
                 ),
               ),
-              if (!_isEdit) ...[
-                const SizedBox(height: AppSpacing.md),
-                Text('Priority', style: labelStyle),
-                const SizedBox(height: AppSpacing.xs),
-                Wrap(
-                  spacing: AppSpacing.xs,
-                  children: _priorities.entries.map((e) {
-                    return ChoiceChip(
-                      label: Text(e.value),
-                      selected: _priority == e.key,
-                      onSelected: _loading
-                          ? null
-                          : (_) => setState(() => _priority = e.key),
-                    );
-                  }).toList(),
-                ),
-              ],
+              const SizedBox(height: AppSpacing.md),
+              Text('Priority', style: labelStyle),
+              const SizedBox(height: AppSpacing.xs),
+              Wrap(
+                spacing: AppSpacing.xs,
+                children: _priorities.entries.map((e) {
+                  return ChoiceChip(
+                    label: Text(e.value),
+                    selected: _priority == e.key,
+                    onSelected: _loading
+                        ? null
+                        : (_) => setState(() => _priority = e.key),
+                  );
+                }).toList(),
+              ),
               const SizedBox(height: AppSpacing.md),
               Text('Repeats', style: labelStyle),
               const SizedBox(height: AppSpacing.xs),
@@ -542,30 +674,138 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
                     ),
                 ],
               ),
-              if (!_isEdit) ...[
-                const SizedBox(height: AppSpacing.md),
-                Text('Assignees', style: labelStyle),
-                const SizedBox(height: AppSpacing.xs),
-                _TapField(
-                  icon: Icons.people_alt_rounded,
-                  label: _assigneeIds.isEmpty
-                      ? 'Unassigned'
-                      : '${_assigneeIds.length} assigned',
-                  onTap: _loading || _members.isEmpty ? null : _openAssignees,
+              const SizedBox(height: AppSpacing.md),
+              Text('Assignees', style: labelStyle),
+              const SizedBox(height: AppSpacing.xs),
+              _TapField(
+                icon: Icons.people_alt_rounded,
+                label: _assigneeIds.isEmpty
+                    ? 'Unassigned'
+                    : '${_assigneeIds.length} assigned',
+                onTap: _loading || _members.isEmpty ? null : _openAssignees,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.check_box_outlined,
+                      size: 18,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Checklist',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        Text(
+                          'Copied into every run · tap to edit',
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppColors.textMuted,
+                                  ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              NewSubtaskComposer(
+                enabled: !_loading,
+                onSubmit: _appendChecklistItem,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              if (_checklist.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.border.withValues(alpha: 0.8),
+                    ),
+                  ),
+                  child: Text(
+                    'Break the planner into checklist steps. Each item can have its own owners and due time.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textMuted,
+                        ),
+                  ),
                 ),
-                const SizedBox(height: AppSpacing.md),
-                _ChecklistEditor(
-                  items: _checklist,
-                  enabled: !_loading,
-                  onAdd: () =>
-                      setState(() => _checklist.add(_ChecklistDraft())),
-                  onRemove: (i) => setState(() {
-                    _checklist.removeAt(i).dispose();
-                  }),
-                  onDueTimeChanged: (i, time) =>
-                      setState(() => _checklist[i].dueTime = time),
-                ),
-              ],
+              ...List.generate(_checklist.length, (index) {
+                final item = _checklist[index];
+                final expanded = _expandedSubtaskIndex == index;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SubtaskCompactRow(
+                      subtask: item,
+                      members: _members,
+                      expanded: expanded,
+                      enabled: !_loading,
+                      canComplete: false,
+                      onToggleComplete: (_) {},
+                      onExpand: () {
+                        FocusManager.instance.primaryFocus?.unfocus();
+                        _toggleChecklistExpanded(index);
+                      },
+                      onAssigneesChanged: (ids) =>
+                          _quickUpdateChecklistAssignees(index, ids),
+                    ),
+                    if (expanded)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                        child: Material(
+                          color: AppColors.surface,
+                          elevation: 1,
+                          shadowColor: Colors.black.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: const EdgeInsets.all(AppSpacing.sm),
+                            child: SubtaskDetailPanel(
+                              subtask: item,
+                              members: _members,
+                              taskId: widget.template?.id ?? 'template-draft',
+                              organizationId: widget.organizationId,
+                              saving: false,
+                              canComplete: false,
+                              templateMode: true,
+                              onRequestCompletion: ({
+                                required String subtaskId,
+                                required String subtaskTitle,
+                                required String? subtaskPriority,
+                              }) async =>
+                                  null,
+                              onCancel: () {
+                                setState(() {
+                                  if (_checklist[index].title.trim().isEmpty) {
+                                    _checklist.removeAt(index);
+                                  }
+                                  _expandedSubtaskIndex = null;
+                                });
+                              },
+                              onSave: (updated) =>
+                                  _saveChecklistItem(index, updated),
+                              onDelete: () => _deleteChecklistItem(index),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              }),
               const SizedBox(height: AppSpacing.md),
               Text('Ends', style: labelStyle),
               const SizedBox(height: AppSpacing.xs),
@@ -697,156 +937,6 @@ class _TapField extends StatelessWidget {
               const Icon(Icons.chevron_right_rounded,
                   size: 18, color: AppColors.textMuted),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ChecklistEditor extends StatelessWidget {
-  const _ChecklistEditor({
-    required this.items,
-    required this.enabled,
-    required this.onAdd,
-    required this.onRemove,
-    required this.onDueTimeChanged,
-  });
-
-  final List<_ChecklistDraft> items;
-  final bool enabled;
-  final VoidCallback onAdd;
-  final ValueChanged<int> onRemove;
-  final void Function(int index, TimeOfDay? time) onDueTimeChanged;
-
-  Future<void> _pickTime(BuildContext context, int index) async {
-    final current = items[index].dueTime;
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: current ?? const TimeOfDay(hour: 9, minute: 0),
-    );
-    if (picked != null) onDueTimeChanged(index, picked);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            Text(
-              'Checklist',
-              style: Theme.of(context)
-                  .textTheme
-                  .labelLarge
-                  ?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(width: AppSpacing.xs),
-            Expanded(
-              child: Text(
-                'copied into every run',
-                style: Theme.of(context)
-                    .textTheme
-                    .labelSmall
-                    ?.copyWith(color: AppColors.textMuted),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        for (var i = 0; i < items.length; i++)
-          Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: items[i].titleController,
-                    enabled: enabled,
-                    decoration: InputDecoration(
-                      isDense: true,
-                      hintText: 'Checklist item ${i + 1}',
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                _ChecklistTimeCircle(
-                  time: items[i].dueTime,
-                  enabled: enabled,
-                  onTap: () => _pickTime(context, i),
-                  onLongPress: items[i].dueTime == null
-                      ? null
-                      : () => onDueTimeChanged(i, null),
-                ),
-                IconButton(
-                  onPressed: enabled ? () => onRemove(i) : null,
-                  visualDensity: VisualDensity.compact,
-                  icon: const Icon(Icons.close_rounded, size: 18),
-                ),
-              ],
-            ),
-          ),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: enabled ? onAdd : null,
-            icon: const Icon(Icons.add_rounded, size: 18),
-            label: const Text('Add checklist item'),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ChecklistTimeCircle extends StatelessWidget {
-  const _ChecklistTimeCircle({
-    required this.time,
-    required this.enabled,
-    required this.onTap,
-    this.onLongPress,
-  });
-
-  final TimeOfDay? time;
-  final bool enabled;
-  final VoidCallback onTap;
-  final VoidCallback? onLongPress;
-
-  @override
-  Widget build(BuildContext context) {
-    final hasTime = time != null;
-    final tooltip = hasTime
-        ? '${time!.format(context)} · long-press to clear'
-        : 'Set due time';
-
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: enabled ? onTap : null,
-          onLongPress: enabled ? onLongPress : null,
-          customBorder: const CircleBorder(),
-          child: Ink(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: hasTime
-                  ? AppColors.primary.withValues(alpha: 0.12)
-                  : AppColors.border.withValues(alpha: 0.45),
-              border: Border.all(
-                color: hasTime
-                    ? AppColors.primary.withValues(alpha: 0.35)
-                    : AppColors.border,
-              ),
-            ),
-            child: Icon(
-              Icons.schedule_rounded,
-              size: 16,
-              color: hasTime ? AppColors.primary : AppColors.textMuted,
-            ),
-          ),
         ),
       ),
     );

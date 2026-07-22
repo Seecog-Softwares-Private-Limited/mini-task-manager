@@ -57,7 +57,7 @@ import {
 } from "@/lib/recurring-board-constants";
 import type { RecurringBoardResponse } from "@/services/api/recurring-tasks.api";
 import { RecurringExecutiveHealth } from "@/components/recurring/recurring-executive-health";
-import { formatShortDate, computeExecutiveHealth, dedupeRecurringBoardTasks } from "@/lib/recurring-board-utils";
+import { formatShortDate, computeExecutiveHealth, dedupeRecurringBoardTasks, pickBestOccurrence } from "@/lib/recurring-board-utils";
 import { EXEC_PLANNER } from "@/lib/executive-planner-theme";
 import {
   applyRecurringBoardFilters,
@@ -364,6 +364,11 @@ export default function RecurringTasksPage() {
   });
 
   const permissions = useBoardPermissions(orgMembers, currentUserId);
+  // Recurring planners (series templates) are manageable by OWNER + ADMIN.
+  // The board itself (task editing/moves) is more restrictive, so we keep it
+  // tied to `permissions.canEditTask` elsewhere.
+  const canManageSeries =
+    permissions.role === "OWNER" || permissions.role === "ADMIN";
 
   const assigneeMap: AssigneeMap = useMemo(() => {
     const map: AssigneeMap = {};
@@ -573,7 +578,7 @@ export default function RecurringTasksPage() {
       await resumeRecurringTemplate(templateId);
       // Immediately trigger a catch-up sync so the calendar fills in
       if (selectedProjectId) {
-        await syncRecurringBoard(selectedProjectId);
+        await syncRecurringBoard(selectedProjectId).catch(() => undefined);
       }
     },
     onSuccess: () => {
@@ -654,7 +659,19 @@ export default function RecurringTasksPage() {
       payload,
     }: {
       templateId: string;
-      payload: { title?: string; recurrence?: TaskRecurrenceConfig };
+      payload: {
+        title?: string;
+        description?: string;
+        recurrence?: TaskRecurrenceConfig;
+        subtasks?: Array<{
+          id?: string;
+          title: string;
+          completed?: boolean;
+          dueTime?: string;
+          priority?: string;
+          status?: string;
+        }>;
+      };
     }) => updateRecurringTemplate(templateId, payload),
     onSuccess: async () => {
       if (selectedProjectId) {
@@ -663,11 +680,11 @@ export default function RecurringTasksPage() {
       queryClient.invalidateQueries({ queryKey: ["recurring-board", selectedProjectId] });
       queryClient.invalidateQueries({ queryKey: ["recurring-summary"] });
       queryClient.invalidateQueries({ queryKey: ["recurring-templates"] });
-      toast({ title: "Series updated", variant: "success" });
+      toast({ title: "Planner updated", variant: "success" });
     },
     onError: (err) => {
       toast({
-        title: "Could not update series",
+        title: "Could not update planner",
         description: parseApiError(err),
         variant: "error",
       });
@@ -1006,6 +1023,38 @@ export default function RecurringTasksPage() {
     []
   );
 
+  const doneStatusIds = useMemo(
+    () =>
+      new Set(
+        statuses
+          .filter((s) => s.type === "DONE" || s.name.toLowerCase() === "done")
+          .map((s) => s.id)
+      ),
+    [statuses]
+  );
+
+  const openEditRecurringTask = useCallback(
+    (template: RecurringTemplateSummary) => {
+      const occurrences = dedupeRecurringBoardTasks(
+        tasks.filter((t) => t.recurringTemplateId === template.id)
+      );
+      const pick = pickBestOccurrence(occurrences, overdueTaskIds, doneStatusIds);
+      if (!pick) {
+        toast({
+          title: "No run to edit yet",
+          description: "This planner has no runs on the board. Open the series to check schedule or wait for the next run.",
+          variant: "error",
+        });
+        openSeriesDrawer(template);
+        return;
+      }
+      setSeriesDrawerOpen(false);
+      setSelectedTaskId(null);
+      setFullDetailTaskId(pick.id);
+    },
+    [tasks, overdueTaskIds, doneStatusIds, toast, openSeriesDrawer]
+  );
+
   const isSeriesMutating =
     pauseSeriesMutation.isPending ||
     resumeSeriesMutation.isPending ||
@@ -1233,10 +1282,10 @@ export default function RecurringTasksPage() {
                   className="min-h-0 flex-1"
                   templates={recurringTemplates}
                   assigneeMap={assigneeMap}
-                  canManage={permissions.canEditTask}
+                  canManage={canManageSeries}
                   isMutating={isSeriesMutating}
                   onOpen={(t) => openSeriesDrawer(t)}
-                  onEdit={(t) => openSeriesDrawer(t, true)}
+                  onEdit={(t) => openEditRecurringTask(t)}
                   onViewHistory={(t) => openSeriesDrawer(t)}
                   onPause={(id) => pauseSeriesMutation.mutate(id)}
                   onResume={(id) => resumeSeriesMutation.mutate(id)}
@@ -1403,12 +1452,13 @@ export default function RecurringTasksPage() {
             occurrences={seriesOccurrences}
             statuses={statuses}
             overdueTaskIds={overdueTaskIds}
-            readOnly={!permissions.canEditTask}
+            readOnly={!canManageSeries}
             isMutating={isSeriesMutating}
             startInEdit={seriesDrawerStartEdit}
             onPause={(id) => pauseSeriesMutation.mutate(id)}
             onResume={(id) => resumeSeriesMutation.mutate(id)}
             onDelete={(tpl) => setDeleteSeriesTarget(tpl)}
+            onEditRecurringTask={(tpl) => openEditRecurringTask(tpl)}
             onSaveCadence={(templateId, payload) =>
               updateTemplateMutation.mutate({ templateId, payload })
             }

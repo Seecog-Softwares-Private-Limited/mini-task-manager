@@ -56,6 +56,8 @@ class SubtaskDetailPanel extends ConsumerStatefulWidget {
     this.fallbackReporterId,
     this.fallbackCreatedAt,
     this.canEditRequireLocation = false,
+    /// Planner-template editing: no completion/attachments/status; due time only.
+    this.templateMode = false,
   });
 
   final TaskSubtask subtask;
@@ -67,6 +69,7 @@ class SubtaskDetailPanel extends ConsumerStatefulWidget {
   final bool saving;
   final bool canComplete;
   final bool canEditRequireLocation;
+  final bool templateMode;
   final SubtaskCompletionRequest onRequestCompletion;
   final VoidCallback onCancel;
   final ValueChanged<TaskSubtask> onSave;
@@ -104,7 +107,11 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     _assigneeIds = _storedAssigneeIds(widget.subtask);
     _requireLocation = widget.subtask.requireLocation;
     _completionRecord = widget.subtask.completionRecord;
-    _loadAttachments();
+    if (!widget.templateMode) {
+      _loadAttachments();
+    } else {
+      _loadingAttachments = false;
+    }
   }
 
   @override
@@ -215,7 +222,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
   }
 
   Future<void> _pickDueTime() async {
-    if (_dueDate == null) return;
+    if (!widget.templateMode && _dueDate == null) return;
     final parts = (_dueTime ?? '09:00').split(':');
     final initial = TimeOfDay(
       hour: int.tryParse(parts[0]) ?? 9,
@@ -373,25 +380,25 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
       _completionRecord = record;
     }
 
-    final completed = _status == 'DONE';
+    final completed = widget.templateMode ? false : _status == 'DONE';
     widget.onSave(
       widget.subtask.copyWith(
         title: title,
         description: _descriptionController.text.trim().isEmpty
             ? null
             : _descriptionController.text,
-        status: _status,
+        status: widget.templateMode ? 'TODO' : _status,
         completed: completed,
         priority: _priority,
-        dueDate: _dueDate,
+        dueDate: widget.templateMode ? null : _dueDate,
         dueTime: _dueTime,
-        clearDueDate: _dueDate == null,
-        clearDueTime: _dueDate == null || _dueTime == null,
+        clearDueDate: widget.templateMode || _dueDate == null,
+        clearDueTime: _dueTime == null,
         assigneeIds: _assigneeIds,
         assigneeId: _assigneeIds.isNotEmpty ? _assigneeIds.first : null,
         completionRecord: completed ? record : null,
         clearCompletionRecord: !completed,
-        requireLocation: _requireLocation,
+        requireLocation: widget.templateMode ? false : _requireLocation,
       ),
     );
   }
@@ -467,79 +474,83 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
             ),
           ),
           const SizedBox(height: AppSpacing.md),
-          Text(
-            'SUBTASK ATTACHMENTS',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  letterSpacing: 1.2,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textMuted,
-                ),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          AttachmentUploadActions(
-            disabled: widget.saving,
-            uploading: _uploadingAttachment,
-            onPickAndUpload: _pickAndUpload,
-          ),
-          if (_loadingAttachments)
-            const Padding(
-              padding: EdgeInsets.only(top: AppSpacing.sm),
-              child: LinearProgressIndicator(minHeight: 2),
-            )
-          else if (_attachments.isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: AppSpacing.sm),
-              child: Text(
-                'No subtask attachments yet',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textMuted,
-                    ),
-              ),
-            )
-          else
-            AttachmentGrid(
-              organizationId: widget.organizationId,
-              enabled: !widget.saving,
-              items: _attachments.asMap().entries.map(
-                (entry) => AttachmentGridEntry(
-                  attachment: entry.value,
-                  index: entry.key + 1,
-                  onDelete: () => _deleteAttachment(entry.value.id),
-                ),
-              ).toList(),
+          if (!widget.templateMode) ...[
+            Text(
+              'SUBTASK ATTACHMENTS',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    letterSpacing: 1.2,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textMuted,
+                  ),
             ),
-          if (_attachmentError != null) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Text(_attachmentError!, style: const TextStyle(color: AppColors.danger)),
+            const SizedBox(height: AppSpacing.sm),
+            AttachmentUploadActions(
+              disabled: widget.saving,
+              uploading: _uploadingAttachment,
+              onPickAndUpload: _pickAndUpload,
+            ),
+            if (_loadingAttachments)
+              const Padding(
+                padding: EdgeInsets.only(top: AppSpacing.sm),
+                child: LinearProgressIndicator(minHeight: 2),
+              )
+            else if (_attachments.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.sm),
+                child: Text(
+                  'No subtask attachments yet',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textMuted,
+                      ),
+                ),
+              )
+            else
+              AttachmentGrid(
+                organizationId: widget.organizationId,
+                enabled: !widget.saving,
+                items: _attachments.asMap().entries.map(
+                  (entry) => AttachmentGridEntry(
+                    attachment: entry.value,
+                    index: entry.key + 1,
+                    onDelete: () => _deleteAttachment(entry.value.id),
+                  ),
+                ).toList(),
+              ),
+            if (_attachmentError != null) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Text(_attachmentError!, style: const TextStyle(color: AppColors.danger)),
+            ],
+            const SizedBox(height: AppSpacing.md),
           ],
-          const SizedBox(height: AppSpacing.md),
           Row(
             children: [
-              Expanded(
-                child: _SubtaskDropdown<String>(
-                  label: 'Status',
-                  value: _status,
-                  enabled: !widget.saving && (widget.canComplete || _status == 'DONE'),
-                  items: _subtaskStatuses
-                      .map(
-                        (status) => DropdownMenuItem(
-                          value: status,
-                          enabled: widget.canComplete || status != 'DONE',
-                          child: Text(
-                            _labelForSubtaskStatus(status),
-                            overflow: TextOverflow.ellipsis,
+              if (!widget.templateMode) ...[
+                Expanded(
+                  child: _SubtaskDropdown<String>(
+                    label: 'Status',
+                    value: _status,
+                    enabled: !widget.saving && (widget.canComplete || _status == 'DONE'),
+                    items: _subtaskStatuses
+                        .map(
+                          (status) => DropdownMenuItem(
+                            value: status,
+                            enabled: widget.canComplete || status != 'DONE',
+                            child: Text(
+                              _labelForSubtaskStatus(status),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        ),
-                      )
-                      .toList(),
-                  selectedChild: Text(
-                    _labelForSubtaskStatus(_status),
-                    overflow: TextOverflow.ellipsis,
+                        )
+                        .toList(),
+                    selectedChild: Text(
+                      _labelForSubtaskStatus(_status),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onChanged: _handleStatusChange,
                   ),
-                  onChanged: _handleStatusChange,
                 ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
+                const SizedBox(width: AppSpacing.sm),
+              ],
               Expanded(
                 child: _SubtaskDropdown<String>(
                   label: 'Priority',
@@ -579,32 +590,55 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
           const SizedBox(height: AppSpacing.sm),
           Row(
             children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: widget.saving ? null : _pickDueDate,
-                  icon: const Icon(Icons.calendar_today_rounded, size: 18),
-                  label: Text(
-                    dueDate == null
-                        ? 'Due date'
-                        : DateFormat('MMM d, yyyy').format(dueDate),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ),
-              if (_dueDate != null) ...[
-                const SizedBox(width: AppSpacing.xs),
+              if (widget.templateMode) ...[
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: widget.saving ? null : _pickDueTime,
                     icon: const Icon(Icons.schedule_rounded, size: 18),
                     label: Text(
                       _dueTime == null
-                          ? 'Time'
+                          ? 'Due time'
                           : _formatDueTimeLabel(_dueTime!),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ),
+                if (_dueTime != null) ...[
+                  const SizedBox(width: AppSpacing.xs),
+                  IconButton(
+                    tooltip: 'Clear time',
+                    onPressed: widget.saving ? null : _clearDueTime,
+                    icon: const Icon(Icons.clear_rounded),
+                  ),
+                ],
+              ] else ...[
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: widget.saving ? null : _pickDueDate,
+                    icon: const Icon(Icons.calendar_today_rounded, size: 18),
+                    label: Text(
+                      dueDate == null
+                          ? 'Due date'
+                          : DateFormat('MMM d, yyyy').format(dueDate),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+                if (_dueDate != null) ...[
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: widget.saving ? null : _pickDueTime,
+                      icon: const Icon(Icons.schedule_rounded, size: 18),
+                      label: Text(
+                        _dueTime == null
+                            ? 'Time'
+                            : _formatDueTimeLabel(_dueTime!),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ],
               ],
               const SizedBox(width: AppSpacing.sm),
               OutlinedButton(
@@ -626,7 +660,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
               ),
             ],
           ),
-          if (_dueDate != null) ...[
+          if (!widget.templateMode && _dueDate != null) ...[
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton(
@@ -641,29 +675,31 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
               ),
             ),
           ],
-          if (!widget.canComplete) ...[
+          if (!widget.templateMode && !widget.canComplete) ...[
             const SizedBox(height: AppSpacing.sm),
             Text(
               'Only assigned team members can mark this subtask as Done.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.warning),
             ),
           ],
-          const SizedBox(height: AppSpacing.sm),
-          RequireLocationToggle(
-            value: _requireLocation,
-            enabled: !widget.saving && widget.canEditRequireLocation,
-            title: 'Require location',
-            subtitle: widget.canEditRequireLocation
-                ? 'Ask for GPS when this subtask is completed'
-                : 'Only the owner or creator can change this',
-            onChanged: widget.canEditRequireLocation
-                ? (value) {
-                    FocusManager.instance.primaryFocus?.unfocus();
-                    setState(() => _requireLocation = value);
-                  }
-                : null,
-          ),
-          if (_completionRecord != null) ...[
+          if (!widget.templateMode) ...[
+            const SizedBox(height: AppSpacing.sm),
+            RequireLocationToggle(
+              value: _requireLocation,
+              enabled: !widget.saving && widget.canEditRequireLocation,
+              title: 'Require location',
+              subtitle: widget.canEditRequireLocation
+                  ? 'Ask for GPS when this subtask is completed'
+                  : 'Only the owner or creator can change this',
+              onChanged: widget.canEditRequireLocation
+                  ? (value) {
+                      FocusManager.instance.primaryFocus?.unfocus();
+                      setState(() => _requireLocation = value);
+                    }
+                  : null,
+            ),
+          ],
+          if (!widget.templateMode && _completionRecord != null) ...[
             const SizedBox(height: AppSpacing.md),
             _CompletionRecordCard(record: _completionRecord!),
           ],
@@ -677,21 +713,24 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
                   icon: const Icon(Icons.delete_outline_rounded),
                   color: AppColors.danger,
                 )
+              else if (!widget.templateMode)
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: _buildReporterBadge(context),
+                  ),
+                )
               else
+                const Spacer(),
+              if (widget.onDelete != null && !widget.templateMode) ...[
                 Expanded(
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: _buildReporterBadge(context),
                   ),
                 ),
-              if (widget.onDelete != null) ...[
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: _buildReporterBadge(context),
-                  ),
-                ),
-              ],
+              ] else if (widget.onDelete != null)
+                const Spacer(),
               const SizedBox(width: AppSpacing.sm),
               TextButton(
                 onPressed: widget.saving ? null : _handleCancel,

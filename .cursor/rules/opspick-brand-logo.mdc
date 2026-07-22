@@ -1,0 +1,38 @@
+---
+description: OpsPick brand logo assets and App Store Connect icon upload steps
+alwaysApply: true
+---
+
+# OpsPick brand logo
+
+## Source of truth
+
+- Master mark: `branding/opspick-logo-1024.png`
+- App Store 1024: `branding/app-store-icon-1024.png`
+- Web UI: `frontend/public/branding/opspick-logo.png` via `OpsPickLogo` / `/branding/opspick-logo.png`
+- Mobile UI: `mobile/assets/branding/opspick-logo.png` (+ `opspick_logo.png` alias)
+  - Use `OpsPickLogo` from `mobile/lib/core/branding/opspick_logo.dart`
+  - Declare folder in `mobile/pubspec.yaml`: `assets/branding/`
+  - After changing assets: `flutter pub get` then **full restart** (hot reload does not pick up new assets)
+- iOS launcher: `mobile/ios/Runner/Assets.xcassets/AppIcon.appiconset/`
+- Android launcher: `mobile/android/app/src/main/res/mipmap-*/ic_launcher*.png`
+
+When replacing the logo, regenerate all of the above from the master 1024 PNG. Do not revive `mobile/assets/app_icon_source.svg` (old orange clipboard).
+
+## App Store Connect — why the grid placeholder shows
+
+ASC **cannot** be updated from this repo. The Apps list wireframe grid means no processed icon/build yet.
+
+### Option A (recommended): upload a new iOS build
+
+1. Archive & upload a build that includes the updated `AppIcon.appiconset` (esp. `Icon-App-1024x1024@1x.png`).
+2. App Store Connect → Apps → Mini Task Manager (or OpsPick) → version → select the new build.
+3. After processing, the Apps list and app detail replace the grid with the logo.
+
+### Option B: manual 1024 upload
+
+1. Open [App Store Connect](https://appstoreconnect.apple.com) → Apps → the app.
+2. App Information (or the version App Store tab).
+3. Upload `branding/app-store-icon-1024.png` (exactly 1024×1024 PNG; flatten/remove alpha if Apple rejects it).
+
+Optional: rename listing display name from “Mini Task Manager” → **OpsPick** under App Information.

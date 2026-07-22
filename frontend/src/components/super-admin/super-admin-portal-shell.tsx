@@ -16,10 +16,10 @@ import {
   LogOut,
   ScrollText,
   Settings,
-  Shield,
   Ticket,
   Users,
 } from "lucide-react";
+import { OpsPickLogo } from "@/components/brand/opspick-logo";
 import { logout } from "@/services/api/auth.api";
 import { clearAuth } from "@/services/api/client";
 
@@ -77,12 +77,10 @@ export function SuperAdminPortalShell({ children }: { children: React.ReactNode 
       <div className="mx-auto flex max-w-7xl gap-6 px-4 py-6">
         <aside className="sticky top-4 h-fit w-64 shrink-0 rounded-xl border bg-card p-3 shadow-sm">
           <div className="mb-3 flex items-center gap-2 px-2 py-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-              <Shield className="h-5 w-5 text-primary" />
-            </div>
+            <OpsPickLogo className="h-9 w-9" />
             <div>
-              <p className="text-sm font-semibold">Super Admin</p>
-              <p className="text-xs text-muted-foreground">Platform Control</p>
+              <p className="text-sm font-semibold">OpsPick</p>
+              <p className="text-xs text-muted-foreground">Super Admin</p>
             </div>
           </div>
           <nav className="space-y-1">

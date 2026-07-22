@@ -1,4 +1,49 @@
 import '../../core/utils/json_bool.dart';
+import 'dart:convert';
+
+class RecurringTemplateSubtask {
+  const RecurringTemplateSubtask({
+    required this.title,
+    this.id,
+    this.dueTime,
+    this.description,
+    this.priority,
+    this.assigneeId,
+    this.assigneeIds = const [],
+  });
+
+  final String? id;
+  final String title;
+  final String? dueTime;
+  final String? description;
+  final String? priority;
+  final String? assigneeId;
+  final List<String> assigneeIds;
+
+  factory RecurringTemplateSubtask.fromJson(Map<String, dynamic> json) {
+    final fromList = json['assigneeIds'];
+    final assigneeIds = fromList is List
+        ? fromList
+            .map((e) => e?.toString())
+            .whereType<String>()
+            .where((id) => id.isNotEmpty)
+            .toList()
+        : <String>[];
+    final single = json['assigneeId']?.toString();
+    if (assigneeIds.isEmpty && single != null && single.isNotEmpty) {
+      assigneeIds.add(single);
+    }
+    return RecurringTemplateSubtask(
+      id: json['id']?.toString(),
+      title: json['title'] as String? ?? '',
+      dueTime: json['dueTime'] as String?,
+      description: json['description'] as String?,
+      priority: json['priority'] as String?,
+      assigneeId: single,
+      assigneeIds: assigneeIds,
+    );
+  }
+}
 
 class RecurringSummary {
   const RecurringSummary({
@@ -40,7 +85,9 @@ class RecurringTemplate {
     this.description,
     this.completionHealth,
     this.subtaskCount,
+    this.templateSubtasks = const [],
     this.priority,
+    this.assigneeIds = const [],
     this.startDueDate,
     this.endType,
     this.endDate,
@@ -62,7 +109,9 @@ class RecurringTemplate {
   final int missed;
   final double? completionHealth;
   final int? subtaskCount;
+  final List<RecurringTemplateSubtask> templateSubtasks;
   final String? priority;
+  final List<String> assigneeIds;
 
   // Recurrence detail (for lossless editing).
   final String? startDueDate;
@@ -101,7 +150,9 @@ class RecurringTemplate {
       missed: json['missed'] as int? ?? 0,
       completionHealth: (json['completionHealth'] as num?)?.toDouble(),
       subtaskCount: json['subtaskCount'] as int?,
+      templateSubtasks: _parseTemplateSubtasks(json['templateSubtasks']),
       priority: json['priority'] as String?,
+      assigneeIds: _parseAssigneeIds(json),
       startDueDate: json['startDueDate']?.toString(),
       endType: json['endType'] as String?,
       endDate: json['endDate']?.toString(),
@@ -115,6 +166,40 @@ class RecurringTemplate {
               .toList(),
       rawRuleConfig: rule,
     );
+  }
+
+  static List<RecurringTemplateSubtask> _parseTemplateSubtasks(dynamic raw) {
+    List<dynamic>? list;
+    if (raw is List) {
+      list = raw;
+    } else if (raw is String && raw.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) list = decoded;
+      } catch (_) {
+        return const [];
+      }
+    }
+    if (list == null || list.isEmpty) return const [];
+    final out = <RecurringTemplateSubtask>[];
+    for (final e in list) {
+      if (e is! Map) continue;
+      final item = RecurringTemplateSubtask.fromJson(
+        Map<String, dynamic>.from(e),
+      );
+      if (item.title.trim().isNotEmpty) out.add(item);
+    }
+    return out;
+  }
+
+  static List<String> _parseAssigneeIds(Map<String, dynamic> json) {
+    final fromList = json['assigneeIds'];
+    if (fromList is List) {
+      return fromList.map((e) => e?.toString()).whereType<String>().where((id) => id.isNotEmpty).toList();
+    }
+    final single = json['assigneeId']?.toString();
+    if (single != null && single.isNotEmpty) return [single];
+    return const [];
   }
 }
 

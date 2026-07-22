@@ -13,7 +13,6 @@ import '../auth/session_controller.dart';
 import '../kanban/kanban_providers.dart';
 import '../kanban/task_detail_sheet.dart';
 import 'recurring_actions.dart';
-import 'recurring_editor_sheet.dart';
 import 'recurring_providers.dart';
 
 Future<void> showRecurringPlannerSheet({
@@ -261,19 +260,54 @@ class _RecurringPlannerSheetState extends ConsumerState<_RecurringPlannerSheet> 
   }
 
   Future<void> _editSeries() async {
-    final orgId = ref.read(sessionControllerProvider).orgId;
-    if (orgId == null || !canManageRecurring(ref)) return;
-    final saved = await showRecurringEditorSheet(
-      context: context,
-      organizationId: orgId,
-      projectId: projectId,
-      template: template,
+    if (!canManageRecurring(ref)) return;
+    final taskId = await _resolveEditTaskId();
+    if (!mounted) return;
+    if (taskId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No run to edit yet. Wait for the next scheduled run.'),
+        ),
+      );
+      return;
+    }
+    await _openTask(
+      context,
+      taskId,
+      mode: TaskDetailMode.full,
     );
-    if (!saved || !mounted) return;
-    ref.invalidate(recurringTemplatesProvider);
-    ref.invalidate(recurringSummaryProvider);
-    ref.invalidate(recurringTemplateHistoryProvider(template.id));
-    Navigator.of(context).pop();
+  }
+
+  /// Prefer the soonest incomplete board run, else earliest history task.
+  Future<String?> _resolveEditTaskId() async {
+    final board = ref.read(recurringBoardTasksProvider).valueOrNull ?? const <Task>[];
+    final forTemplate = board
+        .where((t) => t.recurringTemplateId == template.id)
+        .toList()
+      ..sort((a, b) => (a.dueDate ?? '').compareTo(b.dueDate ?? ''));
+    if (forTemplate.isNotEmpty) return forTemplate.first.id;
+
+    try {
+      final history =
+          await ref.read(recurringTemplateHistoryProvider(template.id).future);
+      final withTask = history
+          .where((o) => o.taskId != null && o.taskId!.isNotEmpty)
+          .toList()
+        ..sort((a, b) {
+          final stateRank = (RecurringOccurrence o) {
+            final s = o.state.toUpperCase();
+            if (s == 'PENDING') return 0;
+            if (s == 'MISSED') return 1;
+            return 2;
+          };
+          final byState = stateRank(a).compareTo(stateRank(b));
+          if (byState != 0) return byState;
+          return a.sequenceNumber.compareTo(b.sequenceNumber);
+        });
+      return withTask.isEmpty ? null : withTask.first.taskId;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _deleteSeries() async {
@@ -287,7 +321,11 @@ class _RecurringPlannerSheetState extends ConsumerState<_RecurringPlannerSheet> 
     }
   }
 
-  Future<void> _openTask(BuildContext context, String taskId) async {
+  Future<void> _openTask(
+    BuildContext context,
+    String taskId, {
+    TaskDetailMode mode = TaskDetailMode.runChecklist,
+  }) async {
     if (_openingTaskId != null) return;
     setState(() => _openingTaskId = taskId);
 
@@ -302,8 +340,15 @@ class _RecurringPlannerSheetState extends ConsumerState<_RecurringPlannerSheet> 
         taskFuture,
         statusesFuture,
       ]);
-      final task = results[0] as Task;
+      var task = results[0] as Task;
       final statuses = results[1] as List<WorkflowStatus>;
+
+      // Full edit should show checklist from the run; refresh if board cache is stale.
+      if (mode == TaskDetailMode.full && task.subtasks.isEmpty) {
+        try {
+          task = await ref.read(tasksRepositoryProvider).fetchTask(taskId);
+        } catch (_) {}
+      }
 
       if (!context.mounted) return;
       await showModalBottomSheet<void>(
@@ -315,7 +360,14 @@ class _RecurringPlannerSheetState extends ConsumerState<_RecurringPlannerSheet> 
             task: task,
             statuses: statuses,
             projectId: projectId,
+            mode: mode,
             onUpdated: () {
+              ref.invalidate(recurringBoardTasksProvider);
+              ref.invalidate(recurringTemplateHistoryProvider(template.id));
+              ref.invalidate(recurringTemplatesProvider);
+              ref.invalidate(recurringSummaryProvider);
+            },
+            onDeleted: () {
               ref.invalidate(recurringBoardTasksProvider);
               ref.invalidate(recurringTemplateHistoryProvider(template.id));
               ref.invalidate(recurringTemplatesProvider);

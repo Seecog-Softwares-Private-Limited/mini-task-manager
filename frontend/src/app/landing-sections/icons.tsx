@@ -82,12 +82,12 @@ export function IconChevronDown({ className = "h-5 w-5" }: { className?: string 
 /** Matches in-app auth logo styling */
 export function IconLogo({ className = "h-8 w-8" }: { className?: string }) {
   return (
-    <div className={`flex shrink-0 items-center justify-center rounded-xl bg-white ring-1 ring-border shadow-sm dark:bg-card ${className}`}>
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <rect x="5" y="7" width="14" height="15" rx="2" fill="hsl(var(--primary))" fillOpacity="0.1" />
-        <rect x="8" y="4" width="8" height="4" rx="1.5" fill="hsl(var(--primary))" fillOpacity="0.15" />
-        <path d="M8.5 14.5L11 17l5.5-7" stroke="hsl(var(--primary))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </div>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/branding/opspick-logo.png"
+      alt=""
+      className={`shrink-0 rounded-[10px] bg-white object-contain p-[3px] ring-1 ring-black/5 shadow-sm ${className}`}
+      aria-hidden
+    />
   );
 }

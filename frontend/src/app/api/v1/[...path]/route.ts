@@ -120,7 +120,7 @@ function applyCorsHeaders(headers: Headers, request: NextRequest): void {
 }
 
 function proxyUnavailableResponse(base: string, targetUrl: string, err: unknown, timedOut: boolean) {
-  const upstreamTimeoutMs = 12_000;
+  const upstreamTimeoutMs = 45_000;
   console.error("[mini-tm api proxy] fetch failed:", targetUrl, err);
   return NextResponse.json(
     {
@@ -158,7 +158,7 @@ async function proxy(request: NextRequest, pathSegments: string[] | undefined) {
     }
   }
 
-  const upstreamTimeoutMs = 12_000;
+  const upstreamTimeoutMs = 45_000;
   const maxAttempts = 2;
   const base = upstreamBaseUrl();
   let upstream: Response | undefined;

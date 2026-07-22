@@ -447,15 +447,6 @@ export class RecurringTasksService {
     return null;
   }
 
-  /** True when occurrence points at a missing/deleted task row. */
-  private async isOccurrenceTaskMissing(
-    occurrence: import('./entities/recurring-task-occurrence.entity').RecurringTaskOccurrenceEntity,
-  ): Promise<boolean> {
-    if (!occurrence.taskId) return true;
-    const task = await this.tasksRepository.findById(occurrence.taskId);
-    return !task;
-  }
-
   /** Repair missing task links, materialize overdue occurrences, and fix metadata for board display. */
   async syncBoardTasks(organizationId: string, projectId: string): Promise<{ materialized: number; repaired: number }> {
     await this.generateDueOccurrences(nowYmd(), { organizationId, projectId });
@@ -463,6 +454,8 @@ export class RecurringTasksService {
     const templateMap = new Map(templates.map((t) => [t.id, t]));
     await this.purgeOrphanRecurringRuns(organizationId, projectId, templateMap);
     const pending = await this.occurrencesRepository.findPendingByProject(organizationId, projectId);
+    const existingTasks = await this.tasksRepository.findRecurringByProject(projectId, organizationId);
+    const tasksById = new Map(existingTasks.map((t) => [t.id, t]));
     let materialized = 0;
     let repaired = 0;
 
@@ -475,17 +468,25 @@ export class RecurringTasksService {
       );
       if (!template) continue;
 
-      const taskMissing = await this.isOccurrenceTaskMissing(occ);
-      let task = !taskMissing && occ.taskId
-        ? await this.tasksRepository.findByIdAndOrganization(occ.taskId, organizationId)
-        : null;
+      let task = occ.taskId ? tasksById.get(occ.taskId) ?? null : null;
+      if (occ.taskId && !task) {
+        // Stale link — clear and rematerialize below.
+        await this.occurrencesRepository.update(occ.id, { taskId: null });
+      }
 
       if (!task) {
-        if (occ.taskId && taskMissing) {
-          await this.occurrencesRepository.update(occ.id, { taskId: null });
-        }
         const ok = await this.materializeOccurrence(occ, template);
-        if (ok) materialized += 1;
+        if (ok) {
+          materialized += 1;
+          const refreshed = await this.occurrencesRepository.findById(occ.id);
+          if (refreshed?.taskId) {
+            const created = await this.tasksRepository.findByIdAndOrganization(
+              refreshed.taskId,
+              organizationId,
+            );
+            if (created) tasksById.set(created.id, created);
+          }
+        }
         continue;
       }
 
@@ -499,8 +500,7 @@ export class RecurringTasksService {
       }
     }
 
-    const tasks = await this.tasksRepository.findRecurringByProject(projectId, organizationId);
-    for (const task of tasks) {
+    for (const task of tasksById.values()) {
       if (!task.recurringTemplateId) continue;
       const template = templateMap.get(task.recurringTemplateId);
       if (!template) continue;
@@ -544,59 +544,32 @@ export class RecurringTasksService {
     }
     const today = nowYmd();
     const pending = await this.occurrencesRepository.findPendingByProject(organizationId, projectId);
-    const templates = await this.templatesRepository.findByOrganization(organizationId, projectId);
-    const templateMap = new Map(templates.map((t) => [t.id, t]));
-    const overdueTaskIds: string[] = [];
-    const statusIdSet = new Set(validStatusIds.filter(Boolean));
-    const fallbackStatusId = validStatusIds[0];
-
-    for (const occ of pending) {
-      const dueYmd = String(occ.dueDate).slice(0, 10);
-      if (dueYmd >= today) continue;
-      const template = await this.resolveTemplateForOccurrence(
-        occ,
-        templateMap,
-        organizationId,
-        projectId,
-      );
-      if (!template) continue;
-
-      let taskId = occ.taskId;
-      const taskMissing = await this.isOccurrenceTaskMissing(occ);
-      if (taskId && taskMissing) {
-        await this.occurrencesRepository.update(occ.id, { taskId: null });
-        taskId = null;
-      }
-      if (taskId) {
-        const task = await this.tasksRepository.findByIdAndOrganization(taskId, organizationId);
-        if (!task) {
-          await this.materializeOccurrence(occ, template);
-          taskId = (await this.occurrencesRepository.findById(occ.id))?.taskId ?? null;
-        }
-      } else {
-        await this.materializeOccurrence(occ, template);
-        taskId = (await this.occurrencesRepository.findById(occ.id))?.taskId ?? null;
-      }
-      if (taskId) {
-        const linked = await this.tasksRepository.findByIdAndOrganization(taskId, organizationId);
-        if (linked) overdueTaskIds.push(taskId);
-      }
-    }
+    // Sync already materialized missing runs — only collect overdue task ids here.
+    const overdueTaskIds = [
+      ...new Set(
+        pending
+          .filter((occ) => String(occ.dueDate).slice(0, 10) < today && !!occ.taskId)
+          .map((occ) => occ.taskId as string),
+      ),
+    ];
 
     const tasks = await this.mergeBoardTasks(projectId, organizationId, overdueTaskIds);
 
+    const statusIdSet = new Set(validStatusIds.filter(Boolean));
+    const fallbackStatusId = validStatusIds[0];
     if (statusIdSet.size > 0 && fallbackStatusId) {
-      for (const task of tasks) {
-        if (task.statusId && !statusIdSet.has(task.statusId)) {
+      const toFix = tasks.filter((task) => task.statusId && !statusIdSet.has(task.statusId));
+      await Promise.all(
+        toFix.map(async (task) => {
           await this.tasksRepository.update(task.id, { statusId: fallbackStatusId });
           task.statusId = fallbackStatusId;
-        }
-      }
+        }),
+      );
     }
 
     return {
       tasks,
-      overdueTaskIds: [...new Set(overdueTaskIds)],
+      overdueTaskIds,
     };
   }
 
@@ -910,6 +883,20 @@ export class RecurringTasksService {
       endAfterOccurrences: number | null;
       createDaysBeforeDue: number;
       ruleConfig: Record<string, unknown> | null;
+      templateSubtasks: Array<{
+        id: string;
+        title: string;
+        completed: boolean;
+        description?: string;
+        assigneeId?: string;
+        assigneeIds?: string[];
+        dueDate?: string;
+        dueOffsetDays?: number;
+        dueTime?: string;
+        status?: 'TODO' | 'IN_PROGRESS' | 'DONE';
+        priority?: string;
+        statusId?: string;
+      }>;
     }> = [];
     for (const tpl of templates) {
       const history = await this.occurrencesRepository.findByTemplate(tpl.id);
@@ -931,6 +918,39 @@ export class RecurringTasksService {
         tpl.generatedCount > 0
           ? Math.round((completed / tpl.generatedCount) * 100)
           : 0;
+
+      // Checklist often lives on the seed/run task when users edit a run.
+      // Hydrate (and backfill) templateSubtasks so Edit planner shows them.
+      let templateSubtasks = tpl.templateSubtasks ?? [];
+      if (!templateSubtasks.length) {
+        const seedOcc = [...history].sort((a, b) => a.sequenceNumber - b.sequenceNumber).find((h) => h.taskId);
+        if (seedOcc?.taskId) {
+          const seedTask = await this.tasksRepository.findById(seedOcc.taskId);
+          if (seedTask?.subtasks?.length) {
+            const hydrated = normalizeTemplateSubtasks(
+              seedTask.subtasks.map((s) => ({
+                id: s.id,
+                title: s.title,
+                description: s.description,
+                assigneeId: s.assigneeId,
+                assigneeIds: s.assigneeIds,
+                dueOffsetDays: 0,
+                dueTime: s.dueTime,
+                priority: s.priority,
+                status: (s.status as 'TODO' | 'IN_PROGRESS' | 'DONE') ?? 'TODO',
+                statusId: s.statusId,
+              })),
+            );
+            if (hydrated?.length) {
+              templateSubtasks = hydrated;
+              await this.templatesRepository.update(tpl.id, {
+                templateSubtasks: hydrated,
+              } as never);
+            }
+          }
+        }
+      }
+
       items.push({
         id: tpl.id,
         title: tpl.title,
@@ -946,7 +966,7 @@ export class RecurringTasksService {
         missed,
         lastRunState: lastResolved?.state ?? null,
         completionHealth,
-        subtaskCount: tpl.templateSubtasks?.length ?? 0,
+        subtaskCount: templateSubtasks.length,
         assigneeId: tpl.assigneeId ?? null,
         assigneeIds: tpl.assigneeIds ?? null,
         priority: tpl.priority,
@@ -958,6 +978,7 @@ export class RecurringTasksService {
         createDaysBeforeDue: tpl.createDaysBeforeDue,
         // Needed so clients can expand WEEKLY calendars with weeklyDays / interval.
         ruleConfig: tpl.ruleConfig ?? null,
+        templateSubtasks,
       });
     }
     return items;
@@ -1189,6 +1210,39 @@ export class RecurringTasksService {
     return { success: true };
   }
 
+  /**
+   * When a run's checklist is edited, mirror titles/times onto the planner
+   * template so Edit planner and future runs stay in sync.
+   */
+  async syncTemplateChecklistFromTaskSubtasks(
+    templateId: string,
+    organizationId: string,
+    subtasks: NonNullable<TaskEntity['subtasks']>,
+  ): Promise<void> {
+    const template = await this.templatesRepository.findByIdAndOrganization(
+      templateId,
+      organizationId,
+    );
+    if (!template) return;
+    const hydrated = normalizeTemplateSubtasks(
+      (subtasks ?? []).map((s) => ({
+        id: s.id,
+        title: s.title,
+        description: s.description,
+        assigneeId: s.assigneeId,
+        assigneeIds: s.assigneeIds,
+        dueOffsetDays: 0,
+        dueTime: s.dueTime,
+        priority: s.priority,
+        status: (s.status as 'TODO' | 'IN_PROGRESS' | 'DONE') ?? 'TODO',
+        statusId: s.statusId,
+      })),
+    );
+    await this.templatesRepository.update(template.id, {
+      templateSubtasks: hydrated,
+    } as never);
+  }
+
   async updateTemplate(templateId: string, organizationId: string, dto: UpdateRecurringTemplateDto) {
     const template = await this.templatesRepository.findByIdAndOrganization(templateId, organizationId);
     if (!template) throw new NotFoundException('Recurring template not found');
@@ -1198,6 +1252,14 @@ export class RecurringTasksService {
       const trimmed = dto.description.trim();
       patch.description = trimmed.length ? trimmed : null;
     }
+    if (dto.priority !== undefined) {
+      patch.priority = dto.priority;
+    }
+    if (dto.assigneeIds !== undefined) {
+      const ids = [...new Set(dto.assigneeIds.filter(Boolean))];
+      patch.assigneeIds = ids.length ? ids : null;
+      patch.assigneeId = ids[0] ?? null;
+    }
     if (dto.recurrence) {
       patch.repeatType = dto.recurrence.repeat ?? template.repeatType;
       patch.ruleConfig = dto.recurrence as unknown as Record<string, unknown>;
@@ -1205,6 +1267,9 @@ export class RecurringTasksService {
       patch.endType = dto.recurrence.endType ?? template.endType ?? 'NEVER';
       patch.endDate = dto.recurrence.endDate ? (dto.recurrence.endDate as unknown as Date) : null;
       patch.endAfterOccurrences = dto.recurrence.endAfterOccurrences ?? null;
+    }
+    if (dto.subtasks !== undefined) {
+      patch.templateSubtasks = normalizeTemplateSubtasks(dto.subtasks);
     }
     await this.templatesRepository.update(template.id, patch as any);
     return this.templatesRepository.findById(template.id);

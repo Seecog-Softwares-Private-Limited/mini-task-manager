@@ -19,6 +19,27 @@ function isPublic(pathname: string) {
   );
 }
 
+/** Public static files under /public — must never redirect to /login. */
+function isStaticAsset(pathname: string) {
+  if (
+    pathname.startsWith("/branding/") ||
+    pathname.startsWith("/icons/") ||
+    pathname === "/favicon.ico" ||
+    pathname === "/favicon.png" ||
+    pathname === "/apple-touch-icon.png" ||
+    pathname === "/opengraph-image.png" ||
+    pathname === "/manifest.webmanifest" ||
+    pathname === "/manifest.json" ||
+    pathname === "/icon" ||
+    pathname.startsWith("/icon/") ||
+    pathname === "/apple-icon" ||
+    pathname.startsWith("/apple-icon")
+  ) {
+    return true;
+  }
+  return /\.(?:png|jpe?g|gif|webp|svg|ico|txt|xml|webmanifest)$/i.test(pathname);
+}
+
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
@@ -26,6 +47,10 @@ export function middleware(request: NextRequest) {
   // If we redirect unauthenticated `/api/v1/auth/login` to /login, the browser never reaches the
   // backend and sign-in always fails (HTML redirect instead of JSON).
   if (pathname.startsWith("/api")) {
+    return NextResponse.next();
+  }
+
+  if (isStaticAsset(pathname)) {
     return NextResponse.next();
   }
 
@@ -43,7 +68,7 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Exclude api (proxied to backend), static assets, and images — same reasons as early return above.
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
+    // Exclude api, Next internals, brand assets, and App Router icon routes (/icon, /apple-icon).
+    "/((?!api|_next/static|_next/image|favicon\\.ico|favicon\\.png|branding/|icon(?:/|$)|apple-icon|apple-touch|opengraph).*)",
   ],
 };

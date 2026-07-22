@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../workspaces/workspace_switcher_sheet.dart';
+import '../../core/branding/opspick_logo.dart';
 import '../../core/services/push_nav.dart';
 import '../../core/theme/app_colors.dart';
 import '../auth/session_controller.dart';
@@ -161,8 +162,16 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
     return Scaffold(
       appBar: AppBar(
-        titleSpacing: 16,
-        title: Text(_titleForIndex(_index)),
+        titleSpacing: 12,
+        title: Row(
+          children: [
+            if (_index == 0) ...[
+              const OpsPickLogo(size: 28, borderRadius: 8),
+              const SizedBox(width: 10),
+            ],
+            Flexible(child: Text(_titleForIndex(_index))),
+          ],
+        ),
         actions: [
           IconButton(
             tooltip: 'Switch workspace',
