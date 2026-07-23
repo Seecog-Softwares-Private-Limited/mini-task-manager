@@ -32,6 +32,7 @@
     "seed:add-invited-user": "npx ts-node -r tsconfig-paths/register src/infrastructure/database/seed/add-invited-user.ts",
     "seed:personal-solutions-members": "npx ts-node -r tsconfig-paths/register src/infrastructure/database/seed/seed-personal-solutions-members.ts",
     "seed:fix-login": "npx ts-node -r tsconfig-paths/register src/infrastructure/database/seed/fix-seed-users-login.ts",
+    "seed:app-review": "npx ts-node -r tsconfig-paths/register src/infrastructure/database/seed/seed-app-review-user.ts",
     "migrate:passwords": "npx ts-node -r tsconfig-paths/register scripts/migrate-passwords.ts",
     "dev": "node app.js",
     "dev:split": "concurrently -n api,web -c blue,green \"npm run start:dev\" \"npm run dev:frontend\"",
