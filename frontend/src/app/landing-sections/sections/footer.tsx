@@ -12,6 +12,7 @@ const FOOTER_LINKS = {
     { label: "Sign in", href: "/login" },
     { label: "Create account", href: "/signup" },
     { label: "Dashboard", href: "/dashboard" },
+    { label: "Privacy Policy", href: "/privacypolicy" },
   ],
 };
 
@@ -47,8 +48,12 @@ export function Footer() {
         </div>
 
         <div className="mt-10 pt-6 border-t border-border/60 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">© {new Date().getFullYear()} OpsPick. All rights reserved.</p>
-          <p className="text-sm text-muted-foreground">Built for teams who ship.</p>
+          <p className="text-sm text-muted-foreground">
+            © {new Date().getFullYear()} OpsPick · Seecog Softwares Pvt. Ltd. All rights reserved.
+          </p>
+          <Link href="/privacypolicy" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            Privacy Policy
+          </Link>
         </div>
       </div>
     </footer>
