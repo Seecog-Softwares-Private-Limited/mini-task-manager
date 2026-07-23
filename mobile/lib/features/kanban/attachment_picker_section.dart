@@ -113,50 +113,66 @@ class AttachmentUploadActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final actions = <Widget>[
-      _ActionChip(
-        icon: Icons.photo_camera_rounded,
-        label: 'Camera',
-        onTap: uploading || disabled
-            ? null
-            : () => _handle(AttachmentPickerUtils.capturePhoto),
-      ),
-      _ActionChip(
-        icon: Icons.attach_file_rounded,
-        label: 'File',
-        onTap: uploading || disabled
-            ? null
-            : () => _handle(AttachmentPickerUtils.pickFile),
-      ),
-      if (showGallery && !compact)
-        _ActionChip(
-          icon: Icons.photo_library_rounded,
-          label: 'Gallery',
-          onTap: uploading || disabled
-              ? null
-              : () => _handle(AttachmentPickerUtils.pickFromGallery),
-        ),
-      _ActionChip(
-        icon: Icons.mic_rounded,
-        label: 'Voice',
-        onTap: uploading || disabled
-            ? null
-            : () => _handle(() => showVoiceNoteRecorderSheet(context)),
-      ),
-    ];
+    final camera = _ActionChip(
+      icon: Icons.photo_camera_rounded,
+      label: 'Camera',
+      onTap: uploading || disabled
+          ? null
+          : () => _handle(AttachmentPickerUtils.capturePhoto),
+    );
+    final file = _ActionChip(
+      icon: Icons.attach_file_rounded,
+      label: 'File',
+      onTap: uploading || disabled
+          ? null
+          : () => _handle(AttachmentPickerUtils.pickFile),
+    );
+    final gallery = _ActionChip(
+      icon: Icons.photo_library_rounded,
+      label: 'Gallery',
+      onTap: uploading || disabled
+          ? null
+          : () => _handle(AttachmentPickerUtils.pickFromGallery),
+    );
+    final voice = _ActionChip(
+      icon: Icons.mic_rounded,
+      label: 'Voice',
+      onTap: uploading || disabled
+          ? null
+          : () => _handle(() => showVoiceNoteRecorderSheet(context)),
+    );
 
-    return Row(
+    final showGalleryChip = showGallery && !compact;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (var i = 0; i < actions.length; i++) ...[
-          if (i > 0) const SizedBox(width: 6),
-          Expanded(child: actions[i]),
-        ],
+        Row(
+          children: [
+            Expanded(child: camera),
+            const SizedBox(width: 8),
+            Expanded(child: file),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            if (showGalleryChip) ...[
+              Expanded(child: gallery),
+              const SizedBox(width: 8),
+            ],
+            Expanded(child: voice),
+            if (!showGalleryChip) const Expanded(child: SizedBox.shrink()),
+          ],
+        ),
         if (uploading) ...[
-          const SizedBox(width: 8),
-          const SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(strokeWidth: 2),
+          const SizedBox(height: 8),
+          const Center(
+            child: SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
           ),
         ],
       ],
@@ -205,7 +221,7 @@ class AttachmentPickerSection extends StatelessWidget {
                     : () => _addAttachment(AttachmentPickerUtils.capturePhoto),
               ),
             ),
-            const SizedBox(width: 6),
+            const SizedBox(width: 8),
             Expanded(
               child: _ActionChip(
                 icon: Icons.attach_file_rounded,
@@ -215,20 +231,25 @@ class AttachmentPickerSection extends StatelessWidget {
                     : () => _addAttachment(AttachmentPickerUtils.pickFile),
               ),
             ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
             if (!compact) ...[
-              const SizedBox(width: 6),
               Expanded(
                 child: _ActionChip(
                   icon: Icons.photo_library_rounded,
                   label: 'Gallery',
                   onTap: disabled
                       ? null
-                      : () =>
-                          _addAttachment(AttachmentPickerUtils.pickFromGallery),
+                      : () => _addAttachment(
+                            AttachmentPickerUtils.pickFromGallery,
+                          ),
                 ),
               ),
+              const SizedBox(width: 8),
             ],
-            const SizedBox(width: 6),
             Expanded(
               child: _ActionChip(
                 icon: Icons.mic_rounded,
@@ -240,6 +261,7 @@ class AttachmentPickerSection extends StatelessWidget {
                         ),
               ),
             ),
+            if (compact) const Expanded(child: SizedBox.shrink()),
           ],
         ),
         if (attachments.isNotEmpty) ...[
@@ -295,19 +317,33 @@ class _ActionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: onTap,
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-        visualDensity: VisualDensity.compact,
-        minimumSize: const Size(0, 36),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      ),
-      icon: Icon(icon, size: 15),
-      label: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+    return SizedBox(
+      height: 40,
+      width: double.infinity,
+      child: OutlinedButton(
+        onPressed: onTap,
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          visualDensity: VisualDensity.compact,
+          minimumSize: const Size(0, 40),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 18),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              maxLines: 1,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
       ),
     );
   }
