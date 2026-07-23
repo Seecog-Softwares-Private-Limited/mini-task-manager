@@ -16,6 +16,7 @@ import '../kanban/kanban_providers.dart';
 import '../kanban/task_detail_sheet.dart';
 import '../projects/projects_providers.dart';
 import 'recurring_providers.dart';
+import 'subtask_note_sheet.dart';
 
 /// How far ahead we project upcoming (not-yet-materialized) recurring runs.
 const int _projectionHorizonDays = 120;
@@ -870,6 +871,42 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
     }
   }
 
+  Future<void> _editSubtaskNote(Task task, int subIndex) async {
+    final ti = _tasks.indexWhere((t) => t.id == task.id);
+    if (ti < 0) return;
+    final orgId = _orgId;
+    if (orgId == null || orgId.isEmpty) {
+      _snack('No workspace selected');
+      return;
+    }
+    final sub = _tasks[ti].subtasks[subIndex];
+    final result = await showSubtaskNoteSheet(
+      context: context,
+      subtask: sub,
+      taskId: task.id,
+      organizationId: orgId,
+    );
+    if (result == null || !mounted) return;
+
+    final prevTask = _tasks[ti];
+    final subs = List<TaskSubtask>.from(prevTask.subtasks);
+    subs[subIndex] = subs[subIndex].copyWith(
+      note: result.note.isEmpty ? null : result.note,
+      clearNote: result.note.isEmpty,
+    );
+    setState(() => _tasks[ti] = prevTask.copyWith(subtasks: subs));
+    try {
+      await ref
+          .read(tasksRepositoryProvider)
+          .updateTask(taskId: task.id, subtasks: subs);
+      widget.onChanged();
+      _snack(result.note.isEmpty ? 'Note cleared' : 'Note saved');
+    } catch (error) {
+      if (mounted) setState(() => _tasks[ti] = prevTask);
+      _snack('Could not save note: ${_msg(error)}');
+    }
+  }
+
   Future<void> _confirmDeleteSubtask(Task task, int subIndex) async {
     if (_busy) return;
     final ti = _tasks.indexWhere((t) => t.id == task.id);
@@ -1352,6 +1389,7 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
                       _SubtaskRow(
                         subtask: task.subtasks[i],
                         onToggle: (value) => _toggleSubtask(task, i, value),
+                        onEditNote: () => _editSubtaskNote(task, i),
                         onEdit: () => widget.onOpenDetails(task),
                         onDelete: () => _confirmDeleteSubtask(task, i),
                         enabled: !_busy,
@@ -1362,7 +1400,7 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
                       child: Text(
-                        'This day has passed. Open Edit on an item for details and attachments; you can still mark items done or undone.',
+                        'This day has passed. Use Add note for details and attachments; you can still mark items done or undone.',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                               color: AppColors.textMuted,
                             ),
@@ -1464,6 +1502,7 @@ class _SubtaskRow extends StatelessWidget {
   const _SubtaskRow({
     required this.subtask,
     required this.onToggle,
+    required this.onEditNote,
     required this.onEdit,
     required this.onDelete,
     required this.enabled,
@@ -1472,6 +1511,7 @@ class _SubtaskRow extends StatelessWidget {
 
   final TaskSubtask subtask;
   final ValueChanged<bool> onToggle;
+  final VoidCallback onEditNote;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final bool enabled;
@@ -1558,6 +1598,8 @@ class _SubtaskRow extends StatelessWidget {
                     ),
                     onSelected: (action) {
                       switch (action) {
+                        case _SubtaskMenuAction.note:
+                          onEditNote();
                         case _SubtaskMenuAction.edit:
                           onEdit();
                         case _SubtaskMenuAction.delete:
@@ -1565,6 +1607,10 @@ class _SubtaskRow extends StatelessWidget {
                       }
                     },
                     itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: _SubtaskMenuAction.note,
+                        child: Text(hasNote ? 'Edit note' : 'Add note'),
+                      ),
                       const PopupMenuItem(
                         value: _SubtaskMenuAction.edit,
                         child: Text('Edit'),
@@ -1627,7 +1673,7 @@ class _DoneAtChip extends StatelessWidget {
   }
 }
 
-enum _SubtaskMenuAction { edit, delete }
+enum _SubtaskMenuAction { note, edit, delete }
 
 /// Read-only card for a projected upcoming run (not yet a real task).
 class _ProjectedRunCard extends StatelessWidget {
