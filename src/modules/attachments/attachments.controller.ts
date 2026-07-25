@@ -55,8 +55,12 @@ export class AttachmentsController {
       throw new BadRequestException('entityType and entityId are required');
     }
     const normalizedType = entityType.toUpperCase();
-    if (normalizedType !== 'TASK' && normalizedType !== 'SUBTASK') {
-      throw new BadRequestException('entityType must be TASK or SUBTASK');
+    if (
+      normalizedType !== 'TASK' &&
+      normalizedType !== 'SUBTASK' &&
+      normalizedType !== 'SUBTASK_COMMENT'
+    ) {
+      throw new BadRequestException('entityType must be TASK, SUBTASK, or SUBTASK_COMMENT');
     }
     const attachment = await this.attachmentsService.upload(
       normalizedType as AttachmentEntityType,
@@ -77,8 +81,12 @@ export class AttachmentsController {
     @Query('taskId') taskId?: string,
   ): Promise<AttachmentResponseDto[]> {
     const normalizedType = entityType.toUpperCase();
-    if (normalizedType !== 'TASK' && normalizedType !== 'SUBTASK') {
-      throw new BadRequestException('entityType must be TASK or SUBTASK');
+    if (
+      normalizedType !== 'TASK' &&
+      normalizedType !== 'SUBTASK' &&
+      normalizedType !== 'SUBTASK_COMMENT'
+    ) {
+      throw new BadRequestException('entityType must be TASK, SUBTASK, or SUBTASK_COMMENT');
     }
     const items = await this.attachmentsService.findByEntity(
       normalizedType as AttachmentEntityType,

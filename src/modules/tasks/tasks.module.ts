@@ -12,11 +12,13 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { ActivityLogsModule } from '../activity-logs/activity-logs.module';
 import { TaskEntity } from './entities/task.entity';
 import { TaskCommentEntity } from './entities/task-comment.entity';
+import { SubtaskCommentEntity } from './entities/subtask-comment.entity';
 import { TaskAttachmentEntity } from './entities/task-attachment.entity';
 import { RecurringTaskTemplateEntity } from './entities/recurring-task-template.entity';
 import { RecurringTaskOccurrenceEntity } from './entities/recurring-task-occurrence.entity';
 import { TasksRepository } from './repositories/tasks.repository';
 import { TaskCommentsRepository } from './repositories/task-comments.repository';
+import { SubtaskCommentsRepository } from './repositories/subtask-comments.repository';
 import { TaskAttachmentsRepository } from './repositories/task-attachments.repository';
 import { RecurringTaskTemplatesRepository } from './repositories/recurring-task-templates.repository';
 import { RecurringTaskOccurrencesRepository } from './repositories/recurring-task-occurrences.repository';
@@ -37,6 +39,7 @@ import { OrgEventsModule } from '../org-events/org-events.module';
     TypeOrmModule.forFeature([
       TaskEntity,
       TaskCommentEntity,
+      SubtaskCommentEntity,
       TaskAttachmentEntity,
       RecurringTaskTemplateEntity,
       RecurringTaskOccurrenceEntity,
@@ -58,6 +61,7 @@ import { OrgEventsModule } from '../org-events/org-events.module';
   providers: [
     TasksRepository,
     TaskCommentsRepository,
+    SubtaskCommentsRepository,
     TaskAttachmentsRepository,
     RecurringTaskTemplatesRepository,
     RecurringTaskOccurrencesRepository,
@@ -68,6 +72,11 @@ import { OrgEventsModule } from '../org-events/org-events.module';
     RecurringTasksCron,
     TimeTrackingService,
   ],
-  exports: [TasksService, TasksRepository, TaskNotificationsService],
+  exports: [
+    TasksService,
+    TasksRepository,
+    SubtaskCommentsRepository,
+    TaskNotificationsService,
+  ],
 })
 export class TasksModule {}

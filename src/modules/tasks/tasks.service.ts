@@ -2,7 +2,9 @@ import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Inj
 import { ConfigService } from '@nestjs/config';
 import { TasksRepository } from './repositories/tasks.repository';
 import { TaskCommentsRepository } from './repositories/task-comments.repository';
+import { SubtaskCommentsRepository } from './repositories/subtask-comments.repository';
 import { TaskAttachmentsRepository } from './repositories/task-attachments.repository';
+import { SubtaskCommentEntity } from './entities/subtask-comment.entity';
 import { ProjectsService } from '../projects/projects.service';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { UsageService } from '../billing/usage.service';
@@ -134,6 +136,7 @@ export class TasksService {
   constructor(
     private readonly tasksRepository: TasksRepository,
     private readonly taskCommentsRepository: TaskCommentsRepository,
+    private readonly subtaskCommentsRepository: SubtaskCommentsRepository,
     private readonly taskAttachmentsRepository: TaskAttachmentsRepository,
     private readonly projectsService: ProjectsService,
     @Inject(forwardRef(() => WorkflowsService))
@@ -1041,6 +1044,212 @@ export class TasksService {
     const comment = await this.taskCommentsRepository.findById(commentId);
     if (!comment || comment.taskId !== taskId) throw new NotFoundException('Comment not found');
     await this.taskCommentsRepository.delete(commentId);
+  }
+
+  /**
+   * Checklist-item note thread (Planner). Roots + one-level replies.
+   * Deleting a root cascade-deletes replies (DB FK + explicit cleanup).
+   */
+  async getSubtaskComments(
+    taskId: string,
+    subtaskId: string,
+    organizationId: string,
+    actorUserId: string,
+  ): Promise<Array<SubtaskCommentEntity & { replies: SubtaskCommentEntity[] }>> {
+    const task = await this.assertTaskSubtask(taskId, subtaskId, organizationId);
+    await this.ensureLegacySubtaskNoteSeeded(task, subtaskId, actorUserId);
+
+    const roots = await this.subtaskCommentsRepository.findRootsBySubtask(taskId, subtaskId);
+    const replies = await this.subtaskCommentsRepository.findRepliesByParentIds(
+      roots.map((r) => r.id),
+    );
+    const byParent = new Map<string, SubtaskCommentEntity[]>();
+    for (const reply of replies) {
+      if (!reply.parentId) continue;
+      const list = byParent.get(reply.parentId) ?? [];
+      list.push(reply);
+      byParent.set(reply.parentId, list);
+    }
+    return roots.map((root) => Object.assign(root, { replies: byParent.get(root.id) ?? [] }));
+  }
+
+  async addSubtaskComment(
+    taskId: string,
+    subtaskId: string,
+    organizationId: string,
+    userId: string,
+    body: string,
+    parentId?: string | null,
+  ): Promise<SubtaskCommentEntity> {
+    await this.assertTaskSubtask(taskId, subtaskId, organizationId);
+    const trimmed = body.trim().slice(0, 2000);
+    if (!trimmed.length) throw new BadRequestException('Comment cannot be empty');
+
+    let resolvedParentId: string | null = null;
+    if (parentId) {
+      const parent = await this.subtaskCommentsRepository.findById(parentId);
+      if (
+        !parent ||
+        parent.taskId !== taskId ||
+        parent.subtaskId !== subtaskId ||
+        parent.organizationId !== organizationId
+      ) {
+        throw new NotFoundException('Parent note not found');
+      }
+      // One-level only: replies must attach to a root note.
+      if (parent.parentId != null) {
+        throw new BadRequestException('Replies can only be attached to a root note');
+      }
+      resolvedParentId = parent.id;
+    }
+
+    const created = await this.subtaskCommentsRepository.create({
+      organizationId,
+      taskId,
+      subtaskId,
+      userId,
+      body: trimmed,
+      parentId: resolvedParentId,
+    });
+
+    if (!resolvedParentId) {
+      await this.syncSubtaskNotePreview(taskId, organizationId, subtaskId);
+    }
+
+    const reloaded = await this.subtaskCommentsRepository.findById(created.id);
+    if (!reloaded) throw new NotFoundException('Comment not found');
+    return reloaded;
+  }
+
+  async updateSubtaskComment(
+    taskId: string,
+    subtaskId: string,
+    commentId: string,
+    organizationId: string,
+    userId: string,
+    body: string,
+  ): Promise<SubtaskCommentEntity> {
+    await this.assertTaskSubtask(taskId, subtaskId, organizationId);
+    const comment = await this.subtaskCommentsRepository.findById(commentId);
+    if (
+      !comment ||
+      comment.taskId !== taskId ||
+      comment.subtaskId !== subtaskId ||
+      comment.organizationId !== organizationId
+    ) {
+      throw new NotFoundException('Comment not found');
+    }
+    if (comment.userId !== userId) {
+      throw new ForbiddenException('You can only edit your own notes');
+    }
+    const trimmed = body.trim().slice(0, 2000);
+    if (!trimmed.length) throw new BadRequestException('Comment cannot be empty');
+    await this.subtaskCommentsRepository.updateBody(commentId, trimmed);
+    if (!comment.parentId) {
+      await this.syncSubtaskNotePreview(taskId, organizationId, subtaskId);
+    }
+    const reloaded = await this.subtaskCommentsRepository.findById(commentId);
+    if (!reloaded) throw new NotFoundException('Comment not found');
+    return reloaded;
+  }
+
+  async deleteSubtaskComment(
+    taskId: string,
+    subtaskId: string,
+    commentId: string,
+    organizationId: string,
+    userId: string,
+  ): Promise<void> {
+    await this.assertTaskSubtask(taskId, subtaskId, organizationId);
+    const comment = await this.subtaskCommentsRepository.findById(commentId);
+    if (
+      !comment ||
+      comment.taskId !== taskId ||
+      comment.subtaskId !== subtaskId ||
+      comment.organizationId !== organizationId
+    ) {
+      throw new NotFoundException('Comment not found');
+    }
+
+    const isAuthor = comment.userId === userId;
+    if (!isAuthor) {
+      const role = (await this.organizationsService.getMemberRole(organizationId, userId))
+        ?.toLowerCase();
+      if (role !== 'owner' && role !== 'admin') {
+        throw new ForbiddenException('Only the author, an admin, or the owner can delete this note');
+      }
+    }
+
+    // Cascade replies (FK also cascades); roots refresh denormalized preview.
+    if (!comment.parentId) {
+      await this.subtaskCommentsRepository.deleteByParentId(commentId);
+    }
+    await this.subtaskCommentsRepository.delete(commentId);
+    if (!comment.parentId) {
+      await this.syncSubtaskNotePreview(taskId, organizationId, subtaskId);
+    }
+  }
+
+  private async assertTaskSubtask(
+    taskId: string,
+    subtaskId: string,
+    organizationId: string,
+  ): Promise<TaskEntity> {
+    const task = await this.tasksRepository.findByIdAndOrganization(taskId, organizationId);
+    if (!task) throw new NotFoundException('Task not found');
+    const found = task.subtasks?.some((s) => s.id === subtaskId);
+    if (!found) throw new NotFoundException('Checklist item not found');
+    return task;
+  }
+
+  /**
+   * One-time: if JSON subtask.note is set and the thread is empty, seed a root note.
+   * Author: task reporter (fallback: actor).
+   */
+  private async ensureLegacySubtaskNoteSeeded(
+    task: TaskEntity,
+    subtaskId: string,
+    actorUserId: string,
+  ): Promise<void> {
+    const sub = task.subtasks?.find((s) => s.id === subtaskId);
+    const legacy = sub?.note?.trim();
+    if (!legacy) return;
+
+    const count = await this.subtaskCommentsRepository.countRootsBySubtask(task.id, subtaskId);
+    if (count > 0) return;
+
+    const authorId = task.reporterId || actorUserId;
+    await this.subtaskCommentsRepository.create({
+      organizationId: task.organizationId,
+      taskId: task.id,
+      subtaskId,
+      userId: authorId,
+      body: legacy.slice(0, 2000),
+      parentId: null,
+    });
+  }
+
+  /** Keep tasks.subtasks[].note as a denormalized preview for Planner badges. */
+  private async syncSubtaskNotePreview(
+    taskId: string,
+    organizationId: string,
+    subtaskId: string,
+  ): Promise<void> {
+    const task = await this.tasksRepository.findByIdAndOrganization(taskId, organizationId);
+    if (!task?.subtasks?.length) return;
+
+    const roots = await this.subtaskCommentsRepository.findRootsBySubtask(taskId, subtaskId);
+    const latest = roots.length ? roots[roots.length - 1] : null;
+    const preview = latest?.body?.trim().slice(0, 2000) || undefined;
+
+    const next = task.subtasks.map((s) => {
+      if (s.id !== subtaskId) return s;
+      const copy = { ...s };
+      if (preview) copy.note = preview;
+      else delete copy.note;
+      return copy;
+    });
+    await this.tasksRepository.update(taskId, { subtasks: next });
   }
 
   async getAttachments(taskId: string): Promise<TaskAttachmentEntity[]> {

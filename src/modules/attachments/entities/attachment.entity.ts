@@ -4,7 +4,7 @@ import { ProjectEntity } from '../../projects/entities/project.entity';
 import { TaskEntity } from '../../tasks/entities/task.entity';
 import { UserEntity } from '../../users/entities/user.entity';
 
-export type AttachmentEntityType = 'TASK' | 'SUBTASK';
+export type AttachmentEntityType = 'TASK' | 'SUBTASK' | 'SUBTASK_COMMENT';
 
 @Entity('attachments')
 export class AttachmentEntity extends BaseEntity {

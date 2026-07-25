@@ -14,6 +14,7 @@ import { generateUuid } from '../../common/utils/uuid.util';
 import { findExistingUploadPath } from '../../common/utils/upload-path.util';
 import { resolveAttachmentDisplayName } from '../../common/utils/attachment-display-name.util';
 import { TasksRepository } from '../tasks/repositories/tasks.repository';
+import { SubtaskCommentsRepository } from '../tasks/repositories/subtask-comments.repository';
 import { UsageService } from '../billing/usage.service';
 import { PlanLimitService } from '../../plans/plan-limit.service';
 import {
@@ -113,6 +114,7 @@ export class AttachmentsService {
   constructor(
     private readonly attachmentsRepository: AttachmentsRepository,
     private readonly tasksRepository: TasksRepository,
+    private readonly subtaskCommentsRepository: SubtaskCommentsRepository,
     private readonly configService: ConfigService<Configuration>,
     private readonly usageService: UsageService,
     private readonly planLimitService: PlanLimitService,
@@ -361,6 +363,22 @@ export class AttachmentsService {
         task = await this.findTaskContainingSubtask(entityId, organizationId);
       }
       if (!task) throw new NotFoundException('Subtask not found');
+      return { projectId: task.projectId, taskId: task.id };
+    }
+
+    if (entityType === 'SUBTASK_COMMENT') {
+      const comment = await this.subtaskCommentsRepository.findById(entityId);
+      if (!comment || comment.organizationId !== organizationId) {
+        throw new NotFoundException('Subtask note not found');
+      }
+      if (taskIdHint && comment.taskId !== taskIdHint) {
+        throw new NotFoundException('Subtask note not found');
+      }
+      const task = await this.tasksRepository.findByIdAndOrganization(
+        comment.taskId,
+        organizationId,
+      );
+      if (!task) throw new NotFoundException('Task not found');
       return { projectId: task.projectId, taskId: task.id };
     }
 

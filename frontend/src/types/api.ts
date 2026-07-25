@@ -211,7 +211,7 @@ export interface TaskSubtask {
   requireLocation?: boolean;
 }
 
-export type EntityAttachmentType = "TASK" | "SUBTASK";
+export type EntityAttachmentType = "TASK" | "SUBTASK" | "SUBTASK_COMMENT";
 
 export interface EntityAttachment {
   id: string;
