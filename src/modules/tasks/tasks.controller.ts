@@ -444,7 +444,9 @@ export class TasksController {
           }
         : undefined,
       replies: (c.replies ?? []).map((r) =>
-        this.toSubtaskCommentResponse({ ...r, replies: [] }),
+        this.toSubtaskCommentResponse(
+          r as SubtaskCommentEntity & { replies?: SubtaskCommentEntity[] },
+        ),
       ),
     };
   }

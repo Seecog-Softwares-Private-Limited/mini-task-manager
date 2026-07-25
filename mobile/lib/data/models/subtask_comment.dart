@@ -30,6 +30,14 @@ class SubtaskComment {
 
   bool get isRoot => parentId == null || parentId!.isEmpty;
 
+  int get descendantCount {
+    var n = replies.length;
+    for (final r in replies) {
+      n += r.descendantCount;
+    }
+    return n;
+  }
+
   factory SubtaskComment.fromJson(Map<String, dynamic> json) {
     final rawUser = json['user'];
     final rawReplies = json['replies'];
@@ -70,5 +78,52 @@ class SubtaskComment {
       user: user,
       replies: replies ?? this.replies,
     );
+  }
+
+  /// Depth-first id walk for attachment loading.
+  Iterable<String> get allIds sync* {
+    yield id;
+    for (final r in replies) {
+      yield* r.allIds;
+    }
+  }
+
+  static List<SubtaskComment> removeById(
+    List<SubtaskComment> nodes,
+    String id,
+  ) {
+    return [
+      for (final n in nodes)
+        if (n.id != id)
+          n.copyWith(replies: removeById(n.replies, id)),
+    ];
+  }
+
+  static List<SubtaskComment> replaceById(
+    List<SubtaskComment> nodes,
+    String id,
+    SubtaskComment Function(SubtaskComment current) map,
+  ) {
+    return [
+      for (final n in nodes)
+        if (n.id == id)
+          map(n)
+        else
+          n.copyWith(replies: replaceById(n.replies, id, map)),
+    ];
+  }
+
+  static List<SubtaskComment> insertReply(
+    List<SubtaskComment> nodes,
+    String parentId,
+    SubtaskComment reply,
+  ) {
+    return [
+      for (final n in nodes)
+        if (n.id == parentId)
+          n.copyWith(replies: [...n.replies, reply])
+        else
+          n.copyWith(replies: insertReply(n.replies, parentId, reply)),
+    ];
   }
 }

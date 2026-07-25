@@ -871,7 +871,7 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
     }
   }
 
-  Future<void> _editSubtaskNote(Task task, int subIndex) async {
+  Future<void> _editSubtaskNote(Task task, TaskSubtask subtask) async {
     final ti = _tasks.indexWhere((t) => t.id == task.id);
     if (ti < 0) return;
     final orgId = _orgId;
@@ -879,17 +879,36 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
       _snack('No workspace selected');
       return;
     }
-    final sub = _tasks[ti].subtasks[subIndex];
+    final subtaskId = subtask.id.trim();
+    if (subtaskId.isEmpty) {
+      _snack('This checklist item needs to be saved before adding notes.');
+      return;
+    }
+    // Re-resolve from current state so we never open another row's thread.
+    final liveTask = _tasks[ti];
+    final liveIndex = liveTask.subtasks.indexWhere((s) => s.id == subtaskId);
+    if (liveIndex < 0) {
+      _snack('Checklist item not found. Pull to refresh and try again.');
+      return;
+    }
+    final liveSub = liveTask.subtasks[liveIndex];
     final result = await showSubtaskNoteSheet(
       context: context,
-      subtask: sub,
-      taskId: task.id,
+      subtask: liveSub,
+      taskId: liveTask.id,
       organizationId: orgId,
     );
     if (!mounted) return;
 
-    if (result != null) {
-      final prevTask = _tasks[ti];
+    final taskIndex = _tasks.indexWhere((t) => t.id == liveTask.id);
+    if (taskIndex < 0) {
+      widget.onChanged();
+      return;
+    }
+    final subIndex =
+        _tasks[taskIndex].subtasks.indexWhere((s) => s.id == subtaskId);
+    if (result != null && subIndex >= 0) {
+      final prevTask = _tasks[taskIndex];
       final subs = List<TaskSubtask>.from(prevTask.subtasks);
       final preview = result.latestNotePreview?.trim();
       subs[subIndex] = subs[subIndex].copyWith(
@@ -898,7 +917,7 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
             : null,
         clearNote: !result.hasNotes,
       );
-      setState(() => _tasks[ti] = prevTask.copyWith(subtasks: subs));
+      setState(() => _tasks[taskIndex] = prevTask.copyWith(subtasks: subs));
     }
     widget.onChanged();
   }
@@ -1381,13 +1400,21 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
                       ),
                     )
                   else
-                    for (var i = 0; i < task.subtasks.length; i++)
+                    for (final subtask in task.subtasks)
                       _SubtaskRow(
-                        subtask: task.subtasks[i],
-                        onToggle: (value) => _toggleSubtask(task, i, value),
-                        onEditNote: () => _editSubtaskNote(task, i),
+                        subtask: subtask,
+                        onToggle: (value) {
+                          final idx = task.subtasks
+                              .indexWhere((s) => s.id == subtask.id);
+                          if (idx >= 0) _toggleSubtask(task, idx, value);
+                        },
+                        onEditNote: () => _editSubtaskNote(task, subtask),
                         onEdit: () => widget.onOpenDetails(task),
-                        onDelete: () => _confirmDeleteSubtask(task, i),
+                        onDelete: () {
+                          final idx = task.subtasks
+                              .indexWhere((s) => s.id == subtask.id);
+                          if (idx >= 0) _confirmDeleteSubtask(task, idx);
+                        },
                         enabled: !_busy,
                         allowStructureEdit: !isPastDay,
                       ),

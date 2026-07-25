@@ -15,21 +15,39 @@ export class SubtaskCommentsRepository {
     return this.repo.findOne({ where: { id }, relations: ['user'] });
   }
 
+  async findAllBySubtask(
+    taskId: string,
+    subtaskId: string,
+  ): Promise<SubtaskCommentEntity[]> {
+    return this.repo.find({
+      where: { taskId, subtaskId },
+      order: { createdAt: 'ASC' },
+      relations: ['user'],
+    });
+  }
+
   async findRootsBySubtask(
     taskId: string,
     subtaskId: string,
   ): Promise<SubtaskCommentEntity[]> {
     return this.repo.find({
       where: { taskId, subtaskId, parentId: IsNull() },
-      order: { createdAt: 'ASC' },
+      order: { createdAt: 'DESC' },
       relations: ['user'],
     });
   }
 
-  async findRepliesByParentIds(parentIds: string[]): Promise<SubtaskCommentEntity[]> {
+  async findRepliesByParentIds(
+    parentIds: string[],
+    opts?: { taskId?: string; subtaskId?: string },
+  ): Promise<SubtaskCommentEntity[]> {
     if (!parentIds.length) return [];
     return this.repo.find({
-      where: { parentId: In(parentIds) },
+      where: {
+        parentId: In(parentIds),
+        ...(opts?.taskId ? { taskId: opts.taskId } : {}),
+        ...(opts?.subtaskId ? { subtaskId: opts.subtaskId } : {}),
+      },
       order: { createdAt: 'ASC' },
       relations: ['user'],
     });

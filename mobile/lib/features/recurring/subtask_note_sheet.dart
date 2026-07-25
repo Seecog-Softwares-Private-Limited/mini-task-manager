@@ -33,6 +33,7 @@ Future<SubtaskNoteSheetResult?> showSubtaskNoteSheet({
   required String taskId,
   required String organizationId,
 }) {
+  final sheetKey = ValueKey<String>('subtask-notes-$taskId-${subtask.id}');
   return showModalBottomSheet<SubtaskNoteSheetResult>(
     context: context,
     isScrollControlled: true,
@@ -45,6 +46,7 @@ Future<SubtaskNoteSheetResult?> showSubtaskNoteSheet({
           bottom: MediaQuery.viewInsetsOf(context).bottom,
         ),
         child: SubtaskNotesThreadSheet(
+          key: sheetKey,
           subtask: subtask,
           taskId: taskId,
           organizationId: organizationId,
@@ -124,30 +126,50 @@ class _SubtaskNotesThreadSheetState
   }
 
   Future<void> _load() async {
+    final expectedSubtaskId = widget.subtask.id.trim();
     setState(() {
       _loading = true;
       _error = null;
+      _roots = const [];
+      _legacyAttachments = const [];
+      _attachmentsByComment.clear();
+      _replyingTo = null;
+      _editing = null;
     });
     try {
       final repo = ref.read(tasksRepositoryProvider);
       final attachmentsRepo = ref.read(attachmentsRepositoryProvider);
-      final roots = await repo.fetchSubtaskComments(
+      final fetched = await repo.fetchSubtaskComments(
         taskId: widget.taskId,
-        subtaskId: widget.subtask.id,
+        subtaskId: expectedSubtaskId,
       );
+      // Never show another checklist item's thread if the API/scope drifts.
+      List<SubtaskComment> scopeTree(List<SubtaskComment> nodes) {
+        return nodes
+            .where(
+              (c) =>
+                  c.subtaskId == expectedSubtaskId ||
+                  (c.subtaskId.isEmpty && expectedSubtaskId.isEmpty),
+            )
+            .map((c) => c.copyWith(replies: scopeTree(c.replies)))
+            .toList();
+      }
 
-      final legacy = widget.subtask.id.trim().isEmpty
+      final roots = scopeTree(fetched)
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      final legacy = expectedSubtaskId.isEmpty
           ? <TaskAttachment>[]
           : await attachmentsRepo.fetchEntityAttachments(
               entityType: 'SUBTASK',
-              entityId: widget.subtask.id,
+              entityId: expectedSubtaskId,
               organizationId: widget.organizationId,
               taskId: widget.taskId,
             );
 
       final byComment = <String, List<TaskAttachment>>{};
       final allIds = <String>[
-        for (final r in roots) ...[r.id, ...r.replies.map((x) => x.id)],
+        for (final r in roots) ...r.allIds,
       ];
       await Future.wait(allIds.map((id) async {
         final items = await attachmentsRepo.fetchEntityAttachments(
@@ -160,6 +182,8 @@ class _SubtaskNotesThreadSheetState
       }));
 
       if (!mounted) return;
+      // Sheet was reused for a different checklist item mid-flight.
+      if (widget.subtask.id.trim() != expectedSubtaskId) return;
       setState(() {
         _roots = roots;
         _legacyAttachments = legacy;
@@ -170,12 +194,14 @@ class _SubtaskNotesThreadSheetState
       });
     } on ApiException catch (e) {
       if (!mounted) return;
+      if (widget.subtask.id.trim() != expectedSubtaskId) return;
       setState(() {
         _error = _friendlyLoadError(e.message);
         _loading = false;
       });
     } catch (e) {
       if (!mounted) return;
+      if (widget.subtask.id.trim() != expectedSubtaskId) return;
       setState(() {
         _error = e.toString();
         _loading = false;
@@ -195,7 +221,8 @@ class _SubtaskNotesThreadSheetState
 
   void _popResult() {
     final hasNotes = _roots.isNotEmpty;
-    final latest = hasNotes ? _roots.last.body.trim() : null;
+    // Roots are newest-first.
+    final latest = hasNotes ? _roots.first.body.trim() : null;
     Navigator.of(context).pop(
       SubtaskNoteSheetResult(
         hasNotes: hasNotes,
@@ -293,18 +320,11 @@ class _SubtaskNotesThreadSheetState
           body: body,
         );
         setState(() {
-          _roots = _roots.map((r) {
-            if (r.id == editingId) {
-              return updated.copyWith(replies: existingReplies);
-            }
-            final replyIdx = r.replies.indexWhere((x) => x.id == editingId);
-            if (replyIdx >= 0) {
-              final next = [...r.replies];
-              next[replyIdx] = updated;
-              return r.copyWith(replies: next);
-            }
-            return r;
-          }).toList();
+          _roots = SubtaskComment.replaceById(
+            _roots,
+            editingId,
+            (_) => updated.copyWith(replies: existingReplies),
+          );
           _editing = null;
           _composerController.clear();
           _pending = const [];
@@ -336,31 +356,36 @@ class _SubtaskNotesThreadSheetState
                 taskId: widget.taskId,
               );
 
+        final wasReply = _replyingTo != null;
         setState(() {
           _attachmentsByComment[created.id] = uploaded;
-          if (_replyingTo != null) {
-            _roots = _roots.map((r) {
-              if (r.id != _replyingTo!.id) return r;
-              return r.copyWith(replies: [...r.replies, created]);
-            }).toList();
+          if (wasReply) {
+            _roots = SubtaskComment.insertReply(
+              _roots,
+              _replyingTo!.id,
+              created,
+            );
           } else {
-            _roots = [..._roots, created];
+            // Newest root threads sit on top.
+            _roots = [created, ..._roots];
           }
           _replyingTo = null;
           _composerController.clear();
           _pending = const [];
         });
-      }
 
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_listController.hasClients) {
-          _listController.animateTo(
-            _listController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOut,
-          );
+        if (!wasReply) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (_listController.hasClients) {
+              _listController.animateTo(
+                0,
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOut,
+              );
+            }
+          });
         }
-      });
+      }
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (e) {
@@ -371,14 +396,15 @@ class _SubtaskNotesThreadSheetState
   }
 
   Future<void> _delete(SubtaskComment comment) async {
+    final nested = comment.descendantCount;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete note?'),
         content: Text(
-          comment.isRoot && comment.replies.isNotEmpty
-              ? 'This will also delete ${comment.replies.length} '
-                  '${comment.replies.length == 1 ? 'reply' : 'replies'}.'
+          nested > 0
+              ? 'This will also delete $nested '
+                  '${nested == 1 ? 'reply' : 'replies'} under it.'
               : 'This note will be removed from the thread.',
         ),
         actions: [
@@ -402,16 +428,10 @@ class _SubtaskNotesThreadSheetState
             commentId: comment.id,
           );
       setState(() {
-        if (comment.isRoot) {
-          _roots = _roots.where((r) => r.id != comment.id).toList();
-        } else {
-          _roots = _roots.map((r) {
-            return r.copyWith(
-              replies: r.replies.where((x) => x.id != comment.id).toList(),
-            );
-          }).toList();
+        for (final id in comment.allIds) {
+          _attachmentsByComment.remove(id);
         }
-        _attachmentsByComment.remove(comment.id);
+        _roots = SubtaskComment.removeById(_roots, comment.id);
         if (_replyingTo?.id == comment.id) _replyingTo = null;
         if (_editing?.id == comment.id) {
           _editing = null;
@@ -425,9 +445,9 @@ class _SubtaskNotesThreadSheetState
     }
   }
 
-  void _startReply(SubtaskComment root) {
+  void _startReply(SubtaskComment comment) {
     setState(() {
-      _replyingTo = root;
+      _replyingTo = comment;
       _editing = null;
     });
   }
@@ -474,7 +494,8 @@ class _SubtaskNotesThreadSheetState
 
   @override
   Widget build(BuildContext context) {
-    final height = MediaQuery.sizeOf(context).height * 0.85;
+    final height = MediaQuery.sizeOf(context).height * 0.88;
+    final noteCount = _roots.length;
 
     return SizedBox(
       height: height,
@@ -484,45 +505,95 @@ class _SubtaskNotesThreadSheetState
           Padding(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.lg,
+              AppSpacing.xs,
               AppSpacing.sm,
-              AppSpacing.lg,
-              0,
+              AppSpacing.sm,
             ),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Notes',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w700,
+                      Row(
+                        children: [
+                          Text(
+                            'Notes',
+                            style:
+                                Theme.of(context).textTheme.titleLarge?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: -0.3,
+                                    ),
+                          ),
+                          if (!_loading && noteCount > 0) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                '$noteCount',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                              ),
                             ),
+                          ],
+                        ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: AppColors.textMuted,
-                            ),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: AppColors.border.withValues(alpha: 0.9),
+                          ),
+                        ),
+                        child: Text(
+                          _title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.labelMedium?.copyWith(
+                                    color: AppColors.textSecondary,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                        ),
                       ),
                     ],
                   ),
                 ),
                 IconButton(
                   tooltip: 'Close',
+                  visualDensity: VisualDensity.compact,
                   onPressed: _popResult,
-                  icon: const Icon(Icons.close_rounded),
+                  icon: Icon(
+                    Icons.close_rounded,
+                    color: AppColors.textMuted.withValues(alpha: 0.9),
+                  ),
                 ),
               ],
             ),
           ),
+          const Divider(height: 1, color: AppColors.border),
           if (_loading)
             const Expanded(
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)),
             )
           else if (_error != null && _roots.isEmpty)
             Expanded(
@@ -532,13 +603,21 @@ class _SubtaskNotesThreadSheetState
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      Icon(
+                        Icons.cloud_off_outlined,
+                        size: 36,
+                        color: AppColors.textMuted.withValues(alpha: 0.7),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
                       Text(
                         _error!,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(color: AppColors.danger),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: AppColors.danger,
+                            ),
                       ),
                       const SizedBox(height: AppSpacing.md),
-                      FilledButton(
+                      FilledButton.tonal(
                         onPressed: _load,
                         child: const Text('Retry'),
                       ),
@@ -554,21 +633,14 @@ class _SubtaskNotesThreadSheetState
                 child: ListView(
                   controller: _listController,
                   padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.lg,
+                    AppSpacing.md,
+                    AppSpacing.md,
                     AppSpacing.md,
                     AppSpacing.lg,
-                    AppSpacing.sm,
                   ),
                   children: [
                     if (_legacyAttachments.isNotEmpty) ...[
-                      Text(
-                        'OLDER ATTACHMENTS',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              letterSpacing: 1.1,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textMuted,
-                            ),
-                      ),
+                      _SectionLabel('Earlier files'),
                       const SizedBox(height: AppSpacing.sm),
                       AttachmentGrid(
                         organizationId: widget.organizationId,
@@ -583,19 +655,7 @@ class _SubtaskNotesThreadSheetState
                       const SizedBox(height: AppSpacing.md),
                     ],
                     if (_roots.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: AppSpacing.xl,
-                        ),
-                        child: Text(
-                          'No notes yet — start the thread',
-                          textAlign: TextAlign.center,
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: AppColors.textMuted,
-                                  ),
-                        ),
-                      )
+                      const _EmptyThread()
                     else
                       ..._roots.map(_buildRootBubble),
                     if (_error != null) ...[
@@ -616,67 +676,34 @@ class _SubtaskNotesThreadSheetState
   }
 
   Widget _buildRootBubble(SubtaskComment comment) {
-    final parentName = comment.user?.fullName.trim().isNotEmpty == true
-        ? comment.user!.fullName
-        : (comment.user?.email ?? 'note');
-    final replies = comment.replies;
-
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
-      child: Container(
+      child: DecoratedBox(
         decoration: BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(color: AppColors.border),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
-              child: _NoteContent(
-                comment: comment,
-                relativeTime: _relativeTime(comment.createdAt),
-                attachments: _attachmentsByComment[comment.id] ?? const [],
-                organizationId: widget.organizationId,
-                canEdit: _canEdit(comment),
-                canDelete: _canDelete(comment),
-                onReply: () => _startReply(comment),
-                onEdit: () => _startEdit(comment),
-                onDelete: () => _delete(comment),
-                showReply: true,
-              ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.textPrimary.withValues(alpha: 0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
-            if (replies.isNotEmpty) ...[
-              const Divider(height: 1, color: AppColors.border),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 8, 8, 10),
-                child: Column(
-                  children: [
-                    for (var i = 0; i < replies.length; i++)
-                      _ThreadedReplyRow(
-                        isLast: i == replies.length - 1,
-                        child: _NoteContent(
-                          comment: replies[i],
-                          relativeTime: _relativeTime(replies[i].createdAt),
-                          attachments:
-                              _attachmentsByComment[replies[i].id] ?? const [],
-                          organizationId: widget.organizationId,
-                          canEdit: _canEdit(replies[i]),
-                          canDelete: _canDelete(replies[i]),
-                          onEdit: () => _startEdit(replies[i]),
-                          onDelete: () => _delete(replies[i]),
-                          showReply: false,
-                          compact: true,
-                          replyToName: parentName,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
           ],
+        ),
+        child: _ThreadBranch(
+          comment: comment,
+          depth: 0,
+          relativeTime: _relativeTime(comment.createdAt),
+          attachmentsByComment: _attachmentsByComment,
+          organizationId: widget.organizationId,
+          canEdit: _canEdit,
+          canDelete: _canDelete,
+          onReply: _startReply,
+          onEdit: _startEdit,
+          onDelete: _delete,
+          formatTime: _relativeTime,
+          nestInCard: true,
         ),
       ),
     );
@@ -690,16 +717,20 @@ class _SubtaskNotesThreadSheetState
             : null;
 
     return Material(
-      elevation: 8,
       color: AppColors.surface,
+      elevation: 10,
+      shadowColor: AppColors.textPrimary.withValues(alpha: 0.08),
       child: SafeArea(
         top: false,
-        child: Padding(
+        child: Container(
+          decoration: const BoxDecoration(
+            border: Border(top: BorderSide(color: AppColors.border)),
+          ),
           padding: const EdgeInsets.fromLTRB(
-            AppSpacing.md,
             AppSpacing.sm,
-            AppSpacing.md,
-            AppSpacing.md,
+            AppSpacing.sm,
+            AppSpacing.sm,
+            AppSpacing.sm,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -707,77 +738,114 @@ class _SubtaskNotesThreadSheetState
             children: [
               if (modeLabel != null)
                 Container(
-                  margin: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  margin: const EdgeInsets.only(bottom: AppSpacing.xs),
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
                     vertical: 8,
                   ),
                   decoration: BoxDecoration(
                     color: AppColors.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     children: [
+                      Icon(
+                        _editing != null
+                            ? Icons.edit_outlined
+                            : Icons.reply_rounded,
+                        size: 16,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           modeLabel,
-                          style:
-                              Theme.of(context).textTheme.labelMedium?.copyWith(
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelMedium
+                              ?.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
                         ),
                       ),
                       InkWell(
+                        borderRadius: BorderRadius.circular(999),
                         onTap: _cancelComposerMode,
-                        child: const Icon(Icons.close, size: 18),
+                        child: const Padding(
+                          padding: EdgeInsets.all(2),
+                          child: Icon(Icons.close, size: 16),
+                        ),
                       ),
                     ],
                   ),
                 ),
               if (_pending.isNotEmpty) ...[
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    for (var i = 0; i < _pending.length; i++)
-                      Chip(
-                        label: Text(
-                          _pending[i].fileName,
-                          overflow: TextOverflow.ellipsis,
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (var i = 0; i < _pending.length; i++) ...[
+                        if (i > 0) const SizedBox(width: 6),
+                        InputChip(
+                          visualDensity: VisualDensity.compact,
+                          label: Text(
+                            _pending[i].fileName,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          onDeleted: _posting
+                              ? null
+                              : () {
+                                  setState(() {
+                                    _pending = [
+                                      for (var j = 0; j < _pending.length; j++)
+                                        if (j != i) _pending[j],
+                                    ];
+                                  });
+                                },
                         ),
-                        onDeleted: _posting
-                            ? null
-                            : () {
-                                setState(() {
-                                  _pending = [
-                                    for (var j = 0; j < _pending.length; j++)
-                                      if (j != i) _pending[j],
-                                  ];
-                                });
-                              },
-                      ),
-                  ],
+                      ],
+                    ],
+                  ),
                 ),
-                const SizedBox(height: AppSpacing.sm),
+                const SizedBox(height: AppSpacing.xs),
               ],
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  IconButton(
-                    tooltip: 'Add attachment',
-                    onPressed: (_posting || _picking || _editing != null)
-                        ? null
-                        : _showAttachMenu,
-                    icon: _picking
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.add_circle_outline_rounded),
-                    color: AppColors.primary,
+                  Material(
+                    color: AppColors.background,
+                    shape: const CircleBorder(
+                      side: BorderSide(color: AppColors.border),
+                    ),
+                    child: InkWell(
+                      customBorder: const CircleBorder(),
+                      onTap: (_posting || _picking || _editing != null)
+                          ? null
+                          : _showAttachMenu,
+                      child: SizedBox(
+                        width: 42,
+                        height: 42,
+                        child: Center(
+                          child: _picking
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Icon(
+                                  Icons.add_rounded,
+                                  color: (_posting || _editing != null)
+                                      ? AppColors.textMuted
+                                      : AppColors.primary,
+                                ),
+                        ),
+                      ),
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: TextField(
                       controller: _composerController,
@@ -785,15 +853,33 @@ class _SubtaskNotesThreadSheetState
                       maxLines: 5,
                       maxLength: 2000,
                       enabled: !_posting,
+                      textInputAction: TextInputAction.newline,
                       decoration: InputDecoration(
-                        hintText: 'Why was this done / not done today?',
+                        hintText: 'Add a note…',
+                        hintStyle: TextStyle(
+                          color: AppColors.textMuted.withValues(alpha: 0.85),
+                        ),
                         counterText: '',
+                        filled: true,
+                        fillColor: AppColors.background,
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: AppColors.border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: AppColors.border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(
+                            color: AppColors.primary,
+                            width: 1.4,
+                          ),
                         ),
                         isDense: true,
                         contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
+                          horizontal: 14,
                           vertical: 12,
                         ),
                       ),
@@ -802,6 +888,13 @@ class _SubtaskNotesThreadSheetState
                   const SizedBox(width: 8),
                   FilledButton(
                     onPressed: _posting ? null : _post,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(72, 42),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
                     child: _posting
                         ? const SizedBox(
                             width: 18,
@@ -823,18 +916,218 @@ class _SubtaskNotesThreadSheetState
   }
 }
 
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text.toUpperCase(),
+      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            letterSpacing: 1.1,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textMuted,
+          ),
+    );
+  }
+}
+
+class _EmptyThread extends StatelessWidget {
+  const _EmptyThread();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 12),
+      child: Column(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.08),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.forum_outlined,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            'No notes yet',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Start the thread with why this was done or not done today.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textMuted,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Recursive note + nested replies (reply-of-reply).
+class _ThreadBranch extends StatelessWidget {
+  const _ThreadBranch({
+    required this.comment,
+    required this.depth,
+    required this.relativeTime,
+    required this.attachmentsByComment,
+    required this.organizationId,
+    required this.canEdit,
+    required this.canDelete,
+    required this.onReply,
+    required this.onEdit,
+    required this.onDelete,
+    required this.formatTime,
+    this.replyToName,
+    this.nestInCard = false,
+  });
+
+  final SubtaskComment comment;
+  final int depth;
+  final String relativeTime;
+  final Map<String, List<TaskAttachment>> attachmentsByComment;
+  final String organizationId;
+  final bool Function(SubtaskComment) canEdit;
+  final bool Function(SubtaskComment) canDelete;
+  final ValueChanged<SubtaskComment> onReply;
+  final ValueChanged<SubtaskComment> onEdit;
+  final ValueChanged<SubtaskComment> onDelete;
+  final String Function(String iso) formatTime;
+  final String? replyToName;
+  final bool nestInCard;
+
+  static const _maxVisualDepth = 5;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = comment.user?.fullName.trim().isNotEmpty == true
+        ? comment.user!.fullName
+        : (comment.user?.email ?? 'note');
+    final replies = comment.replies;
+    final content = Padding(
+      padding: EdgeInsets.fromLTRB(
+        nestInCard ? 14 : 0,
+        nestInCard ? 14 : 0,
+        nestInCard ? 6 : 0,
+        nestInCard && replies.isEmpty ? 12 : 8,
+      ),
+      child: _NoteContent(
+        comment: comment,
+        relativeTime: relativeTime,
+        attachments: attachmentsByComment[comment.id] ?? const [],
+        organizationId: organizationId,
+        canEdit: canEdit(comment),
+        canDelete: canDelete(comment),
+        onReply: () => onReply(comment),
+        onEdit: () => onEdit(comment),
+        onDelete: () => onDelete(comment),
+        showReply: depth < 7,
+        compact: depth > 0,
+        replyToName: replyToName,
+      ),
+    );
+
+    final repliesBlock = replies.isEmpty
+        ? const SizedBox.shrink()
+        : Container(
+            width: double.infinity,
+            decoration: nestInCard && depth == 0
+                ? BoxDecoration(
+                    color: AppColors.background.withValues(alpha: 0.85),
+                    border: const Border(
+                      top: BorderSide(color: AppColors.border),
+                    ),
+                    borderRadius: const BorderRadius.vertical(
+                      bottom: Radius.circular(17),
+                    ),
+                  )
+                : null,
+            padding: EdgeInsets.fromLTRB(
+              depth == 0 ? 6 : 0,
+              depth == 0 ? 10 : 4,
+              depth == 0 ? 10 : 0,
+              depth == 0 ? 12 : 0,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (depth == 0)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 34, bottom: 8),
+                    child: Text(
+                      '${comment.descendantCount} '
+                      '${comment.descendantCount == 1 ? 'reply' : 'replies'}',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: AppColors.textMuted,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ),
+                for (var i = 0; i < replies.length; i++)
+                  _ThreadedReplyRow(
+                    isLast: i == replies.length - 1,
+                    depth: (depth + 1).clamp(0, _maxVisualDepth),
+                    child: _ThreadBranch(
+                      comment: replies[i],
+                      depth: depth + 1,
+                      relativeTime: formatTime(replies[i].createdAt),
+                      attachmentsByComment: attachmentsByComment,
+                      organizationId: organizationId,
+                      canEdit: canEdit,
+                      canDelete: canDelete,
+                      onReply: onReply,
+                      onEdit: onEdit,
+                      onDelete: onDelete,
+                      formatTime: formatTime,
+                      replyToName: name,
+                    ),
+                  ),
+              ],
+            ),
+          );
+
+    if (depth == 0) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [content, repliesBlock],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        content,
+        if (replies.isNotEmpty) repliesBlock,
+      ],
+    );
+  }
+}
+
 /// Vertical rail + elbow so a reply reads as attached to its parent note.
 class _ThreadedReplyRow extends StatelessWidget {
   const _ThreadedReplyRow({
     required this.child,
     required this.isLast,
+    this.depth = 1,
   });
 
   final Widget child;
   final bool isLast;
+  final int depth;
 
   static const _railWidth = 28.0;
-  static const _lineColor = Color(0xFFCBD5E1);
 
   @override
   Widget build(BuildContext context) {
@@ -847,13 +1140,16 @@ class _ThreadedReplyRow extends StatelessWidget {
             child: CustomPaint(
               painter: _ThreadConnectorPainter(
                 isLast: isLast,
-                color: _lineColor,
+                color: AppColors.border,
               ),
             ),
           ),
           Expanded(
             child: Padding(
-              padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
+              padding: EdgeInsets.only(
+                bottom: isLast ? 0 : 10,
+                left: depth > 2 ? 2.0 : 0,
+              ),
               child: child,
             ),
           ),
@@ -876,21 +1172,18 @@ class _ThreadConnectorPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = color
-      ..strokeWidth = 1.5
+      ..strokeWidth = 1.6
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
-    const avatarCenterY = 14.0;
+    const avatarCenterY = 16.0;
     final x = size.width * 0.55;
 
-    // Vertical stem from top of rail into this reply (and beyond if not last).
     final stemEnd = isLast ? avatarCenterY : size.height;
     canvas.drawLine(Offset(x, 0), Offset(x, stemEnd), paint);
-
-    // Elbow into the reply avatar.
     canvas.drawLine(
       Offset(x, avatarCenterY),
-      Offset(size.width - 2, avatarCenterY),
+      Offset(size.width - 1, avatarCenterY),
       paint,
     );
   }
@@ -949,45 +1242,69 @@ class _NoteContent extends ConsumerWidget {
                 fullName: name,
                 avatarUrl: comment.user?.avatarUrl,
               ),
-              size: compact ? 28 : 32,
+              size: compact ? 28 : 34,
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (replyToName != null && replyToName!.trim().isNotEmpty)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 2),
+                      padding: const EdgeInsets.only(bottom: 3),
                       child: Text(
-                        '↳ $replyToName',
+                        'Replying to $replyToName',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: AppColors.primary.withValues(alpha: 0.85),
+                              color: AppColors.primary,
                               fontWeight: FontWeight.w600,
                             ),
                       ),
                     ),
-                  Text(
-                    name,
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                          fontWeight: FontWeight.w600,
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.labelLarge?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
                         ),
-                  ),
-                  if (relativeTime.isNotEmpty)
-                    Text(
-                      relativeTime,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: AppColors.textMuted,
+                      ),
+                      if (relativeTime.isNotEmpty) ...[
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: Text(
+                            '·',
+                            style: TextStyle(
+                              color: AppColors.textMuted.withValues(alpha: 0.7),
+                            ),
                           ),
-                    ),
+                        ),
+                        Text(
+                          relativeTime,
+                          style:
+                              Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: AppColors.textMuted,
+                                  ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ],
               ),
             ),
             if (canEdit || canDelete || showReply)
               PopupMenuButton<String>(
                 padding: EdgeInsets.zero,
+                icon: Icon(
+                  Icons.more_horiz_rounded,
+                  color: AppColors.textMuted.withValues(alpha: 0.85),
+                ),
                 onSelected: (value) {
                   switch (value) {
                     case 'reply':
@@ -1018,24 +1335,49 @@ class _NoteContent extends ConsumerWidget {
               ),
           ],
         ),
-        const SizedBox(height: 8),
-        Text(
-          comment.body,
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        if (attachments.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          AttachmentGrid(
-            organizationId: organizationId,
-            enabled: false,
-            items: attachments.asMap().entries.map(
-              (e) => AttachmentGridEntry(
-                attachment: e.value,
-                index: e.key + 1,
+        Padding(
+          padding: EdgeInsets.only(left: compact ? 38 : 44, top: 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                comment.body,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      height: 1.35,
+                      color: AppColors.textPrimary,
+                    ),
               ),
-            ).toList(),
+              if (attachments.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                AttachmentGrid(
+                  organizationId: organizationId,
+                  enabled: false,
+                  items: attachments.asMap().entries.map(
+                    (e) => AttachmentGridEntry(
+                      attachment: e.value,
+                      index: e.key + 1,
+                    ),
+                  ).toList(),
+                ),
+              ],
+              if (showReply) ...[
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  onPressed: onReply,
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(0, 28),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  icon: const Icon(Icons.reply_rounded, size: 16),
+                  label: const Text('Reply'),
+                ),
+              ],
+            ],
           ),
-        ],
+        ),
       ],
     );
   }
