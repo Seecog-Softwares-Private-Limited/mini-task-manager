@@ -1047,8 +1047,8 @@ export class TasksService {
   }
 
   /**
-   * Checklist-item note thread (Planner). Roots + one-level replies.
-   * Deleting a root cascade-deletes replies (DB FK + explicit cleanup).
+   * Checklist-item note thread (Planner). Nested replies allowed (reply-to-reply).
+   * Deleting a note cascade-deletes descendants via FK.
    */
   async getSubtaskComments(
     taskId: string,
@@ -1057,20 +1057,35 @@ export class TasksService {
     actorUserId: string,
   ): Promise<Array<SubtaskCommentEntity & { replies: SubtaskCommentEntity[] }>> {
     const task = await this.assertTaskSubtask(taskId, subtaskId, organizationId);
-    await this.ensureLegacySubtaskNoteSeeded(task, subtaskId, actorUserId);
+    const scopedSubtaskId = subtaskId.trim();
+    await this.ensureLegacySubtaskNoteSeeded(task, scopedSubtaskId, actorUserId);
 
-    const roots = await this.subtaskCommentsRepository.findRootsBySubtask(taskId, subtaskId);
-    const replies = await this.subtaskCommentsRepository.findRepliesByParentIds(
-      roots.map((r) => r.id),
+    const all = await this.subtaskCommentsRepository.findAllBySubtask(
+      taskId,
+      scopedSubtaskId,
     );
     const byParent = new Map<string, SubtaskCommentEntity[]>();
-    for (const reply of replies) {
-      if (!reply.parentId) continue;
-      const list = byParent.get(reply.parentId) ?? [];
-      list.push(reply);
-      byParent.set(reply.parentId, list);
+    for (const comment of all) {
+      if (!comment.parentId) continue;
+      const list = byParent.get(comment.parentId) ?? [];
+      list.push(comment);
+      byParent.set(comment.parentId, list);
     }
-    return roots.map((root) => Object.assign(root, { replies: byParent.get(root.id) ?? [] }));
+
+    const nest = (
+      node: SubtaskCommentEntity,
+    ): SubtaskCommentEntity & { replies: SubtaskCommentEntity[] } => {
+      // Replies stay oldest → newest so the conversation reads top to bottom.
+      const children = (byParent.get(node.id) ?? []).map(nest);
+      return Object.assign(node, { replies: children });
+    };
+
+    // Root threads: newest first.
+    return all
+      .filter((c) => !c.parentId)
+      .slice()
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .map(nest);
   }
 
   async addSubtaskComment(
@@ -1096,9 +1111,10 @@ export class TasksService {
       ) {
         throw new NotFoundException('Parent note not found');
       }
-      // One-level only: replies must attach to a root note.
-      if (parent.parentId != null) {
-        throw new BadRequestException('Replies can only be attached to a root note');
+      const depth = await this.getCommentDepth(parent);
+      // Root = 0; allow up to depth 7 so a reply sits at depth 8 max.
+      if (depth >= 7) {
+        throw new BadRequestException('Reply nesting limit reached');
       }
       resolvedParentId = parent.id;
     }
@@ -1180,14 +1196,26 @@ export class TasksService {
       }
     }
 
-    // Cascade replies (FK also cascades); roots refresh denormalized preview.
-    if (!comment.parentId) {
-      await this.subtaskCommentsRepository.deleteByParentId(commentId);
-    }
+    // Cascade descendants via FK ON DELETE CASCADE.
     await this.subtaskCommentsRepository.delete(commentId);
     if (!comment.parentId) {
       await this.syncSubtaskNotePreview(taskId, organizationId, subtaskId);
     }
+  }
+
+  /** Depth of a note in its thread (root = 0). */
+  private async getCommentDepth(comment: SubtaskCommentEntity): Promise<number> {
+    let depth = 0;
+    let current: SubtaskCommentEntity | null = comment;
+    const seen = new Set<string>();
+    while (current?.parentId) {
+      if (seen.has(current.id)) break;
+      seen.add(current.id);
+      depth += 1;
+      current = await this.subtaskCommentsRepository.findById(current.parentId);
+      if (depth > 20) break;
+    }
+    return depth;
   }
 
   private async assertTaskSubtask(
@@ -1195,9 +1223,13 @@ export class TasksService {
     subtaskId: string,
     organizationId: string,
   ): Promise<TaskEntity> {
+    const trimmedSubtaskId = subtaskId?.trim();
+    if (!trimmedSubtaskId) {
+      throw new BadRequestException('Checklist item id is required');
+    }
     const task = await this.tasksRepository.findByIdAndOrganization(taskId, organizationId);
     if (!task) throw new NotFoundException('Task not found');
-    const found = task.subtasks?.some((s) => s.id === subtaskId);
+    const found = task.subtasks?.some((s) => s.id === trimmedSubtaskId);
     if (!found) throw new NotFoundException('Checklist item not found');
     return task;
   }
@@ -1239,7 +1271,8 @@ export class TasksService {
     if (!task?.subtasks?.length) return;
 
     const roots = await this.subtaskCommentsRepository.findRootsBySubtask(taskId, subtaskId);
-    const latest = roots.length ? roots[roots.length - 1] : null;
+    // Roots are newest-first.
+    const latest = roots.length ? roots[0] : null;
     const preview = latest?.body?.trim().slice(0, 2000) || undefined;
 
     const next = task.subtasks.map((s) => {

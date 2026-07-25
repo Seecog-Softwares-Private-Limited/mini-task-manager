@@ -6,7 +6,7 @@ export class CreateSubtaskCommentDto {
   @MaxLength(2000)
   body!: string;
 
-  /** Root notes omit this. Replies set parentId to a root comment id. */
+  /** Root notes omit this. Replies set parentId to any note in the same thread. */
   @IsOptional()
   @ValidateIf((_, v) => v != null && v !== '')
   @IsUUID('4')
