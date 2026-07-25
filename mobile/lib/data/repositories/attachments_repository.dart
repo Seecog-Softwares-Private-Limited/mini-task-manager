@@ -42,11 +42,27 @@ class AttachmentsRepository {
     required String organizationId,
     required PendingAttachment file,
   }) async {
+    await uploadEntityAttachment(
+      entityType: 'SUBTASK',
+      entityId: subtaskId,
+      taskId: taskId,
+      organizationId: organizationId,
+      file: file,
+    );
+  }
+
+  Future<void> uploadEntityAttachment({
+    required String entityType,
+    required String entityId,
+    required String taskId,
+    required String organizationId,
+    required PendingAttachment file,
+  }) async {
     try {
       final form = FormData.fromMap({
         'file': await file.toMultipartFile(),
-        'entityType': 'SUBTASK',
-        'entityId': subtaskId,
+        'entityType': entityType,
+        'entityId': entityId,
         'taskId': taskId,
       });
       await _api.dio.post<void>(

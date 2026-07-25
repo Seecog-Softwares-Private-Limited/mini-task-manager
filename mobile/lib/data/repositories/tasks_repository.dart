@@ -7,6 +7,7 @@ import '../models/my_tasks.dart';
 import '../models/paginated_result.dart';
 import '../models/task_attachment.dart';
 import '../models/task_comment.dart';
+import '../models/subtask_comment.dart';
 import '../models/task.dart';
 
 class TasksRepository {
@@ -389,6 +390,75 @@ class TasksRepository {
         data: {'body': body},
       );
       return TaskComment.fromJson(response.data ?? const {});
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<List<SubtaskComment>> fetchSubtaskComments({
+    required String taskId,
+    required String subtaskId,
+  }) async {
+    try {
+      final response = await _api.dio.get<List<dynamic>>(
+        '/tasks/$taskId/subtasks/$subtaskId/comments',
+      );
+      final list = response.data ?? const [];
+      return list
+          .whereType<Map<String, dynamic>>()
+          .map(SubtaskComment.fromJson)
+          .toList();
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<SubtaskComment> addSubtaskComment({
+    required String taskId,
+    required String subtaskId,
+    required String body,
+    String? parentId,
+  }) async {
+    try {
+      final response = await _api.dio.post<Map<String, dynamic>>(
+        '/tasks/$taskId/subtasks/$subtaskId/comments',
+        data: {
+          'body': body,
+          if (parentId != null && parentId.isNotEmpty) 'parentId': parentId,
+        },
+      );
+      return SubtaskComment.fromJson(response.data ?? const {});
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<SubtaskComment> updateSubtaskComment({
+    required String taskId,
+    required String subtaskId,
+    required String commentId,
+    required String body,
+  }) async {
+    try {
+      final response = await _api.dio.patch<Map<String, dynamic>>(
+        '/tasks/$taskId/subtasks/$subtaskId/comments/$commentId',
+        data: {'body': body},
+      );
+      return SubtaskComment.fromJson(response.data ?? const {});
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<void> deleteSubtaskComment({
+    required String taskId,
+    required String subtaskId,
+    required String commentId,
+  }) async {
+    try {
+      await _api.dio.delete<void>(
+        '/tasks/$taskId/subtasks/$subtaskId/comments/$commentId',
+      );
     } on DioException catch (error) {
       throw ApiException.fromDio(error);
     }

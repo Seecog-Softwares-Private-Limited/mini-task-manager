@@ -31,12 +31,15 @@ import { formatUuid } from '../../common/utils/uuid.util';
 import { CurrentUserId } from '../../common/decorators/current-user.decorator';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { CreateTaskCommentDto } from './dto/create-task-comment.dto';
+import { CreateSubtaskCommentDto } from './dto/create-subtask-comment.dto';
+import { UpdateSubtaskCommentDto } from './dto/update-subtask-comment.dto';
 import { PatchTaskDto } from './dto/patch-task.dto';
 import { UpdateTaskAssigneeDto } from './dto/update-task-assignee.dto';
 import { PaginationQueryDto } from '../../common/pagination';
 import { TaskResponseDto } from './dto/task-response.dto';
 import { TaskAttachmentResponseDto } from './dto/task-attachment-response.dto';
 import { TaskCommentEntity } from './entities/task-comment.entity';
+import { SubtaskCommentEntity } from './entities/subtask-comment.entity';
 import { TaskEntity } from './entities/task.entity';
 
 interface MulterFile {
@@ -46,6 +49,19 @@ interface MulterFile {
   mimetype: string;
   size: number;
   buffer: Buffer;
+}
+
+interface SubtaskCommentResponse {
+  id: string;
+  taskId: string;
+  subtaskId: string;
+  userId: string;
+  body: string;
+  parentId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  user?: { id: string; fullName: string; email: string; avatarUrl?: string };
+  replies: SubtaskCommentResponse[];
 }
 
 @Controller('tasks')
@@ -229,6 +245,79 @@ export class TasksController {
     return { success: true };
   }
 
+  @Get(':id/subtasks/:subtaskId/comments')
+  async getSubtaskComments(
+    @Param('id') taskId: string,
+    @Param('subtaskId') subtaskId: string,
+    @TenantId() tenantId: string,
+    @CurrentUserId() userId: string,
+  ) {
+    const comments = await this.tasksService.getSubtaskComments(
+      taskId,
+      subtaskId,
+      tenantId,
+      userId,
+    );
+    return comments.map((c) => this.toSubtaskCommentResponse(c));
+  }
+
+  @Post(':id/subtasks/:subtaskId/comments')
+  async addSubtaskComment(
+    @Param('id') taskId: string,
+    @Param('subtaskId') subtaskId: string,
+    @TenantId() tenantId: string,
+    @CurrentUserId() userId: string,
+    @Body() dto: CreateSubtaskCommentDto,
+  ) {
+    const comment = await this.tasksService.addSubtaskComment(
+      taskId,
+      subtaskId,
+      tenantId,
+      userId,
+      dto.body,
+      dto.parentId,
+    );
+    return this.toSubtaskCommentResponse({ ...comment, replies: [] });
+  }
+
+  @Patch(':id/subtasks/:subtaskId/comments/:commentId')
+  async updateSubtaskComment(
+    @Param('id') taskId: string,
+    @Param('subtaskId') subtaskId: string,
+    @Param('commentId') commentId: string,
+    @TenantId() tenantId: string,
+    @CurrentUserId() userId: string,
+    @Body() dto: UpdateSubtaskCommentDto,
+  ) {
+    const comment = await this.tasksService.updateSubtaskComment(
+      taskId,
+      subtaskId,
+      commentId,
+      tenantId,
+      userId,
+      dto.body,
+    );
+    return this.toSubtaskCommentResponse({ ...comment, replies: [] });
+  }
+
+  @Delete(':id/subtasks/:subtaskId/comments/:commentId')
+  async deleteSubtaskComment(
+    @Param('id') taskId: string,
+    @Param('subtaskId') subtaskId: string,
+    @Param('commentId') commentId: string,
+    @TenantId() tenantId: string,
+    @CurrentUserId() userId: string,
+  ): Promise<{ success: boolean }> {
+    await this.tasksService.deleteSubtaskComment(
+      taskId,
+      subtaskId,
+      commentId,
+      tenantId,
+      userId,
+    );
+    return { success: true };
+  }
+
   @Get(':id')
   async findOne(
     @Param('id') id: string,
@@ -331,6 +420,32 @@ export class TasksController {
             avatarUrl: c.user.avatarUrl ?? undefined,
           }
         : undefined,
+    };
+  }
+
+  private toSubtaskCommentResponse(
+    c: SubtaskCommentEntity & { replies?: SubtaskCommentEntity[] },
+  ): SubtaskCommentResponse {
+    return {
+      id: c.id,
+      taskId: c.taskId,
+      subtaskId: c.subtaskId,
+      userId: c.userId,
+      body: c.body,
+      parentId: c.parentId ?? null,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt ?? c.createdAt,
+      user: c.user
+        ? {
+            id: c.user.id,
+            fullName: c.user.fullName,
+            email: c.user.email,
+            avatarUrl: c.user.avatarUrl ?? undefined,
+          }
+        : undefined,
+      replies: (c.replies ?? []).map((r) =>
+        this.toSubtaskCommentResponse({ ...r, replies: [] }),
+      ),
     };
   }
 

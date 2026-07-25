@@ -886,25 +886,21 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
       taskId: task.id,
       organizationId: orgId,
     );
-    if (result == null || !mounted) return;
+    if (!mounted) return;
 
-    final prevTask = _tasks[ti];
-    final subs = List<TaskSubtask>.from(prevTask.subtasks);
-    subs[subIndex] = subs[subIndex].copyWith(
-      note: result.note.isEmpty ? null : result.note,
-      clearNote: result.note.isEmpty,
-    );
-    setState(() => _tasks[ti] = prevTask.copyWith(subtasks: subs));
-    try {
-      await ref
-          .read(tasksRepositoryProvider)
-          .updateTask(taskId: task.id, subtasks: subs);
-      widget.onChanged();
-      _snack(result.note.isEmpty ? 'Note cleared' : 'Note saved');
-    } catch (error) {
-      if (mounted) setState(() => _tasks[ti] = prevTask);
-      _snack('Could not save note: ${_msg(error)}');
+    if (result != null) {
+      final prevTask = _tasks[ti];
+      final subs = List<TaskSubtask>.from(prevTask.subtasks);
+      final preview = result.latestNotePreview?.trim();
+      subs[subIndex] = subs[subIndex].copyWith(
+        note: result.hasNotes
+            ? (preview != null && preview.isNotEmpty ? preview : 'Notes')
+            : null,
+        clearNote: !result.hasNotes,
+      );
+      setState(() => _tasks[ti] = prevTask.copyWith(subtasks: subs));
     }
+    widget.onChanged();
   }
 
   Future<void> _confirmDeleteSubtask(Task task, int subIndex) async {
@@ -1573,7 +1569,7 @@ class _SubtaskRow extends StatelessWidget {
                         Text(
                           [
                             if (hasTime) dueTime,
-                            if (hasNote) 'Note',
+                            if (hasNote) 'Notes',
                           ].join(' · '),
                           style:
                               Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -1609,7 +1605,7 @@ class _SubtaskRow extends StatelessWidget {
                     itemBuilder: (context) => [
                       PopupMenuItem(
                         value: _SubtaskMenuAction.note,
-                        child: Text(hasNote ? 'Edit note' : 'Add note'),
+                        child: Text(hasNote ? 'Notes' : 'Add note'),
                       ),
                       const PopupMenuItem(
                         value: _SubtaskMenuAction.edit,
