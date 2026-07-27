@@ -19,7 +19,11 @@ import { RecurringTasksService } from './recurring-tasks.service';
 import { OrgEventsService } from '../org-events/org-events.service';
 import { TaskNotificationsService } from './task-notifications.service';
 import { PaginationQueryDto, PaginatedResult, paginate } from '../../common/pagination';
-import { formatUuid, generateUuid } from '../../common/utils/uuid.util';
+import {
+  formatUuid,
+  generateUuid,
+  normalizeUserIdForCompare,
+} from '../../common/utils/uuid.util';
 import { Configuration } from '../../config/configuration';
 import {
   isOfficeDocumentPreviewable,
@@ -1096,7 +1100,8 @@ export class TasksService {
     body: string,
     parentId?: string | null,
   ): Promise<SubtaskCommentEntity> {
-    await this.assertTaskSubtask(taskId, subtaskId, organizationId);
+    const task = await this.assertTaskSubtask(taskId, subtaskId, organizationId);
+    await this.assertCanCommentOnSubtaskNote(task, subtaskId, organizationId, userId);
     const trimmed = body.trim().slice(0, 2000);
     if (!trimmed.length) throw new BadRequestException('Comment cannot be empty');
 
@@ -1232,6 +1237,42 @@ export class TasksService {
     const found = task.subtasks?.some((s) => s.id === trimmedSubtaskId);
     if (!found) throw new NotFoundException('Checklist item not found');
     return task;
+  }
+
+  /**
+   * Planner note ACL:
+   * - owner / admin → comment or reply on any checklist note
+   * - member → only on checklist items where they are assigned
+   */
+  private async assertCanCommentOnSubtaskNote(
+    task: TaskEntity,
+    subtaskId: string,
+    organizationId: string,
+    userId: string,
+  ): Promise<void> {
+    const role = (await this.organizationsService.getMemberRole(organizationId, userId))
+      ?.toLowerCase();
+    if (role === 'owner' || role === 'admin') return;
+
+    const sub = task.subtasks?.find((s) => s.id === subtaskId);
+    if (!sub) throw new NotFoundException('Checklist item not found');
+
+    const assigneeIds = [
+      ...(sub.assigneeIds?.length
+        ? sub.assigneeIds
+        : sub.assigneeId
+          ? [sub.assigneeId]
+          : []),
+    ];
+    const actorKey = normalizeUserIdForCompare(userId);
+    const isAssigned = assigneeIds.some(
+      (id) => normalizeUserIdForCompare(id) === actorKey,
+    );
+    if (!isAssigned) {
+      throw new ForbiddenException(
+        'Only owners and admins can comment on any note. Members can comment only on checklist notes they are assigned to.',
+      );
+    }
   }
 
   /**

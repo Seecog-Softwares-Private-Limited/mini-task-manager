@@ -125,6 +125,20 @@ class _SubtaskNotesThreadSheetState
     return role == 'admin' || role == 'owner';
   }
 
+  /// Owner/admin: any checklist note. Member: only if assigned to this item.
+  bool get _canCommentOnThisNote {
+    if (_canModerate) return true;
+    final uid = _currentUserId;
+    if (uid == null || uid.isEmpty) return false;
+    final ids = widget.subtask.assigneeIds.isNotEmpty
+        ? widget.subtask.assigneeIds
+        : (widget.subtask.assigneeId != null &&
+                widget.subtask.assigneeId!.isNotEmpty
+            ? [widget.subtask.assigneeId!]
+            : <String>[]);
+    return ids.any((id) => id == uid);
+  }
+
   Future<void> _load() async {
     final expectedSubtaskId = widget.subtask.id.trim();
     setState(() {
@@ -300,6 +314,13 @@ class _SubtaskNotesThreadSheetState
       setState(() => _error = 'Save the checklist item before adding notes.');
       return;
     }
+    if (_editing == null && !_canCommentOnThisNote) {
+      setState(() {
+        _error =
+            'You can only add notes on checklist items assigned to you.';
+      });
+      return;
+    }
 
     setState(() {
       _posting = true;
@@ -446,6 +467,13 @@ class _SubtaskNotesThreadSheetState
   }
 
   void _startReply(SubtaskComment comment) {
+    if (!_canCommentOnThisNote) {
+      setState(() {
+        _error =
+            'You can only reply on checklist items assigned to you.';
+      });
+      return;
+    }
     setState(() {
       _replyingTo = comment;
       _editing = null;
@@ -699,6 +727,7 @@ class _SubtaskNotesThreadSheetState
           organizationId: widget.organizationId,
           canEdit: _canEdit,
           canDelete: _canDelete,
+          canReply: _canCommentOnThisNote,
           onReply: _startReply,
           onEdit: _startEdit,
           onDelete: _delete,
@@ -710,6 +739,36 @@ class _SubtaskNotesThreadSheetState
   }
 
   Widget _buildComposer(BuildContext context) {
+    if (!_canCommentOnThisNote && _editing == null) {
+      return Material(
+        color: AppColors.surface,
+        elevation: 10,
+        shadowColor: AppColors.textPrimary.withValues(alpha: 0.08),
+        child: SafeArea(
+          top: false,
+          child: Container(
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              border: Border(top: BorderSide(color: AppColors.border)),
+            ),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.md,
+            ),
+            child: Text(
+              'Only owners and admins can comment on any note. '
+              'Members can comment only on checklist notes assigned to them.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textMuted,
+                  ),
+            ),
+          ),
+        ),
+      );
+    }
+
     final modeLabel = _editing != null
         ? 'Editing note'
         : _replyingTo != null
@@ -986,6 +1045,7 @@ class _ThreadBranch extends StatelessWidget {
     required this.organizationId,
     required this.canEdit,
     required this.canDelete,
+    required this.canReply,
     required this.onReply,
     required this.onEdit,
     required this.onDelete,
@@ -1001,6 +1061,7 @@ class _ThreadBranch extends StatelessWidget {
   final String organizationId;
   final bool Function(SubtaskComment) canEdit;
   final bool Function(SubtaskComment) canDelete;
+  final bool canReply;
   final ValueChanged<SubtaskComment> onReply;
   final ValueChanged<SubtaskComment> onEdit;
   final ValueChanged<SubtaskComment> onDelete;
@@ -1033,7 +1094,7 @@ class _ThreadBranch extends StatelessWidget {
         onReply: () => onReply(comment),
         onEdit: () => onEdit(comment),
         onDelete: () => onDelete(comment),
-        showReply: depth < 7,
+        showReply: canReply && depth < 7,
         compact: depth > 0,
         replyToName: replyToName,
       ),
@@ -1087,6 +1148,7 @@ class _ThreadBranch extends StatelessWidget {
                       organizationId: organizationId,
                       canEdit: canEdit,
                       canDelete: canDelete,
+                      canReply: canReply,
                       onReply: onReply,
                       onEdit: onEdit,
                       onDelete: onDelete,
