@@ -42,6 +42,12 @@ class TaskSubtask {
 
   factory TaskSubtask.fromJson(Map<String, dynamic> json) {
     final rawRecord = json['completionRecord'];
+    Map<String, dynamic>? recordMap;
+    if (rawRecord is Map<String, dynamic>) {
+      recordMap = rawRecord;
+    } else if (rawRecord is Map) {
+      recordMap = Map<String, dynamic>.from(rawRecord);
+    }
     return TaskSubtask(
       id: json['id']?.toString() ?? '',
       title: stripHtmlToPlainText(json['title']?.toString()),
@@ -54,14 +60,30 @@ class TaskSubtask {
       status: _nullableString(json['status']),
       priority: _nullableString(json['priority']),
       statusId: _nullableString(json['statusId']),
-      completionRecord: rawRecord is Map<String, dynamic>
-          ? SubtaskCompletionRecord.fromJson(rawRecord)
+      completionRecord: recordMap != null
+          ? SubtaskCompletionRecord.fromJson(recordMap)
           : null,
       reporterId: _nullableString(json['reporterId']),
       createdAt: _nullableString(json['createdAt']),
       note: _nullableString(json['note']),
       requireLocation: json['requireLocation'] == true,
     );
+  }
+
+  /// Prefer [server] fields, but keep a local completion stamp if the API
+  /// response dropped it (common after older servers / web toggles).
+  static TaskSubtask coalesce(TaskSubtask local, TaskSubtask server) {
+    final serverHasStamp =
+        server.completionRecord?.completedAt.trim().isNotEmpty == true;
+    final localHasStamp =
+        local.completionRecord?.completedAt.trim().isNotEmpty == true;
+    if (server.completed && !serverHasStamp && localHasStamp) {
+      // Do not re-apply repaired-away mass server stamps.
+      final src = local.completionRecord?.deviceInfo['source']?.toString();
+      if (src == 'server') return server;
+      return server.copyWith(completionRecord: local.completionRecord);
+    }
+    return server;
   }
 
   TaskSubtask copyWith({
