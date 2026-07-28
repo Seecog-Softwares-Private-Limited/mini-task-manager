@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/theme/app_colors.dart';
@@ -58,6 +59,7 @@ class SubtaskCompactRow extends StatelessWidget {
         .toList();
     final showAssignees =
         assigneeMembers.isNotEmpty || (showUnassignedChip && canChangeAssignees);
+    final doneAtLabel = _completedAtLabel(subtask);
 
     return Container(
       margin: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -152,6 +154,10 @@ class SubtaskCompactRow extends StatelessWidget {
                         ),
                       ),
                     ),
+                    if (doneAtLabel != null) ...[
+                      const SizedBox(width: 6),
+                      _DoneAtChip(label: doneAtLabel),
+                    ],
                     if (showAssignees) ...[
                       const SizedBox(width: 6),
                       _AssigneeChip(
@@ -349,4 +355,49 @@ List<String> _assigneeIdsOf(TaskSubtask subtask) {
     return [subtask.assigneeId!];
   }
   return const [];
+}
+
+String? _completedAtLabel(TaskSubtask subtask) {
+  if (!subtask.completed) return null;
+  final raw = subtask.completionRecord?.completedAt.trim();
+  if (raw == null || raw.isEmpty) return null;
+  final parsed = DateTime.tryParse(raw);
+  if (parsed == null) return null;
+  return DateFormat('h:mm a').format(parsed.toLocal());
+}
+
+class _DoneAtChip extends StatelessWidget {
+  const _DoneAtChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.success.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.check_circle_rounded,
+            size: 11,
+            color: AppColors.success,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: AppColors.success,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

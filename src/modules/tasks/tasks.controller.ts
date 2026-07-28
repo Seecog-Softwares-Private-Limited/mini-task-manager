@@ -33,6 +33,7 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { CreateTaskCommentDto } from './dto/create-task-comment.dto';
 import { CreateSubtaskCommentDto } from './dto/create-subtask-comment.dto';
 import { UpdateSubtaskCommentDto } from './dto/update-subtask-comment.dto';
+import { MoveSubtaskDto } from './dto/move-subtask.dto';
 import { PatchTaskDto } from './dto/patch-task.dto';
 import { UpdateTaskAssigneeDto } from './dto/update-task-assignee.dto';
 import { PaginationQueryDto } from '../../common/pagination';
@@ -243,6 +244,27 @@ export class TasksController {
   ): Promise<{ success: boolean }> {
     await this.tasksService.deleteComment(taskId, commentId, tenantId);
     return { success: true };
+  }
+
+  @Post(':id/subtasks/:subtaskId/move')
+  async moveSubtask(
+    @Param('id') taskId: string,
+    @Param('subtaskId') subtaskId: string,
+    @TenantId() tenantId: string,
+    @CurrentUserId() userId: string,
+    @Body() dto: MoveSubtaskDto,
+  ) {
+    const result = await this.tasksService.moveSubtask({
+      sourceTaskId: taskId,
+      subtaskId,
+      targetTaskId: dto.targetTaskId,
+      organizationId: tenantId,
+      userId,
+    });
+    return {
+      source: this.toResponse(result.source),
+      target: this.toResponse(result.target),
+    };
   }
 
   @Get(':id/subtasks/:subtaskId/comments')

@@ -1443,16 +1443,28 @@ export function TaskDetailModal({
                               editDisabled={!canEditSubtasks || updateSubtasksMutation.isPending}
                               onToggleComplete={() => {
                                 const isDone = resolveSubtaskStatus(item) === "DONE";
+                                const actor = {
+                                  id: currentUserId,
+                                  name: user?.fullName ?? user?.email ?? "",
+                                };
                                 updateSubtasksMutation.mutate(
                                   checklist.map((i) =>
-                                    i.id === item.id ? subtaskWithCompleted(i, !isDone) : i
+                                    i.id === item.id
+                                      ? subtaskWithCompleted(i, !isDone, actor)
+                                      : i
                                   )
                                 );
                               }}
                               onStatusChange={(nextStatus: SubtaskStatus) => {
+                                const actor = {
+                                  id: currentUserId,
+                                  name: user?.fullName ?? user?.email ?? "",
+                                };
                                 updateSubtasksMutation.mutate(
                                   checklist.map((i) =>
-                                    i.id === item.id ? subtaskWithStatus(i, nextStatus) : i
+                                    i.id === item.id
+                                      ? subtaskWithStatus(i, nextStatus, actor)
+                                      : i
                                   )
                                 );
                               }}

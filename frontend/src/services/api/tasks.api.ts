@@ -75,6 +75,9 @@ export function serializeSubtasksForApi(subtasks: TaskSubtask[]): TaskSubtask[] 
     if (s.requireLocation === true) {
       item.requireLocation = true;
     }
+    if (s.completionRecord && typeof s.completionRecord === "object") {
+      item.completionRecord = s.completionRecord;
+    }
     return item;
   });
 }

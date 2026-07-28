@@ -36,6 +36,7 @@ import {
   type SubtaskDraft,
 } from "@/components/tasks/subtasks/subtask-detail-panel";
 import { useTenant } from "@/context/tenant-context";
+import { useAuth } from "@/hooks/use-auth";
 import type { Task, TaskSubtask } from "@/types/api";
 import { CalendarDays, Check, ListChecks, Plus } from "lucide-react";
 
@@ -65,6 +66,11 @@ export function RecurringSubtaskChecklist({
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { orgId } = useTenant();
+  const { user } = useAuth();
+  const completionActor = {
+    id: user?.id ?? "",
+    name: user?.fullName ?? user?.email ?? "",
+  };
   const ensureAttemptedRef = useRef<string | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
@@ -144,7 +150,7 @@ export function RecurringSubtaskChecklist({
   function toggleSubtask(subtaskId: string) {
     if (readOnly || !task) return;
     const next = subtasks.map((s) =>
-      s.id === subtaskId ? subtaskWithCompleted(s, !s.completed) : s
+      s.id === subtaskId ? subtaskWithCompleted(s, !s.completed, completionActor) : s
     );
     updateMutation.mutate(next);
   }
@@ -274,7 +280,9 @@ export function RecurringSubtaskChecklist({
                     onToggleComplete={() => toggleSubtask(s.id)}
                     onStatusChange={(nextStatus: SubtaskStatus) => {
                       patchSubtasks((item) =>
-                        item.id === s.id ? subtaskWithStatus(item, nextStatus) : item
+                        item.id === s.id
+                          ? subtaskWithStatus(item, nextStatus, completionActor)
+                          : item
                       );
                     }}
                     onAssigneeChange={(nextAssigneeIds) => {

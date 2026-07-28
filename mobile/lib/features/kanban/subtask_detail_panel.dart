@@ -53,6 +53,7 @@ class SubtaskDetailPanel extends ConsumerStatefulWidget {
     required this.onCancel,
     required this.onSave,
     this.onDelete,
+    this.onMove,
     this.fallbackReporterId,
     this.fallbackCreatedAt,
     this.canEditRequireLocation = false,
@@ -74,6 +75,8 @@ class SubtaskDetailPanel extends ConsumerStatefulWidget {
   final VoidCallback onCancel;
   final ValueChanged<TaskSubtask> onSave;
   final VoidCallback? onDelete;
+  /// Move this checklist item under another task in the same project.
+  final VoidCallback? onMove;
 
   @override
   ConsumerState<SubtaskDetailPanel> createState() => _SubtaskDetailPanelState();
@@ -300,6 +303,22 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
         ],
       ),
     );
+  }
+
+  void _handleReset() {
+    if (widget.saving) return;
+    setState(() {
+      _titleController.text = widget.subtask.title;
+      _descriptionController.text = widget.subtask.description ?? '';
+      _status = _resolveSubtaskStatus(widget.subtask);
+      _priority = (widget.subtask.priority ?? 'MEDIUM').toUpperCase();
+      _dueDate = widget.subtask.dueDate;
+      _dueTime = widget.subtask.dueTime;
+      _assigneeIds = _storedAssigneeIds(widget.subtask);
+      _requireLocation = widget.subtask.requireLocation;
+      _completionRecord = widget.subtask.completionRecord;
+      _attachmentError = null;
+    });
   }
 
   void _showNotAssigned() {
@@ -703,49 +722,68 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
             const SizedBox(height: AppSpacing.md),
             _CompletionRecordCard(record: _completionRecord!),
           ],
+          if (!widget.templateMode) ...[
+            const SizedBox(height: AppSpacing.md),
+            _buildReporterBadge(context),
+          ],
           const SizedBox(height: AppSpacing.md),
+          if (widget.onMove != null) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: widget.saving ? null : widget.onMove,
+                icon: const Icon(Icons.drive_file_move_outlined, size: 18),
+                label: const Text('Move to another task'),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+          ],
           Row(
             children: [
               if (widget.onDelete != null)
-                IconButton(
-                  tooltip: 'Delete subtask',
+                OutlinedButton.icon(
                   onPressed: widget.saving ? null : widget.onDelete,
-                  icon: const Icon(Icons.delete_outline_rounded),
-                  color: AppColors.danger,
-                )
-              else if (!widget.templateMode)
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: _buildReporterBadge(context),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.danger,
+                    side: BorderSide(
+                      color: AppColors.danger.withValues(alpha: 0.45),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
                   ),
+                  icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                  label: const Text('Delete'),
                 )
               else
-                const Spacer(),
-              if (widget.onDelete != null && !widget.templateMode) ...[
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: _buildReporterBadge(context),
+                TextButton(
+                  onPressed: widget.saving ? null : _handleCancel,
+                  child: const Text('Cancel'),
+                ),
+              const SizedBox(width: AppSpacing.sm),
+              OutlinedButton(
+                onPressed: widget.saving || !_isDirty ? null : _handleReset,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
                   ),
                 ),
-              ] else if (widget.onDelete != null)
-                const Spacer(),
-              const SizedBox(width: AppSpacing.sm),
-              TextButton(
-                onPressed: widget.saving ? null : _handleCancel,
-                child: const Text('Cancel'),
+                child: const Text('Reset'),
               ),
               const SizedBox(width: AppSpacing.sm),
-              PrimaryButton(
-                label: widget.saving ? 'Saving...' : 'Save',
-                expand: false,
-                loading: widget.saving,
-                onPressed: widget.saving ||
-                        _titleController.text.trim().isEmpty ||
-                        _titleController.text.length > subtaskTitleMaxLength
-                    ? null
-                    : _handleSave,
+              Expanded(
+                child: PrimaryButton(
+                  label: widget.saving ? 'Saving...' : 'Save',
+                  expand: true,
+                  loading: widget.saving,
+                  onPressed: widget.saving ||
+                          _titleController.text.trim().isEmpty ||
+                          _titleController.text.length > subtaskTitleMaxLength
+                      ? null
+                      : _handleSave,
+                ),
               ),
             ],
           ),
@@ -765,38 +803,60 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
                 widget.subtask.createdAt!.trim().isNotEmpty)
             ? widget.subtask.createdAt
             : widget.fallbackCreatedAt;
-    final hasReporter = reporterId != null && reporterId.trim().isNotEmpty;
     final hasDate = createdAtRaw != null && createdAtRaw.trim().isNotEmpty;
-    if (!hasReporter && !hasDate) return const SizedBox.shrink();
 
-    String name = 'Unknown';
-    String? avatarUrl;
-    if (hasReporter) {
-      final normalized = _normalizeUserId(reporterId);
-      ProjectMember? match;
+    ProjectMember? memberFor(String? userId) {
+      if (userId == null || userId.trim().isEmpty) return null;
+      final normalized = _normalizeUserId(userId);
       for (final member in widget.members) {
-        if (_normalizeUserId(member.userId) == normalized) {
-          match = member;
-          break;
-        }
+        if (_normalizeUserId(member.userId) == normalized) return member;
       }
+      return null;
+    }
+
+    String displayNameFor(String? userId) {
+      final match = memberFor(userId);
       final memberUser = match?.user;
       if (memberUser != null) {
-        name = memberUser.fullName.trim().isNotEmpty
+        return memberUser.fullName.trim().isNotEmpty
             ? memberUser.fullName
             : memberUser.email;
-        avatarUrl = memberUser.avatarUrl;
-      } else {
-        final currentUser = ref.read(sessionControllerProvider).user;
-        if (currentUser != null &&
-            _normalizeUserId(currentUser.id) == normalized) {
-          name = currentUser.fullName.trim().isNotEmpty
-              ? currentUser.fullName
-              : currentUser.email;
-          avatarUrl = currentUser.avatarUrl;
-        }
       }
+      final currentUser = ref.read(sessionControllerProvider).user;
+      if (currentUser != null &&
+          userId != null &&
+          _normalizeUserId(currentUser.id) == _normalizeUserId(userId)) {
+        return currentUser.fullName.trim().isNotEmpty
+            ? currentUser.fullName
+            : currentUser.email;
+      }
+      return 'Unknown';
     }
+
+    String? avatarFor(String? userId) {
+      final match = memberFor(userId);
+      if (match?.user?.avatarUrl != null) return match!.user!.avatarUrl;
+      final currentUser = ref.read(sessionControllerProvider).user;
+      if (currentUser != null &&
+          userId != null &&
+          _normalizeUserId(currentUser.id) == _normalizeUserId(userId)) {
+        return currentUser.avatarUrl;
+      }
+      return null;
+    }
+
+    final assigneeIds = _assigneeIds;
+    final hasAssignees = assigneeIds.isNotEmpty;
+    final primaryUserId = hasAssignees ? assigneeIds.first : reporterId;
+    final hasPerson =
+        primaryUserId != null && primaryUserId.trim().isNotEmpty;
+    if (!hasPerson && !hasDate) return const SizedBox.shrink();
+
+    final name = hasPerson ? displayNameFor(primaryUserId) : 'Unassigned';
+    final avatarUrl = hasPerson ? avatarFor(primaryUserId) : null;
+    final extraAssignees = hasAssignees && assigneeIds.length > 1
+        ? ' +${assigneeIds.length - 1}'
+        : '';
 
     String? dateLabel;
     if (hasDate) {
@@ -810,71 +870,80 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     final imageUrl = resolveUserAvatarUrl(apiBaseUrl, avatarUrl);
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(6, 5, 12, 5),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
             AppColors.primary.withValues(alpha: 0.10),
-            AppColors.violet.withValues(alpha: 0.10),
+            AppColors.violet.withValues(alpha: 0.08),
           ],
         ),
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          _ReporterAvatar(name: name, imageUrl: imageUrl, size: 28),
-          const SizedBox(width: 8),
-          Flexible(
+          _ReporterAvatar(
+            name: name,
+            imageUrl: imageUrl,
+            size: 40,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Raised by',
+                  hasAssignees ? 'Assignee' : 'Raised by',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: AppColors.textMuted,
-                        fontSize: 9.5,
-                        letterSpacing: 0.4,
                         fontWeight: FontWeight.w600,
-                        height: 1.1,
+                        letterSpacing: 0.2,
                       ),
                 ),
+                const SizedBox(height: 2),
                 Text(
-                  name,
+                  '$name$extraAssignees',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
-                        fontSize: 12,
                         height: 1.2,
                       ),
                 ),
+                const SizedBox(height: 4),
                 if (dateLabel != null)
                   Row(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.schedule_rounded,
-                        size: 10,
-                        color: AppColors.textMuted,
+                        size: 14,
+                        color: AppColors.textMuted.withValues(alpha: 0.95),
                       ),
-                      const SizedBox(width: 3),
-                      Flexible(
+                      const SizedBox(width: 5),
+                      Expanded(
                         child: Text(
                           dateLabel,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style:
-                              Theme.of(context).textTheme.labelSmall?.copyWith(
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: AppColors.textMuted,
-                                    fontSize: 10,
-                                    height: 1.1,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.2,
                                   ),
                         ),
                       ),
                     ],
+                  )
+                else
+                  Text(
+                    'Created date unavailable',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textMuted,
+                        ),
                   ),
               ],
             ),

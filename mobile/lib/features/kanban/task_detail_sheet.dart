@@ -25,6 +25,7 @@ import 'subtask_completion_sheet.dart';
 import 'subtask_completion_utils.dart';
 import 'subtask_compact_row.dart';
 import 'subtask_detail_panel.dart';
+import 'move_subtask_sheet.dart';
 import 'new_subtask_composer.dart';
 import 'attachment_picker_section.dart';
 import 'attachment_preview.dart';
@@ -453,9 +454,11 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       return;
     }
 
+    final rowId = _subtasks[index].id;
     if (value) {
       if (isSubtaskDone(_subtasks[index])) return;
       await _completeSubtaskAtIndex(index);
+      if (mounted) _stabilizeChecklistScroll(rowId, alignment: 0.15);
       return;
     }
 
@@ -472,9 +475,11 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
           subtasks: updated,
         ));
     if (!mounted) return;
+    // Keep local checklist order; never let completed items sink.
     setState(() {
       _subtasks = _mergeSubtasksPreservingOrder(updated, _subtasks);
     });
+    _stabilizeChecklistScroll(rowId, alignment: 0.15);
   }
 
   Future<SubtaskCompletionRecord?> _requestSubtaskCompletion({
@@ -537,6 +542,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
 
   Future<void> _completeSubtaskAtIndex(int index) async {
     final item = _subtasks[index];
+    final rowId = item.id;
+    final orderBefore = List<TaskSubtask>.from(_subtasks);
     final record = await _requestSubtaskCompletion(
       subtaskId: item.id,
       subtaskTitle: item.title,
@@ -545,8 +552,10 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     );
     if (record == null) return;
 
-    final updated = List<TaskSubtask>.from(_subtasks);
-    updated[index] = item.copyWith(
+    final updated = List<TaskSubtask>.from(orderBefore);
+    final liveIndex = updated.indexWhere((s) => s.id == rowId);
+    if (liveIndex < 0) return;
+    updated[liveIndex] = updated[liveIndex].copyWith(
       completed: true,
       status: 'DONE',
       completionRecord: record,
@@ -557,9 +566,18 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
           subtasks: updated,
         ));
     if (!mounted) return;
+    // Preserve the checklist order the user had before completing.
     setState(() {
-      _subtasks = _mergeSubtasksPreservingOrder(updated, _subtasks);
+      _subtasks = _mergeSubtasksPreservingOrder(orderBefore.map((s) {
+        if (s.id != rowId) return s;
+        return s.copyWith(
+          completed: true,
+          status: 'DONE',
+          completionRecord: record,
+        );
+      }).toList(), _subtasks);
     });
+    _stabilizeChecklistScroll(rowId, alignment: 0.15);
   }
 
   Future<void> _appendSubtask(String rawTitle) async {
@@ -733,6 +751,89 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     );
     if (confirmed == true && mounted) {
       await _deleteSubtask(index);
+    }
+  }
+
+  Future<void> _moveSubtaskToAnotherTask(int index) async {
+    if (!_canEditSubtasks() || _saving || _savingSubtaskIndex != null) return;
+    if (index < 0 || index >= _subtasks.length) return;
+    final orgId = ref.read(sessionControllerProvider).orgId ?? '';
+    if (orgId.isEmpty) return;
+
+    final item = _subtasks[index];
+    final target = await showMoveSubtaskTargetSheet(
+      context: context,
+      projectId: widget.projectId,
+      organizationId: orgId,
+      currentTaskId: _task.id,
+      subtaskTitle: item.title.trim().isEmpty ? 'Untitled' : item.title.trim(),
+    );
+    if (target == null || !mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Move checklist item'),
+        content: Text(
+          'Move “${item.title.trim().isEmpty ? 'this item' : item.title.trim()}” '
+          'under “${target.title}”?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Move'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    FocusManager.instance.primaryFocus?.unfocus();
+    final remaining = List<TaskSubtask>.from(_subtasks)..removeAt(index);
+    final anchorId = remaining.isEmpty
+        ? null
+        : remaining[index.clamp(0, remaining.length - 1)].id;
+    setState(() {
+      _subtasks = remaining;
+      _savingSubtaskIndex = index;
+      _expandedSubtaskIndex = null;
+      _error = null;
+    });
+    _stabilizeChecklistScroll(anchorId);
+    try {
+      final result = await ref.read(tasksRepositoryProvider).moveSubtask(
+            sourceTaskId: _task.id,
+            subtaskId: item.id,
+            targetTaskId: target.id,
+          );
+      if (!mounted) return;
+      setState(() {
+        _task = result.source;
+        _subtasks =
+            _mergeSubtasksPreservingOrder(remaining, result.source.subtasks);
+      });
+      _stabilizeChecklistScroll(anchorId);
+      widget.onUpdated();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Moved to “${result.target.title}”'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.message;
+          _subtasks = List.of(_task.subtasks);
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _savingSubtaskIndex = null);
     }
   }
 
@@ -1237,6 +1338,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                   final expanded = _expandedSubtaskIndex == index;
                   final canExpandSubtask = canEditSubtasks;
                   return Column(
+                    key: ValueKey<String>('subtask-wrap-${item.id}'),
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       KeyedSubtree(
@@ -1307,6 +1409,9 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                                 onSave: (draft) => _saveSubtask(index, draft),
                                 onDelete: allowChecklistStructureEdit
                                     ? () => _confirmDeleteSubtask(index)
+                                    : null,
+                                onMove: allowChecklistStructureEdit
+                                    ? () => _moveSubtaskToAnotherTask(index)
                                     : null,
                               ),
                             ),

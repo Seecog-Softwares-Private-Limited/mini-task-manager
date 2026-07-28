@@ -76,4 +76,12 @@ export class SubtaskCommentsRepository {
   async deleteByParentId(parentId: string): Promise<void> {
     await this.repo.delete({ parentId });
   }
+
+  /** Re-point note threads when a checklist item moves to another task. */
+  async reassignTaskId(subtaskId: string, fromTaskId: string, toTaskId: string): Promise<void> {
+    await this.repo.update(
+      { subtaskId, taskId: fromTaskId },
+      { taskId: toTaskId },
+    );
+  }
 }
