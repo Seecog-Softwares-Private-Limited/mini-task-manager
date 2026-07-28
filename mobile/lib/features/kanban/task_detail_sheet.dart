@@ -213,7 +213,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       setState(() {
         _members = members;
         _task = task;
-        _subtasks = List.of(task.subtasks);
+        // Keep local completion stamps if the server omitted them this round-trip.
+        _subtasks = _mergeSubtasksPreservingOrder(_subtasks, task.subtasks);
         _attachments = results[2] as List<_TaskAttachmentItem>;
         _comments = results[3] as List<TaskComment>;
         _loadingMeta = false;
@@ -468,6 +469,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       completed: false,
       status: item.status == 'DONE' ? 'TODO' : item.status,
       clearCompletionRecord: true,
+      clearCompletedAt: true,
     );
     setState(() => _subtasks = updated);
     await _run(() => ref.read(tasksRepositoryProvider).updateTask(
@@ -559,6 +561,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       completed: true,
       status: 'DONE',
       completionRecord: record,
+      completedAt: record.completedAt,
     );
     setState(() => _subtasks = updated);
     await _run(() => ref.read(tasksRepositoryProvider).updateTask(
@@ -574,6 +577,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
           completed: true,
           status: 'DONE',
           completionRecord: record,
+          completedAt: record.completedAt,
         );
       }).toList(), _subtasks);
     });
@@ -1417,6 +1421,18 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                                 onMove: allowChecklistStructureEdit
                                     ? () => _moveSubtaskToAnotherTask(index)
                                     : null,
+                                onNoteChanged: (preview) {
+                                  if (index < 0 || index >= _subtasks.length) {
+                                    return;
+                                  }
+                                  setState(() {
+                                    _subtasks[index] = _subtasks[index].copyWith(
+                                      note: preview,
+                                      clearNote: preview == null ||
+                                          preview.trim().isEmpty,
+                                    );
+                                  });
+                                },
                               ),
                             ),
                           ),

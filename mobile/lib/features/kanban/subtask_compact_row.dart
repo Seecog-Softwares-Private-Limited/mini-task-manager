@@ -359,7 +359,7 @@ List<String> _assigneeIdsOf(TaskSubtask subtask) {
 
 String? _completedAtLabel(TaskSubtask subtask) {
   if (!subtask.completed) return null;
-  final raw = subtask.completionRecord?.completedAt.trim();
+  final raw = subtask.effectiveCompletedAt;
   if (raw == null || raw.isEmpty) return null;
   final parsed = DateTime.tryParse(raw);
   if (parsed == null) return null;

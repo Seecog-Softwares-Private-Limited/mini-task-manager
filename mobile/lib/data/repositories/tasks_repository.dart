@@ -208,7 +208,8 @@ class TasksRepository {
           // Never silently drop location — that makes the toggle look broken.
           ..remove('requireLocation')
           // Never drop completion timestamps — chips would vanish after save.
-          ..remove('completionRecord');
+          ..remove('completionRecord')
+          ..remove('completedAt');
         final next = forbidden.difference(omitSubtaskKeys);
         if (next.isEmpty) break;
         omitSubtaskKeys.addAll(next);
@@ -311,6 +312,13 @@ class TasksRepository {
             s.completionRecord != null) {
           row['completionRecord'] = s.completionRecord!.toJson();
         }
+        final completedAt = s.effectiveCompletedAt;
+        if (!omitSubtaskKeys.contains('completedAt') &&
+            completedAt != null &&
+            completedAt.isNotEmpty &&
+            s.completed) {
+          row['completedAt'] = completedAt;
+        }
         if (!omitSubtaskKeys.contains('note') &&
             s.note != null &&
             s.note!.isNotEmpty) {
@@ -370,6 +378,7 @@ class TasksRepository {
         'dueTime',
         'reporterId',
         'createdAt',
+        'completedAt',
         'note',
         'completionRecord',
       ]) {

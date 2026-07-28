@@ -19,6 +19,7 @@ class TaskSubtask {
     this.completionRecord,
     this.reporterId,
     this.createdAt,
+    this.completedAt,
     this.note,
     this.requireLocation = false,
   });
@@ -37,8 +38,19 @@ class TaskSubtask {
   final SubtaskCompletionRecord? completionRecord;
   final String? reporterId;
   final String? createdAt;
+  /// ISO timestamp when marked done (lightweight; survives when full record is omitted).
+  final String? completedAt;
   final String? note;
   final bool requireLocation;
+
+  /// Best available completion timestamp for UI chips.
+  String? get effectiveCompletedAt {
+    final top = completedAt?.trim();
+    if (top != null && top.isNotEmpty) return top;
+    final fromRecord = completionRecord?.completedAt.trim();
+    if (fromRecord != null && fromRecord.isNotEmpty) return fromRecord;
+    return null;
+  }
 
   factory TaskSubtask.fromJson(Map<String, dynamic> json) {
     final rawRecord = json['completionRecord'];
@@ -48,6 +60,13 @@ class TaskSubtask {
     } else if (rawRecord is Map) {
       recordMap = Map<String, dynamic>.from(rawRecord);
     }
+    final record = recordMap != null
+        ? SubtaskCompletionRecord.fromJson(recordMap)
+        : null;
+    final completedAt = _nullableString(json['completedAt']) ??
+        (record?.completedAt.trim().isNotEmpty == true
+            ? record!.completedAt
+            : null);
     return TaskSubtask(
       id: json['id']?.toString() ?? '',
       title: stripHtmlToPlainText(json['title']?.toString()),
@@ -60,11 +79,10 @@ class TaskSubtask {
       status: _nullableString(json['status']),
       priority: _nullableString(json['priority']),
       statusId: _nullableString(json['statusId']),
-      completionRecord: recordMap != null
-          ? SubtaskCompletionRecord.fromJson(recordMap)
-          : null,
+      completionRecord: record,
       reporterId: _nullableString(json['reporterId']),
       createdAt: _nullableString(json['createdAt']),
+      completedAt: completedAt,
       note: _nullableString(json['note']),
       requireLocation: json['requireLocation'] == true,
     );
@@ -73,17 +91,27 @@ class TaskSubtask {
   /// Prefer [server] fields, but keep a local completion stamp if the API
   /// response dropped it (common after older servers / web toggles).
   static TaskSubtask coalesce(TaskSubtask local, TaskSubtask server) {
-    final serverHasStamp =
-        server.completionRecord?.completedAt.trim().isNotEmpty == true;
-    final localHasStamp =
-        local.completionRecord?.completedAt.trim().isNotEmpty == true;
-    if (server.completed && !serverHasStamp && localHasStamp) {
-      // Do not re-apply repaired-away mass server stamps.
+    var next = server;
+    final serverStamp = server.effectiveCompletedAt;
+    final localStamp = local.effectiveCompletedAt;
+    if (server.completed &&
+        (serverStamp == null || serverStamp.isEmpty) &&
+        localStamp != null &&
+        localStamp.isNotEmpty) {
       final src = local.completionRecord?.deviceInfo['source']?.toString();
-      if (src == 'server') return server;
-      return server.copyWith(completionRecord: local.completionRecord);
+      if (src != 'server') {
+        next = next.copyWith(
+          completionRecord: local.completionRecord,
+          completedAt: localStamp,
+        );
+      }
+    } else if (server.completed &&
+        (server.completedAt == null || server.completedAt!.trim().isEmpty) &&
+        serverStamp != null &&
+        serverStamp.isNotEmpty) {
+      next = next.copyWith(completedAt: serverStamp);
     }
-    return server;
+    return next;
   }
 
   TaskSubtask copyWith({
@@ -102,6 +130,8 @@ class TaskSubtask {
     bool clearCompletionRecord = false,
     String? reporterId,
     String? createdAt,
+    String? completedAt,
+    bool clearCompletedAt = false,
     String? note,
     bool clearNote = false,
     bool clearDueDate = false,
@@ -124,6 +154,8 @@ class TaskSubtask {
           clearCompletionRecord ? null : (completionRecord ?? this.completionRecord),
       reporterId: reporterId ?? this.reporterId,
       createdAt: createdAt ?? this.createdAt,
+      completedAt:
+          clearCompletedAt ? null : (completedAt ?? this.completedAt),
       note: clearNote ? null : (note ?? this.note),
       requireLocation: requireLocation ?? this.requireLocation,
     );
