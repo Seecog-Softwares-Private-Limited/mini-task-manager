@@ -845,19 +845,22 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
     final subs = List<TaskSubtask>.from(prevTask.subtasks);
     final sub = subs[subIndex];
     final user = ref.read(sessionControllerProvider).user;
+    final stamp = value
+        ? SubtaskCompletionRecord.timestampOnly(
+            completedAt: DateTime.now(),
+            employeeId: user?.id ?? '',
+            employeeName: user?.fullName.trim().isNotEmpty == true
+                ? user!.fullName.trim()
+                : (user?.email ?? ''),
+          )
+        : null;
     subs[subIndex] = sub.copyWith(
       completed: value,
       status: value ? 'DONE' : (sub.status == 'DONE' ? 'TODO' : sub.status),
       clearCompletionRecord: !value,
-      completionRecord: value
-          ? SubtaskCompletionRecord.timestampOnly(
-              completedAt: DateTime.now(),
-              employeeId: user?.id ?? '',
-              employeeName: user?.fullName.trim().isNotEmpty == true
-                  ? user!.fullName.trim()
-                  : (user?.email ?? ''),
-            )
-          : null,
+      clearCompletedAt: !value,
+      completionRecord: stamp,
+      completedAt: stamp?.completedAt,
     );
     setState(() => _tasks[ti] = prevTask.copyWith(subtasks: subs));
     try {
@@ -1656,7 +1659,7 @@ class _SubtaskRow extends StatelessWidget {
 
 String? _completedAtLabel(TaskSubtask subtask) {
   if (!subtask.completed) return null;
-  final raw = subtask.completionRecord?.completedAt.trim();
+  final raw = subtask.effectiveCompletedAt;
   if (raw == null || raw.isEmpty) return null;
   final parsed = DateTime.tryParse(raw);
   if (parsed == null) return null;

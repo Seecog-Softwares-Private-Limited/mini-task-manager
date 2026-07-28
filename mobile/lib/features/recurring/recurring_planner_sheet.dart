@@ -13,6 +13,7 @@ import '../auth/session_controller.dart';
 import '../kanban/kanban_providers.dart';
 import '../kanban/task_detail_sheet.dart';
 import 'recurring_actions.dart';
+import 'recurring_editor_sheet.dart';
 import 'recurring_providers.dart';
 
 Future<void> showRecurringPlannerSheet({
@@ -261,52 +262,23 @@ class _RecurringPlannerSheetState extends ConsumerState<_RecurringPlannerSheet> 
 
   Future<void> _editSeries() async {
     if (!canManageRecurring(ref)) return;
-    final taskId = await _resolveEditTaskId();
-    if (!mounted) return;
-    if (taskId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No run to edit yet. Wait for the next scheduled run.'),
-        ),
-      );
-      return;
-    }
-    await _openTask(
-      context,
-      taskId,
-      mode: TaskDetailMode.full,
+    final orgId = ref.read(sessionControllerProvider).orgId;
+    if (orgId == null || orgId.isEmpty) return;
+
+    // Edit the planner template (title, schedule, checklist for future runs) —
+    // not a single occurrence/run task.
+    final saved = await showRecurringEditorSheet(
+      context: context,
+      organizationId: orgId,
+      projectId: projectId,
+      template: template,
     );
-  }
-
-  /// Prefer the soonest incomplete board run, else earliest history task.
-  Future<String?> _resolveEditTaskId() async {
-    final board = ref.read(recurringBoardTasksProvider).valueOrNull ?? const <Task>[];
-    final forTemplate = board
-        .where((t) => t.recurringTemplateId == template.id)
-        .toList()
-      ..sort((a, b) => (a.dueDate ?? '').compareTo(b.dueDate ?? ''));
-    if (forTemplate.isNotEmpty) return forTemplate.first.id;
-
-    try {
-      final history =
-          await ref.read(recurringTemplateHistoryProvider(template.id).future);
-      final withTask = history
-          .where((o) => o.taskId != null && o.taskId!.isNotEmpty)
-          .toList()
-        ..sort((a, b) {
-          final stateRank = (RecurringOccurrence o) {
-            final s = o.state.toUpperCase();
-            if (s == 'PENDING') return 0;
-            if (s == 'MISSED') return 1;
-            return 2;
-          };
-          final byState = stateRank(a).compareTo(stateRank(b));
-          if (byState != 0) return byState;
-          return a.sequenceNumber.compareTo(b.sequenceNumber);
-        });
-      return withTask.isEmpty ? null : withTask.first.taskId;
-    } catch (_) {
-      return null;
+    if (!mounted) return;
+    if (saved) {
+      ref.invalidate(recurringTemplatesProvider);
+      ref.invalidate(recurringSummaryProvider);
+      ref.invalidate(recurringTemplateHistoryProvider(template.id));
+      ref.invalidate(recurringBoardTasksProvider);
     }
   }
 

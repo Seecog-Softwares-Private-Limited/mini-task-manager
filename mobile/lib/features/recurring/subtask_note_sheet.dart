@@ -32,6 +32,7 @@ Future<SubtaskNoteSheetResult?> showSubtaskNoteSheet({
   required TaskSubtask subtask,
   required String taskId,
   required String organizationId,
+  String title = 'Comments',
 }) {
   final sheetKey = ValueKey<String>('subtask-notes-$taskId-${subtask.id}');
   return showModalBottomSheet<SubtaskNoteSheetResult>(
@@ -50,6 +51,7 @@ Future<SubtaskNoteSheetResult?> showSubtaskNoteSheet({
           subtask: subtask,
           taskId: taskId,
           organizationId: organizationId,
+          title: title,
         ),
       );
     },
@@ -62,11 +64,13 @@ class SubtaskNotesThreadSheet extends ConsumerStatefulWidget {
     required this.subtask,
     required this.taskId,
     required this.organizationId,
+    this.title = 'Comments',
   });
 
   final TaskSubtask subtask;
   final String taskId;
   final String organizationId;
+  final String title;
 
   @override
   ConsumerState<SubtaskNotesThreadSheet> createState() =>
@@ -547,7 +551,7 @@ class _SubtaskNotesThreadSheetState
                       Row(
                         children: [
                           Text(
-                            'Notes',
+                            widget.title,
                             style:
                                 Theme.of(context).textTheme.titleLarge?.copyWith(
                                       fontWeight: FontWeight.w700,
@@ -683,7 +687,7 @@ class _SubtaskNotesThreadSheetState
                       const SizedBox(height: AppSpacing.md),
                     ],
                     if (_roots.isEmpty)
-                      const _EmptyThread()
+                      _EmptyThread(title: widget.title)
                     else
                       ..._roots.map(_buildRootBubble),
                     if (_error != null) ...[
@@ -914,7 +918,7 @@ class _SubtaskNotesThreadSheetState
                       enabled: !_posting,
                       textInputAction: TextInputAction.newline,
                       decoration: InputDecoration(
-                        hintText: 'Add a note…',
+                        hintText: 'Write a comment…',
                         hintStyle: TextStyle(
                           color: AppColors.textMuted.withValues(alpha: 0.85),
                         ),
@@ -994,7 +998,9 @@ class _SectionLabel extends StatelessWidget {
 }
 
 class _EmptyThread extends StatelessWidget {
-  const _EmptyThread();
+  const _EmptyThread({required this.title});
+
+  final String title;
 
   @override
   Widget build(BuildContext context) {
@@ -1016,14 +1022,15 @@ class _EmptyThread extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.md),
           Text(
-            'No notes yet',
+            'No ${title.toLowerCase()} yet',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
           ),
           const SizedBox(height: 6),
           Text(
-            'Start the thread with why this was done or not done today.',
+            'Start a thread — text, paste, files, camera, or voice. '
+            'Replies can nest. Owners/admins and assignees can comment.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: AppColors.textMuted,

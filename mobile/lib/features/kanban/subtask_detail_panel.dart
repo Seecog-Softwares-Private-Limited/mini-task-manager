@@ -22,6 +22,7 @@ import 'assignee_picker_sheet.dart';
 
 import 'subtask_completion_utils.dart';
 import 'require_location_toggle.dart';
+import '../recurring/subtask_note_sheet.dart';
 
 typedef SubtaskCompletionRequest = Future<SubtaskCompletionRecord?> Function({
   required String subtaskId,
@@ -54,6 +55,7 @@ class SubtaskDetailPanel extends ConsumerStatefulWidget {
     required this.onSave,
     this.onDelete,
     this.onMove,
+    this.onNoteChanged,
     this.fallbackReporterId,
     this.fallbackCreatedAt,
     this.canEditRequireLocation = false,
@@ -77,6 +79,8 @@ class SubtaskDetailPanel extends ConsumerStatefulWidget {
   final VoidCallback? onDelete;
   /// Move this checklist item under another task in the same project.
   final VoidCallback? onMove;
+  /// Latest comment preview after the comments sheet closes.
+  final ValueChanged<String?>? onNoteChanged;
 
   @override
   ConsumerState<SubtaskDetailPanel> createState() => _SubtaskDetailPanelState();
@@ -96,6 +100,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
   String? _attachmentError;
   SubtaskCompletionRecord? _completionRecord;
   late bool _requireLocation;
+  String? _notePreview;
 
   @override
   void initState() {
@@ -110,6 +115,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     _assigneeIds = _storedAssigneeIds(widget.subtask);
     _requireLocation = widget.subtask.requireLocation;
     _completionRecord = widget.subtask.completionRecord;
+    _notePreview = widget.subtask.note;
     if (!widget.templateMode) {
       _loadAttachments();
     } else {
@@ -129,8 +135,12 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.subtask.id != widget.subtask.id) {
       _completionRecord = widget.subtask.completionRecord;
+      _notePreview = widget.subtask.note;
       _loadAttachments();
       return;
+    }
+    if (oldWidget.subtask.note != widget.subtask.note) {
+      _notePreview = widget.subtask.note;
     }
     final wasDone = isSubtaskDone(oldWidget.subtask);
     final isDone = isSubtaskDone(widget.subtask);
@@ -367,6 +377,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
           assigneeIds: _assigneeIds,
           assigneeId: _assigneeIds.isNotEmpty ? _assigneeIds.first : null,
           completionRecord: record,
+          completedAt: record.completedAt,
           requireLocation: _requireLocation,
         ),
       );
@@ -417,9 +428,46 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
         assigneeId: _assigneeIds.isNotEmpty ? _assigneeIds.first : null,
         completionRecord: completed ? record : null,
         clearCompletionRecord: !completed,
+        completedAt: completed ? record?.completedAt : null,
+        clearCompletedAt: !completed,
         requireLocation: widget.templateMode ? false : _requireLocation,
       ),
     );
+  }
+
+  Future<void> _openComments() async {
+    if (widget.templateMode || widget.saving) return;
+    final id = widget.subtask.id.trim();
+    if (id.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Save this checklist item before adding comments.'),
+        ),
+      );
+      return;
+    }
+    FocusManager.instance.primaryFocus?.unfocus();
+    final live = widget.subtask.copyWith(
+      title: _titleController.text.trim().isEmpty
+          ? widget.subtask.title
+          : _titleController.text.trim(),
+      note: _notePreview,
+    );
+    final result = await showSubtaskNoteSheet(
+      context: context,
+      subtask: live,
+      taskId: widget.taskId,
+      organizationId: widget.organizationId,
+      title: 'Comments',
+    );
+    if (!mounted || result == null) return;
+    final preview = result.latestNotePreview?.trim();
+    final next = result.hasNotes
+        ? (preview != null && preview.isNotEmpty ? preview : 'Comments')
+        : null;
+    setState(() => _notePreview = next);
+    widget.onNoteChanged?.call(next);
   }
 
   @override
@@ -427,282 +475,377 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     final dueDate = _parseDueDate(_dueDate);
     final priority = _findPriority(_priority);
     final assigneeCount = _assigneeIds.length;
+    final hasCommentPreview =
+        _notePreview != null && _notePreview!.trim().isNotEmpty;
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.04),
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.15)),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.9)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Text(
-                'Title',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textMuted,
-                      fontWeight: FontWeight.w600,
+          _PanelSection(
+            title: 'Details',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Title',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.textMuted,
+                            fontWeight: FontWeight.w600,
+                          ),
                     ),
-              ),
-              const Spacer(),
-              Text(
-                '${_titleController.text.length}/$subtaskTitleMaxLength',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: _titleController.text.length >= subtaskTitleMaxLength
-                          ? AppColors.danger
-                          : AppColors.textMuted,
+                    const Spacer(),
+                    Text(
+                      '${_titleController.text.length}/$subtaskTitleMaxLength',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: _titleController.text.length >=
+                                    subtaskTitleMaxLength
+                                ? AppColors.danger
+                                : AppColors.textMuted,
+                          ),
                     ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          TextField(
-            controller: _titleController,
-            enabled: !widget.saving,
-            maxLength: subtaskTitleMaxLength,
-            scrollPadding: EdgeInsets.zero,
-            decoration: InputDecoration(
-              hintText: 'Subtask title',
-              counterText: '',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            onChanged: (_) => setState(() {}),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'Description',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textMuted,
-                  fontWeight: FontWeight.w600,
+                  ],
                 ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          TextField(
-            controller: _descriptionController,
-            enabled: !widget.saving,
-            minLines: 4,
-            maxLines: 8,
-            scrollPadding: EdgeInsets.zero,
-            decoration: InputDecoration(
-              hintText: 'Add detailed notes...',
-              alignLabelWithHint: true,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          if (!widget.templateMode) ...[
-            Text(
-              'SUBTASK ATTACHMENTS',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    letterSpacing: 1.2,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textMuted,
+                const SizedBox(height: AppSpacing.xs),
+                TextField(
+                  controller: _titleController,
+                  enabled: !widget.saving,
+                  maxLength: subtaskTitleMaxLength,
+                  scrollPadding: EdgeInsets.zero,
+                  decoration: InputDecoration(
+                    hintText: 'Subtask title',
+                    counterText: '',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            AttachmentUploadActions(
-              disabled: widget.saving,
-              uploading: _uploadingAttachment,
-              onPickAndUpload: _pickAndUpload,
-            ),
-            if (_loadingAttachments)
-              const Padding(
-                padding: EdgeInsets.only(top: AppSpacing.sm),
-                child: LinearProgressIndicator(minHeight: 2),
-              )
-            else if (_attachments.isEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: AppSpacing.sm),
-                child: Text(
-                  'No subtask attachments yet',
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'Description',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppColors.textMuted,
+                        fontWeight: FontWeight.w600,
                       ),
                 ),
-              )
-            else
-              AttachmentGrid(
-                organizationId: widget.organizationId,
-                enabled: !widget.saving,
-                items: _attachments.asMap().entries.map(
-                  (entry) => AttachmentGridEntry(
-                    attachment: entry.value,
-                    index: entry.key + 1,
-                    onDelete: () => _deleteAttachment(entry.value.id),
-                  ),
-                ).toList(),
-              ),
-            if (_attachmentError != null) ...[
-              const SizedBox(height: AppSpacing.xs),
-              Text(_attachmentError!, style: const TextStyle(color: AppColors.danger)),
-            ],
-            const SizedBox(height: AppSpacing.md),
-          ],
-          Row(
-            children: [
-              if (!widget.templateMode) ...[
-                Expanded(
-                  child: _SubtaskDropdown<String>(
-                    label: 'Status',
-                    value: _status,
-                    enabled: !widget.saving && (widget.canComplete || _status == 'DONE'),
-                    items: _subtaskStatuses
-                        .map(
-                          (status) => DropdownMenuItem(
-                            value: status,
-                            enabled: widget.canComplete || status != 'DONE',
-                            child: Text(
-                              _labelForSubtaskStatus(status),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    selectedChild: Text(
-                      _labelForSubtaskStatus(_status),
-                      overflow: TextOverflow.ellipsis,
+                const SizedBox(height: AppSpacing.xs),
+                TextField(
+                  controller: _descriptionController,
+                  enabled: !widget.saving,
+                  minLines: 2,
+                  maxLines: 5,
+                  scrollPadding: EdgeInsets.zero,
+                  decoration: InputDecoration(
+                    hintText: 'Optional details (not the comment thread)',
+                    alignLabelWithHint: true,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    onChanged: _handleStatusChange,
                   ),
                 ),
-                const SizedBox(width: AppSpacing.sm),
               ],
-              Expanded(
-                child: _SubtaskDropdown<String>(
-                  label: 'Priority',
-                  value: priority.$1,
-                  enabled: !widget.saving,
-                  items: _priorities
-                      .map(
-                        (item) => DropdownMenuItem(
-                          value: item.$1,
-                          child: Row(
+            ),
+          ),
+          if (!widget.templateMode) ...[
+            const SizedBox(height: AppSpacing.md),
+            _PanelSection(
+              title: 'Comments',
+              child: Material(
+                color: AppColors.primary.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+                child: InkWell(
+                  onTap: widget.saving ? null : _openComments,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.sm + 2),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.forum_outlined,
+                            color: AppColors.primary,
+                            size: 22,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _StatusDot(color: _priorityColor(item.$1)),
-                              const SizedBox(width: 8),
-                              Flexible(child: Text(item.$2)),
+                              Text(
+                                hasCommentPreview
+                                    ? 'Open comments'
+                                    : 'Add comments',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                hasCommentPreview
+                                    ? _notePreview!
+                                    : 'Threaded replies · files · camera · voice · paste',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: AppColors.textMuted),
+                              ),
                             ],
                           ),
                         ),
-                      )
-                      .toList(),
-                  selectedChild: Row(
-                    children: [
-                      _StatusDot(color: _priorityColor(priority.$1)),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          priority.$2,
-                          overflow: TextOverflow.ellipsis,
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: AppColors.textMuted.withValues(alpha: 0.8),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                  onChanged: (value) => setState(() => _priority = value),
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Row(
-            children: [
-              if (widget.templateMode) ...[
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: widget.saving ? null : _pickDueTime,
-                    icon: const Icon(Icons.schedule_rounded, size: 18),
-                    label: Text(
-                      _dueTime == null
-                          ? 'Due time'
-                          : _formatDueTimeLabel(_dueTime!),
-                      overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _PanelSection(
+              title: 'Files',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AttachmentUploadActions(
+                    disabled: widget.saving,
+                    uploading: _uploadingAttachment,
+                    onPickAndUpload: _pickAndUpload,
+                  ),
+                  if (_loadingAttachments)
+                    const Padding(
+                      padding: EdgeInsets.only(top: AppSpacing.sm),
+                      child: LinearProgressIndicator(minHeight: 2),
+                    )
+                  else if (_attachments.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.sm),
+                      child: Text(
+                        'No files on this subtask yet',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.textMuted,
+                            ),
+                      ),
+                    )
+                  else
+                    AttachmentGrid(
+                      organizationId: widget.organizationId,
+                      enabled: !widget.saving,
+                      items: _attachments.asMap().entries.map(
+                        (entry) => AttachmentGridEntry(
+                          attachment: entry.value,
+                          index: entry.key + 1,
+                          onDelete: () => _deleteAttachment(entry.value.id),
+                        ),
+                      ).toList(),
                     ),
-                  ),
-                ),
-                if (_dueTime != null) ...[
-                  const SizedBox(width: AppSpacing.xs),
-                  IconButton(
-                    tooltip: 'Clear time',
-                    onPressed: widget.saving ? null : _clearDueTime,
-                    icon: const Icon(Icons.clear_rounded),
-                  ),
+                  if (_attachmentError != null) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      _attachmentError!,
+                      style: const TextStyle(color: AppColors.danger),
+                    ),
+                  ],
                 ],
-              ] else ...[
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: widget.saving ? null : _pickDueDate,
-                    icon: const Icon(Icons.calendar_today_rounded, size: 18),
-                    label: Text(
-                      dueDate == null
-                          ? 'Due date'
-                          : DateFormat('MMM d, yyyy').format(dueDate),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-                if (_dueDate != null) ...[
-                  const SizedBox(width: AppSpacing.xs),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: widget.saving ? null : _pickDueTime,
-                      icon: const Icon(Icons.schedule_rounded, size: 18),
-                      label: Text(
-                        _dueTime == null
-                            ? 'Time'
-                            : _formatDueTimeLabel(_dueTime!),
-                        overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.md),
+          _PanelSection(
+            title: 'Status & schedule',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    if (!widget.templateMode) ...[
+                      Expanded(
+                        child: _SubtaskDropdown<String>(
+                          label: 'Status',
+                          value: _status,
+                          enabled: !widget.saving &&
+                              (widget.canComplete || _status == 'DONE'),
+                          items: _subtaskStatuses
+                              .map(
+                                (status) => DropdownMenuItem(
+                                  value: status,
+                                  enabled:
+                                      widget.canComplete || status != 'DONE',
+                                  child: Text(
+                                    _labelForSubtaskStatus(status),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          selectedChild: Text(
+                            _labelForSubtaskStatus(_status),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          onChanged: _handleStatusChange,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                    ],
+                    Expanded(
+                      child: _SubtaskDropdown<String>(
+                        label: 'Priority',
+                        value: priority.$1,
+                        enabled: !widget.saving,
+                        items: _priorities
+                            .map(
+                              (item) => DropdownMenuItem(
+                                value: item.$1,
+                                child: Row(
+                                  children: [
+                                    _StatusDot(color: _priorityColor(item.$1)),
+                                    const SizedBox(width: 8),
+                                    Flexible(child: Text(item.$2)),
+                                  ],
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        selectedChild: Row(
+                          children: [
+                            _StatusDot(color: _priorityColor(priority.$1)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                priority.$2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        onChanged: (value) => setState(() => _priority = value),
                       ),
                     ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  children: [
+                    if (widget.templateMode) ...[
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: widget.saving ? null : _pickDueTime,
+                          icon: const Icon(Icons.schedule_rounded, size: 18),
+                          label: Text(
+                            _dueTime == null
+                                ? 'Due time'
+                                : _formatDueTimeLabel(_dueTime!),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                      if (_dueTime != null) ...[
+                        const SizedBox(width: AppSpacing.xs),
+                        IconButton(
+                          tooltip: 'Clear time',
+                          onPressed: widget.saving ? null : _clearDueTime,
+                          icon: const Icon(Icons.clear_rounded),
+                        ),
+                      ],
+                    ] else ...[
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: widget.saving ? null : _pickDueDate,
+                          icon:
+                              const Icon(Icons.calendar_today_rounded, size: 18),
+                          label: Text(
+                            dueDate == null
+                                ? 'Due date'
+                                : DateFormat('MMM d, yyyy').format(dueDate),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                      if (_dueDate != null) ...[
+                        const SizedBox(width: AppSpacing.xs),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: widget.saving ? null : _pickDueTime,
+                            icon: const Icon(Icons.schedule_rounded, size: 18),
+                            label: Text(
+                              _dueTime == null
+                                  ? 'Time'
+                                  : _formatDueTimeLabel(_dueTime!),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                    const SizedBox(width: AppSpacing.sm),
+                    OutlinedButton(
+                      onPressed: widget.saving ? null : _openAssigneeSheet,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        minimumSize: const Size(40, 40),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.person_add_alt_1_rounded, size: 18),
+                          if (assigneeCount > 0) ...[
+                            const SizedBox(width: 6),
+                            Text('$assigneeCount'),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (!widget.templateMode && _dueDate != null)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton(
+                      onPressed: widget.saving
+                          ? null
+                          : (_dueTime != null ? _clearDueTime : _clearDueDate),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                      child:
+                          Text(_dueTime != null ? 'Clear time' : 'Clear date'),
+                    ),
+                  ),
+                if (!widget.templateMode && !widget.canComplete) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    'Only assigned members can mark this as Done.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.warning,
+                        ),
                   ),
                 ],
               ],
-              const SizedBox(width: AppSpacing.sm),
-              OutlinedButton(
-                onPressed: widget.saving ? null : _openAssigneeSheet,
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  minimumSize: const Size(40, 40),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.person_add_alt_1_rounded, size: 18),
-                    if (assigneeCount > 0) ...[
-                      const SizedBox(width: 6),
-                      Text('$assigneeCount'),
-                    ],
-                  ],
-                ),
-              ),
-            ],
+            ),
           ),
-          if (!widget.templateMode && _dueDate != null) ...[
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                onPressed: widget.saving
-                    ? null
-                    : (_dueTime != null ? _clearDueTime : _clearDueDate),
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  visualDensity: VisualDensity.compact,
-                ),
-                child: Text(_dueTime != null ? 'Clear time' : 'Clear date'),
-              ),
-            ),
-          ],
-          if (!widget.templateMode && !widget.canComplete) ...[
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'Only assigned team members can mark this subtask as Done.',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.warning),
-            ),
-          ],
           if (!widget.templateMode) ...[
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpacing.md),
             RequireLocationToggle(
               value: _requireLocation,
               enabled: !widget.saving && widget.canEditRequireLocation,
@@ -726,8 +869,8 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
             const SizedBox(height: AppSpacing.md),
             _buildReporterBadge(context),
           ],
-          const SizedBox(height: AppSpacing.md),
           if (widget.onMove != null) ...[
+            const SizedBox(height: AppSpacing.sm),
             Align(
               alignment: Alignment.centerLeft,
               child: TextButton.icon(
@@ -736,8 +879,8 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
                 label: const Text('Move to another task'),
               ),
             ),
-            const SizedBox(height: AppSpacing.xs),
           ],
+          const SizedBox(height: AppSpacing.md),
           Row(
             children: [
               if (widget.onDelete != null)
@@ -1194,6 +1337,35 @@ class _CompletionRecordCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PanelSection extends StatelessWidget {
+  const _PanelSection({
+    required this.title,
+    required this.child,
+  });
+
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title.toUpperCase(),
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                letterSpacing: 1.1,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textMuted,
+              ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        child,
+      ],
     );
   }
 }
