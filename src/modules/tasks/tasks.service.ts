@@ -1,5 +1,7 @@
 import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectDataSource } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
 import { TasksRepository } from './repositories/tasks.repository';
 import { TaskCommentsRepository } from './repositories/task-comments.repository';
 import { SubtaskCommentsRepository } from './repositories/subtask-comments.repository';
@@ -157,6 +159,8 @@ export class TasksService {
     private readonly orgEventsService: OrgEventsService,
     @Inject(forwardRef(() => TaskNotificationsService))
     private readonly taskNotifications: TaskNotificationsService,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
 
   async findById(id: string): Promise<TaskEntity | null> {
@@ -946,7 +950,14 @@ export class TasksService {
       requireLocation?: boolean;
     }>,
     context?: {
-      existing?: Array<{ id?: string; reporterId?: string; createdAt?: string }> | null;
+      existing?: Array<{
+        id?: string;
+        reporterId?: string;
+        createdAt?: string;
+        status?: string;
+        completed?: boolean;
+        completionRecord?: Record<string, any>;
+      }> | null;
       currentUserId?: string;
     },
   ): Array<{
@@ -991,6 +1002,31 @@ export class TasksService {
         const dueTime = /^([01]\d|2[0-3]):[0-5]\d/.test(dueTimeRaw)
           ? dueTimeRaw.slice(0, 5)
           : undefined;
+
+        // completionRecord: keep client value, else preserve existing while DONE,
+        // else auto-stamp when newly completed (e.g. website toggle with no record).
+        let completionRecord: Record<string, any> | undefined;
+        if (status === 'DONE') {
+          if (s.completionRecord && typeof s.completionRecord === 'object') {
+            completionRecord = s.completionRecord;
+          } else if (
+            prior?.completionRecord &&
+            typeof prior.completionRecord === 'object'
+          ) {
+            completionRecord = prior.completionRecord;
+          } else {
+            completionRecord = {
+              completedAt: nowIso,
+              employeeId: context?.currentUserId ?? '',
+              employeeName: '',
+              latitude: 0,
+              longitude: 0,
+              geofenceValid: false,
+              deviceInfo: { source: 'server' },
+            };
+          }
+        }
+
         return {
           id: s.id ?? generateUuid(),
           title: s.title?.trim() ?? '',
@@ -1002,9 +1038,7 @@ export class TasksService {
           ...(dueTime ? { dueTime } : {}),
           ...(s.priority ? { priority: s.priority } : {}),
           ...(s.statusId ? { statusId: s.statusId } : {}),
-          ...(s.completionRecord && typeof s.completionRecord === 'object'
-            ? { completionRecord: s.completionRecord }
-            : {}),
+          ...(completionRecord ? { completionRecord } : {}),
           ...(reporterId ? { reporterId } : {}),
           createdAt,
           ...(typeof s.note === 'string' && s.note.trim().length
@@ -1237,6 +1271,139 @@ export class TasksService {
     const found = task.subtasks?.some((s) => s.id === trimmedSubtaskId);
     if (!found) throw new NotFoundException('Checklist item not found');
     return task;
+  }
+
+  /**
+   * Move a checklist item from one task to another within the same project.
+   * Notes (subtask_comments) and related attachments follow the subtask.
+   */
+  async moveSubtask(params: {
+    sourceTaskId: string;
+    subtaskId: string;
+    targetTaskId: string;
+    organizationId: string;
+    userId: string;
+  }): Promise<{ source: TaskEntity; target: TaskEntity }> {
+    const { organizationId, userId } = params;
+    const sourceTaskId = params.sourceTaskId.trim();
+    const targetTaskId = params.targetTaskId.trim();
+    const subtaskId = params.subtaskId.trim();
+
+    if (!subtaskId) {
+      throw new BadRequestException('Checklist item id is required');
+    }
+    if (!targetTaskId) {
+      throw new BadRequestException('Target task id is required');
+    }
+    if (sourceTaskId === targetTaskId) {
+      throw new BadRequestException(
+        'Choose a different task to move this checklist item into',
+      );
+    }
+
+    const source = await this.tasksRepository.findByIdAndOrganization(
+      sourceTaskId,
+      organizationId,
+    );
+    if (!source) throw new NotFoundException('Source task not found');
+
+    const target = await this.tasksRepository.findByIdAndOrganization(
+      targetTaskId,
+      organizationId,
+    );
+    if (!target) throw new NotFoundException('Target task not found');
+
+    if (source.projectId !== target.projectId) {
+      throw new BadRequestException(
+        'Checklist items can only be moved between tasks in the same project',
+      );
+    }
+
+    await this.assertCanUpdateTask(source, organizationId, userId, {
+      subtasks: source.subtasks ?? [],
+    } as PatchTaskDto);
+    await this.assertCanUpdateTask(target, organizationId, userId, {
+      subtasks: target.subtasks ?? [],
+    } as PatchTaskDto);
+
+    const sourceSubs = [...(source.subtasks ?? [])];
+    const index = sourceSubs.findIndex((s) => s.id === subtaskId);
+    if (index < 0) {
+      throw new NotFoundException('Checklist item not found on source task');
+    }
+
+    const [moved] = sourceSubs.splice(index, 1);
+    const targetSubs = [...(target.subtasks ?? [])];
+    if (targetSubs.some((s) => s.id === subtaskId)) {
+      throw new BadRequestException('Target task already has this checklist item');
+    }
+    targetSubs.push(moved);
+
+    const noteRows = await this.subtaskCommentsRepository.findAllBySubtask(
+      sourceTaskId,
+      subtaskId,
+    );
+    const noteIds = noteRows.map((c) => c.id);
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(TaskEntity).update(sourceTaskId, {
+        subtasks: sourceSubs.length ? sourceSubs : null,
+      } as never);
+      await manager.getRepository(TaskEntity).update(targetTaskId, {
+        subtasks: targetSubs,
+      } as never);
+
+      await manager.getRepository(SubtaskCommentEntity).update(
+        { taskId: sourceTaskId, subtaskId },
+        { taskId: targetTaskId },
+      );
+
+      await manager.query(
+        `UPDATE attachments
+         SET task_id = UNHEX(REPLACE(?, '-', ''))
+         WHERE entity_type = 'SUBTASK'
+           AND entity_id = ?
+           AND task_id = UNHEX(REPLACE(?, '-', ''))
+           AND is_deleted = 0`,
+        [targetTaskId, subtaskId, sourceTaskId],
+      );
+
+      if (noteIds.length > 0) {
+        const placeholders = noteIds.map(() => '?').join(', ');
+        await manager.query(
+          `UPDATE attachments
+           SET task_id = UNHEX(REPLACE(?, '-', ''))
+           WHERE entity_type = 'SUBTASK_COMMENT'
+             AND entity_id IN (${placeholders})
+             AND task_id = UNHEX(REPLACE(?, '-', ''))
+             AND is_deleted = 0`,
+          [targetTaskId, ...noteIds, sourceTaskId],
+        );
+      }
+    });
+
+    this.activityLogsService
+      .log({
+        organizationId,
+        userId,
+        entityType: 'task',
+        entityId: sourceTaskId,
+        action: 'update',
+        metadata: {
+          name: source.title,
+          movedSubtaskId: subtaskId,
+          toTaskId: targetTaskId,
+        },
+      })
+      .catch(() => {});
+
+    const refreshedSource =
+      (await this.tasksRepository.findByIdAndOrganization(sourceTaskId, organizationId)) ??
+      source;
+    const refreshedTarget =
+      (await this.tasksRepository.findByIdAndOrganization(targetTaskId, organizationId)) ??
+      target;
+    return { source: refreshedSource, target: refreshedTarget };
   }
 
   /**

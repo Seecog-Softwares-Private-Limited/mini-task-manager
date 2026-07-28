@@ -21,6 +21,7 @@ import { getClipboardImageFile, validateTaskPasteImageFile } from "@/lib/task-cl
 import { normalizePastedScreenshotFile } from "@/lib/screenshot-filename";
 import { resolveSubtaskStatus, subtaskWithStatus, type SubtaskStatus } from "@/lib/subtask-status";
 import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import type { TaskSubtask, OrgMember } from "@/types/api";
 import { generateClientId } from "@/lib/generate-client-id";
 import { uploadEntityAttachment } from "@/services/api/entity-attachments.api";
@@ -46,6 +47,7 @@ export type SubtaskDraft = Pick<
   | "status"
   | "priority"
   | "requireLocation"
+  | "completionRecord"
 >;
 
 interface SubtaskDetailPanelProps {
@@ -94,6 +96,7 @@ export function SubtaskDetailPanel({
   onCancel,
 }: SubtaskDetailPanelProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [draft, setDraft] = React.useState(initialDraft);
   const [discardConfirmOpen, setDiscardConfirmOpen] = React.useState(false);
@@ -164,7 +167,10 @@ export function SubtaskDetailPanel({
 
   const handleStatusChange = (status: SubtaskStatus) => {
     setDraft((prev) => {
-      const next = subtaskWithStatus(prev, status);
+      const next = subtaskWithStatus(prev, status, {
+        id: user?.id ?? "",
+        name: user?.fullName ?? user?.email ?? "",
+      });
       onDraftChange?.(next);
       return next;
     });

@@ -1,4 +1,4 @@
-import type { TaskSubtask } from "@/types/api";
+import type { SubtaskCompletionRecord, TaskSubtask } from "@/types/api";
 
 export type SubtaskStatus = "TODO" | "IN_PROGRESS" | "DONE";
 
@@ -26,30 +26,53 @@ export function resolveSubtaskStatus(subtask: {
   return "TODO";
 }
 
-export function subtaskWithStatus<T extends Pick<TaskSubtask, "status" | "completed">>(
-  subtask: T,
-  status: SubtaskStatus
-): T {
+function lightweightCompletionStamp(actor?: {
+  id?: string;
+  name?: string;
+}): SubtaskCompletionRecord {
   return {
+    completedAt: new Date().toISOString(),
+    employeeId: actor?.id ?? "",
+    employeeName: actor?.name ?? "",
+    latitude: 0,
+    longitude: 0,
+    geofenceValid: false,
+    deviceInfo: { source: "web" },
+  };
+}
+
+export function subtaskWithStatus<
+  T extends Pick<TaskSubtask, "status" | "completed"> & {
+    completionRecord?: TaskSubtask["completionRecord"];
+  },
+>(subtask: T, status: SubtaskStatus, actor?: { id?: string; name?: string }): T {
+  const next: T = {
     ...subtask,
     status,
     completed: status === "DONE",
   };
+  if (status === "DONE") {
+    return {
+      ...next,
+      completionRecord: subtask.completionRecord ?? lightweightCompletionStamp(actor),
+    };
+  }
+  return {
+    ...next,
+    completionRecord: null,
+  };
 }
 
-export function subtaskWithCompleted<T extends Pick<TaskSubtask, "status" | "completed">>(
-  subtask: T,
-  completed: boolean
-): T {
+export function subtaskWithCompleted<
+  T extends Pick<TaskSubtask, "status" | "completed"> & {
+    completionRecord?: TaskSubtask["completionRecord"];
+  },
+>(subtask: T, completed: boolean, actor?: { id?: string; name?: string }): T {
   const current = resolveSubtaskStatus(subtask);
   const status: SubtaskStatus = completed
     ? "DONE"
     : current === "DONE"
       ? "TODO"
       : current;
-  return {
-    ...subtask,
-    status,
-    completed,
-  };
+  return subtaskWithStatus(subtask, status, actor);
 }

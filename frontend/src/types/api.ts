@@ -188,6 +188,27 @@ export interface RecurringTaskOccurrence {
 
 export type SubtaskStatus = "TODO" | "IN_PROGRESS" | "DONE";
 
+/** Proof / audit payload written when a checklist item is marked done. */
+export interface SubtaskCompletionRecord {
+  completedAt: string;
+  employeeId?: string;
+  employeeName?: string;
+  employeeEmail?: string;
+  latitude?: number;
+  longitude?: number;
+  accuracyMeters?: number;
+  geofenceValid?: boolean;
+  geofenceDistanceMeters?: number;
+  geofenceRadiusMeters?: number;
+  geofenceSiteId?: string;
+  deviceInfo?: Record<string, unknown>;
+  notes?: string;
+  beforePhotoFileNames?: string[];
+  afterPhotoFileNames?: string[];
+  voiceNoteFileName?: string;
+  videoFileName?: string;
+}
+
 export interface TaskSubtask {
   id: string;
   title: string;
@@ -209,6 +230,8 @@ export interface TaskSubtask {
   note?: string;
   /** When true, completing this subtask requires GPS/geofence. */
   requireLocation?: boolean;
+  /** Set when marked done (mobile site-proof or lightweight web/server stamp). */
+  completionRecord?: SubtaskCompletionRecord | null;
 }
 
 export type EntityAttachmentType = "TASK" | "SUBTASK" | "SUBTASK_COMMENT";

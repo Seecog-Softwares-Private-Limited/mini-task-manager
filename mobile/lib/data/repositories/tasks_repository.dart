@@ -216,6 +216,33 @@ class TasksRepository {
     throw ApiException.fromDio(lastError!);
   }
 
+  /// Move a checklist item to another task in the same project.
+  Future<({Task source, Task target})> moveSubtask({
+    required String sourceTaskId,
+    required String subtaskId,
+    required String targetTaskId,
+  }) async {
+    try {
+      final response = await _api.dio.post<Map<String, dynamic>>(
+        '/tasks/$sourceTaskId/subtasks/$subtaskId/move',
+        data: {'targetTaskId': targetTaskId},
+      );
+      final body = response.data ?? const {};
+      final sourceJson = body['source'];
+      final targetJson = body['target'];
+      if (sourceJson is! Map<String, dynamic> ||
+          targetJson is! Map<String, dynamic>) {
+        throw const ApiException(message: 'Invalid move subtask response');
+      }
+      return (
+        source: Task.fromJson(sourceJson),
+        target: Task.fromJson(targetJson),
+      );
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
   Map<String, dynamic> _buildUpdatePayload({
     String? title,
     String? description,
