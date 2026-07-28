@@ -206,7 +206,9 @@ class TasksRepository {
         if (subtasks == null) break;
         final forbidden = _forbiddenSubtaskProperties(error)
           // Never silently drop location — that makes the toggle look broken.
-          ..remove('requireLocation');
+          ..remove('requireLocation')
+          // Never drop completion timestamps — chips would vanish after save.
+          ..remove('completionRecord');
         final next = forbidden.difference(omitSubtaskKeys);
         if (next.isEmpty) break;
         omitSubtaskKeys.addAll(next);

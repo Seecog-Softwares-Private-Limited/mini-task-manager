@@ -985,7 +985,7 @@ export class TasksService {
         .map((s) => [String(s.id), s] as const),
     );
     const nowIso = new Date().toISOString();
-    return subtasks
+    const normalized = subtasks
       .map((s) => {
         const description = s.description?.trim();
         const status = this.normalizeSubtaskStatus(s);
@@ -1004,7 +1004,8 @@ export class TasksService {
           : undefined;
 
         // completionRecord: keep client value, else preserve existing while DONE,
-        // else auto-stamp when newly completed (e.g. website toggle with no record).
+        // else auto-stamp only when newly transitioning to DONE (never mass-stamp
+        // every already-done item on an unrelated checklist save).
         let completionRecord: Record<string, any> | undefined;
         if (status === 'DONE') {
           if (s.completionRecord && typeof s.completionRecord === 'object') {
@@ -1015,15 +1016,21 @@ export class TasksService {
           ) {
             completionRecord = prior.completionRecord;
           } else {
-            completionRecord = {
-              completedAt: nowIso,
-              employeeId: context?.currentUserId ?? '',
-              employeeName: '',
-              latitude: 0,
-              longitude: 0,
-              geofenceValid: false,
-              deviceInfo: { source: 'server' },
-            };
+            const priorStatus = prior
+              ? this.normalizeSubtaskStatus(prior)
+              : null;
+            const newlyCompleted = priorStatus !== 'DONE';
+            if (newlyCompleted) {
+              completionRecord = {
+                completedAt: new Date().toISOString(),
+                employeeId: context?.currentUserId ?? '',
+                employeeName: '',
+                latitude: 0,
+                longitude: 0,
+                geofenceValid: false,
+                deviceInfo: { source: 'server' },
+              };
+            }
           }
         }
 
@@ -1048,6 +1055,33 @@ export class TasksService {
         };
       })
       .filter((s) => s.title.length > 0);
+
+    // Undo accidental mass-stamps: older logic stamped every DONE item missing a
+    // record with the same completedAt on one PATCH. Drop duplicate server stamps.
+    const serverStampCounts = new Map<string, number>();
+    for (const s of normalized) {
+      const rec = s.completionRecord;
+      if (!rec || typeof rec !== 'object') continue;
+      const src = (rec as { deviceInfo?: { source?: string } }).deviceInfo?.source;
+      const at = (rec as { completedAt?: string }).completedAt;
+      if (src === 'server' && typeof at === 'string' && at.length > 0) {
+        serverStampCounts.set(at, (serverStampCounts.get(at) ?? 0) + 1);
+      }
+    }
+    if (![...serverStampCounts.values()].some((n) => n > 1)) {
+      return normalized;
+    }
+    return normalized.map((s) => {
+      const rec = s.completionRecord;
+      if (!rec || typeof rec !== 'object') return s;
+      const src = (rec as { deviceInfo?: { source?: string } }).deviceInfo?.source;
+      const at = (rec as { completedAt?: string }).completedAt;
+      if (src === 'server' && typeof at === 'string' && (serverStampCounts.get(at) ?? 0) > 1) {
+        const { completionRecord: _drop, ...rest } = s;
+        return rest;
+      }
+      return s;
+    });
   }
 
   async getComments(taskId: string) {

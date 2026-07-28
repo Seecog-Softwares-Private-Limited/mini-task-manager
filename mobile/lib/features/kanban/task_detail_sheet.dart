@@ -713,8 +713,12 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     final merged = <TaskSubtask>[];
     final seen = <String>{};
     for (final local in localOrder) {
-      final next = byId[local.id] ?? local;
-      merged.add(next);
+      final fromServer = byId[local.id];
+      merged.add(
+        fromServer == null
+            ? local
+            : TaskSubtask.coalesce(local, fromServer),
+      );
       seen.add(local.id);
     }
     for (final s in server) {
