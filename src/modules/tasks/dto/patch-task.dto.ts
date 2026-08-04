@@ -121,6 +121,19 @@ class PatchTaskSubtaskDto {
   @MaxLength(40)
   createdAt?: string;
 
+  /**
+   * Lightweight done timestamp clients may echo (mobile chips). Prefer
+   * completionRecord.completedAt when both are present; accepted so PATCH
+   * does not fail with "property completedAt should not exist".
+   */
+  @Allow()
+  @IsOptional()
+  @Transform(emptyStrToUndef)
+  @ValidateIf((_o, v) => v != null && v !== '')
+  @IsString()
+  @MaxLength(40)
+  completedAt?: string;
+
   @IsOptional()
   @IsObject()
   completionRecord?: Record<string, unknown>;

@@ -946,6 +946,8 @@ export class TasksService {
       completionRecord?: Record<string, any>;
       reporterId?: string;
       createdAt?: string;
+      /** Top-level done stamp (mobile); mirrored into/from completionRecord. */
+      completedAt?: string;
       note?: string;
       requireLocation?: boolean;
     }>,
@@ -954,6 +956,7 @@ export class TasksService {
         id?: string;
         reporterId?: string;
         createdAt?: string;
+        completedAt?: string;
         status?: string;
         completed?: boolean;
         completionRecord?: Record<string, any>;
@@ -975,6 +978,7 @@ export class TasksService {
     completionRecord?: Record<string, any>;
     reporterId?: string;
     createdAt?: string;
+    completedAt?: string;
     note?: string;
     requireLocation?: boolean;
   }> {
@@ -1006,10 +1010,23 @@ export class TasksService {
         // completionRecord: keep client value, else preserve existing while DONE,
         // else auto-stamp only when newly transitioning to DONE (never mass-stamp
         // every already-done item on an unrelated checklist save).
+        const clientCompletedAt =
+          typeof s.completedAt === 'string' && s.completedAt.trim().length
+            ? s.completedAt.trim().slice(0, 40)
+            : undefined;
         let completionRecord: Record<string, any> | undefined;
         if (status === 'DONE') {
           if (s.completionRecord && typeof s.completionRecord === 'object') {
-            completionRecord = s.completionRecord;
+            completionRecord = { ...s.completionRecord };
+            if (
+              clientCompletedAt &&
+              !(
+                typeof completionRecord.completedAt === 'string' &&
+                completionRecord.completedAt.trim().length
+              )
+            ) {
+              completionRecord.completedAt = clientCompletedAt;
+            }
           } else if (
             prior?.completionRecord &&
             typeof prior.completionRecord === 'object'
@@ -1020,9 +1037,9 @@ export class TasksService {
               ? this.normalizeSubtaskStatus(prior)
               : null;
             const newlyCompleted = priorStatus !== 'DONE';
-            if (newlyCompleted) {
+            if (newlyCompleted || clientCompletedAt) {
               completionRecord = {
-                completedAt: new Date().toISOString(),
+                completedAt: clientCompletedAt ?? new Date().toISOString(),
                 employeeId: context?.currentUserId ?? '',
                 employeeName: '',
                 latitude: 0,
@@ -1033,6 +1050,18 @@ export class TasksService {
             }
           }
         }
+
+        const completedAt =
+          status === 'DONE'
+            ? (typeof completionRecord?.completedAt === 'string' &&
+              completionRecord.completedAt.trim().length
+                ? completionRecord.completedAt.trim().slice(0, 40)
+                : clientCompletedAt ??
+                  (typeof prior?.completedAt === 'string' &&
+                  prior.completedAt.trim().length
+                    ? prior.completedAt.trim().slice(0, 40)
+                    : undefined))
+            : undefined;
 
         return {
           id: s.id ?? generateUuid(),
@@ -1048,6 +1077,7 @@ export class TasksService {
           ...(completionRecord ? { completionRecord } : {}),
           ...(reporterId ? { reporterId } : {}),
           createdAt,
+          ...(completedAt ? { completedAt } : {}),
           ...(typeof s.note === 'string' && s.note.trim().length
             ? { note: s.note.trim().slice(0, 2000) }
             : {}),
