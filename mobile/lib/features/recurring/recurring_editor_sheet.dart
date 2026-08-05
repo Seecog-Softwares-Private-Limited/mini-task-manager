@@ -70,6 +70,8 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
   String _endType = 'NEVER';
   DateTime? _endDate;
   TimeOfDay? _dueTime;
+  /// Minutes before due time. null = off.
+  int? _notifyMinutesBefore;
 
   final List<TaskSubtask> _checklist = [];
   int? _expandedSubtaskIndex;
@@ -117,6 +119,15 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
           _dueTime = TimeOfDay(hour: hour, minute: minute);
         }
       }
+      final rawNotify = t.rawRuleConfig?['notifyMinutesBefore'];
+      if (rawNotify != null) {
+        final parsed = rawNotify is num
+            ? rawNotify.toInt()
+            : int.tryParse(rawNotify.toString());
+        if (parsed != null && parsed >= 0 && parsed <= 24 * 60) {
+          _notifyMinutesBefore = parsed;
+        }
+      }
       for (final item in t.templateSubtasks) {
         final title = item.title.trim();
         if (title.isEmpty) continue;
@@ -131,6 +142,7 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
             priority: item.priority ?? 'MEDIUM',
             description: item.description,
             dueTime: item.dueTime,
+            notifyMinutesBefore: item.notifyMinutesBefore,
             assigneeIds: item.assigneeIds,
             assigneeId: item.assigneeId ??
                 (item.assigneeIds.isNotEmpty ? item.assigneeIds.first : null),
@@ -179,6 +191,7 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
               priority: item.priority ?? 'MEDIUM',
               description: item.description,
               dueTime: item.dueTime,
+              notifyMinutesBefore: item.notifyMinutesBefore,
               assigneeIds: item.assigneeIds.isNotEmpty
                   ? item.assigneeIds
                   : (item.assigneeId != null && item.assigneeId!.isNotEmpty
@@ -249,8 +262,14 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
       final m = _dueTime!.minute.toString().padLeft(2, '0');
       base['dueTime'] = '$h:$m';
       base['dueLogic'] = 'DUE_TIME';
+      if (_notifyMinutesBefore != null) {
+        base['notifyMinutesBefore'] = _notifyMinutesBefore;
+      } else {
+        base.remove('notifyMinutesBefore');
+      }
     } else {
       base.remove('dueTime');
+      base.remove('notifyMinutesBefore');
       if (base['dueLogic'] == 'DUE_TIME') {
         base['dueLogic'] = 'DUE_DATE';
       }
@@ -280,6 +299,10 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
         if (assigneeIds.isNotEmpty) 'assigneeId': assigneeIds.first,
         if (item.dueTime != null && item.dueTime!.trim().isNotEmpty)
           'dueTime': item.dueTime,
+        if (item.notifyMinutesBefore != null &&
+            item.dueTime != null &&
+            item.dueTime!.trim().isNotEmpty)
+          'notifyMinutesBefore': item.notifyMinutesBefore,
       });
     }
     return result;
@@ -668,12 +691,73 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
                   if (_dueTime != null)
                     IconButton(
                       tooltip: 'Clear time',
-                      onPressed:
-                          _loading ? null : () => setState(() => _dueTime = null),
+                      onPressed: _loading
+                          ? null
+                          : () => setState(() {
+                                _dueTime = null;
+                                _notifyMinutesBefore = null;
+                              }),
                       icon: const Icon(Icons.clear_rounded),
                     ),
                 ],
               ),
+              if (_dueTime != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                Text('Notify checklist members', style: labelStyle),
+                const SizedBox(height: AppSpacing.xs),
+                DropdownButtonFormField<int?>(
+                  value: _notifyMinutesBefore,
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                  ),
+                  items: const [
+                    DropdownMenuItem<int?>(
+                      value: null,
+                      child: Text('Off'),
+                    ),
+                    DropdownMenuItem<int?>(
+                      value: 0,
+                      child: Text('At due time'),
+                    ),
+                    DropdownMenuItem<int?>(
+                      value: 5,
+                      child: Text('5 minutes before'),
+                    ),
+                    DropdownMenuItem<int?>(
+                      value: 15,
+                      child: Text('15 minutes before'),
+                    ),
+                    DropdownMenuItem<int?>(
+                      value: 30,
+                      child: Text('30 minutes before'),
+                    ),
+                    DropdownMenuItem<int?>(
+                      value: 60,
+                      child: Text('1 hour before'),
+                    ),
+                    DropdownMenuItem<int?>(
+                      value: 120,
+                      child: Text('2 hours before'),
+                    ),
+                  ],
+                  onChanged: _loading
+                      ? null
+                      : (value) =>
+                          setState(() => _notifyMinutesBefore = value),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Notifies ritual checklist assignees with the ritual title only.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.textMuted,
+                      ),
+                ),
+              ],
               const SizedBox(height: AppSpacing.md),
               Text('Assignees', style: labelStyle),
               const SizedBox(height: AppSpacing.xs),
@@ -738,7 +822,7 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
                     ),
                   ),
                   child: Text(
-                    'Break the planner into checklist steps. Each item can have its own owners and due time.',
+                    'Break the planner into checklist steps. Each item can have its own owners, due time, and notify setting.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: AppColors.textMuted,
                         ),

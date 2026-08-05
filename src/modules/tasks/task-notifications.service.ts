@@ -78,6 +78,47 @@ export class TaskNotificationsService {
     );
   }
 
+  /** Title-only push (+ in-app) for ritual / checklist due reminders. */
+  async notifyRitualDue(params: {
+    title: string;
+    recipientIds: string[];
+    taskId: string;
+    projectId: string;
+    organizationId: string;
+    occurrenceId: string;
+    subtaskId?: string;
+  }): Promise<void> {
+    const title = params.title.trim() || 'Ritual';
+    const uniqueIds = [
+      ...new Set(
+        params.recipientIds
+          .map((id) => formatUuid(id) ?? id.trim())
+          .filter((id) => !!id),
+      ),
+    ];
+    await Promise.all(
+      uniqueIds.map((userId) =>
+        this.notificationsService
+          .createNotification(userId, title, '', {
+            type: params.subtaskId ? 'checklist_reminder' : 'ritual_reminder',
+            taskId: params.taskId,
+            projectId: params.projectId,
+            organizationId: params.organizationId,
+            occurrenceId: params.occurrenceId,
+            ...(params.subtaskId ? { subtaskId: params.subtaskId } : {}),
+            vibrate: '1',
+          })
+          .catch((err) =>
+            this.logger.error(
+              `Ritual reminder failed for ${userId}: ${
+                err instanceof Error ? err.message : err
+              }`,
+            ),
+          ),
+      ),
+    );
+  }
+
   schedule(params: {
     actorUserId: string;
     after: TaskEntity;

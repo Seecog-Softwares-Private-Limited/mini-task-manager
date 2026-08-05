@@ -32,5 +32,13 @@ export class RecurringTaskOccurrenceEntity extends BaseEntity {
 
   @Column({ name: 'completed_at', type: 'timestamp', nullable: true })
   completedAt!: Date | null;
+
+  /** Set when a due-time reminder was pushed to checklist assignees. */
+  @Column({ name: 'reminder_sent_at', type: 'timestamp', nullable: true })
+  reminderSentAt!: Date | null;
+
+  /** Keys already notified, e.g. `ritual` or `subtask:<id>`. */
+  @Column({ name: 'reminders_sent', type: 'simple-json', nullable: true })
+  remindersSent!: string[] | null;
 }
 

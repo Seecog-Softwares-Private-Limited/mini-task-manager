@@ -51,6 +51,8 @@ export interface SubtaskItem {
   dueOffsetDays?: number;
   /** Recurring planner: optional time of day (HH:mm, template only). */
   dueTime?: string;
+  /** Minutes before dueTime to notify this item's assignees. */
+  notifyMinutesBefore?: number | null;
   status?: SubtaskStatus;
   priority?: SubtaskPriority;
   requireLocation?: boolean;

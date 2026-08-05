@@ -1,5 +1,6 @@
 import { Type, Transform } from 'class-transformer';
 import {
+  Allow,
   IsArray,
   IsBoolean,
   IsDateString,
@@ -65,6 +66,19 @@ export class CreateTaskSubtaskDto {
   @IsString()
   @Matches(/^([01]\d|2[0-3]):[0-5]\d$/)
   dueTime?: string;
+
+  /**
+   * Minutes before this checklist item's dueTime to notify its assignees.
+   * Omit / null = inherit series setting or off.
+   */
+  @Allow()
+  @IsOptional()
+  @ValidateIf((_o, v) => v != null)
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(24 * 60)
+  notifyMinutesBefore?: number | null;
 
   @IsOptional()
   @IsIn(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'])

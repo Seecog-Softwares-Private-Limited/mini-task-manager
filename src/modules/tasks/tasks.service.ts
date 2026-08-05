@@ -940,6 +940,7 @@ export class TasksService {
       assigneeIds?: string[];
       dueDate?: string;
       dueTime?: string;
+      notifyMinutesBefore?: number | null;
       priority?: string;
       status?: string;
       statusId?: string;
@@ -972,6 +973,7 @@ export class TasksService {
     assigneeIds?: string[];
     dueDate?: string;
     dueTime?: string;
+    notifyMinutesBefore?: number;
     status: 'TODO' | 'IN_PROGRESS' | 'DONE';
     priority?: string;
     statusId?: string;
@@ -1006,6 +1008,13 @@ export class TasksService {
         const dueTime = /^([01]\d|2[0-3]):[0-5]\d/.test(dueTimeRaw)
           ? dueTimeRaw.slice(0, 5)
           : undefined;
+        const rawNotify = s.notifyMinutesBefore;
+        const notifyMinutesBefore =
+          dueTime &&
+          rawNotify != null &&
+          !Number.isNaN(Number(rawNotify))
+            ? Math.max(0, Math.min(24 * 60, Number(rawNotify)))
+            : undefined;
 
         // completionRecord: keep client value, else preserve existing while DONE,
         // else auto-stamp only when newly transitioning to DONE (never mass-stamp
@@ -1072,6 +1081,7 @@ export class TasksService {
           ...assignees,
           ...(dueDate ? { dueDate } : {}),
           ...(dueTime ? { dueTime } : {}),
+          ...(notifyMinutesBefore != null ? { notifyMinutesBefore } : {}),
           ...(s.priority ? { priority: s.priority } : {}),
           ...(s.statusId ? { statusId: s.statusId } : {}),
           ...(completionRecord ? { completionRecord } : {}),
@@ -1201,7 +1211,6 @@ export class TasksService {
     const task = await this.assertTaskSubtask(taskId, subtaskId, organizationId);
     await this.assertCanCommentOnSubtaskNote(task, subtaskId, organizationId, userId);
     const trimmed = body.trim().slice(0, 2000);
-    if (!trimmed.length) throw new BadRequestException('Comment cannot be empty');
 
     let resolvedParentId: string | null = null;
     if (parentId) {
@@ -1262,7 +1271,6 @@ export class TasksService {
       throw new ForbiddenException('You can only edit your own notes');
     }
     const trimmed = body.trim().slice(0, 2000);
-    if (!trimmed.length) throw new BadRequestException('Comment cannot be empty');
     await this.subtaskCommentsRepository.updateBody(commentId, trimmed);
     if (!comment.parentId) {
       await this.syncSubtaskNotePreview(taskId, organizationId, subtaskId);
@@ -1543,9 +1551,11 @@ export class TasksService {
     if (!task?.subtasks?.length) return;
 
     const roots = await this.subtaskCommentsRepository.findRootsBySubtask(taskId, subtaskId);
-    // Roots are newest-first.
+    // Roots are newest-first. Empty body (attachment-only) still marks the checklist as having notes.
     const latest = roots.length ? roots[0] : null;
-    const preview = latest?.body?.trim().slice(0, 2000) || undefined;
+    const preview =
+      latest?.body?.trim().slice(0, 2000) ||
+      (latest ? 'Attachment' : undefined);
 
     const next = task.subtasks.map((s) => {
       if (s.id !== subtaskId) return s;

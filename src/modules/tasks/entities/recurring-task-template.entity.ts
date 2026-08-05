@@ -50,6 +50,7 @@ export class RecurringTaskTemplateEntity extends BaseEntity {
     dueDate?: string;
     dueOffsetDays?: number;
     dueTime?: string;
+    notifyMinutesBefore?: number | null;
     status?: 'TODO' | 'IN_PROGRESS' | 'DONE';
     priority?: string;
     statusId?: string;

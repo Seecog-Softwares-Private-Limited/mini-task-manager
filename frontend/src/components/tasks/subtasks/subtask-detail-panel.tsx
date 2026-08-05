@@ -31,8 +31,38 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SUBTASK_TITLE_MAX_LENGTH, clampSubtaskTitle } from "@/lib/subtask-limits";
 import { cn } from "@/lib/utils";
 import { getSubtaskAssigneeIds, subtaskAssigneesEqual, withSubtaskAssignees } from "@/lib/subtask-assignees";
+import { MessageSquare, StickyNote } from "lucide-react";
 
 type MemberHint = { id: string; name: string; email?: string; avatarUrl?: string };
+
+function formatDailyDueSummary(dueDate?: string, dueTime?: string): string {
+  const timePart = dueTime?.trim() ? ` · ${dueTime.trim()}` : "";
+  if (!dueDate?.trim()) {
+    return dueTime?.trim() ? `Due ${dueTime.trim()}` : "No due date";
+  }
+  const parsed = new Date(`${dueDate.trim()}T12:00:00`);
+  if (Number.isNaN(parsed.getTime())) {
+    return `Due ${dueDate}${timePart}`;
+  }
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const day = new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+  const dayMs = 24 * 60 * 60 * 1000;
+  if (day.getTime() === today.getTime()) return `Due today${timePart}`;
+  if (day.getTime() === today.getTime() + dayMs) return `Due tomorrow${timePart}`;
+  return `Due ${parsed.toLocaleDateString(undefined, { month: "short", day: "numeric" })}${timePart}`;
+}
+
+function formatDailyStatusLabel(status: SubtaskStatus): string {
+  switch (status) {
+    case "DONE":
+      return "Done";
+    case "IN_PROGRESS":
+      return "In progress";
+    default:
+      return "To Do";
+  }
+}
 
 export type SubtaskDraft = Pick<
   TaskSubtask,
@@ -44,6 +74,7 @@ export type SubtaskDraft = Pick<
   | "assigneeIds"
   | "dueDate"
   | "dueTime"
+  | "notifyMinutesBefore"
   | "status"
   | "priority"
   | "requireLocation"
@@ -73,6 +104,17 @@ interface SubtaskDetailPanelProps {
   /** Notifies parent when unsaved field edits exist (edit-task flow). */
   onDirtyChange?: (dirty: boolean) => void;
   onCancel?: () => void;
+  /** Opens threaded checklist comments (planner notes). */
+  onOpenNotes?: () => void;
+  /** Preview text when notes exist on this checklist item. */
+  notePreview?: string | null;
+  /**
+   * Daily recurring run: hide setup fields; completion ritual only.
+   * Title/priority/assignees/due/location stay on the series template.
+   */
+  dailyRunMode?: boolean;
+  /** Optional assignee names for the daily summary strip. */
+  assigneeLabels?: string[];
 }
 
 export function SubtaskDetailPanel({
@@ -94,6 +136,10 @@ export function SubtaskDetailPanel({
   onDraftChange,
   onDirtyChange,
   onCancel,
+  onOpenNotes,
+  notePreview,
+  dailyRunMode = false,
+  assigneeLabels,
 }: SubtaskDetailPanelProps) {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -115,6 +161,7 @@ export function SubtaskDetailPanel({
       subtaskAssigneesEqual(a, b) &&
       a.dueDate === b.dueDate &&
       (a.dueTime ?? "") === (b.dueTime ?? "") &&
+      (a.notifyMinutesBefore ?? null) === (b.notifyMinutesBefore ?? null) &&
       resolveSubtaskStatus(a) === resolveSubtaskStatus(b) &&
       resolveSubtaskPriority(a.priority) === resolveSubtaskPriority(b.priority) &&
       Boolean(a.requireLocation) === Boolean(b.requireLocation)
@@ -147,6 +194,7 @@ export function SubtaskDetailPanel({
     initialDraft.assigneeIds,
     initialDraft.dueDate,
     initialDraft.dueTime,
+    initialDraft.notifyMinutesBefore,
     initialDraft.status,
     initialDraft.priority,
     initialDraft.requireLocation,
@@ -212,6 +260,106 @@ export function SubtaskDetailPanel({
     ]);
   };
 
+  const status = resolveSubtaskStatus(draft);
+  const isDone = status === "DONE";
+  const assigneeSummary =
+    assigneeLabels && assigneeLabels.length > 0
+      ? assigneeLabels.length === 1
+        ? assigneeLabels[0]
+        : `${assigneeLabels[0]} +${assigneeLabels.length - 1}`
+      : getSubtaskAssigneeIds(draft).length > 0
+        ? `${getSubtaskAssigneeIds(draft).length} assigned`
+        : "Unassigned";
+  const dailySummary = `${formatDailyStatusLabel(status)} · ${formatDailyDueSummary(draft.dueDate, draft.dueTime)} · ${assigneeSummary}`;
+
+  const commitDraft = (next: SubtaskDraft = draft) => {
+    onSave({
+      ...next,
+      title: clampSubtaskTitle(next.title.trim() || initialDraft.title),
+      status: resolveSubtaskStatus(next),
+      completed: resolveSubtaskStatus(next) === "DONE",
+      priority: resolveSubtaskPriority(next.priority),
+      requireLocation: next.requireLocation === true,
+    });
+  };
+
+  const markDone = () => {
+    const next = subtaskWithStatus(draft, "DONE", {
+      id: user?.id ?? "",
+      name: user?.fullName ?? user?.email ?? "",
+    });
+    setDraft(next);
+    onDraftChange?.(next);
+    commitDraft(next);
+  };
+
+  if (dailyRunMode) {
+    return (
+      <div className="mt-2 space-y-4 rounded-2xl border border-primary/15 bg-gradient-to-b from-primary/[0.04] to-background p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+        <div className="space-y-1">
+          <Label className="text-xs font-semibold text-muted-foreground">
+            Status & schedule
+          </Label>
+          <p className="text-sm font-semibold leading-snug text-foreground">{dailySummary}</p>
+        </div>
+
+        {onOpenNotes && taskId ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-10 w-full justify-start gap-2"
+            onClick={onOpenNotes}
+            disabled={Boolean(disabled)}
+          >
+            <StickyNote className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">
+              {notePreview?.trim() ? notePreview.trim() : "Add a note"}
+            </span>
+          </Button>
+        ) : null}
+
+        <SubtaskAttachmentsSection
+          subtaskId={draft.id}
+          taskId={taskId}
+          persist={persistAttachments}
+          pendingAttachments={pendingAttachments}
+          onPendingChange={onPendingAttachmentsChange}
+          disabled={attachmentsManageDisabled}
+          sectionLabel="Proof"
+          emptyLabel="No proof attached yet"
+          persistHelpText="Optional photo or file before you mark done."
+          collapseEmpty
+        />
+
+        <div className="flex items-center justify-end gap-2 border-t border-border/40 pt-3">
+          {onCancel ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onCancel}
+              disabled={saving}
+            >
+              Close
+            </Button>
+          ) : null}
+          {!readOnly ? (
+            <Button
+              type="button"
+              size="sm"
+              className="min-w-[7.5rem]"
+              disabled={disabled || saving || isDone}
+              onClick={markDone}
+            >
+              {saving ? "Saving…" : isDone ? "Done" : "Mark done"}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mt-2 space-y-4 rounded-2xl border border-primary/15 bg-gradient-to-b from-primary/[0.04] to-background p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
       <div className="space-y-1.5">
@@ -253,9 +401,26 @@ export function SubtaskDetailPanel({
           disabled={fieldsDisabled}
           rows={5}
           className="min-h-[120px] resize-y bg-background/90 text-sm leading-relaxed"
-          placeholder="Add detailed notes…"
+          placeholder="Add a description…"
         />
       </div>
+
+      {onOpenNotes && taskId ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-9 w-full justify-start gap-2"
+          onClick={onOpenNotes}
+        >
+          <MessageSquare className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">
+            {notePreview?.trim()
+              ? `Comments · ${notePreview.trim()}`
+              : "Comments & notes"}
+          </span>
+        </Button>
+      ) : null}
 
       <SubtaskAttachmentsSection
         subtaskId={draft.id}
@@ -292,13 +457,51 @@ export function SubtaskDetailPanel({
           completed={draft.completed}
           onChange={(dueDate, nextDueTime) => {
             setDraft((prev) => {
-              const next = { ...prev, dueDate, dueTime: nextDueTime };
+              const next = {
+                ...prev,
+                dueDate,
+                dueTime: nextDueTime,
+                ...(nextDueTime
+                  ? {}
+                  : { notifyMinutesBefore: undefined }),
+              };
               onDraftChange?.(next);
               return next;
             });
           }}
           disabled={fieldsDisabled}
         />
+        {draft.dueTime ? (
+          <div className="w-full min-w-[180px] flex-1 sm:max-w-[240px]">
+            <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+              Notify checklist members
+            </label>
+            <select
+              value={
+                draft.notifyMinutesBefore == null
+                  ? ""
+                  : String(draft.notifyMinutesBefore)
+              }
+              disabled={fieldsDisabled}
+              onChange={(e) => {
+                const raw = e.target.value;
+                update(
+                  "notifyMinutesBefore",
+                  raw === "" ? undefined : Number(raw)
+                );
+              }}
+              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="">Off</option>
+              <option value="0">At due time</option>
+              <option value="5">5 minutes before</option>
+              <option value="15">15 minutes before</option>
+              <option value="30">30 minutes before</option>
+              <option value="60">1 hour before</option>
+              <option value="120">2 hours before</option>
+            </select>
+          </div>
+        ) : null}
         <SubtaskAssigneeSelector
           projectId={projectId}
           organizationId={organizationId}
@@ -375,16 +578,7 @@ export function SubtaskDetailPanel({
                 !draft.title.trim() ||
                 draft.title.length > SUBTASK_TITLE_MAX_LENGTH
               }
-              onClick={() =>
-                onSave({
-                  ...draft,
-                  title: clampSubtaskTitle(draft.title.trim()),
-                  status: resolveSubtaskStatus(draft),
-                  completed: resolveSubtaskStatus(draft) === "DONE",
-                  priority: resolveSubtaskPriority(draft.priority),
-                  requireLocation: draft.requireLocation === true,
-                })
-              }
+              onClick={() => commitDraft()}
             >
               {saving ? "Saving…" : "Save"}
             </Button>

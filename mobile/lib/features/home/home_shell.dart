@@ -51,6 +51,10 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     if (value == 1 && tasksFilter != null) {
       ref.read(myWorkFilterProvider.notifier).state = tasksFilter;
     }
+    // Reset planner FAB visibility when leaving the Planner tab.
+    if (_index == 3 && value != 3) {
+      ref.read(recurringFabHiddenProvider.notifier).state = false;
+    }
     setState(() {
       _mountedTabs.add(value);
       _index = value;
@@ -116,6 +120,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       );
     }
     if (onPlannerTab) {
+      final hideFab = ref.watch(recurringFabHiddenProvider);
+      if (hideFab) return null;
       return _GradientFab(
         label: 'Add planner',
         onPressed: _openCreatePlanner,

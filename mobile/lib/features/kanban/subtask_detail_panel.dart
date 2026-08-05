@@ -61,6 +61,8 @@ class SubtaskDetailPanel extends ConsumerStatefulWidget {
     this.canEditRequireLocation = false,
     /// Planner-template editing: no completion/attachments/status; due time only.
     this.templateMode = false,
+    /// Daily recurring run: completion ritual only — setup lives on the series.
+    this.dailyRunMode = false,
   });
 
   final TaskSubtask subtask;
@@ -73,6 +75,7 @@ class SubtaskDetailPanel extends ConsumerStatefulWidget {
   final bool canComplete;
   final bool canEditRequireLocation;
   final bool templateMode;
+  final bool dailyRunMode;
   final SubtaskCompletionRequest onRequestCompletion;
   final VoidCallback onCancel;
   final ValueChanged<TaskSubtask> onSave;
@@ -93,6 +96,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
   late String _priority;
   String? _dueDate;
   String? _dueTime;
+  int? _notifyMinutesBefore;
   late List<String> _assigneeIds;
   List<TaskAttachment> _attachments = const [];
   bool _loadingAttachments = true;
@@ -101,6 +105,8 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
   SubtaskCompletionRecord? _completionRecord;
   late bool _requireLocation;
   String? _notePreview;
+  /// Daily-run: expand Camera/Gallery/File/Voice only after "Attach proof".
+  bool _proofPickerOpen = false;
 
   @override
   void initState() {
@@ -112,6 +118,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     _priority = (widget.subtask.priority ?? 'MEDIUM').toUpperCase();
     _dueDate = widget.subtask.dueDate;
     _dueTime = widget.subtask.dueTime;
+    _notifyMinutesBefore = widget.subtask.notifyMinutesBefore;
     _assigneeIds = _storedAssigneeIds(widget.subtask);
     _requireLocation = widget.subtask.requireLocation;
     _completionRecord = widget.subtask.completionRecord;
@@ -122,6 +129,8 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
       _loadingAttachments = false;
     }
   }
+
+  bool get _isDailyRun => widget.dailyRunMode && !widget.templateMode;
 
   @override
   void dispose() {
@@ -136,6 +145,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     if (oldWidget.subtask.id != widget.subtask.id) {
       _completionRecord = widget.subtask.completionRecord;
       _notePreview = widget.subtask.note;
+      _proofPickerOpen = false;
       _loadAttachments();
       return;
     }
@@ -215,6 +225,9 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
       if (!mounted) return;
       setState(() {
         _attachments = _attachments.where((item) => item.id != attachmentId).toList();
+        if (_isDailyRun && _attachments.isEmpty) {
+          _proofPickerOpen = false;
+        }
       });
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -255,9 +268,13 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
   void _clearDueDate() => setState(() {
         _dueDate = null;
         _dueTime = null;
+        _notifyMinutesBefore = null;
       });
 
-  void _clearDueTime() => setState(() => _dueTime = null);
+  void _clearDueTime() => setState(() {
+        _dueTime = null;
+        _notifyMinutesBefore = null;
+      });
 
   void _openAssigneeSheet() {
     showAssigneePickerSheet(
@@ -283,6 +300,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
         _priority != (widget.subtask.priority ?? 'MEDIUM').toUpperCase() ||
         _dueDate != widget.subtask.dueDate ||
         (_dueTime ?? '') != (widget.subtask.dueTime ?? '') ||
+        _notifyMinutesBefore != widget.subtask.notifyMinutesBefore ||
         !_assigneeListsEqual(_assigneeIds, _storedAssigneeIds(widget.subtask));
   }
 
@@ -324,6 +342,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
       _priority = (widget.subtask.priority ?? 'MEDIUM').toUpperCase();
       _dueDate = widget.subtask.dueDate;
       _dueTime = widget.subtask.dueTime;
+      _notifyMinutesBefore = widget.subtask.notifyMinutesBefore;
       _assigneeIds = _storedAssigneeIds(widget.subtask);
       _requireLocation = widget.subtask.requireLocation;
       _completionRecord = widget.subtask.completionRecord;
@@ -372,8 +391,10 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
           priority: _priority,
           dueDate: _dueDate,
           dueTime: _dueTime,
+          notifyMinutesBefore: _notifyMinutesBefore,
           clearDueDate: _dueDate == null,
           clearDueTime: _dueDate == null || _dueTime == null,
+          clearNotifyMinutesBefore: _dueTime == null || _notifyMinutesBefore == null,
           assigneeIds: _assigneeIds,
           assigneeId: _assigneeIds.isNotEmpty ? _assigneeIds.first : null,
           completionRecord: record,
@@ -422,8 +443,10 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
         priority: _priority,
         dueDate: widget.templateMode ? null : _dueDate,
         dueTime: _dueTime,
+        notifyMinutesBefore: _notifyMinutesBefore,
         clearDueDate: widget.templateMode || _dueDate == null,
         clearDueTime: _dueTime == null,
+        clearNotifyMinutesBefore: _dueTime == null || _notifyMinutesBefore == null,
         assigneeIds: _assigneeIds,
         assigneeId: _assigneeIds.isNotEmpty ? _assigneeIds.first : null,
         completionRecord: completed ? record : null,
@@ -459,7 +482,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
       subtask: live,
       taskId: widget.taskId,
       organizationId: widget.organizationId,
-      title: 'Comments',
+      title: _isDailyRun ? 'Note' : 'Comments',
     );
     if (!mounted || result == null) return;
     final preview = result.latestNotePreview?.trim();
@@ -470,14 +493,52 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     widget.onNoteChanged?.call(next);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final dueDate = _parseDueDate(_dueDate);
-    final priority = _findPriority(_priority);
-    final assigneeCount = _assigneeIds.length;
-    final hasCommentPreview =
-        _notePreview != null && _notePreview!.trim().isNotEmpty;
+  String _dailyDueSummary() {
+    final due = _parseDueDate(_dueDate);
+    if (due == null) {
+      return _dueTime == null
+          ? 'No due date'
+          : 'Due ${_formatDueTimeLabel(_dueTime!)}';
+    }
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(due.year, due.month, due.day);
+    final timePart =
+        _dueTime == null ? '' : ' · ${_formatDueTimeLabel(_dueTime!)}';
+    if (day == today) return 'Due today$timePart';
+    if (day == today.add(const Duration(days: 1))) {
+      return 'Due tomorrow$timePart';
+    }
+    return 'Due ${DateFormat('MMM d').format(day)}$timePart';
+  }
 
+  String _dailyAssigneeSummary() {
+    if (_assigneeIds.isEmpty) return 'Unassigned';
+
+    String nameFor(String userId) {
+      final normalized = _normalizeUserId(userId);
+      for (final member in widget.members) {
+        if (_normalizeUserId(member.userId) != normalized) continue;
+        final user = member.user;
+        if (user == null) break;
+        return user.fullName.trim().isNotEmpty ? user.fullName : user.email;
+      }
+      final current = ref.read(sessionControllerProvider).user;
+      if (current != null &&
+          _normalizeUserId(current.id) == normalized) {
+        return current.fullName.trim().isNotEmpty
+            ? current.fullName
+            : current.email;
+      }
+      return 'Assigned';
+    }
+
+    final primary = nameFor(_assigneeIds.first);
+    if (_assigneeIds.length == 1) return primary;
+    return '$primary +${_assigneeIds.length - 1}';
+  }
+
+  Widget _panelShell({required List<Widget> children}) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
@@ -487,7 +548,201 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+        children: children,
+      ),
+    );
+  }
+
+  Widget _buildDailyNoteTile(BuildContext context) {
+    final hasNote =
+        _notePreview != null && _notePreview!.trim().isNotEmpty;
+    return Material(
+      color: AppColors.primary.withValues(alpha: 0.05),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: widget.saving ? null : _openComments,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.sm + 2),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  hasNote ? Icons.notes_rounded : Icons.note_add_outlined,
+                  color: AppColors.primary,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  hasNote ? _notePreview! : 'Add a note',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: hasNote
+                            ? AppColors.textPrimary
+                            : AppColors.textMuted,
+                      ),
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.textMuted.withValues(alpha: 0.8),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDailyProofSection(BuildContext context) {
+    final showPicker = _proofPickerOpen || _attachments.isNotEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_loadingAttachments)
+          const Padding(
+            padding: EdgeInsets.only(top: AppSpacing.xs),
+            child: LinearProgressIndicator(minHeight: 2),
+          )
+        else if (!showPicker)
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: widget.saving || _uploadingAttachment
+                  ? null
+                  : () => setState(() => _proofPickerOpen = true),
+              icon: const Icon(Icons.add_a_photo_outlined, size: 18),
+              label: const Text('Attach proof'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          )
+        else ...[
+          AttachmentUploadActions(
+            disabled: widget.saving,
+            uploading: _uploadingAttachment,
+            onPickAndUpload: (pick) async {
+              await _pickAndUpload(pick);
+              if (mounted && _attachments.isNotEmpty) {
+                setState(() => _proofPickerOpen = true);
+              }
+            },
+          ),
+          if (_attachments.isNotEmpty)
+            AttachmentGrid(
+              organizationId: widget.organizationId,
+              enabled: !widget.saving,
+              items: _attachments.asMap().entries.map(
+                (entry) => AttachmentGridEntry(
+                  attachment: entry.value,
+                  index: entry.key + 1,
+                  onDelete: () => _deleteAttachment(entry.value.id),
+                ),
+              ).toList(),
+            ),
+        ],
+        if (_attachmentError != null) ...[
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            _attachmentError!,
+            style: const TextStyle(color: AppColors.danger),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildDailyRunPanel(BuildContext context) {
+    final isDone = _status == 'DONE';
+    final summary =
+        '${_labelForSubtaskStatus(_status)} · ${_dailyDueSummary()} · ${_dailyAssigneeSummary()}';
+
+    return _panelShell(
+      children: [
+        _PanelSection(
+          title: 'Status & schedule',
+          child: Text(
+            summary,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  height: 1.35,
+                ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _PanelSection(
+          title: 'Note',
+          child: _buildDailyNoteTile(context),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        _PanelSection(
+          title: 'Proof',
+          child: _buildDailyProofSection(context),
+        ),
+        if (_completionRecord != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          _CompletionRecordCard(record: _completionRecord!),
+        ],
+        if (!widget.canComplete && !isDone) ...[
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Only assigned members can mark this as Done.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.warning,
+                ),
+          ),
+        ],
+        const SizedBox(height: AppSpacing.md),
+        Row(
+          children: [
+            TextButton(
+              onPressed: widget.saving ? null : _handleCancel,
+              child: const Text('Close'),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: PrimaryButton(
+                label: widget.saving
+                    ? 'Saving...'
+                    : (isDone ? 'Done' : 'Mark done'),
+                expand: true,
+                loading: widget.saving,
+                onPressed: widget.saving || isDone || !widget.canComplete
+                    ? null
+                    : () => _handleStatusChange('DONE'),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isDailyRun) {
+      return _buildDailyRunPanel(context);
+    }
+
+    final dueDate = _parseDueDate(_dueDate);
+    final priority = _findPriority(_priority);
+    final assigneeCount = _assigneeIds.length;
+    final hasCommentPreview =
+        _notePreview != null && _notePreview!.trim().isNotEmpty;
+
+    return _panelShell(
+      children: [
           _PanelSection(
             title: 'Details',
             child: Column(
@@ -817,6 +1072,62 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
                     ),
                   ],
                 ),
+                if (_dueTime != null) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  DropdownButtonFormField<int?>(
+                    value: _notifyMinutesBefore,
+                    decoration: const InputDecoration(
+                      labelText: 'Notify checklist members',
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                    ),
+                    items: const [
+                      DropdownMenuItem<int?>(
+                        value: null,
+                        child: Text('Off'),
+                      ),
+                      DropdownMenuItem<int?>(
+                        value: 0,
+                        child: Text('At due time'),
+                      ),
+                      DropdownMenuItem<int?>(
+                        value: 5,
+                        child: Text('5 minutes before'),
+                      ),
+                      DropdownMenuItem<int?>(
+                        value: 15,
+                        child: Text('15 minutes before'),
+                      ),
+                      DropdownMenuItem<int?>(
+                        value: 30,
+                        child: Text('30 minutes before'),
+                      ),
+                      DropdownMenuItem<int?>(
+                        value: 60,
+                        child: Text('1 hour before'),
+                      ),
+                      DropdownMenuItem<int?>(
+                        value: 120,
+                        child: Text('2 hours before'),
+                      ),
+                    ],
+                    onChanged: widget.saving
+                        ? null
+                        : (value) =>
+                            setState(() => _notifyMinutesBefore = value),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Notifies this item’s assignees with the item title at the selected time.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textMuted,
+                        ),
+                  ),
+                ],
                 if (!widget.templateMode && _dueDate != null)
                   Align(
                     alignment: Alignment.centerLeft,
@@ -930,8 +1241,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
               ),
             ],
           ),
-        ],
-      ),
+      ],
     );
   }
 

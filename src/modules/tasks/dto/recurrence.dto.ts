@@ -132,6 +132,17 @@ export class TaskRecurrenceDto {
   })
   dueTime?: string;
 
+  /**
+   * Minutes before dueTime to notify checklist assignees.
+   * Omit / null = off. 0 = at due time.
+   */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(24 * 60)
+  notifyMinutesBefore?: number | null;
+
   @IsOptional()
   @Type(() => Boolean)
   @IsBoolean()

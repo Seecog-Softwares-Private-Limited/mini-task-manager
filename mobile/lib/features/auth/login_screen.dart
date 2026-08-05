@@ -1,16 +1,11 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import '../../core/api/api_connection_service.dart';
-import '../../core/api/api_exception.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/api/api_client.dart';
+import '../../core/api/api_exception.dart';
 import '../../core/branding/opspick_logo.dart';
 import '../../core/config/api_base_url_controller.dart';
 import '../../core/config/api_reachability_probe.dart';
-import '../../core/config/app_config.dart';
 import '../../core/preferences/app_preferences.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
@@ -29,22 +24,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _serverUrlController = TextEditingController();
 
   bool _obscurePassword = true;
   bool _loading = false;
-  bool _showServerSettings = false;
-  bool _testingConnection = false;
   String? _error;
-  String? _serverStatus;
-  bool _serverStatusOk = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _reprobeApiUrl();
-      _syncServerField();
     });
   }
 
@@ -56,87 +45,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  void _syncServerField() {
-    final apiUrl = ref.read(apiBaseUrlProvider);
-    _serverUrlController.text = _displayServerInput(apiUrl);
-  }
-
-  String _displayServerInput(String apiBaseUrl) {
-    final origin = AppConfig.parseApiOrigin(apiBaseUrl);
-    if (origin == null) return apiBaseUrl;
-    return origin.toString().replaceAll(RegExp(r'/$'), '');
-  }
-
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _serverUrlController.dispose();
     super.dispose();
-  }
-
-  Future<void> _saveServerUrl() async {
-    final raw = _serverUrlController.text.trim();
-    if (raw.isEmpty) return;
-    await ref.read(apiBaseUrlProvider.notifier).setBaseUrl(raw);
-    if (!mounted) return;
-    setState(() {
-      _serverStatus = 'Saved: ${ref.read(apiBaseUrlProvider)}';
-      _serverStatusOk = true;
-      _error = null;
-    });
-  }
-
-  Future<void> _testConnection() async {
-    setState(() {
-      _testingConnection = true;
-      _serverStatus = null;
-    });
-    final candidate = AppConfig.normalizeBaseUrl(_serverUrlController.text.trim());
-    final host = Uri.tryParse(candidate)?.host;
-    final isProductionHost = host == AppConfig.productionHost;
-
-    final result = isProductionHost
-        ? await ApiConnectionService.findFirstReachable([
-            candidate,
-            ...AppConfig.productionApiCandidates.where((url) => url != candidate),
-          ])
-        : await ApiConnectionService.test(candidate);
-
-    if (!mounted) return;
-    setState(() {
-      _testingConnection = false;
-      _serverStatus = result.message;
-      _serverStatusOk = result.ok;
-    });
-    if (result.ok) {
-      await ref.read(apiBaseUrlProvider.notifier).setBaseUrl(result.url);
-      _serverUrlController.text = _displayServerInput(result.url);
-    }
-  }
-
-  Future<void> _useProductionServer() async {
-    setState(() {
-      _testingConnection = true;
-      _serverStatus = null;
-    });
-    // Web: try Hostinger first, then local Nest (CORS allows localhost → prod after server update).
-    final result = kIsWeb
-        ? await ApiConnectionService.findFirstReachable([
-            ...AppConfig.productionApiCandidates,
-            'http://localhost:3007/api/v1',
-          ])
-        : await ApiConnectionService.findFirstReachable(AppConfig.productionApiCandidates);
-    if (!mounted) return;
-    if (result.ok) {
-      _serverUrlController.text = _displayServerInput(result.url);
-      await ref.read(apiBaseUrlProvider.notifier).setBaseUrl(result.url);
-    }
-    setState(() {
-      _testingConnection = false;
-      _serverStatus = result.message;
-      _serverStatusOk = result.ok;
-    });
   }
 
   Future<void> _submit() async {
@@ -164,7 +77,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (error.isNetwork) {
         final before = ref.read(apiBaseUrlProvider);
         await _reprobeApiUrl();
-        _syncServerField();
         final after = ref.read(apiBaseUrlProvider);
         if (after != before && mounted) {
           try {
@@ -205,13 +117,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final config = ref.watch(appConfigProvider);
-    ref.listen(apiBaseUrlProvider, (previous, next) {
-      if (previous != next) {
-        _serverUrlController.text = _displayServerInput(next);
-      }
-    });
-
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -335,71 +240,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   TextButton(
                     onPressed: _loading ? null : () => context.push(AppRoutes.forgotPassword),
                     child: const Text('Forgot password?'),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  OutlinedButton.icon(
-                    onPressed: _loading
-                        ? null
-                        : () => setState(() => _showServerSettings = !_showServerSettings),
-                    icon: Icon(_showServerSettings
-                        ? Icons.expand_less_rounded
-                        : Icons.settings_ethernet_rounded),
-                    label: Text(_showServerSettings ? 'Hide server settings' : 'Server settings'),
-                  ),
-                  if (_showServerSettings) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    TextFormField(
-                      controller: _serverUrlController,
-                      decoration: const InputDecoration(
-                        labelText: 'Server URL',
-                        hintText: 'http://localhost:3007',
-                        helperText: kIsWeb
-                            ? 'Web: use http://localhost:3007'
-                            : 'Mobile: try port 80 (http://server) or :3000 on Wi‑Fi.',
-                      ),
-                      keyboardType: TextInputType.url,
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: _testingConnection || _loading ? null : _testConnection,
-                            child: Text(_testingConnection ? 'Testing...' : 'Test connection'),
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: _loading ? null : _saveServerUrl,
-                            child: const Text('Save'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton(
-                        onPressed: _loading || _testingConnection ? null : _useProductionServer,
-                        child: const Text('Use production server'),
-                      ),
-                    ),
-                    if (_serverStatus != null) ...[
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(
-                        _serverStatus!,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: _serverStatusOk ? AppColors.success : AppColors.danger,
-                            ),
-                      ),
-                    ],
-                  ],
-                  const SizedBox(height: AppSpacing.lg),
-                  Text(
-                    'API: ${config.apiBaseUrl}',
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.labelMedium,
                   ),
                 ],
               ),

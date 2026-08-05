@@ -165,6 +165,7 @@ const schema = z.object({
           }),
         dueOffsetDays: z.coerce.number().min(0).max(365).optional(),
         dueTime: z.string().optional(),
+        notifyMinutesBefore: z.coerce.number().min(0).max(24 * 60).optional().nullable(),
         requireLocation: z.boolean().optional().default(false),
       })
     )

@@ -47,6 +47,8 @@ export class TaskEntity extends BaseEntity {
     assigneeIds?: string[];
     dueDate?: string;
     dueTime?: string;
+    /** Minutes before dueTime to notify this item's assignees. */
+    notifyMinutesBefore?: number | null;
     status?: 'TODO' | 'IN_PROGRESS' | 'DONE';
     priority?: string;
     statusId?: string;

@@ -1,10 +1,12 @@
-import { IsOptional, IsString, IsUUID, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsOptional, IsString, IsUUID, MaxLength, ValidateIf } from 'class-validator';
 
 export class CreateSubtaskCommentDto {
+  /** Text may be empty for attachment-only notes. */
+  @Transform(({ value }) => (typeof value === 'string' ? value : value == null ? '' : String(value)))
   @IsString()
-  @MinLength(1, { message: 'Comment cannot be empty' })
   @MaxLength(2000)
-  body!: string;
+  body: string = '';
 
   /** Root notes omit this. Replies set parentId to any note in the same thread. */
   @IsOptional()

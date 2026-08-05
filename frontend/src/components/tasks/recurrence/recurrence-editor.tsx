@@ -54,6 +54,10 @@ function normalize(
     createDaysBeforeDue: value?.createDaysBeforeDue ?? 0,
     dueLogic: value?.dueLogic ?? "DUE_DATE",
     dueTime: value?.dueTime,
+    notifyMinutesBefore:
+      value?.notifyMinutesBefore == null
+        ? undefined
+        : Number(value.notifyMinutesBefore),
   };
 }
 
@@ -382,8 +386,46 @@ export function RecurrenceEditor({
                   type="time"
                   value={state.dueTime ?? ""}
                   disabled={disabled}
-                  onChange={(e) => patch({ dueTime: e.target.value || undefined })}
+                  onChange={(e) =>
+                    patch({
+                      dueTime: e.target.value || undefined,
+                      ...(e.target.value
+                        ? {}
+                        : { notifyMinutesBefore: undefined }),
+                    })
+                  }
                 />
+              </div>
+            ) : null}
+            {state.dueLogic === "DUE_TIME" && state.dueTime ? (
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label className="text-xs text-muted-foreground">
+                  Notify checklist members
+                </Label>
+                <select
+                  value={
+                    state.notifyMinutesBefore == null
+                      ? ""
+                      : String(state.notifyMinutesBefore)
+                  }
+                  disabled={disabled}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    patch({
+                      notifyMinutesBefore:
+                        raw === "" ? undefined : Number(raw),
+                    });
+                  }}
+                  className="h-9 w-full rounded-lg border bg-background px-3 text-sm"
+                >
+                  <option value="">Off</option>
+                  <option value="0">At due time</option>
+                  <option value="5">5 minutes before</option>
+                  <option value="15">15 minutes before</option>
+                  <option value="30">30 minutes before</option>
+                  <option value="60">1 hour before</option>
+                  <option value="120">2 hours before</option>
+                </select>
               </div>
             ) : null}
           </div>

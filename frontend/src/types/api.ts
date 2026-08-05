@@ -122,6 +122,11 @@ export interface TaskRecurrenceConfig {
   createDaysBeforeDue?: number;
   dueLogic?: "DUE_DATE" | "DUE_TIME";
   dueTime?: string;
+  /**
+   * Minutes before dueTime to notify checklist assignees.
+   * Omit / null = off. 0 = at due time.
+   */
+  notifyMinutesBefore?: number | null;
   /** Skip Saturday/Sunday when computing next run dates. */
   skipWeekends?: boolean;
   /** How run completion is validated: all checklist items vs manual. */
@@ -152,6 +157,7 @@ export interface RecurringTemplateSummary {
     completed?: boolean;
     dueTime?: string | null;
     dueOffsetDays?: number | null;
+    notifyMinutesBefore?: number | null;
     priority?: string;
     status?: string;
   }>;
@@ -219,6 +225,11 @@ export interface TaskSubtask {
   dueDate?: string;
   dueOffsetDays?: number;
   dueTime?: string;
+  /**
+   * Minutes before this checklist item's dueTime to notify its assignees.
+   * Omit / null = off for this item. 0 = at due time.
+   */
+  notifyMinutesBefore?: number | null;
   status?: SubtaskStatus;
   /** @deprecated Legacy field — kept for old data; UI uses `status` instead. */
   priority?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -487,6 +498,20 @@ export interface TaskComment {
   createdAt: string;
   updatedAt: string;
   user?: Pick<User, "id" | "fullName" | "email" | "avatarUrl">;
+}
+
+/** Threaded checklist notes (planner / subtask comments). */
+export interface SubtaskComment {
+  id: string;
+  taskId: string;
+  subtaskId: string;
+  userId: string;
+  body: string;
+  parentId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  user?: Pick<User, "id" | "fullName" | "email" | "avatarUrl">;
+  replies?: SubtaskComment[];
 }
 
 export interface TaskAttachment {

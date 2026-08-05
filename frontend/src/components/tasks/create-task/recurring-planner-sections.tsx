@@ -178,6 +178,10 @@ function normalizeSchedule(value?: TaskRecurrenceConfig): TaskRecurrenceConfig {
     createDaysBeforeDue: value?.createDaysBeforeDue ?? 0,
     dueLogic: value?.dueLogic ?? "DUE_DATE",
     dueTime: value?.dueTime,
+    notifyMinutesBefore:
+      value?.notifyMinutesBefore == null
+        ? undefined
+        : Number(value.notifyMinutesBefore),
     skipWeekends: value?.skipWeekends ?? false,
     completionRule: value?.completionRule ?? "ALL_CHECKLIST",
   };
@@ -301,11 +305,48 @@ export function RepeatScheduleControl({
                   patch({
                     dueTime: next,
                     dueLogic: next ? "DUE_TIME" : "DUE_DATE",
+                    ...(next
+                      ? {}
+                      : { notifyMinutesBefore: undefined }),
                   });
                 }}
                 className="h-9"
               />
             </div>
+
+            {state.dueTime ? (
+              <div className="space-y-1.5">
+                <Label className={FIELD_LABEL}>Notify checklist members</Label>
+                <select
+                  value={
+                    state.notifyMinutesBefore == null
+                      ? ""
+                      : String(state.notifyMinutesBefore)
+                  }
+                  disabled={disabled}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    patch({
+                      notifyMinutesBefore:
+                        raw === "" ? undefined : Number(raw),
+                    });
+                  }}
+                  className={SELECT_CLASS}
+                >
+                  <option value="">Off</option>
+                  <option value="0">At due time</option>
+                  <option value="5">5 minutes before</option>
+                  <option value="15">15 minutes before</option>
+                  <option value="30">30 minutes before</option>
+                  <option value="60">1 hour before</option>
+                  <option value="120">2 hours before</option>
+                </select>
+                <p className="text-[11px] text-muted-foreground">
+                  Sends the ritual title to checklist assignees. Each checklist
+                  item has its own notify setting under due time.
+                </p>
+              </div>
+            ) : null}
           </div>
 
           {repeat === "WEEKLY" ? (
@@ -672,14 +713,53 @@ function ChecklistRelativeDueControl({
           type="time"
           value={current?.dueTime ?? ""}
           disabled={disabled}
-          onChange={(e) =>
-            setValue(`subtasks.${index}.dueTime` as const, e.target.value || undefined, {
+          onChange={(e) => {
+            const next = e.target.value || undefined;
+            setValue(`subtasks.${index}.dueTime` as const, next, {
               shouldDirty: true,
-            })
-          }
+            });
+            if (!next) {
+              setValue(`subtasks.${index}.notifyMinutesBefore` as const, undefined, {
+                shouldDirty: true,
+              });
+            }
+          }}
           className="h-8 w-[140px] text-sm"
         />
       </div>
+      {current?.dueTime ? (
+        <div className="space-y-1.5">
+          <Label className={FIELD_LABEL}>Notify checklist members</Label>
+          <select
+            value={
+              current.notifyMinutesBefore == null
+                ? ""
+                : String(current.notifyMinutesBefore)
+            }
+            disabled={disabled}
+            onChange={(e) => {
+              const raw = e.target.value;
+              setValue(
+                `subtasks.${index}.notifyMinutesBefore` as const,
+                raw === "" ? undefined : Number(raw),
+                { shouldDirty: true }
+              );
+            }}
+            className={cn(SELECT_CLASS, "h-8 w-full max-w-[220px] text-sm")}
+          >
+            <option value="">Off</option>
+            <option value="0">At due time</option>
+            <option value="5">5 minutes before</option>
+            <option value="15">15 minutes before</option>
+            <option value="30">30 minutes before</option>
+            <option value="60">1 hour before</option>
+            <option value="120">2 hours before</option>
+          </select>
+          <p className="text-[10px] text-muted-foreground">
+            Notifies this item’s assignees with the item title.
+          </p>
+        </div>
+      ) : null}
       <p className="text-[10px] leading-relaxed text-muted-foreground/85">
         Checklist due dates are calculated from each generated run&apos;s date — not a fixed calendar date.
       </p>

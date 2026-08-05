@@ -124,7 +124,9 @@ export class PushNotificationsService implements OnModuleInit {
 
     const message: MulticastMessage = {
       tokens,
-      notification: { title, body },
+      notification: body?.trim()
+        ? { title, body }
+        : { title },
       data: payloadData,
       android: {
         priority: 'high',
@@ -134,6 +136,8 @@ export class PushNotificationsService implements OnModuleInit {
           priority: 'high',
           defaultSound: true,
           defaultVibrateTimings: true,
+          // Ensure vibration even when body is empty (title-only ritual alerts).
+          vibrateTimingsMillis: [0, 250, 120, 250],
         },
       },
       apns: {
@@ -143,7 +147,7 @@ export class PushNotificationsService implements OnModuleInit {
         },
         payload: {
           aps: {
-            alert: { title, body },
+            alert: body?.trim() ? { title, body } : { title },
             sound: 'default',
             badge: 1,
             'content-available': 1,

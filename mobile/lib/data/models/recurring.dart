@@ -6,6 +6,7 @@ class RecurringTemplateSubtask {
     required this.title,
     this.id,
     this.dueTime,
+    this.notifyMinutesBefore,
     this.description,
     this.priority,
     this.assigneeId,
@@ -15,6 +16,7 @@ class RecurringTemplateSubtask {
   final String? id;
   final String title;
   final String? dueTime;
+  final int? notifyMinutesBefore;
   final String? description;
   final String? priority;
   final String? assigneeId;
@@ -33,10 +35,18 @@ class RecurringTemplateSubtask {
     if (assigneeIds.isEmpty && single != null && single.isNotEmpty) {
       assigneeIds.add(single);
     }
+    final rawNotify = json['notifyMinutesBefore'];
+    int? notifyMinutesBefore;
+    if (rawNotify is int) {
+      notifyMinutesBefore = rawNotify;
+    } else if (rawNotify != null) {
+      notifyMinutesBefore = int.tryParse(rawNotify.toString());
+    }
     return RecurringTemplateSubtask(
       id: json['id']?.toString(),
       title: json['title'] as String? ?? '',
       dueTime: json['dueTime'] as String?,
+      notifyMinutesBefore: notifyMinutesBefore,
       description: json['description'] as String?,
       priority: json['priority'] as String?,
       assigneeId: single,
