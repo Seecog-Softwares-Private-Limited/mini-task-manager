@@ -35,6 +35,10 @@ import {
   SubtaskDetailPanel,
   type SubtaskDraft,
 } from "@/components/tasks/subtasks/subtask-detail-panel";
+import {
+  SubtaskNotesSheet,
+  type SubtaskNotesCloseResult,
+} from "@/components/tasks/subtasks/subtask-notes-sheet";
 import { useTenant } from "@/context/tenant-context";
 import { useAuth } from "@/hooks/use-auth";
 import type { Task, TaskSubtask } from "@/types/api";
@@ -80,6 +84,7 @@ export function RecurringSubtaskChecklist({
   const [draftPriority, setDraftPriority] = useState<SubtaskPriority>("MEDIUM");
   const [expandedSubtaskId, setExpandedSubtaskId] = useState<string | null>(null);
   const [subtaskDraftDirty, setSubtaskDraftDirty] = useState(false);
+  const [notesSubtaskId, setNotesSubtaskId] = useState<string | null>(null);
 
   const ensureMutation = useMutation({
     mutationFn: () => ensureRecurringOccurrenceSubtasks(taskId!),
@@ -134,6 +139,28 @@ export function RecurringSubtaskChecklist({
   const progress = useMemo(() => getOccurrenceSubtaskProgress(subtasks), [subtasks]);
   const allDone = allOccurrenceSubtasksDone(subtasks);
   const projectId = task?.projectId ?? "";
+  const notesSubtask = notesSubtaskId
+    ? subtasks.find((s) => s.id === notesSubtaskId) ?? null
+    : null;
+
+  function applyNotesCloseResult(result: SubtaskNotesCloseResult) {
+    if (!notesSubtaskId || !task) return;
+    const nextNote = result.hasNotes ? result.latestNotePreview ?? undefined : undefined;
+    const current = subtasks.find((s) => s.id === notesSubtaskId);
+    const currentNote = current?.note?.trim() || undefined;
+    if (currentNote === nextNote) return;
+    const optimistic: Task = {
+      ...task,
+      subtasks: subtasks.map((s) =>
+        s.id === notesSubtaskId
+          ? { ...s, note: nextNote }
+          : s
+      ),
+    };
+    queryClient.setQueryData(["task", taskId], optimistic);
+    onTaskUpdated?.(optimistic);
+    void queryClient.invalidateQueries({ queryKey: ["task", taskId ?? ""] });
+  }
 
   if (ensureMutation.isPending && subtasks.length === 0) {
     return (
@@ -210,6 +237,9 @@ export function RecurringSubtaskChecklist({
               completed: draft.completed,
               dueDate: draft.dueDate,
               dueTime: draft.dueTime,
+              notifyMinutesBefore: draft.dueTime
+                ? draft.notifyMinutesBefore ?? null
+                : null,
               status: draft.status,
               priority: draft.priority,
               requireLocation: draft.requireLocation,
@@ -273,6 +303,7 @@ export function RecurringSubtaskChecklist({
                     dueTime={s.dueTime}
                     assigneeId={s.assigneeId}
                     assigneeIds={s.assigneeIds}
+                    note={s.note}
                     projectId={projectId}
                     organizationId={orgId ?? undefined}
                     expanded={expanded}
@@ -285,16 +316,7 @@ export function RecurringSubtaskChecklist({
                           : item
                       );
                     }}
-                    onAssigneeChange={(nextAssigneeIds) => {
-                      patchSubtasks((item) =>
-                        item.id === s.id ? withSubtaskAssignees(item, nextAssigneeIds) : item
-                      );
-                    }}
-                    onDueDateChange={(dueDate, dueTime) => {
-                      patchSubtasks((item) =>
-                        item.id === s.id ? { ...item, dueDate, dueTime } : item
-                      );
-                    }}
+                    onNotesClick={() => setNotesSubtaskId(s.id)}
                     onRowClick={() => {
                       if (subtaskDraftDirty && expandedSubtaskId && expandedSubtaskId !== s.id) {
                         toast({
@@ -319,6 +341,7 @@ export function RecurringSubtaskChecklist({
                         assigneeIds: s.assigneeIds ?? getSubtaskAssigneeIds(s),
                         dueDate: s.dueDate,
                         dueTime: s.dueTime,
+                        notifyMinutesBefore: s.notifyMinutesBefore ?? null,
                         status: resolveSubtaskStatus(s),
                         priority: s.priority,
                         requireLocation: s.requireLocation === true,
@@ -327,9 +350,12 @@ export function RecurringSubtaskChecklist({
                       organizationId={orgId ?? undefined}
                       taskId={taskId ?? undefined}
                       persistAttachments
+                      dailyRunMode
                       disabled={readOnly || updateMutation.isPending}
                       readOnly={readOnly}
                       saving={updateMutation.isPending}
+                      notePreview={s.note}
+                      onOpenNotes={() => setNotesSubtaskId(s.id)}
                       onSave={saveSubtaskDetail}
                       onDirtyChange={setSubtaskDraftDirty}
                       onCancel={() => {
@@ -448,6 +474,17 @@ export function RecurringSubtaskChecklist({
           </p>
         ) : null}
       </div>
+      {taskId && notesSubtask ? (
+        <SubtaskNotesSheet
+          open={!!notesSubtaskId}
+          onOpenChange={(next) => {
+            if (!next) setNotesSubtaskId(null);
+          }}
+          taskId={taskId}
+          subtask={notesSubtask}
+          onCloseResult={applyNotesCloseResult}
+        />
+      ) : null}
     </section>
   );
 }

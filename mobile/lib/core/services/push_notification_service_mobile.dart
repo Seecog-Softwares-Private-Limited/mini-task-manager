@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -157,6 +158,8 @@ class PushNotificationService {
       'High Importance Notifications',
       description: 'OpsPick alerts',
       importance: Importance.high,
+      enableVibration: true,
+      playSound: true,
     );
     await _local!
         .resolvePlatformSpecificImplementation<
@@ -176,7 +179,7 @@ class PushNotificationService {
       id: notification.hashCode,
       title: notification.title,
       body: notification.body,
-      notificationDetails: const NotificationDetails(
+      notificationDetails: NotificationDetails(
         android: AndroidNotificationDetails(
           'high_importance_channel',
           'High Importance Notifications',
@@ -184,8 +187,15 @@ class PushNotificationService {
           importance: Importance.high,
           priority: Priority.high,
           icon: '@mipmap/ic_launcher',
+          enableVibration: true,
+          playSound: true,
+          vibrationPattern: Int64List.fromList([0, 250, 120, 250]),
         ),
-        iOS: DarwinNotificationDetails(),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
       ),
     );
   }

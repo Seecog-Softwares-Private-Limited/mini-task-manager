@@ -124,7 +124,12 @@ export function RecurringSeriesDrawer({
   const [draftEndDate, setDraftEndDate] = useState("");
   const [draftEndAfter, setDraftEndAfter] = useState(10);
   const [draftChecklist, setDraftChecklist] = useState<
-    Array<{ id?: string; title: string; dueTime: string }>
+    Array<{
+      id?: string;
+      title: string;
+      dueTime: string;
+      notifyMinutesBefore?: number | null;
+    }>
   >([]);
 
   useEffect(() => {
@@ -146,6 +151,7 @@ export function RecurringSeriesDrawer({
           id: s.id,
           title: s.title,
           dueTime: s.dueTime ?? "",
+          notifyMinutesBefore: s.notifyMinutesBefore ?? null,
         }))
       );
     }
@@ -221,6 +227,9 @@ export function RecurringSeriesDrawer({
           status: "TODO",
           priority: "MEDIUM",
           ...(item.dueTime.trim() ? { dueTime: item.dueTime.trim() } : {}),
+          ...(item.dueTime.trim() && item.notifyMinutesBefore != null
+            ? { notifyMinutesBefore: item.notifyMinutesBefore }
+            : {}),
         }))
         .filter((item) => item.title.length > 0),
     });
@@ -410,7 +419,7 @@ export function RecurringSeriesDrawer({
                       onClick={() =>
                         setDraftChecklist((prev) => [
                           ...prev,
-                          { title: "", dueTime: "" },
+                          { title: "", dueTime: "", notifyMinutesBefore: null },
                         ])
                       }
                     >
@@ -424,48 +433,94 @@ export function RecurringSeriesDrawer({
                   ) : (
                     <ul className="space-y-2">
                       {draftChecklist.map((item, index) => (
-                        <li key={item.id ?? `new-${index}`} className="flex gap-2">
-                          <Input
-                            value={item.title}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              setDraftChecklist((prev) =>
-                                prev.map((row, i) =>
-                                  i === index ? { ...row, title: value } : row
+                        <li
+                          key={item.id ?? `new-${index}`}
+                          className="space-y-1.5 rounded-md border border-border/40 bg-background/60 p-2"
+                        >
+                          <div className="flex gap-2">
+                            <Input
+                              value={item.title}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                setDraftChecklist((prev) =>
+                                  prev.map((row, i) =>
+                                    i === index ? { ...row, title: value } : row
+                                  )
+                                );
+                              }}
+                              className="h-9 flex-1 text-sm"
+                              placeholder={`Checklist item ${index + 1}`}
+                            />
+                            <Input
+                              type="time"
+                              value={item.dueTime}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                setDraftChecklist((prev) =>
+                                  prev.map((row, i) =>
+                                    i === index
+                                      ? {
+                                          ...row,
+                                          dueTime: value,
+                                          ...(value
+                                            ? {}
+                                            : { notifyMinutesBefore: null }),
+                                        }
+                                      : row
+                                  )
+                                );
+                              }}
+                              className="h-9 w-[7.5rem] text-sm"
+                              aria-label={`Due time for item ${index + 1}`}
+                            />
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="h-9 px-2 text-destructive"
+                              onClick={() =>
+                                setDraftChecklist((prev) =>
+                                  prev.filter((_, i) => i !== index)
                                 )
-                              );
-                            }}
-                            className="h-9 flex-1 text-sm"
-                            placeholder={`Checklist item ${index + 1}`}
-                          />
-                          <Input
-                            type="time"
-                            value={item.dueTime}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              setDraftChecklist((prev) =>
-                                prev.map((row, i) =>
-                                  i === index ? { ...row, dueTime: value } : row
-                                )
-                              );
-                            }}
-                            className="h-9 w-[7.5rem] text-sm"
-                            aria-label={`Due time for item ${index + 1}`}
-                          />
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            className="h-9 px-2 text-destructive"
-                            onClick={() =>
-                              setDraftChecklist((prev) =>
-                                prev.filter((_, i) => i !== index)
-                              )
-                            }
-                            aria-label={`Remove checklist item ${index + 1}`}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                              }
+                              aria-label={`Remove checklist item ${index + 1}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                          {item.dueTime ? (
+                            <select
+                              value={
+                                item.notifyMinutesBefore == null
+                                  ? ""
+                                  : String(item.notifyMinutesBefore)
+                              }
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                setDraftChecklist((prev) =>
+                                  prev.map((row, i) =>
+                                    i === index
+                                      ? {
+                                          ...row,
+                                          notifyMinutesBefore:
+                                            raw === "" ? null : Number(raw),
+                                        }
+                                      : row
+                                  )
+                                );
+                              }}
+                              className="h-8 w-full rounded-md border bg-background px-2 text-xs"
+                              aria-label={`Notify for item ${index + 1}`}
+                            >
+                              <option value="">Notify: Off</option>
+                              <option value="0">Notify: At due time</option>
+                              <option value="5">Notify: 5 minutes before</option>
+                              <option value="15">Notify: 15 minutes before</option>
+                              <option value="30">Notify: 30 minutes before</option>
+                              <option value="60">Notify: 1 hour before</option>
+                              <option value="120">Notify: 2 hours before</option>
+                            </select>
+                          ) : null}
                         </li>
                       ))}
                     </ul>

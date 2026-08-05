@@ -305,6 +305,12 @@ class TasksRepository {
         if (!omitSubtaskKeys.contains('dueTime')) {
           row.addAll(_normalizedDueTimeField(s.dueTime));
         }
+        if (!omitSubtaskKeys.contains('notifyMinutesBefore') &&
+            s.notifyMinutesBefore != null &&
+            s.dueTime != null &&
+            s.dueTime!.trim().isNotEmpty) {
+          row['notifyMinutesBefore'] = s.notifyMinutesBefore;
+        }
         put('status', s.status);
         put('priority', s.priority);
         put('statusId', s.statusId);
@@ -376,6 +382,7 @@ class TasksRepository {
       }
       for (final key in const [
         'dueTime',
+        'notifyMinutesBefore',
         'reporterId',
         'createdAt',
         'completedAt',

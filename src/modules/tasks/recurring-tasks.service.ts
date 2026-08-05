@@ -14,6 +14,7 @@ import { TasksService } from './tasks.service';
 import { TaskNotificationsService } from './task-notifications.service';
 import { ProjectsRepository } from '../projects/repositories/projects.repository';
 import type { TaskEntity } from './entities/task.entity';
+import type { RecurringTaskTemplateEntity } from './entities/recurring-task-template.entity';
 import { generateUuid } from '../../common/utils/uuid.util';
 import {
   computeNextRecurringDueDate,
@@ -52,6 +53,9 @@ function normalizeTemplateSubtasks(
       statusId: s.statusId,
       dueOffsetDays: s.dueOffsetDays ?? 0,
       ...(s.dueTime ? { dueTime: s.dueTime } : {}),
+      ...(s.notifyMinutesBefore != null
+        ? { notifyMinutesBefore: Number(s.notifyMinutesBefore) }
+        : {}),
     };
   });
 }
@@ -81,6 +85,9 @@ function cloneTemplateSubtasksForOccurrence(
       ...(assigneeIds.length ? { assigneeIds, assigneeId: assigneeIds[0] } : {}),
       ...(dueDate ? { dueDate } : {}),
       ...(s.dueTime ? { dueTime: s.dueTime } : {}),
+      ...(s.notifyMinutesBefore != null
+        ? { notifyMinutesBefore: Number(s.notifyMinutesBefore) }
+        : {}),
       status: 'TODO' as const,
       priority: s.priority,
       statusId: s.statusId,
@@ -920,7 +927,8 @@ export class RecurringTasksService {
           : 0;
 
       // Checklist often lives on the seed/run task when users edit a run.
-      // Hydrate (and backfill) templateSubtasks so Edit planner shows them.
+      // Hydrate for the API response only — do not write back to the template
+      // (that re-imported deleted items after a sync left stale run subtasks).
       let templateSubtasks = tpl.templateSubtasks ?? [];
       if (!templateSubtasks.length) {
         const seedOcc = [...history].sort((a, b) => a.sequenceNumber - b.sequenceNumber).find((h) => h.taskId);
@@ -936,6 +944,7 @@ export class RecurringTasksService {
                 assigneeIds: s.assigneeIds,
                 dueOffsetDays: 0,
                 dueTime: s.dueTime,
+                notifyMinutesBefore: s.notifyMinutesBefore,
                 priority: s.priority,
                 status: (s.status as 'TODO' | 'IN_PROGRESS' | 'DONE') ?? 'TODO',
                 statusId: s.statusId,
@@ -943,9 +952,6 @@ export class RecurringTasksService {
             );
             if (hydrated?.length) {
               templateSubtasks = hydrated;
-              await this.templatesRepository.update(tpl.id, {
-                templateSubtasks: hydrated,
-              } as never);
             }
           }
         }
@@ -1233,6 +1239,7 @@ export class RecurringTasksService {
         assigneeIds: s.assigneeIds,
         dueOffsetDays: 0,
         dueTime: s.dueTime,
+        notifyMinutesBefore: s.notifyMinutesBefore,
         priority: s.priority,
         status: (s.status as 'TODO' | 'IN_PROGRESS' | 'DONE') ?? 'TODO',
         statusId: s.statusId,
@@ -1358,51 +1365,93 @@ export class RecurringTasksService {
 
       if (syncChecklist) {
         const templateSubs = afterTemplate.templateSubtasks ?? [];
-        const existing = (task.subtasks ?? []).map((s) => ({ ...s }));
-        const usedExisting = new Set<number>();
-
-        const merged: NonNullable<TaskEntity['subtasks']> = [];
-        for (const templateSub of templateSubs) {
-          const titleKey = String(templateSub.title ?? '').trim().toLowerCase();
-          const matchIndex = existing.findIndex(
-            (item, index) =>
-              !usedExisting.has(index) &&
-              String(item.title ?? '').trim().toLowerCase() === titleKey,
+        // Clearing the planner checklist must clear pending runs too.
+        if (!templateSubs.length) {
+          patch.subtasks = null;
+        } else {
+          const beforeSubs = params.beforeTemplate.templateSubtasks ?? [];
+          const beforeById = new Map(
+            beforeSubs
+              .filter((s) => !!s?.id)
+              .map((s) => [String(s.id), s] as const),
           );
-          const assigneeIds = templateSub.assigneeIds?.length
-            ? [...templateSub.assigneeIds]
-            : templateSub.assigneeId
-              ? [templateSub.assigneeId]
-              : [];
+          const beforeTitleSet = new Set(
+            beforeSubs.map((s) => String(s.title ?? '').trim().toLowerCase()).filter(Boolean),
+          );
 
-          if (matchIndex >= 0) {
-            usedExisting.add(matchIndex);
-            const current = existing[matchIndex];
-            const next = {
-              ...current,
-              title: templateSub.title,
-              ...(templateSub.dueTime ? { dueTime: templateSub.dueTime } : {}),
-              ...(templateSub.priority ? { priority: templateSub.priority } : {}),
-            } as NonNullable<TaskEntity['subtasks']>[number];
-            delete next.assigneeId;
-            delete next.assigneeIds;
-            if (assigneeIds.length) {
-              next.assigneeIds = assigneeIds;
-              next.assigneeId = assigneeIds[0];
+          const existing = (task.subtasks ?? []).map((s) => ({ ...s }));
+          const usedExisting = new Set<number>();
+          const merged: NonNullable<TaskEntity['subtasks']> = [];
+
+          for (const templateSub of templateSubs) {
+            const titleKey = String(templateSub.title ?? '').trim().toLowerCase();
+            const before = templateSub.id ? beforeById.get(String(templateSub.id)) : undefined;
+            const beforeTitleKey = before
+              ? String(before.title ?? '').trim().toLowerCase()
+              : '';
+
+            // Prefer current title, then previous template title (rename), then id.
+            let matchIndex = existing.findIndex(
+              (item, index) =>
+                !usedExisting.has(index) &&
+                String(item.title ?? '').trim().toLowerCase() === titleKey,
+            );
+            if (matchIndex < 0 && beforeTitleKey && beforeTitleKey !== titleKey) {
+              matchIndex = existing.findIndex(
+                (item, index) =>
+                  !usedExisting.has(index) &&
+                  String(item.title ?? '').trim().toLowerCase() === beforeTitleKey,
+              );
             }
-            merged.push(next);
-          } else {
-            const runDueDate = task.dueDate ? String(task.dueDate).slice(0, 10) : nowYmd();
-            const [cloned] = cloneTemplateSubtasksForOccurrence([templateSub], runDueDate);
-            if (cloned) merged.push(cloned);
-          }
-        }
+            if (matchIndex < 0 && templateSub.id) {
+              matchIndex = existing.findIndex(
+                (item, index) =>
+                  !usedExisting.has(index) && String(item.id) === String(templateSub.id),
+              );
+            }
 
-        // Keep unmatched existing items (in-progress run-specific steps).
-        for (let i = 0; i < existing.length; i++) {
-          if (!usedExisting.has(i)) merged.push(existing[i]);
+            const assigneeIds = templateSub.assigneeIds?.length
+              ? [...templateSub.assigneeIds]
+              : templateSub.assigneeId
+                ? [templateSub.assigneeId]
+                : [];
+
+            if (matchIndex >= 0) {
+              usedExisting.add(matchIndex);
+              const current = existing[matchIndex];
+              const next = {
+                ...current,
+                title: templateSub.title,
+                ...(templateSub.dueTime ? { dueTime: templateSub.dueTime } : {}),
+                ...(templateSub.notifyMinutesBefore != null
+                  ? { notifyMinutesBefore: Number(templateSub.notifyMinutesBefore) }
+                  : {}),
+                ...(templateSub.priority ? { priority: templateSub.priority } : {}),
+              } as NonNullable<TaskEntity['subtasks']>[number];
+              delete next.assigneeId;
+              delete next.assigneeIds;
+              if (assigneeIds.length) {
+                next.assigneeIds = assigneeIds;
+                next.assigneeId = assigneeIds[0];
+              }
+              merged.push(next);
+            } else {
+              const runDueDate = task.dueDate ? String(task.dueDate).slice(0, 10) : nowYmd();
+              const [cloned] = cloneTemplateSubtasksForOccurrence([templateSub], runDueDate);
+              if (cloned) merged.push(cloned);
+            }
+          }
+
+          // Keep only run-specific steps that were never part of the previous template.
+          // Items removed/renamed away from the planner checklist must disappear.
+          for (let i = 0; i < existing.length; i++) {
+            if (usedExisting.has(i)) continue;
+            const titleKey = String(existing[i].title ?? '').trim().toLowerCase();
+            if (beforeTitleSet.has(titleKey)) continue;
+            merged.push(existing[i]);
+          }
+          patch.subtasks = merged.length ? merged : null;
         }
-        patch.subtasks = merged.length ? merged : null;
       }
 
       if (Object.keys(patch).length === 0) continue;
@@ -1415,5 +1464,198 @@ export class RecurringTasksService {
 
     return syncedTaskIds;
   }
+
+  /**
+   * Push title-only reminders for:
+   * - the ritual itself (ruleConfig.dueTime) → all checklist assignees, ritual title
+   * - each checklist item with its own dueTime → that item's assignees, item title
+   * Lead time: each checklist item uses its own notifyMinutesBefore.
+   * Ritual-level uses ruleConfig.notifyMinutesBefore (Asia/Kolkata wall clock).
+   */
+  async sendDueRitualReminders(now = new Date()): Promise<{ sent: number }> {
+    const today = toYmd(now);
+    const yesterday = subtractDays(today, 1);
+    const tomorrow = subtractDays(today, -1);
+    const nowMs = now.getTime();
+
+    const occurrences = await this.occurrencesRepository.findPendingForReminders(
+      yesterday,
+      tomorrow,
+    );
+    if (!occurrences.length) return { sent: 0 };
+
+    const templateCache = new Map<
+      string,
+      Awaited<ReturnType<RecurringTaskTemplatesRepository['findById']>>
+    >();
+    let sent = 0;
+
+    for (const occurrence of occurrences) {
+      if (!occurrence.taskId) continue;
+
+      let template = templateCache.get(occurrence.templateId);
+      if (template === undefined) {
+        template = await this.templatesRepository.findById(occurrence.templateId);
+        templateCache.set(occurrence.templateId, template);
+      }
+      if (!template || template.isPaused) continue;
+
+      const rule = (template.ruleConfig ?? {}) as TaskRecurrenceDto;
+      const seriesNotify =
+        rule.notifyMinutesBefore == null || Number.isNaN(Number(rule.notifyMinutesBefore))
+          ? null
+          : Math.max(0, Math.min(24 * 60, Number(rule.notifyMinutesBefore)));
+
+      const task = await this.tasksRepository.findById(occurrence.taskId);
+      if (!task) continue;
+
+      const runDueYmd = toYmd(new Date(occurrence.dueDate));
+      const sentKeys = new Set(occurrence.remindersSent ?? []);
+      // Legacy single-flag → treat ritual as already sent.
+      if (occurrence.reminderSentAt && !sentKeys.has('ritual')) {
+        sentKeys.add('ritual');
+      }
+      let keysChanged = false;
+
+      const markSent = async (key: string) => {
+        if (sentKeys.has(key)) return;
+        sentKeys.add(key);
+        keysChanged = true;
+        sent += 1;
+      };
+
+      // 1) Ritual-level reminder → every checklist assignee, ritual title.
+      const ritualDueTime = parseHHmm(rule.dueTime);
+      if (seriesNotify != null && ritualDueTime && !sentKeys.has('ritual')) {
+        if (isInRemindWindow(runDueYmd, ritualDueTime, seriesNotify, nowMs)) {
+          const recipientIds = collectChecklistAssigneeIds(
+            task.subtasks,
+            template.templateSubtasks,
+          );
+          if (recipientIds.length) {
+            const title = (task.title || template.title || 'Ritual').trim() || 'Ritual';
+            await this.taskNotifications.notifyRitualDue({
+              title,
+              recipientIds,
+              taskId: task.id,
+              projectId: task.projectId,
+              organizationId: task.organizationId,
+              occurrenceId: occurrence.id,
+            });
+          }
+          await markSent('ritual');
+        }
+      }
+
+      // 2) Per checklist item with its own due time → that item's assignees, item title.
+      const subtasks = task.subtasks?.length
+        ? task.subtasks
+        : (template.templateSubtasks ?? []).map((s) => ({
+            id: s.id,
+            title: s.title,
+            assigneeId: s.assigneeId,
+            assigneeIds: s.assigneeIds,
+            dueDate: undefined as string | undefined,
+            dueTime: s.dueTime,
+            notifyMinutesBefore: s.notifyMinutesBefore,
+            completed: false,
+          }));
+
+      for (const subtask of subtasks) {
+        const itemDueTime = parseHHmm(subtask.dueTime);
+        if (!itemDueTime) continue;
+        const key = `subtask:${subtask.id}`;
+        if (sentKeys.has(key)) continue;
+
+        const rawItemNotify = subtask.notifyMinutesBefore;
+        const notifyMinutesBefore =
+          rawItemNotify == null || Number.isNaN(Number(rawItemNotify))
+            ? null
+            : Math.max(0, Math.min(24 * 60, Number(rawItemNotify)));
+        if (notifyMinutesBefore == null) continue;
+
+        const itemDueYmd = subtask.dueDate
+          ? String(subtask.dueDate).slice(0, 10)
+          : runDueYmd;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(itemDueYmd)) continue;
+        if (!isInRemindWindow(itemDueYmd, itemDueTime, notifyMinutesBefore, nowMs)) {
+          continue;
+        }
+
+        const recipientIds = assigneeIdsForItem(subtask);
+        if (recipientIds.length) {
+          const title = (subtask.title || task.title || 'Checklist item').trim() || 'Checklist item';
+          await this.taskNotifications.notifyRitualDue({
+            title,
+            recipientIds,
+            taskId: task.id,
+            projectId: task.projectId,
+            organizationId: task.organizationId,
+            occurrenceId: occurrence.id,
+            subtaskId: subtask.id,
+          });
+        }
+        await markSent(key);
+      }
+
+      if (keysChanged) {
+        await this.occurrencesRepository.update(occurrence.id, {
+          remindersSent: Array.from(sentKeys),
+          // Keep legacy stamp when ritual reminder has fired.
+          ...(sentKeys.has('ritual') && !occurrence.reminderSentAt
+            ? { reminderSentAt: now }
+            : {}),
+        });
+      }
+    }
+
+    return { sent };
+  }
+}
+
+function parseHHmm(raw?: string | null): string | null {
+  if (!raw) return null;
+  const t = String(raw).trim().slice(0, 5);
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(t) ? t : null;
+}
+
+function isInRemindWindow(
+  dueYmd: string,
+  dueTime: string,
+  notifyMinutesBefore: number,
+  nowMs: number,
+): boolean {
+  const dueAtMs = Date.parse(`${dueYmd}T${dueTime}:00+05:30`);
+  if (!Number.isFinite(dueAtMs)) return false;
+  const remindAtMs = dueAtMs - notifyMinutesBefore * 60_000;
+  return nowMs >= remindAtMs && nowMs < remindAtMs + 60_000;
+}
+
+function assigneeIdsForItem(item: {
+  assigneeId?: string | null;
+  assigneeIds?: string[] | null;
+}): string[] {
+  const list =
+    item.assigneeIds?.length
+      ? item.assigneeIds
+      : item.assigneeId
+        ? [item.assigneeId]
+        : [];
+  return [
+    ...new Set(list.map((id) => String(id ?? '').trim()).filter(Boolean)),
+  ];
+}
+
+function collectChecklistAssigneeIds(
+  taskSubtasks: TaskEntity['subtasks'] | null | undefined,
+  templateSubtasks: RecurringTaskTemplateEntity['templateSubtasks'] | null | undefined,
+): string[] {
+  const ids = new Set<string>();
+  const source =
+    taskSubtasks?.length ? taskSubtasks : templateSubtasks?.length ? templateSubtasks : [];
+  for (const item of source) {
+    for (const id of assigneeIdsForItem(item)) ids.add(id);
+  }
+  return Array.from(ids);
 }
 

@@ -92,6 +92,22 @@ export class RecurringTaskOccurrencesRepository {
     });
   }
 
+  /** Pending runs with a task, due in [fromYmd, toYmd]. */
+  async findPendingForReminders(
+    fromYmd: string,
+    toYmd: string,
+  ): Promise<RecurringTaskOccurrenceEntity[]> {
+    return this.repo
+      .createQueryBuilder('o')
+      .where('o.state = :state', { state: 'PENDING' })
+      .andWhere('o.task_id IS NOT NULL')
+      .andWhere('o.due_date >= :fromYmd', { fromYmd })
+      .andWhere('o.due_date <= :toYmd', { toYmd })
+      .orderBy('o.due_date', 'ASC')
+      .take(2000)
+      .getMany();
+  }
+
   async statsByOrganization(organizationId: string, projectId?: string): Promise<RecurringTaskOccurrenceEntity[]> {
     return this.repo.find({
       where: {

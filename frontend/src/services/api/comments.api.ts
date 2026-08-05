@@ -1,5 +1,5 @@
 import { apiClient } from "@/services/api/client";
-import type { TaskComment } from "@/types/api";
+import type { SubtaskComment, TaskComment } from "@/types/api";
 
 export async function fetchComments(taskId: string): Promise<TaskComment[]> {
   const { data } = await apiClient.get<TaskComment[]>(`/tasks/${taskId}/comments`);
@@ -47,4 +47,54 @@ export async function fetchCommentCounts(
     }
   }
   return map;
+}
+
+/** Checklist / planner notes (threaded subtask comments). */
+export async function fetchSubtaskComments(
+  taskId: string,
+  subtaskId: string
+): Promise<SubtaskComment[]> {
+  const { data } = await apiClient.get<SubtaskComment[]>(
+    `/tasks/${taskId}/subtasks/${subtaskId}/comments`
+  );
+  return Array.isArray(data) ? data : [];
+}
+
+export async function addSubtaskComment(
+  taskId: string,
+  subtaskId: string,
+  body: string,
+  parentId?: string | null
+): Promise<SubtaskComment> {
+  const { data } = await apiClient.post<SubtaskComment>(
+    `/tasks/${taskId}/subtasks/${subtaskId}/comments`,
+    {
+      body,
+      ...(parentId ? { parentId } : {}),
+    }
+  );
+  return data;
+}
+
+export async function updateSubtaskComment(
+  taskId: string,
+  subtaskId: string,
+  commentId: string,
+  body: string
+): Promise<SubtaskComment> {
+  const { data } = await apiClient.patch<SubtaskComment>(
+    `/tasks/${taskId}/subtasks/${subtaskId}/comments/${commentId}`,
+    { body }
+  );
+  return data;
+}
+
+export async function deleteSubtaskComment(
+  taskId: string,
+  subtaskId: string,
+  commentId: string
+): Promise<void> {
+  await apiClient.delete(
+    `/tasks/${taskId}/subtasks/${subtaskId}/comments/${commentId}`
+  );
 }

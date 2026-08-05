@@ -1518,6 +1518,7 @@ export function TaskDetailModal({
                                   assigneeIds: item.assigneeIds ?? getSubtaskAssigneeIds(item),
                                   dueDate: item.dueDate,
                                   dueTime: item.dueTime,
+                                  notifyMinutesBefore: item.notifyMinutesBefore ?? null,
                                   status: resolveSubtaskStatus(item),
                                   priority: item.priority,
                                   requireLocation: item.requireLocation === true,

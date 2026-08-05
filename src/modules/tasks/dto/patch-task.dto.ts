@@ -85,6 +85,16 @@ class PatchTaskSubtaskDto {
   @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'dueTime must be HH:mm' })
   dueTime?: string;
 
+  /** Minutes before dueTime to notify this item's assignees. null clears. */
+  @Allow()
+  @IsOptional()
+  @ValidateIf((_o, v) => v != null)
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(24 * 60)
+  notifyMinutesBefore?: number | null;
+
   @IsOptional()
   @Transform(({ value }) => (typeof value === 'string' ? value.toUpperCase() : value))
   @IsIn(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'])

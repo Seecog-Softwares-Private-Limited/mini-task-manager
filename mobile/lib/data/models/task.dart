@@ -13,6 +13,7 @@ class TaskSubtask {
     this.assigneeIds = const [],
     this.dueDate,
     this.dueTime,
+    this.notifyMinutesBefore,
     this.status,
     this.priority,
     this.statusId,
@@ -32,6 +33,8 @@ class TaskSubtask {
   final List<String> assigneeIds;
   final String? dueDate;
   final String? dueTime;
+  /// Minutes before [dueTime] to notify assignees. null = inherit ritual / off.
+  final int? notifyMinutesBefore;
   final String? status;
   final String? priority;
   final String? statusId;
@@ -76,6 +79,7 @@ class TaskSubtask {
       assigneeIds: _parseStringList(json['assigneeIds']),
       dueDate: _nullableDateString(json['dueDate']),
       dueTime: _nullableString(json['dueTime']),
+      notifyMinutesBefore: _nullableInt(json['notifyMinutesBefore']),
       status: _nullableString(json['status']),
       priority: _nullableString(json['priority']),
       statusId: _nullableString(json['statusId']),
@@ -123,6 +127,8 @@ class TaskSubtask {
     List<String>? assigneeIds,
     String? dueDate,
     String? dueTime,
+    int? notifyMinutesBefore,
+    bool clearNotifyMinutesBefore = false,
     String? status,
     String? priority,
     String? statusId,
@@ -147,6 +153,9 @@ class TaskSubtask {
       assigneeIds: assigneeIds ?? this.assigneeIds,
       dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
       dueTime: clearDueTime || clearDueDate ? null : (dueTime ?? this.dueTime),
+      notifyMinutesBefore: clearNotifyMinutesBefore || clearDueTime || clearDueDate
+          ? null
+          : (notifyMinutesBefore ?? this.notifyMinutesBefore),
       status: status ?? this.status,
       priority: priority ?? this.priority,
       statusId: statusId ?? this.statusId,
@@ -308,6 +317,12 @@ String? _nullableString(dynamic value) {
   if (value == null) return null;
   final text = value.toString().trim();
   return text.isEmpty ? null : text;
+}
+
+int? _nullableInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  return int.tryParse(value.toString());
 }
 
 String? _nullableDateString(dynamic value) {

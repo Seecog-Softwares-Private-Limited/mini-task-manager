@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Mic, Paperclip, Upload } from "lucide-react";
+import { ImagePlus, Mic, Paperclip, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
@@ -43,6 +43,11 @@ interface SubtaskAttachmentsSectionProps {
   emptyLabel?: string;
   queueHelpText?: string;
   persistHelpText?: string;
+  /**
+   * Daily completion: empty state is a single “Attach proof” control;
+   * upload actions appear after tap (or when files already exist).
+   */
+  collapseEmpty?: boolean;
 }
 
 function pendingToCard(item: PendingSubtaskAttachment): AttachmentCardItem {
@@ -68,6 +73,7 @@ export function SubtaskAttachmentsSection({
   emptyLabel = "No subtask attachments yet",
   queueHelpText = "Files are queued locally and upload automatically when you create the task. Paste screenshots with Ctrl+V / Cmd+V while this section is focused.",
   persistHelpText = "Paste screenshots with Ctrl+V / Cmd+V while this section is focused.",
+  collapseEmpty = false,
 }: SubtaskAttachmentsSectionProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -76,6 +82,7 @@ export function SubtaskAttachmentsSection({
   const [previewTarget, setPreviewTarget] = React.useState<AttachmentPreviewTarget | null>(null);
   const [voiceOpen, setVoiceOpen] = React.useState(false);
   const [focused, setFocused] = React.useState(false);
+  const [proofPickerOpen, setProofPickerOpen] = React.useState(false);
   const [thumbById, setThumbById] = React.useState<Record<string, string>>({});
 
   const queryKey = ["entity-attachments", "SUBTASK", subtaskId];
@@ -229,6 +236,13 @@ export function SubtaskAttachmentsSection({
     ? [...persistedCards, ...uploadingCards]
     : pendingCards;
 
+  React.useEffect(() => {
+    setProofPickerOpen(false);
+  }, [subtaskId]);
+
+  const showUploadActions =
+    !collapseEmpty || proofPickerOpen || cards.length > 0 || uploadingFiles.length > 0;
+
   const removePending = (clientId: string) => {
     if (!onPendingChange) return;
     const removed = pendingAttachments.find((p) => p.clientId === clientId);
@@ -254,44 +268,48 @@ export function SubtaskAttachmentsSection({
           <Paperclip className="h-3.5 w-3.5" />
           {sectionLabel}
         </Label>
-        <div className="flex items-center gap-1.5">
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            className="hidden"
-            onChange={(e) => {
-              if (e.target.files?.length) void handleFiles(e.target.files);
-              e.target.value = "";
-            }}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 text-xs"
-            disabled={disabled}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Upload className="mr-1.5 h-3.5 w-3.5" />
-            Upload
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 text-xs"
-            disabled={disabled}
-            onClick={() => setVoiceOpen(true)}
-          >
-            <Mic className="mr-1.5 h-3.5 w-3.5" />
-            Voice
-          </Button>
-        </div>
+        {showUploadActions ? (
+          <div className="flex items-center gap-1.5">
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files?.length) void handleFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              disabled={disabled}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload className="mr-1.5 h-3.5 w-3.5" />
+              Upload
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs"
+              disabled={disabled}
+              onClick={() => setVoiceOpen(true)}
+            >
+              <Mic className="mr-1.5 h-3.5 w-3.5" />
+              Voice
+            </Button>
+          </div>
+        ) : null}
       </div>
-      <p className="text-[11px] text-muted-foreground">
-        {persist ? persistHelpText : queueHelpText}
-      </p>
+      {showUploadActions ? (
+        <p className="text-[11px] text-muted-foreground">
+          {persist ? persistHelpText : queueHelpText}
+        </p>
+      ) : null}
 
       {isLoading && persist ? (
         <p className="text-xs text-muted-foreground">Loading attachments…</p>
@@ -310,11 +328,22 @@ export function SubtaskAttachmentsSection({
             Retry
           </Button>
         </div>
-      ) : cards.length === 0 ? (
+      ) : cards.length === 0 && collapseEmpty && !proofPickerOpen ? (
+        <Button
+          type="button"
+          variant="outline"
+          className="h-10 w-full justify-center gap-2 text-sm"
+          disabled={disabled}
+          onClick={() => setProofPickerOpen(true)}
+        >
+          <ImagePlus className="h-4 w-4" />
+          Attach proof
+        </Button>
+      ) : cards.length === 0 && !(collapseEmpty && proofPickerOpen) ? (
         <p className="rounded-lg border border-dashed border-border/50 bg-muted/10 px-3 py-4 text-center text-xs text-muted-foreground">
           {emptyLabel}
         </p>
-      ) : (
+      ) : cards.length === 0 ? null : (
         <div className="space-y-2">
           {cards.map((card) => (
             <EntityAttachmentCard

@@ -36,5 +36,20 @@ export class RecurringTasksCron {
       );
     }
   }
+
+  /** Every minute: notify checklist assignees before ritual due time. */
+  @Cron(CronExpression.EVERY_MINUTE)
+  async sendRitualDueReminders() {
+    try {
+      const result = await this.recurringTasksService.sendDueRitualReminders();
+      if (result.sent > 0) {
+        this.logger.log(`Sent ${result.sent} ritual due reminder(s)`);
+      }
+    } catch (error) {
+      this.logger.error(
+        `Ritual reminder cron failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
 }
 

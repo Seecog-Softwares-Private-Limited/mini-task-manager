@@ -14,6 +14,10 @@ final recurringRepositoryProvider = Provider<RecurringRepository>((ref) {
 
 final recurringProjectIdProvider = StateProvider<String?>((ref) => null);
 
+/// UI-only: when true, the Planner tab's floating “Add planner” button hides
+/// while the user scrolls down (so it never covers the run cards).
+final recurringFabHiddenProvider = StateProvider<bool>((ref) => false);
+
 /// Set by the summary KPIs to ask the calendar tab to jump to a given day.
 /// The calendar consumes and resets it once handled.
 final recurringJumpToDateProvider = StateProvider<DateTime?>((ref) => null);

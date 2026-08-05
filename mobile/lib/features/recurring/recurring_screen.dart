@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -43,10 +44,26 @@ class RecurringScreen extends ConsumerWidget {
       );
     }
 
-    return DefaultTabController(
-      length: 2,
-      child: Column(
-        children: [
+    return NotificationListener<ScrollNotification>(
+      onNotification: (notification) {
+        final fabHidden = ref.read(recurringFabHiddenProvider.notifier);
+        if (notification is UserScrollNotification) {
+          if (notification.direction == ScrollDirection.reverse) {
+            if (!ref.read(recurringFabHiddenProvider)) {
+              fabHidden.state = true;
+            }
+          } else if (notification.direction == ScrollDirection.forward) {
+            if (ref.read(recurringFabHiddenProvider)) {
+              fabHidden.state = false;
+            }
+          }
+        }
+        return false;
+      },
+      child: DefaultTabController(
+        length: 2,
+        child: Column(
+          children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.md,
@@ -127,7 +144,8 @@ class RecurringScreen extends ConsumerWidget {
           ),
         ],
       ),
-    );
+    ),
+  );
   }
 }
 

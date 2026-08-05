@@ -1396,6 +1396,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                                 fallbackCreatedAt: _task.createdAt,
                                 saving: _savingSubtaskIndex == index,
                                 canComplete: canCompleteSubtasks,
+                                dailyRunMode: isRunChecklist,
                                 canEditRequireLocation: canToggleSubtaskRequireLocation(
                                   org: org,
                                   userId: currentUserId,

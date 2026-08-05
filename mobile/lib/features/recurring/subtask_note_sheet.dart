@@ -310,10 +310,6 @@ class _SubtaskNotesThreadSheetState
   Future<void> _post() async {
     final body = _composerController.text.trim();
     if (body.isEmpty && _pending.isEmpty) return;
-    if (body.isEmpty) {
-      setState(() => _error = 'Add a note before attaching files.');
-      return;
-    }
     if (widget.subtask.id.trim().isEmpty) {
       setState(() => _error = 'Save the checklist item before adding notes.');
       return;
