@@ -38,42 +38,76 @@ export class PushNotificationsService implements OnModuleInit {
     const pathEnv = firebaseCfg?.serviceAccountPath?.trim();
 
     try {
-      let credential: ServiceAccount | undefined;
+      let raw: Record<string, unknown> | undefined;
       let loadedFrom = '';
 
       if (jsonEnv) {
-        credential = JSON.parse(jsonEnv) as ServiceAccount;
+        raw = JSON.parse(jsonEnv) as Record<string, unknown>;
         loadedFrom = 'FIREBASE_SERVICE_ACCOUNT_JSON';
       } else {
         const candidates = this.resolveServiceAccountCandidates(pathEnv);
         for (const path of candidates) {
           if (existsSync(path)) {
-            credential = JSON.parse(readFileSync(path, 'utf8')) as ServiceAccount;
+            raw = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
             loadedFrom = path;
             break;
           }
         }
       }
 
-      if (!credential) {
+      if (!raw) {
         this.logger.error(
           'Firebase Admin not configured (set FIREBASE_SERVICE_ACCOUNT_PATH / FIREBASE_SERVICE_ACCOUNT_JSON or place config/firebase-service-account.json on the API host). Push notifications are DISABLED until this is fixed. Device token registration will still succeed.',
         );
         return;
       }
 
+      const credential = this.normalizeServiceAccount(raw);
       initializeApp({
         credential: cert(credential),
+        projectId: credential.projectId,
       });
       this.ready = true;
       this.logger.log(
-        `Firebase Admin initialized — push notifications enabled (from ${loadedFrom})`,
+        `Firebase Admin initialized — push notifications enabled (from ${loadedFrom}, project=${credential.projectId})`,
       );
     } catch (err) {
       this.logger.error(
         `Firebase Admin init failed: ${err instanceof Error ? err.message : err}`,
       );
     }
+  }
+
+  /**
+   * Google SA JSON uses snake_case; firebase-admin cert() wants camelCase.
+   * Also fix private_key values that were pasted with literal "\\n" sequences.
+   */
+  private normalizeServiceAccount(raw: Record<string, unknown>): ServiceAccount {
+    const projectId = String(raw.project_id || raw.projectId || '').trim();
+    const clientEmail = String(raw.client_email || raw.clientEmail || '').trim();
+    let privateKey = String(raw.private_key || raw.privateKey || '');
+
+    if (!projectId || !clientEmail || !privateKey) {
+      throw new Error(
+        'Service account JSON missing project_id / client_email / private_key',
+      );
+    }
+
+    // If the key was double-escaped when copied into env/file, restore real newlines.
+    if (privateKey.includes('\\n') && !privateKey.includes('\n')) {
+      privateKey = privateKey.replace(/\\n/g, '\n');
+      this.logger.warn(
+        'Firebase private_key had escaped \\n sequences — normalized to real newlines',
+      );
+    }
+
+    if (!privateKey.includes('BEGIN PRIVATE KEY')) {
+      throw new Error(
+        'Firebase private_key looks corrupted (missing BEGIN PRIVATE KEY marker)',
+      );
+    }
+
+    return { projectId, clientEmail, privateKey };
   }
 
   /**
@@ -297,7 +331,9 @@ export class PushNotificationsService implements OnModuleInit {
           await this.deviceTokensRepository.deleteByToken(token);
         } else {
           this.logger.warn(
-            `FCM failure for user ${userId}: ${code || res.error?.message || 'unknown'}`,
+            `FCM failure for user ${userId}: ${code || res.error?.message || 'unknown'}${
+              res.error?.message ? ` — ${res.error.message}` : ''
+            }`,
           );
         }
       }),
