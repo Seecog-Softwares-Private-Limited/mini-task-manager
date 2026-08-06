@@ -152,8 +152,9 @@ class TaskSubtask {
       assigneeId: assigneeId ?? this.assigneeId,
       assigneeIds: assigneeIds ?? this.assigneeIds,
       dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
-      dueTime: clearDueTime || clearDueDate ? null : (dueTime ?? this.dueTime),
-      notifyMinutesBefore: clearNotifyMinutesBefore || clearDueTime || clearDueDate
+      // Time-only reminders are valid (planner checklist): clearDueDate must not wipe dueTime/notify.
+      dueTime: clearDueTime ? null : (dueTime ?? this.dueTime),
+      notifyMinutesBefore: clearNotifyMinutesBefore || clearDueTime
           ? null
           : (notifyMinutesBefore ?? this.notifyMinutesBefore),
       status: status ?? this.status,

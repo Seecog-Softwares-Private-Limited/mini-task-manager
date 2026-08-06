@@ -106,14 +106,17 @@ export function RecurringSubtaskChecklist({
   const updateMutation = useMutation({
     mutationFn: (subtasks: TaskSubtask[]) => updateTask(taskId!, { subtasks }),
     onMutate: async (subtasks) => {
-      await queryClient.cancelQueries({ queryKey: ["task", taskId ?? ""] });
-      const previous = queryClient.getQueryData<Task>(["task", taskId ?? ""]);
-      if (previous) {
-        const optimistic = { ...previous, subtasks };
-        queryClient.setQueryData(["task", taskId], optimistic);
-        onTaskUpdated?.(optimistic);
+      if (boardQueryKey) {
+        await queryClient.cancelQueries({ queryKey: [...boardQueryKey] });
       }
-      return { previous };
+      await queryClient.cancelQueries({ queryKey: ["task", taskId ?? ""] });
+      const fromTaskCache = queryClient.getQueryData<Task>(["task", taskId ?? ""]);
+      const base = fromTaskCache ?? task;
+      if (!base) return {};
+      const optimistic = { ...base, subtasks };
+      queryClient.setQueryData(["task", taskId], optimistic);
+      onTaskUpdated?.(optimistic);
+      return { previous: base };
     },
     onError: (err, _vars, ctx) => {
       if (ctx?.previous) {
@@ -129,9 +132,7 @@ export function RecurringSubtaskChecklist({
     onSuccess: (updated) => {
       queryClient.setQueryData(["task", taskId], updated);
       onTaskUpdated?.(updated);
-      if (boardQueryKey) {
-        queryClient.invalidateQueries({ queryKey: boardQueryKey as string[] });
-      }
+      // Prefer board merge via onTaskUpdated; avoid immediate refetch racing the patch.
     },
   });
 

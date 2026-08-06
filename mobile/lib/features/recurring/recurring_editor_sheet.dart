@@ -815,13 +815,13 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
                             child: SubtaskDetailPanel(
                               subtask: item,
                               members: _members,
-                              taskId: widget.template?.id ?? 'template-draft',
+                              // Series setup is not a board task — never pass template id as taskId.
+                              taskId: '',
                               organizationId: widget.organizationId,
                               saving: false,
                               canComplete: false,
-                              // Full editor (attachments/camera/etc) when the series already exists.
-                              templateMode: widget.template?.id == null ||
-                                  widget.template!.id.isEmpty,
+                              // Always template mode: time/notify/assignees only; files on daily runs.
+                              templateMode: true,
                               onRequestCompletion: ({
                                 required String subtaskId,
                                 required String subtaskTitle,
