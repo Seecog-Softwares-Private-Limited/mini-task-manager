@@ -36,7 +36,8 @@
     "migrate:passwords": "npx ts-node -r tsconfig-paths/register scripts/migrate-passwords.ts",
     "dev": "node app.js",
     "dev:split": "concurrently -n api,web -c blue,green \"npm run start:dev\" \"npm run dev:frontend\"",
-    "dev:frontend": "cd frontend && npm run dev"
+    "dev:frontend": "cd frontend && npm run dev",
+    "mirror:uploads": "npx ts-node -r tsconfig-paths/register scripts/mirror-uploads-to-vps.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",

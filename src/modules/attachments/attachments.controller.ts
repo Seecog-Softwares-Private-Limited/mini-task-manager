@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   Param,
   Post,
   Query,
@@ -21,8 +22,10 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
 import { TenantId } from '../../common/decorators/tenant.decorator';
 import { CurrentUserId } from '../../common/decorators/current-user.decorator';
+import { Public } from '../../common/decorators/public.decorator';
 import { AttachmentsService } from './attachments.service';
 import { AttachmentResponseDto } from './dto/attachment-response.dto';
+import { MirrorBlobDto } from './dto/mirror-blob.dto';
 import type { AttachmentEntityType } from './entities/attachment.entity';
 
 interface MulterFile {
@@ -39,6 +42,23 @@ interface MulterFile {
 @UseGuards(JwtAuthGuard, TenantGuard)
 export class AttachmentsController {
   constructor(private readonly attachmentsService: AttachmentsService) {}
+
+  /**
+   * Local Nest → production: copy attachment bytes so mobile (VPS) can preview
+   * files uploaded via localhost web while sharing the same DB.
+   */
+  @Public()
+  @Post('mirror-blob')
+  async mirrorBlob(
+    @Headers('x-uploads-mirror-secret') secret: string | undefined,
+    @Body() body: MirrorBlobDto,
+  ): Promise<{ ok: true }> {
+    return this.attachmentsService.acceptMirroredUpload(
+      secret,
+      body.storageKey,
+      body.contentBase64,
+    );
+  }
 
   @Post('upload')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))

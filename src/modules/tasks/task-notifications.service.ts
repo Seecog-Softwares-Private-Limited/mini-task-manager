@@ -78,7 +78,7 @@ export class TaskNotificationsService {
     );
   }
 
-  /** Title-only push (+ in-app) for ritual / checklist due reminders. */
+  /** Push (+ in-app) for ritual / checklist due reminders. */
   async notifyRitualDue(params: {
     title: string;
     recipientIds: string[];
@@ -87,8 +87,27 @@ export class TaskNotificationsService {
     organizationId: string;
     occurrenceId: string;
     subtaskId?: string;
+    /** Wall-clock due time HH:mm (Asia/Kolkata). */
+    dueTime?: string;
+    /** Minutes before due when this reminder was scheduled. */
+    notifyMinutesBefore?: number;
   }): Promise<void> {
-    const title = params.title.trim() || 'Ritual';
+    const itemTitle = params.title.trim() || 'Checklist item';
+    const lead = params.notifyMinutesBefore;
+    const dueTime = params.dueTime?.trim();
+    const message =
+      lead == null
+        ? dueTime
+          ? `Reminder — due at ${dueTime}`
+          : 'Reminder — due soon'
+        : lead === 0
+          ? dueTime
+            ? `Due now (${dueTime})`
+            : 'Due now'
+          : dueTime
+            ? `Due in ${formatLeadMinutes(lead)} (at ${dueTime})`
+            : `Due in ${formatLeadMinutes(lead)}`;
+
     const uniqueIds = [
       ...new Set(
         params.recipientIds
@@ -99,13 +118,15 @@ export class TaskNotificationsService {
     await Promise.all(
       uniqueIds.map((userId) =>
         this.notificationsService
-          .createNotification(userId, title, '', {
+          .createNotification(userId, itemTitle, message, {
             type: params.subtaskId ? 'checklist_reminder' : 'ritual_reminder',
             taskId: params.taskId,
             projectId: params.projectId,
             organizationId: params.organizationId,
             occurrenceId: params.occurrenceId,
             ...(params.subtaskId ? { subtaskId: params.subtaskId } : {}),
+            ...(dueTime ? { dueTime } : {}),
+            ...(lead != null ? { notifyMinutesBefore: String(lead) } : {}),
             vibrate: '1',
           })
           .catch((err) =>
@@ -710,4 +731,12 @@ export class TaskNotificationsService {
       return null;
     }
   }
+}
+
+function formatLeadMinutes(minutes: number): string {
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'}`;
+  const hours = Math.floor(minutes / 60);
+  const rem = minutes % 60;
+  if (rem === 0) return `${hours} hour${hours === 1 ? '' : 's'}`;
+  return `${hours}h ${rem}m`;
 }

@@ -46,6 +46,15 @@ export const configuration = () => {
         : undefined,
     },
     uploadsPath: process.env.UPLOADS_PATH || join(process.cwd(), 'uploads'),
+    /**
+     * When local Nest shares a remote DB with production, uploads land on the
+     * local disk only. Set PUBLIC_API_URL (+ optional UPLOADS_MIRROR_SECRET) so
+     * new files are also written on the VPS for mobile clients.
+     */
+    publicApiUrl: (process.env.PUBLIC_API_URL || '').replace(/\/$/, ''),
+    uploadsMirrorSecret:
+      process.env.UPLOADS_MIRROR_SECRET?.trim() ||
+      (process.env.JWT_SECRET ? `mirror:${process.env.JWT_SECRET}` : ''),
     jwt: {
       secret: jwtSecret,
       expiresIn: process.env.JWT_EXPIRES_IN || '7d',

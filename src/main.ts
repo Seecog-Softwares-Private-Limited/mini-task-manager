@@ -2,6 +2,7 @@ import './bootstrap-env';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
@@ -10,7 +11,10 @@ import { Configuration } from './config/configuration';
 const logger = new Logger('Bootstrap');
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // Larger JSON limit so local→VPS upload mirroring can send base64 blobs (~10MB files).
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
+  app.use(json({ limit: '15mb' }));
+  app.use(urlencoded({ extended: true, limit: '15mb' }));
   const config = app.get(ConfigService<Configuration>);
   const nodeEnv = config.get('nodeEnv', { infer: true }) ?? 'development';
   const apiPrefix = config.get('apiPrefix', { infer: true }) ?? 'api/v1';
@@ -46,7 +50,12 @@ async function bootstrap() {
     origin: corsOrigin,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Organization-Id'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Organization-Id',
+      'X-Uploads-Mirror-Secret',
+    ],
   });
 
   app.useGlobalPipes(

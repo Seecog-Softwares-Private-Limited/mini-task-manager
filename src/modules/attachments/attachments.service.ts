@@ -4,6 +4,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -111,6 +112,8 @@ function isPreviewableMime(
 
 @Injectable()
 export class AttachmentsService {
+  private readonly logger = new Logger(AttachmentsService.name);
+
   constructor(
     private readonly attachmentsRepository: AttachmentsRepository,
     private readonly tasksRepository: TasksRepository,
@@ -211,7 +214,99 @@ export class AttachmentsService {
     });
 
     await this.planLimitService.incrementStorageUsed(userId, file.size);
+    // Fire-and-forget: copy bytes to production host so mobile (VPS API) can preview.
+    void this.mirrorUploadBytes(storageKey, file.buffer);
     return attachment;
+  }
+
+  /**
+   * Accept a mirrored file blob from another Nest instance that shares this DB.
+   * Writes only the file; the attachment row already exists.
+   */
+  async acceptMirroredUpload(
+    secret: string | undefined,
+    storageKey: string,
+    contentBase64: string,
+  ): Promise<{ ok: true }> {
+    const expected = this.configService.get('uploadsMirrorSecret', { infer: true }) ?? '';
+    if (!expected || !secret || secret !== expected) {
+      throw new ForbiddenException('Invalid mirror secret');
+    }
+    const key = String(storageKey ?? '')
+      .replace(/\\/g, '/')
+      .replace(/^\/+/, '');
+    if (!key || key.includes('..') || !key.startsWith('attachments/')) {
+      throw new BadRequestException('Invalid storageKey');
+    }
+    let buffer: Buffer;
+    try {
+      buffer = Buffer.from(String(contentBase64 ?? ''), 'base64');
+    } catch {
+      throw new BadRequestException('Invalid file payload');
+    }
+    if (!buffer.length || buffer.length > MAX_FILE_SIZE) {
+      throw new BadRequestException('Invalid file size');
+    }
+    const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
+    const fullPath = path.join(uploadsPath, key);
+    await fs.mkdir(path.dirname(fullPath), { recursive: true });
+    await fs.writeFile(fullPath, buffer);
+    return { ok: true };
+  }
+
+  private async mirrorUploadBytes(storageKey: string, buffer: Buffer): Promise<void> {
+    const publicApiUrl = this.configService.get('publicApiUrl', { infer: true }) ?? '';
+    const secret = this.configService.get('uploadsMirrorSecret', { infer: true }) ?? '';
+    if (!publicApiUrl || !secret) return;
+
+    // Skip when this process is already the public host (production).
+    try {
+      const target = new URL(publicApiUrl);
+      const port = this.configService.get('port', { infer: true });
+      const isLoopback =
+        target.hostname === 'localhost' ||
+        target.hostname === '127.0.0.1' ||
+        target.hostname === '0.0.0.0';
+      if (isLoopback) return;
+      // If we're listening as the public host on the same port, don't self-POST.
+      // (Local:3007 → VPS:3000 is the intended path.)
+      if (
+        process.env.APP_MODE === 'production' &&
+        String(target.port || (target.protocol === 'https:' ? 443 : 80)) === String(port)
+      ) {
+        return;
+      }
+    } catch {
+      return;
+    }
+
+    const endpoint = `${publicApiUrl}/api/v1/attachments/mirror-blob`;
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Uploads-Mirror-Secret': secret,
+        },
+        body: JSON.stringify({
+          storageKey,
+          contentBase64: buffer.toString('base64'),
+        }),
+        signal: AbortSignal.timeout(20_000),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        this.logger.warn(
+          `Upload mirror failed (${res.status}) for ${storageKey}: ${text.slice(0, 160)}`,
+        );
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Upload mirror error for ${storageKey}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
   }
 
   async getFileForDownload(
