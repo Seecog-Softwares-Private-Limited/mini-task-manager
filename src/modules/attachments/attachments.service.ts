@@ -129,7 +129,15 @@ export class AttachmentsService {
     organizationId: string,
     taskIdHint?: string,
   ): Promise<AttachmentEntity[]> {
-    await this.assertEntityAccess(entityType, entityId, organizationId, taskIdHint);
+    try {
+      await this.assertEntityAccess(entityType, entityId, organizationId, taskIdHint);
+    } catch (err) {
+      // List should not 404 for series/template checklist ids (no board task yet).
+      if (err instanceof NotFoundException && entityType === 'SUBTASK') {
+        return [];
+      }
+      throw err;
+    }
     return this.attachmentsRepository.findByEntityInWorkspace(
       entityType,
       entityId,

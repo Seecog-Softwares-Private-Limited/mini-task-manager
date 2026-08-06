@@ -1472,12 +1472,19 @@ export class RecurringTasksService {
               const next = {
                 ...current,
                 title: templateSub.title,
-                ...(templateSub.dueTime ? { dueTime: templateSub.dueTime } : {}),
-                ...(templateSub.notifyMinutesBefore != null
-                  ? { notifyMinutesBefore: Number(templateSub.notifyMinutesBefore) }
-                  : {}),
                 ...(templateSub.priority ? { priority: templateSub.priority } : {}),
               } as NonNullable<TaskEntity['subtasks']>[number];
+              // Template is source of truth for schedule/reminder (time-only is OK; no due date).
+              if (templateSub.dueTime) {
+                next.dueTime = templateSub.dueTime;
+              } else {
+                delete next.dueTime;
+              }
+              if (templateSub.notifyMinutesBefore != null && templateSub.dueTime) {
+                next.notifyMinutesBefore = Number(templateSub.notifyMinutesBefore);
+              } else {
+                delete next.notifyMinutesBefore;
+              }
               delete next.assigneeId;
               delete next.assigneeIds;
               if (assigneeIds.length) {

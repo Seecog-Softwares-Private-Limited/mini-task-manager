@@ -369,16 +369,23 @@ export default function RecurringTasksPage() {
 
   const permissions = useBoardPermissions(orgMembers, currentUserId);
   // Recurring planners (series templates + runs) are manageable by OWNER + ADMIN.
+  // Checklist completion on runs is also allowed for MEMBER/CONTRIBUTOR (assignees);
+  // backend still enforces assignee/owner rules on PATCH.
   const canManageSeries =
     permissions.role === "OWNER" || permissions.role === "ADMIN";
+  const canEditOccurrenceChecklist =
+    canManageSeries ||
+    permissions.canEditTask ||
+    permissions.role === "MEMBER" ||
+    permissions.role === "CONTRIBUTOR";
   const plannerPermissions = useMemo(
     () => ({
       ...permissions,
       canDeleteTask: canManageSeries,
-      canEditTask: canManageSeries || permissions.canEditTask,
+      canEditTask: canEditOccurrenceChecklist,
       canMoveTask: canManageSeries || permissions.canMoveTask,
     }),
-    [permissions, canManageSeries],
+    [permissions, canManageSeries, canEditOccurrenceChecklist],
   );
 
   const assigneeMap: AssigneeMap = useMemo(() => {
@@ -1270,7 +1277,7 @@ export default function RecurringTasksPage() {
                   subtaskMap={subtaskMap}
                   commentCountMap={commentCountMap}
                   doneStatusId={doneStatusId}
-                  readOnly={!permissions.canEditTask}
+                  readOnly={!plannerPermissions.canEditTask}
                   onTaskClick={(task) => setSelectedTaskId(task.id)}
                   onMarkDone={(task) => recurringActionMutation.mutate({ type: "complete", task })}
                   onSkip={(task) => recurringActionMutation.mutate({ type: "skip", task })}
@@ -1440,7 +1447,7 @@ export default function RecurringTasksPage() {
             recurringTemplateMap={recurringTemplateMap}
             statuses={statuses}
             overdueTaskIds={overdueTaskIds}
-            readOnly={!permissions.canEditTask}
+            readOnly={!plannerPermissions.canEditTask}
             boardQueryKey={boardQueryKey}
             onTaskUpdated={handleOccurrenceTaskUpdated}
             onMarkDone={(task) => recurringActionMutation.mutate({ type: "complete", task })}
@@ -1494,7 +1501,7 @@ export default function RecurringTasksPage() {
             boardQueryKey={boardQueryKey}
             onTaskUpdated={handleOccurrenceTaskUpdated}
             commentCount={selectedTaskId ? commentCountMap[selectedTaskId] : 0}
-            readOnly={!permissions.canEditTask}
+            readOnly={!plannerPermissions.canEditTask}
             onMarkDone={(task) => recurringActionMutation.mutate({ type: "complete", task })}
             onSkip={(task) => recurringActionMutation.mutate({ type: "skip", task })}
             onSnooze={(task) => snoozeMutation.mutate(task)}
@@ -1516,7 +1523,7 @@ export default function RecurringTasksPage() {
               queryClient.invalidateQueries({ queryKey: ["recurring-summary"] });
               queryClient.invalidateQueries({ queryKey: ["recurring-templates"] });
             }}
-            readOnly={!permissions.canEditTask}
+            readOnly={!plannerPermissions.canEditTask}
           />
         </>
       )}

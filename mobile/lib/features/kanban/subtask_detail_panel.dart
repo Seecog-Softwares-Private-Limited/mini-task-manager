@@ -146,7 +146,13 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
       _completionRecord = widget.subtask.completionRecord;
       _notePreview = widget.subtask.note;
       _proofPickerOpen = false;
-      _loadAttachments();
+      if (!widget.templateMode) {
+        _loadAttachments();
+      } else {
+        _attachments = const [];
+        _attachmentError = null;
+        _loadingAttachments = false;
+      }
       return;
     }
     if (oldWidget.subtask.note != widget.subtask.note) {
@@ -157,13 +163,37 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     if (!wasDone && isDone) {
       _completionRecord = widget.subtask.completionRecord;
       _status = 'DONE';
-      _loadAttachments();
+      if (!widget.templateMode) {
+        _loadAttachments();
+      }
     } else if (oldWidget.subtask.completionRecord != widget.subtask.completionRecord) {
       _completionRecord = widget.subtask.completionRecord;
     }
   }
 
   Future<void> _loadAttachments() async {
+    if (widget.templateMode) {
+      if (!mounted) return;
+      setState(() {
+        _attachments = const [];
+        _attachmentError = null;
+        _loadingAttachments = false;
+      });
+      return;
+    }
+    final subtaskId = widget.subtask.id.trim();
+    final taskId = widget.taskId.trim();
+    if (subtaskId.isEmpty ||
+        taskId.isEmpty ||
+        taskId == 'template-draft') {
+      if (!mounted) return;
+      setState(() {
+        _attachments = const [];
+        _attachmentError = null;
+        _loadingAttachments = false;
+      });
+      return;
+    }
     setState(() {
       _loadingAttachments = true;
       _attachmentError = null;
@@ -171,9 +201,9 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     try {
       final items = await ref.read(attachmentsRepositoryProvider).fetchEntityAttachments(
             entityType: 'SUBTASK',
-            entityId: widget.subtask.id,
+            entityId: subtaskId,
             organizationId: widget.organizationId,
-            taskId: widget.taskId,
+            taskId: taskId,
           );
       if (!mounted) return;
       setState(() {
