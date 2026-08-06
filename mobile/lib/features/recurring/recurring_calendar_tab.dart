@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -811,12 +813,79 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
   late List<Task> _tasks;
   final Set<String> _expanded = {};
   bool _busy = false;
+  Timer? _peerSyncTimer;
+  bool _peerSyncInFlight = false;
 
   @override
   void initState() {
     super.initState();
     _tasks = List<Task>.from(widget.initialTasks);
     _expanded.addAll(_tasks.map((t) => t.id));
+    _peerSyncTimer = Timer.periodic(
+      const Duration(seconds: 12),
+      (_) => _syncPeersFromServer(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _peerSyncTimer?.cancel();
+    super.dispose();
+  }
+
+  /// Pull latest checklist completion from the API so other users' checkmarks appear.
+  Future<void> _syncPeersFromServer() async {
+    if (!mounted || _busy || _peerSyncInFlight || _tasks.isEmpty) return;
+    _peerSyncInFlight = true;
+    try {
+      final repo = ref.read(tasksRepositoryProvider);
+      final ids = _tasks.map((t) => t.id).toList(growable: false);
+      final refreshed = await Future.wait(ids.map(repo.fetchTask));
+      if (!mounted || _busy) return;
+
+      final byId = {for (final t in refreshed) t.id: t};
+      var changed = false;
+      final next = <Task>[];
+      for (final local in _tasks) {
+        final server = byId[local.id];
+        if (server == null) {
+          next.add(local);
+          continue;
+        }
+        if (!_checklistEqual(local.subtasks, server.subtasks) ||
+            local.statusId != server.statusId) {
+          changed = true;
+          next.add(server);
+        } else {
+          next.add(local);
+        }
+      }
+      if (changed && mounted) {
+        setState(() => _tasks = next);
+        widget.onChanged();
+      }
+    } catch (_) {
+      // Soft sync — ignore transient network errors.
+    } finally {
+      _peerSyncInFlight = false;
+    }
+  }
+
+  bool _checklistEqual(List<TaskSubtask> a, List<TaskSubtask> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    final byId = {for (final s in b) s.id: s};
+    for (final left in a) {
+      final right = byId[left.id];
+      if (right == null) return false;
+      if (left.completed != right.completed) return false;
+      if ((left.status ?? '') != (right.status ?? '')) return false;
+      if ((left.effectiveCompletedAt ?? '') !=
+          (right.effectiveCompletedAt ?? '')) {
+        return false;
+      }
+    }
+    return true;
   }
 
   String? get _orgId => ref.read(sessionControllerProvider).orgId;

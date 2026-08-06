@@ -824,7 +824,7 @@ export function SubtaskNotesSheet({
                   disabled={
                     postMutation.isPending ||
                     !subtaskId ||
-                    (!draft.trim() && (editing || pending.length === 0))
+                    (!draft.trim() && (!!editing || pending.length === 0))
                   }
                 >
                   {postMutation.isPending

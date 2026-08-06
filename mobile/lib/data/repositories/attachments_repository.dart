@@ -163,40 +163,45 @@ class AttachmentsRepository {
   }
 
   /// Load attachment bytes for preview.
+  ///
+  /// When [preferPreview] is true (images), try `/preview` before `/download`
+  /// so clients match web behavior.
   Future<Uint8List> fetchAttachmentContent({
     required String attachmentId,
     required String organizationId,
     AttachmentSource source = AttachmentSource.entity,
+    bool preferPreview = false,
   }) async {
-    final attempts = source == AttachmentSource.task
-        ? <Future<Uint8List> Function()>[
-            () => fetchTaskAttachmentBytes(
-                  attachmentId: attachmentId,
-                  organizationId: organizationId,
-                ),
-            () => downloadBytes(
-                  attachmentId: attachmentId,
-                  organizationId: organizationId,
-                ),
-            () => fetchPreviewBytes(
-                  attachmentId: attachmentId,
-                  organizationId: organizationId,
-                ),
-          ]
-        : <Future<Uint8List> Function()>[
-            () => downloadBytes(
-                  attachmentId: attachmentId,
-                  organizationId: organizationId,
-                ),
-            () => fetchPreviewBytes(
-                  attachmentId: attachmentId,
-                  organizationId: organizationId,
-                ),
-            () => fetchTaskAttachmentBytes(
-                  attachmentId: attachmentId,
-                  organizationId: organizationId,
-                ),
-          ];
+    final attempts = <Future<Uint8List> Function()>[];
+    void addPreview() => attempts.add(
+          () => fetchPreviewBytes(
+            attachmentId: attachmentId,
+            organizationId: organizationId,
+          ),
+        );
+    void addDownload() => attempts.add(
+          () => downloadBytes(
+            attachmentId: attachmentId,
+            organizationId: organizationId,
+          ),
+        );
+    void addTaskFile() => attempts.add(
+          () => fetchTaskAttachmentBytes(
+            attachmentId: attachmentId,
+            organizationId: organizationId,
+          ),
+        );
+
+    if (preferPreview) addPreview();
+    if (source == AttachmentSource.task) {
+      addTaskFile();
+      addDownload();
+      if (!preferPreview) addPreview();
+    } else {
+      addDownload();
+      if (!preferPreview) addPreview();
+      addTaskFile();
+    }
 
     ApiException? lastError;
     for (final attempt in attempts) {
@@ -236,15 +241,24 @@ class AttachmentsRepository {
     required String fallbackMessage,
   }) async {
     try {
+      final options = _api.withOrgHeader(
+        organizationId,
+        base: Options(
+          responseType: ResponseType.bytes,
+          headers: const {
+            Headers.acceptHeader: '*/*',
+          },
+          validateStatus: (status) => status != null && status < 500,
+        ),
+      );
+      // Base Dio config sets Content-Type: application/json; strip it for binary GETs.
+      final headers = Map<String, dynamic>.from(options.headers ?? {});
+      headers.remove(Headers.contentTypeHeader);
+      headers.remove('content-type');
+
       final response = await _api.dio.get<dynamic>(
         path,
-        options: _api.withOrgHeader(
-          organizationId,
-          base: Options(
-            responseType: ResponseType.bytes,
-            validateStatus: (status) => status != null && status < 500,
-          ),
-        ),
+        options: options.copyWith(headers: headers),
       );
       final statusCode = response.statusCode ?? 0;
       if (statusCode != 200) {
@@ -256,15 +270,24 @@ class AttachmentsRepository {
       }
       final contentType =
           response.headers.value('content-type')?.toLowerCase() ?? '';
-      if (contentType.contains('application/json')) {
+      if (contentType.contains('application/json') ||
+          contentType.contains('text/html')) {
         throw ApiException(
           message: _messageFromResponseBody(response.data, statusCode) ??
               fallbackMessage,
+          statusCode: statusCode == 200 ? 404 : statusCode,
         );
       }
       final bytes = _normalizeBytes(response.data);
       if (bytes == null || bytes.isEmpty) {
         throw ApiException(message: fallbackMessage);
+      }
+      if (_looksLikeHtmlOrJson(bytes)) {
+        throw ApiException(
+          message: _messageFromResponseBody(bytes, statusCode) ??
+              fallbackMessage,
+          statusCode: 404,
+        );
       }
       return bytes;
     } on ApiException {
@@ -277,9 +300,39 @@ class AttachmentsRepository {
   Uint8List? _normalizeBytes(dynamic data) {
     if (data == null) return null;
     if (data is Uint8List) return data;
-    if (data is List<int>) return Uint8List.fromList(data);
     if (data is ByteBuffer) return data.asUint8List();
+    if (data is TypedData) {
+      return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+    }
+    if (data is List<int>) return Uint8List.fromList(data);
+    if (data is List) {
+      final out = <int>[];
+      for (final item in data) {
+        if (item is int) {
+          out.add(item);
+        } else if (item is num) {
+          out.add(item.toInt());
+        } else {
+          return null;
+        }
+      }
+      return Uint8List.fromList(out);
+    }
     return null;
+  }
+
+  bool _looksLikeHtmlOrJson(Uint8List bytes) {
+    var i = 0;
+    while (i < bytes.length &&
+        (bytes[i] == 0x20 ||
+            bytes[i] == 0x0A ||
+            bytes[i] == 0x0D ||
+            bytes[i] == 0x09)) {
+      i++;
+    }
+    if (i >= bytes.length) return false;
+    final c = bytes[i];
+    return c == 0x3C /* < */ || c == 0x7B /* { */ || c == 0x5B /* [ */;
   }
 
   String? _messageFromResponseBody(dynamic data, int statusCode) {
