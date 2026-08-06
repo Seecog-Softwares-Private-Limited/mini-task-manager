@@ -206,18 +206,21 @@ function isLocalhostHttpUrl(url) {
  *
  * - Explicit MINI_TM_BACKEND_URL / BACKEND_INTERNAL_URL always win (including
  *   http://127.0.0.1:PORT on the VPS — required so Nest actually starts).
- * - If those are unset, a remote PUBLIC_API_URL means "Mac Next → live VPS API"
- *   (skip local Nest). Do not let PUBLIC_API_URL override an explicit localhost
- *   MINI_TM_BACKEND_URL; that caused production to skip Nest and proxy to itself.
+ * - Remote PUBLIC_API_URL may skip local Nest only in non-production (Mac Next →
+ *   live VPS). In production, PUBLIC_API_URL is this host — using it would skip
+ *   Nest and make Next proxy to itself (503 / login hang).
  */
 function resolveFrontendBackendUrl(apiPort) {
   for (const raw of [process.env.MINI_TM_BACKEND_URL, process.env.BACKEND_INTERNAL_URL]) {
     const value = String(raw || '').trim().replace(/\/$/, '');
     if (value) return value;
   }
-  const publicApi = String(process.env.PUBLIC_API_URL || '').trim().replace(/\/$/, '');
-  if (publicApi && !isLocalhostHttpUrl(publicApi)) {
-    return publicApi;
+  const mode = process.env.APP_MODE || process.env.NODE_ENV || '';
+  if (mode !== 'production') {
+    const publicApi = String(process.env.PUBLIC_API_URL || '').trim().replace(/\/$/, '');
+    if (publicApi && !isLocalhostHttpUrl(publicApi)) {
+      return publicApi;
+    }
   }
   return `http://127.0.0.1:${apiPort}`;
 }

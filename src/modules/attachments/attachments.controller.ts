@@ -60,6 +60,21 @@ export class AttachmentsController {
     );
   }
 
+  /**
+   * Canonical host → peer: serve bytes so a host missing the file can pull it.
+   */
+  @Public()
+  @Get('mirror-fetch')
+  async mirrorFetch(
+    @Headers('x-uploads-mirror-secret') secret: string | undefined,
+    @Query('storageKey') storageKey: string,
+  ): Promise<{ storageKey: string; contentBase64: string }> {
+    if (!storageKey?.trim()) {
+      throw new BadRequestException('storageKey is required');
+    }
+    return this.attachmentsService.provideMirroredUpload(secret, storageKey);
+  }
+
   @Post('upload')
   @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
   async upload(

@@ -85,15 +85,16 @@ class AttachmentsRepository {
     String? taskId,
   }) async {
     try {
-      final response = await _api.dio.get<List<dynamic>>(
+      final response = await _api.dio.get<dynamic>(
         '/attachments/entity/$entityType/$entityId',
         queryParameters: taskId == null ? null : {'taskId': taskId},
         options: _api.withOrgHeader(organizationId),
       );
-      final list = response.data ?? const [];
+      final raw = response.data;
+      final list = raw is List ? raw : const [];
       return list
-          .whereType<Map<String, dynamic>>()
-          .map(TaskAttachment.fromJson)
+          .whereType<Map>()
+          .map((row) => TaskAttachment.fromJson(Map<String, dynamic>.from(row)))
           .toList();
     } on DioException catch (error) {
       throw ApiException.fromDio(error);

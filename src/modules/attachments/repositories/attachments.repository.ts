@@ -18,6 +18,17 @@ export class AttachmentsRepository {
     });
   }
 
+  async findByEntityInWorkspace(
+    entityType: AttachmentEntityType,
+    entityId: string,
+    workspaceId: string,
+  ): Promise<AttachmentEntity[]> {
+    return this.repo.find({
+      where: { entityType, entityId, workspaceId, isDeleted: false },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   async findById(id: string): Promise<AttachmentEntity | null> {
     return this.repo.findOne({ where: { id, isDeleted: false } });
   }
