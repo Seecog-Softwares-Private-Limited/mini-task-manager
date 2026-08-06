@@ -64,6 +64,7 @@ Future<void> _downloadAttachment({
           attachmentId: attachment.id,
           organizationId: orgId,
           source: source,
+          preferPreview: isImageAttachment(attachment),
         );
     await openAttachmentBytes(
       bytes: bytes,
@@ -128,6 +129,7 @@ class AttachmentGrid extends ConsumerWidget {
           runSpacing: AppSpacing.sm,
           children: items.map((entry) {
             return AttachmentGridTile(
+              key: ValueKey(entry.attachment.id),
               attachment: entry.attachment,
               organizationId: organizationId,
               source: entry.source,
@@ -261,13 +263,31 @@ class _AttachmentThumbnail extends ConsumerStatefulWidget {
 
 class _AttachmentThumbnailState extends ConsumerState<_AttachmentThumbnail> {
   Uint8List? _bytes;
+  bool _loading = false;
   bool _failed = false;
 
   @override
   void initState() {
     super.initState();
     if (isImageAttachment(widget.attachment)) {
+      _loading = true;
       _load();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _AttachmentThumbnail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.attachment.id != widget.attachment.id ||
+        oldWidget.organizationId != widget.organizationId) {
+      _bytes = null;
+      _failed = false;
+      if (isImageAttachment(widget.attachment)) {
+        _loading = true;
+        _load();
+      } else {
+        _loading = false;
+      }
     }
   }
 
@@ -276,17 +296,77 @@ class _AttachmentThumbnailState extends ConsumerState<_AttachmentThumbnail> {
       final orgId = widget.organizationId.trim().isNotEmpty
           ? widget.organizationId.trim()
           : (ref.read(sessionControllerProvider).orgId ?? '');
-      if (orgId.isEmpty || widget.attachment.id.trim().isEmpty) return;
+      if (orgId.isEmpty || widget.attachment.id.trim().isEmpty) {
+        if (mounted) {
+          setState(() {
+            _failed = true;
+            _loading = false;
+          });
+        }
+        return;
+      }
       final bytes = await ref.read(attachmentsRepositoryProvider).fetchAttachmentContent(
             attachmentId: widget.attachment.id,
             organizationId: orgId,
             source: widget.source,
+            preferPreview: true,
           );
       if (!mounted) return;
-      setState(() => _bytes = bytes);
+      if (!_looksLikeImageBytes(bytes)) {
+        setState(() {
+          _failed = true;
+          _loading = false;
+          _bytes = null;
+        });
+        return;
+      }
+      setState(() {
+        _bytes = bytes;
+        _failed = false;
+        _loading = false;
+      });
     } catch (_) {
-      if (mounted) setState(() => _failed = true);
+      if (mounted) {
+        setState(() {
+          _failed = true;
+          _loading = false;
+          _bytes = null;
+        });
+      }
     }
+  }
+
+  bool _looksLikeImageBytes(Uint8List bytes) {
+    if (bytes.length < 12) return false;
+    // PNG
+    if (bytes[0] == 0x89 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x4E &&
+        bytes[3] == 0x47) {
+      return true;
+    }
+    // JPEG
+    if (bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF) {
+      return true;
+    }
+    // GIF
+    if (bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46) {
+      return true;
+    }
+    // BMP
+    if (bytes[0] == 0x42 && bytes[1] == 0x4D) return true;
+    // WEBP (RIFF....WEBP)
+    if (bytes[0] == 0x52 &&
+        bytes[1] == 0x49 &&
+        bytes[2] == 0x46 &&
+        bytes[3] == 0x46 &&
+        bytes[8] == 0x57 &&
+        bytes[9] == 0x45 &&
+        bytes[10] == 0x42 &&
+        bytes[11] == 0x50) {
+      return true;
+    }
+    return false;
   }
 
   @override
@@ -301,7 +381,34 @@ class _AttachmentThumbnailState extends ConsumerState<_AttachmentThumbnail> {
           width: widget.expand ? double.infinity : widget.size,
           height: widget.expand ? double.infinity : widget.size,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _iconFallback(context),
+          gaplessPlayback: true,
+          errorBuilder: (_, __, ___) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted && !_failed) {
+                setState(() {
+                  _failed = true;
+                  _bytes = null;
+                });
+              }
+            });
+            return _iconFallback(context);
+          },
+        ),
+      );
+    }
+    if (_loading && !_failed) {
+      return Container(
+        width: widget.expand ? double.infinity : widget.size,
+        height: widget.expand ? double.infinity : widget.size,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: borderRadius,
+        ),
+        child: const SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(strokeWidth: 2),
         ),
       );
     }
@@ -395,6 +502,7 @@ class _AttachmentPreviewDialogState extends ConsumerState<_AttachmentPreviewDial
         attachmentId: widget.attachment.id,
         organizationId: orgId,
         source: widget.source,
+        preferPreview: _kind == AttachmentPreviewKind.image,
       );
 
       if (!mounted) return;

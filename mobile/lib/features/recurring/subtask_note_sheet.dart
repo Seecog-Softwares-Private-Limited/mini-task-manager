@@ -672,7 +672,7 @@ class _SubtaskNotesThreadSheetState
                       const SizedBox(height: AppSpacing.sm),
                       AttachmentGrid(
                         organizationId: widget.organizationId,
-                        enabled: false,
+                        enabled: true,
                         items: _legacyAttachments.asMap().entries.map(
                           (e) => AttachmentGridEntry(
                             attachment: e.value,
@@ -1416,7 +1416,7 @@ class _NoteContent extends ConsumerWidget {
                 const SizedBox(height: 10),
                 AttachmentGrid(
                   organizationId: organizationId,
-                  enabled: false,
+                  enabled: true,
                   items: attachments.asMap().entries.map(
                     (e) => AttachmentGridEntry(
                       attachment: e.value,

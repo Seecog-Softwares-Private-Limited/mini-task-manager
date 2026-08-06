@@ -156,55 +156,9 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
     _endDate ??= DateTime.now().add(const Duration(days: 90));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadMembers();
-      if (_isEdit && _checklist.isEmpty) {
-        _hydrateChecklistFromRun();
-      }
+      // Checklist comes from templateSubtasks (API hydrates legacy null from seed).
+      // Do not re-import from a run when empty — that resurrects deleted items.
     });
-  }
-
-  Future<void> _hydrateChecklistFromRun() async {
-    try {
-      final repo = ref.read(recurringRepositoryProvider);
-      final history = await repo.fetchTemplateHistory(
-        templateId: widget.template!.id,
-        organizationId: widget.organizationId,
-      );
-      final withTask = history
-          .where((o) => o.taskId != null && o.taskId!.isNotEmpty)
-          .toList()
-        ..sort((a, b) => a.sequenceNumber.compareTo(b.sequenceNumber));
-      if (withTask.isEmpty) return;
-      final task = await ref
-          .read(tasksRepositoryProvider)
-          .fetchTask(withTask.first.taskId!);
-      if (!mounted || _checklist.isNotEmpty || task.subtasks.isEmpty) return;
-      setState(() {
-        for (final item in task.subtasks) {
-          final title = item.title.trim();
-          if (title.isEmpty) continue;
-          _checklist.add(
-            TaskSubtask(
-              id: item.id.isNotEmpty ? item.id : generateClientId(),
-              title: title,
-              completed: false,
-              status: 'TODO',
-              priority: item.priority ?? 'MEDIUM',
-              description: item.description,
-              dueTime: item.dueTime,
-              notifyMinutesBefore: item.notifyMinutesBefore,
-              assigneeIds: item.assigneeIds.isNotEmpty
-                  ? item.assigneeIds
-                  : (item.assigneeId != null && item.assigneeId!.isNotEmpty
-                      ? [item.assigneeId!]
-                      : const []),
-              assigneeId: item.assigneeId,
-            ),
-          );
-        }
-      });
-    } catch (_) {
-      // Optional hydration — ignore failures.
-    }
   }
 
   Future<void> _loadMembers() async {

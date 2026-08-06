@@ -39,20 +39,17 @@ export class PushNotificationsService implements OnModuleInit {
 
     try {
       let credential: ServiceAccount | undefined;
+      let loadedFrom = '';
 
       if (jsonEnv) {
         credential = JSON.parse(jsonEnv) as ServiceAccount;
+        loadedFrom = 'FIREBASE_SERVICE_ACCOUNT_JSON';
       } else {
-        const candidates = [
-          pathEnv,
-          join(process.cwd(), 'config', 'firebase-service-account.json'),
-          join(process.cwd(), 'config', 'firebase-service.json'),
-        ].filter((p): p is string => !!p && p.length > 0);
-
+        const candidates = this.resolveServiceAccountCandidates(pathEnv);
         for (const path of candidates) {
           if (existsSync(path)) {
             credential = JSON.parse(readFileSync(path, 'utf8')) as ServiceAccount;
-            this.logger.log(`Firebase Admin loaded from ${path}`);
+            loadedFrom = path;
             break;
           }
         }
@@ -60,7 +57,7 @@ export class PushNotificationsService implements OnModuleInit {
 
       if (!credential) {
         this.logger.error(
-          'Firebase Admin not configured (set FIREBASE_SERVICE_ACCOUNT_PATH or place config/firebase-service-account.json). Push notifications are DISABLED until this is fixed.',
+          'Firebase Admin not configured (set FIREBASE_SERVICE_ACCOUNT_PATH / FIREBASE_SERVICE_ACCOUNT_JSON or place config/firebase-service-account.json on the API host). Push notifications are DISABLED until this is fixed. Device token registration will still succeed.',
         );
         return;
       }
@@ -69,12 +66,59 @@ export class PushNotificationsService implements OnModuleInit {
         credential: cert(credential),
       });
       this.ready = true;
-      this.logger.log('Firebase Admin initialized — push notifications enabled');
+      this.logger.log(
+        `Firebase Admin initialized — push notifications enabled (from ${loadedFrom})`,
+      );
     } catch (err) {
       this.logger.error(
         `Firebase Admin init failed: ${err instanceof Error ? err.message : err}`,
       );
     }
+  }
+
+  /**
+   * Resolve relative SA paths against cwd AND the compiled app root.
+   * PM2 often starts with a different cwd than the repo, which previously left push disabled
+   * even when config/firebase-service-account.json existed on disk.
+   */
+  private resolveServiceAccountCandidates(pathEnv?: string): string[] {
+    const roots = new Set<string>([
+      process.cwd(),
+      // dist/modules/notifications → repo root
+      join(__dirname, '..', '..', '..'),
+      // dist/src/modules/... variants
+      join(__dirname, '..', '..', '..', '..'),
+    ]);
+
+    const names = [
+      'firebase-service-account.json',
+      'firebase-service.json',
+    ];
+
+    const out: string[] = [];
+    const pushUnique = (p: string | undefined) => {
+      if (!p || !p.trim()) return;
+      if (!out.includes(p)) out.push(p);
+    };
+
+    if (pathEnv) {
+      if (pathEnv.startsWith('/')) {
+        pushUnique(pathEnv);
+      } else {
+        for (const root of roots) {
+          pushUnique(join(root, pathEnv));
+        }
+        pushUnique(pathEnv);
+      }
+    }
+
+    for (const root of roots) {
+      for (const name of names) {
+        pushUnique(join(root, 'config', name));
+      }
+    }
+
+    return out;
   }
 
   /**

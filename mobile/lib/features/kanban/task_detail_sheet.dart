@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -97,6 +99,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
   List<ProjectMember> _members = const [];
   List<_TaskAttachmentItem> _attachments = const [];
   List<TaskComment> _comments = const [];
+  Timer? _peerSyncTimer;
+  bool _peerSyncInFlight = false;
 
   @override
   void initState() {
@@ -112,6 +116,10 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     _descriptionFocusNode.addListener(_onDescriptionFocusChange);
     _subtasks = List.of(widget.task.subtasks);
     _loadMeta();
+    _peerSyncTimer = Timer.periodic(
+      const Duration(seconds: 12),
+      (_) => _syncChecklistPeers(),
+    );
   }
 
   void _onTitleFocusChange() {
@@ -128,6 +136,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
 
   @override
   void dispose() {
+    _peerSyncTimer?.cancel();
     _titleFocusNode
       ..removeListener(_onTitleFocusChange)
       ..dispose();
@@ -138,6 +147,56 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     _descriptionController.dispose();
     _commentController.dispose();
     super.dispose();
+  }
+
+  /// Refresh checklist completion from server so peer checkmarks appear.
+  Future<void> _syncChecklistPeers() async {
+    if (!mounted ||
+        _loadingMeta ||
+        _saving ||
+        _addingSubtask ||
+        _savingSubtaskIndex != null ||
+        _peerSyncInFlight ||
+        _expandedSubtaskIndex != null) {
+      return;
+    }
+    _peerSyncInFlight = true;
+    try {
+      final task =
+          await ref.read(tasksRepositoryProvider).fetchTask(widget.task.id);
+      if (!mounted ||
+          _saving ||
+          _addingSubtask ||
+          _savingSubtaskIndex != null ||
+          _expandedSubtaskIndex != null) {
+        return;
+      }
+      final merged = _mergeSubtasksPreservingOrder(_subtasks, task.subtasks);
+      final changed = merged.length != _subtasks.length ||
+          !_subtasksCompletionEqual(_subtasks, merged);
+      if (!changed) return;
+      setState(() {
+        _task = task;
+        _subtasks = merged;
+      });
+      widget.onUpdated();
+    } catch (_) {
+      // Soft sync.
+    } finally {
+      _peerSyncInFlight = false;
+    }
+  }
+
+  bool _subtasksCompletionEqual(List<TaskSubtask> a, List<TaskSubtask> b) {
+    if (a.length != b.length) return false;
+    final byId = {for (final s in b) s.id: s};
+    for (final left in a) {
+      final right = byId[left.id];
+      if (right == null) return false;
+      if (left.completed != right.completed) return false;
+      if ((left.status ?? '') != (right.status ?? '')) return false;
+    }
+    return true;
   }
 
   Future<List<_TaskAttachmentItem>> _loadTaskAttachments(

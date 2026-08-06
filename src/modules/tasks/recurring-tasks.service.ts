@@ -29,9 +29,12 @@ type TemplateSubtask = NonNullable<
 >[number];
 
 function normalizeTemplateSubtasks(
-  subtasks?: CreateTaskDto['subtasks'],
+  subtasks?: CreateTaskDto['subtasks'] | null,
 ): import('./entities/recurring-task-template.entity').RecurringTaskTemplateEntity['templateSubtasks'] {
-  if (!subtasks?.length) return null;
+  // Explicit empty checklist must stay empty ([]), not null — null is treated as
+  // "unset" and gets re-hydrated from a seed run (resurrecting deleted items).
+  if (subtasks == null) return null;
+  if (!subtasks.length) return [];
   return subtasks.map((s) => {
     const assigneeIds = s.assigneeIds?.length
       ? Array.from(new Set(s.assigneeIds.map((id) => String(id).trim()).filter(Boolean)))
@@ -927,10 +930,11 @@ export class RecurringTasksService {
           : 0;
 
       // Checklist often lives on the seed/run task when users edit a run.
-      // Hydrate for the API response only — do not write back to the template
-      // (that re-imported deleted items after a sync left stale run subtasks).
-      let templateSubtasks = tpl.templateSubtasks ?? [];
-      if (!templateSubtasks.length) {
+      // Hydrate for the API response only when the template column is truly unset
+      // (null). An explicit empty array [] means the checklist was cleared — do not
+      // re-import deleted items from a seed run.
+      let templateSubtasks = tpl.templateSubtasks;
+      if (templateSubtasks == null) {
         const seedOcc = [...history].sort((a, b) => a.sequenceNumber - b.sequenceNumber).find((h) => h.taskId);
         if (seedOcc?.taskId) {
           const seedTask = await this.tasksRepository.findById(seedOcc.taskId);
@@ -952,8 +956,14 @@ export class RecurringTasksService {
             );
             if (hydrated?.length) {
               templateSubtasks = hydrated;
+            } else {
+              templateSubtasks = [];
             }
+          } else {
+            templateSubtasks = [];
           }
+        } else {
+          templateSubtasks = [];
         }
       }
 
@@ -1218,7 +1228,7 @@ export class RecurringTasksService {
 
   /**
    * When a run's checklist is edited, mirror titles/times onto the planner
-   * template so Edit planner and future runs stay in sync.
+   * template and all PENDING runs so deletes/renames do not leave ghosts.
    */
   async syncTemplateChecklistFromTaskSubtasks(
     templateId: string,
@@ -1230,24 +1240,38 @@ export class RecurringTasksService {
       organizationId,
     );
     if (!template) return;
-    const hydrated = normalizeTemplateSubtasks(
-      (subtasks ?? []).map((s) => ({
-        id: s.id,
-        title: s.title,
-        description: s.description,
-        assigneeId: s.assigneeId,
-        assigneeIds: s.assigneeIds,
-        dueOffsetDays: 0,
-        dueTime: s.dueTime,
-        notifyMinutesBefore: s.notifyMinutesBefore,
-        priority: s.priority,
-        status: (s.status as 'TODO' | 'IN_PROGRESS' | 'DONE') ?? 'TODO',
-        statusId: s.statusId,
-      })),
-    );
+    const hydrated =
+      (subtasks ?? []).length === 0
+        ? []
+        : normalizeTemplateSubtasks(
+            (subtasks ?? []).map((s) => ({
+              id: s.id,
+              title: s.title,
+              description: s.description,
+              assigneeId: s.assigneeId,
+              assigneeIds: s.assigneeIds,
+              dueOffsetDays: 0,
+              dueTime: s.dueTime,
+              notifyMinutesBefore: s.notifyMinutesBefore,
+              priority: s.priority,
+              // Template steps are never "done" — only occurrence runs track completion.
+              status: 'TODO' as const,
+              statusId: s.statusId,
+            })),
+          );
     await this.templatesRepository.update(template.id, {
       templateSubtasks: hydrated,
     } as never);
+    const updated = await this.templatesRepository.findById(template.id);
+    if (!updated) return;
+
+    await this.syncPendingOccurrenceAssignmentsFromTemplate({
+      beforeTemplate: template,
+      afterTemplate: updated,
+      actorUserId: template.createdBy,
+      syncAssignees: false,
+      syncChecklist: true,
+    });
   }
 
   async updateTemplate(
@@ -1291,7 +1315,10 @@ export class RecurringTasksService {
       patch.endAfterOccurrences = dto.recurrence.endAfterOccurrences ?? null;
     }
     if (dto.subtasks !== undefined) {
-      patch.templateSubtasks = normalizeTemplateSubtasks(dto.subtasks);
+      patch.templateSubtasks =
+        Array.isArray(dto.subtasks) && dto.subtasks.length === 0
+          ? []
+          : normalizeTemplateSubtasks(dto.subtasks);
     }
     await this.templatesRepository.update(template.id, patch as any);
     const updated = await this.templatesRepository.findById(template.id);
@@ -1375,9 +1402,6 @@ export class RecurringTasksService {
               .filter((s) => !!s?.id)
               .map((s) => [String(s.id), s] as const),
           );
-          const beforeTitleSet = new Set(
-            beforeSubs.map((s) => String(s.title ?? '').trim().toLowerCase()).filter(Boolean),
-          );
 
           const existing = (task.subtasks ?? []).map((s) => ({ ...s }));
           const usedExisting = new Set<number>();
@@ -1442,14 +1466,9 @@ export class RecurringTasksService {
             }
           }
 
-          // Keep only run-specific steps that were never part of the previous template.
-          // Items removed/renamed away from the planner checklist must disappear.
-          for (let i = 0; i < existing.length; i++) {
-            if (usedExisting.has(i)) continue;
-            const titleKey = String(existing[i].title ?? '').trim().toLowerCase();
-            if (beforeTitleSet.has(titleKey)) continue;
-            merged.push(existing[i]);
-          }
+          // Template is the source of truth for checklist structure. Do not keep
+          // unmatched run rows — that recreated deleted/renamed items as duplicates
+          // when beforeTemplate no longer listed their old titles.
           patch.subtasks = merged.length ? merged : null;
         }
       }

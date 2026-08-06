@@ -7,8 +7,18 @@ import '../../data/models/task_attachment.dart';
 
 enum AttachmentPreviewKind { image, pdf, text, audio, unsupported }
 
+bool isImageMime(String? mimeType, String fileName) {
+  if (mimeType?.toLowerCase().startsWith('image/') == true) return true;
+  return _imageExtensions.contains(_fileExt(fileName));
+}
+
 bool isImageAttachment(TaskAttachment attachment) {
-  return isImageMime(attachment.mimeType, attachment.fileName);
+  if (isImageMime(attachment.mimeType, attachment.fileName)) return true;
+  final ext = attachment.fileExtension?.trim().toLowerCase();
+  if (ext != null && _imageExtensions.contains(ext)) return true;
+  final stored = attachment.storedFileName;
+  if (stored != null && isImageMime(attachment.mimeType, stored)) return true;
+  return false;
 }
 
 bool isPdfAttachment(TaskAttachment attachment) {
@@ -20,7 +30,7 @@ bool isTextAttachment(TaskAttachment attachment) {
 }
 
 AttachmentPreviewKind previewKindFor(TaskAttachment attachment) {
-  if (isImageMime(attachment.mimeType, attachment.fileName)) {
+  if (isImageAttachment(attachment)) {
     return AttachmentPreviewKind.image;
   }
   if (isPdfMime(attachment.mimeType, attachment.fileName)) {
@@ -45,12 +55,14 @@ bool isAudioMime(String? mimeType, String fileName) {
 }
 
 String resolveAttachmentMimeType(TaskAttachment attachment) {
+  final fromStored = attachment.storedFileName;
+  if ((attachment.mimeType == null ||
+          attachment.mimeType!.trim().isEmpty ||
+          attachment.mimeType == 'application/octet-stream') &&
+      fromStored != null) {
+    return inferMimeTypeFromFileName(attachment.mimeType, fromStored);
+  }
   return inferMimeTypeFromFileName(attachment.mimeType, attachment.fileName);
-}
-
-bool isImageMime(String? mimeType, String fileName) {
-  if (mimeType?.toLowerCase().startsWith('image/') == true) return true;
-  return _imageExtensions.contains(_fileExt(fileName));
 }
 
 bool isPdfMime(String? mimeType, String fileName) {

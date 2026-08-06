@@ -31,7 +31,7 @@ class HomeShell extends ConsumerStatefulWidget {
   ConsumerState<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends ConsumerState<HomeShell> {
+class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserver {
   int _index = 0;
   final Set<int> _mountedTabs = {0};
   bool _enableUnreadBadge = false;
@@ -39,11 +39,27 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Defer notification fetch so the first tab paints quickly.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       setState(() => _enableUnreadBadge = true);
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || !mounted) return;
+    // Refresh planner board so checklist done by others appears after app resume.
+    ref.invalidate(recurringBoardTasksProvider);
+    ref.invalidate(recurringSummaryProvider);
+    ref.invalidate(notificationsProvider);
   }
 
   void _selectTab(int value, {MyWorkFilter? tasksFilter}) {
@@ -54,6 +70,11 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     // Reset planner FAB visibility when leaving the Planner tab.
     if (_index == 3 && value != 3) {
       ref.read(recurringFabHiddenProvider.notifier).state = false;
+    }
+    // Entering Planner — refresh board so peer checklist updates are visible.
+    if (value == 3 && _index != 3) {
+      ref.invalidate(recurringBoardTasksProvider);
+      ref.invalidate(recurringSummaryProvider);
     }
     setState(() {
       _mountedTabs.add(value);

@@ -4,28 +4,52 @@ class TaskAttachment {
     required this.fileName,
     this.fileSizeBytes,
     this.mimeType,
+    this.fileExtension,
+    this.storedFileName,
   });
 
   final String id;
   final String fileName;
   final int? fileSizeBytes;
   final String? mimeType;
+  final String? fileExtension;
+  final String? storedFileName;
 
   factory TaskAttachment.fromJson(Map<String, dynamic> json) {
+    final storedFileName = _nullableString(
+      json['storedFileName'] ?? json['stored_file_name'],
+    );
+    final original = _nullableString(
+      json['fileName'] ??
+          json['file_name'] ??
+          json['originalFileName'] ??
+          json['original_file_name'],
+    );
+    final fileExtension = _nullableString(
+      json['fileExtension'] ?? json['file_extension'],
+    );
+    final fileName = (original != null && original.isNotEmpty)
+        ? original
+        : (storedFileName != null && storedFileName.isNotEmpty
+            ? storedFileName
+            : 'Attachment');
     return TaskAttachment(
       id: _parseId(json['id'] ?? json['attachmentId']),
-      fileName: (json['fileName'] ??
-              json['file_name'] ??
-              json['originalFileName'] ??
-              json['original_file_name'] ??
-              'Attachment')
-          .toString(),
+      fileName: fileName,
       fileSizeBytes: _parseInt(json['fileSizeBytes'] ??
           json['file_size_bytes'] ??
           json['fileSize'] ??
           json['file_size']),
-      mimeType: (json['mimeType'] ?? json['mime_type']) as String?,
+      mimeType: _nullableString(json['mimeType'] ?? json['mime_type']),
+      fileExtension: fileExtension,
+      storedFileName: storedFileName,
     );
+  }
+
+  static String? _nullableString(dynamic raw) {
+    if (raw == null) return null;
+    final text = raw.toString().trim();
+    return text.isEmpty ? null : text;
   }
 
   static String _parseId(dynamic raw) {

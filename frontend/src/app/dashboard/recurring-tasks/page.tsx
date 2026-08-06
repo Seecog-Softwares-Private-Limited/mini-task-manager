@@ -264,6 +264,10 @@ export default function RecurringTasksPage() {
     queryFn: () => fetchRecurringBoard(selectedProjectId!, statusIds),
     enabled: !!selectedProjectId && !!orgId && statuses.length > 0,
     retry: 1,
+    // Peer checklist toggles (other users marking items done) need a live board.
+    staleTime: 10_000,
+    refetchInterval: 15_000,
+    refetchOnWindowFocus: true,
   });
 
   useEffect(() => {
