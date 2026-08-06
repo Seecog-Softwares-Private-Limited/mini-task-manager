@@ -1560,6 +1560,8 @@ export class RecurringTasksService {
               projectId: task.projectId,
               organizationId: task.organizationId,
               occurrenceId: occurrence.id,
+              dueTime: ritualDueTime,
+              notifyMinutesBefore: seriesNotify,
             });
           }
           await markSent('ritual');
@@ -1615,6 +1617,8 @@ export class RecurringTasksService {
             organizationId: task.organizationId,
             occurrenceId: occurrence.id,
             subtaskId: subtask.id,
+            dueTime: itemDueTime,
+            notifyMinutesBefore,
           });
         } else {
           this.logger.warn(

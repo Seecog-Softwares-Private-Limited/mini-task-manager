@@ -61,11 +61,56 @@ function upstreamBaseUrl(): string {
   return `http://${host}:${port}`;
 }
 
-function buildTargetUrl(subpath: string, search: string): string {
-  const base = upstreamBaseUrl();
+function buildTargetUrl(base: string, subpath: string, search: string): string {
   const prefix = "/api/v1";
   const pathPart = subpath ? `/${subpath}` : "";
-  return `${base}${prefix}${pathPart}${search}`;
+  return `${base.replace(/\/$/, "")}${prefix}${pathPart}${search}`;
+}
+
+function isLocalhostHttpUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname;
+    return host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * When local Nest shares a remote DB with production, uploads on localhost land
+ * only on the Mac disk — mobile (VPS) sees broken images. Prefer the public API
+ * for attachment upload + binary reads when PUBLIC_API_URL is set.
+ */
+function publicApiBaseUrl(): string | undefined {
+  const raw =
+    process.env.PUBLIC_API_URL?.trim() ||
+    readFromRepoPropertiesEnv("PUBLIC_API_URL");
+  if (!raw) return undefined;
+  const base = raw.replace(/\/$/, "");
+  if (isLocalhostHttpUrl(base)) return undefined;
+  return base;
+}
+
+function preferPublicApiFor(subpath: string, method: string): boolean {
+  if (!publicApiBaseUrl()) return false;
+  const m = method.toUpperCase();
+  if (m === "POST" && subpath === "attachments/upload") return true;
+  if (m === "GET" || m === "HEAD") {
+    return (
+      /^attachments\/[^/]+\/(download|preview)$/.test(subpath) ||
+      /^tasks\/attachments\/[^/]+\/file$/.test(subpath)
+    );
+  }
+  return false;
+}
+
+function isAttachmentBinaryGet(subpath: string, method: string): boolean {
+  const m = method.toUpperCase();
+  if (m !== "GET" && m !== "HEAD") return false;
+  return (
+    /^attachments\/[^/]+\/(download|preview)$/.test(subpath) ||
+    /^tasks\/attachments\/[^/]+\/file$/.test(subpath)
+  );
 }
 
 function isUpstreamConnectionError(err: unknown): boolean {
@@ -135,7 +180,22 @@ function proxyUnavailableResponse(base: string, targetUrl: string, err: unknown,
 
 async function proxy(request: NextRequest, pathSegments: string[] | undefined) {
   const subpath = (pathSegments ?? []).join("/");
-  const targetUrl = buildTargetUrl(subpath, request.nextUrl.search);
+  const localBase = upstreamBaseUrl();
+  const publicBase = publicApiBaseUrl();
+  const primaryBase =
+    preferPublicApiFor(subpath, request.method) && publicBase
+      ? publicBase
+      : localBase;
+  const fallbackBase =
+    isAttachmentBinaryGet(subpath, request.method) &&
+    publicBase &&
+    primaryBase === localBase
+      ? publicBase
+      : isAttachmentBinaryGet(subpath, request.method) &&
+          publicBase &&
+          primaryBase === publicBase
+        ? localBase
+        : undefined;
 
   const headers = new Headers();
   request.headers.forEach((value, key) => {
@@ -160,38 +220,79 @@ async function proxy(request: NextRequest, pathSegments: string[] | undefined) {
 
   const upstreamTimeoutMs = 45_000;
   const maxAttempts = 2;
-  const base = upstreamBaseUrl();
-  let upstream: Response | undefined;
-  let lastErr: unknown;
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), upstreamTimeoutMs);
-    try {
-      upstream = await fetch(targetUrl, {
-        ...init,
-        cache: "no-store",
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      break;
-    } catch (err) {
-      clearTimeout(timeoutId);
-      lastErr = err;
-      const timedOut =
-        err instanceof Error &&
-        (err.name === "AbortError" || err.message?.includes("aborted"));
-      const retryable = isUpstreamConnectionError(err) && attempt < maxAttempts && !timedOut;
-      if (retryable) {
-        await sleep(250);
-        continue;
+  async function fetchUpstream(base: string): Promise<Response | NextResponse> {
+    const targetUrl = buildTargetUrl(base, subpath, request.nextUrl.search);
+    let lastErr: unknown;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), upstreamTimeoutMs);
+      try {
+        const upstream = await fetch(targetUrl, {
+          ...init,
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        return upstream;
+      } catch (err) {
+        clearTimeout(timeoutId);
+        lastErr = err;
+        const timedOut =
+          err instanceof Error &&
+          (err.name === "AbortError" || err.message?.includes("aborted"));
+        const retryable =
+          isUpstreamConnectionError(err) && attempt < maxAttempts && !timedOut;
+        if (retryable) {
+          await sleep(250);
+          continue;
+        }
+        return proxyUnavailableResponse(base, targetUrl, err, timedOut);
       }
-      return proxyUnavailableResponse(base, targetUrl, err, timedOut);
+    }
+    return proxyUnavailableResponse(base, buildTargetUrl(base, subpath, request.nextUrl.search), lastErr, false);
+  }
+
+  let upstream = await fetchUpstream(primaryBase);
+  if (upstream instanceof NextResponse) {
+    // Upload to public failed at network layer — fall back to local Nest.
+    if (
+      preferPublicApiFor(subpath, request.method) &&
+      publicBase &&
+      primaryBase === publicBase
+    ) {
+      const localFallback = await fetchUpstream(localBase);
+      if (localFallback instanceof NextResponse) {
+        return upstream;
+      }
+      upstream = localFallback;
+    } else {
+      return upstream;
     }
   }
 
-  if (!upstream) {
-    return proxyUnavailableResponse(base, targetUrl, lastErr, false);
+  // Local file missing but production may have it (or the reverse after public uploads).
+  if (
+    fallbackBase &&
+    (upstream.status === 404 || upstream.status === 410)
+  ) {
+    const fallback = await fetchUpstream(fallbackBase);
+    if (!(fallback instanceof NextResponse)) {
+      upstream = fallback;
+    }
+  }
+
+  // Public upload rejected — try local so web keep working offline from VPS.
+  if (
+    preferPublicApiFor(subpath, request.method) &&
+    publicBase &&
+    primaryBase === publicBase &&
+    upstream.status >= 500
+  ) {
+    const localFallback = await fetchUpstream(localBase);
+    if (!(localFallback instanceof NextResponse)) {
+      upstream = localFallback;
+    }
   }
 
   const outHeaders = new Headers();
@@ -220,7 +321,12 @@ async function proxy(request: NextRequest, pathSegments: string[] | undefined) {
     });
   } catch (err) {
     if (isUpstreamConnectionError(err)) {
-      return proxyUnavailableResponse(base, targetUrl, err, false);
+      return proxyUnavailableResponse(
+        primaryBase,
+        buildTargetUrl(primaryBase, subpath, request.nextUrl.search),
+        err,
+        false,
+      );
     }
     throw err;
   }

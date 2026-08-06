@@ -248,7 +248,8 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
   }
 
   Future<void> _pickDueTime() async {
-    if (!widget.templateMode && _dueDate == null) return;
+    // Planner daily items only need a wall-clock time; the occurrence date
+    // supplies "which day". Do not require a per-item due date.
     final parts = (_dueTime ?? '09:00').split(':');
     final initial = TimeOfDay(
       hour: int.tryParse(parts[0]) ?? 9,
@@ -267,8 +268,6 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
 
   void _clearDueDate() => setState(() {
         _dueDate = null;
-        _dueTime = null;
-        _notifyMinutesBefore = null;
       });
 
   void _clearDueTime() => setState(() {
@@ -393,7 +392,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
           dueTime: _dueTime,
           notifyMinutesBefore: _notifyMinutesBefore,
           clearDueDate: _dueDate == null,
-          clearDueTime: _dueDate == null || _dueTime == null,
+          clearDueTime: _dueTime == null,
           clearNotifyMinutesBefore: _dueTime == null || _notifyMinutesBefore == null,
           assigneeIds: _assigneeIds,
           assigneeId: _assigneeIds.isNotEmpty ? _assigneeIds.first : null,
@@ -1036,19 +1035,33 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
                           ),
                         ),
                       ),
-                      if (_dueDate != null) ...[
-                        const SizedBox(width: AppSpacing.xs),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: widget.saving ? null : _pickDueTime,
-                            icon: const Icon(Icons.schedule_rounded, size: 18),
-                            label: Text(
-                              _dueTime == null
-                                  ? 'Time'
-                                  : _formatDueTimeLabel(_dueTime!),
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                      const SizedBox(width: AppSpacing.xs),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: widget.saving ? null : _pickDueTime,
+                          icon: const Icon(Icons.schedule_rounded, size: 18),
+                          label: Text(
+                            _dueTime == null
+                                ? 'Time'
+                                : _formatDueTimeLabel(_dueTime!),
+                            overflow: TextOverflow.ellipsis,
                           ),
+                        ),
+                      ),
+                      if (_dueDate != null || _dueTime != null) ...[
+                        const SizedBox(width: AppSpacing.xs),
+                        IconButton(
+                          tooltip: _dueTime != null ? 'Clear time' : 'Clear date',
+                          onPressed: widget.saving
+                              ? null
+                              : () {
+                                  if (_dueTime != null) {
+                                    _clearDueTime();
+                                  } else {
+                                    _clearDueDate();
+                                  }
+                                },
+                          icon: const Icon(Icons.clear_rounded),
                         ),
                       ],
                     ],
