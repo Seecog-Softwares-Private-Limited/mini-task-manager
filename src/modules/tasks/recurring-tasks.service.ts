@@ -1082,6 +1082,9 @@ export class RecurringTasksService {
       taskIds.add(task.id);
     }
 
+    // Drop occurrences first so board sync cannot rematerialize while tasks are deleted.
+    await this.occurrencesRepository.deleteByTemplate(templateId);
+
     for (const taskId of taskIds) {
       try {
         await this.tasksService.delete(taskId, organizationId);
@@ -1090,8 +1093,31 @@ export class RecurringTasksService {
       }
     }
 
-    await this.occurrencesRepository.deleteByTemplate(templateId);
     await this.templatesRepository.delete(template.id);
+    return { success: true };
+  }
+
+  /**
+   * Remove the occurrence row for a planner run task so syncBoardTasks will not
+   * rematerialize it after the task is deleted.
+   */
+  async removeOccurrenceForTask(taskId: string): Promise<void> {
+    const occ = await this.occurrencesRepository.findByTaskId(taskId);
+    if (!occ) return;
+    await this.occurrencesRepository.deleteById(occ.id);
+  }
+
+  /**
+   * Delete a single planner run (task + occurrence). Prefer this over raw task
+   * delete so the run cannot come back on the next board sync.
+   */
+  async deleteRun(taskId: string, organizationId: string, userId: string) {
+    const task = await this.tasksRepository.findByIdAndOrganization(taskId, organizationId);
+    if (!task) throw new NotFoundException('Task not found');
+    if (!task.recurringTemplateId) {
+      throw new BadRequestException('Task is not a planner run');
+    }
+    await this.tasksService.delete(taskId, organizationId, userId);
     return { success: true };
   }
 

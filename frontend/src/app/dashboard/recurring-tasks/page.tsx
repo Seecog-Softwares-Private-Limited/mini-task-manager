@@ -14,7 +14,6 @@ import {
   createTask,
   updateTask,
   updateTaskStatus,
-  deleteTask,
 } from "@/services/api/tasks.api";
 import { fetchOrgMembers, fetchProjectMembers } from "@/services/api/members.api";
 import { fetchCommentCounts } from "@/services/api/comments.api";
@@ -23,6 +22,7 @@ import {
   duplicateRecurringTemplate,
   completeRecurringTaskWithAction,
   deleteRecurringSeries,
+  deleteRecurringRun,
   fetchRecurringBoard,
   fetchRecurringSummary,
   fetchRecurringTemplates,
@@ -368,11 +368,18 @@ export default function RecurringTasksPage() {
   });
 
   const permissions = useBoardPermissions(orgMembers, currentUserId);
-  // Recurring planners (series templates) are manageable by OWNER + ADMIN.
-  // The board itself (task editing/moves) is more restrictive, so we keep it
-  // tied to `permissions.canEditTask` elsewhere.
+  // Recurring planners (series templates + runs) are manageable by OWNER + ADMIN.
   const canManageSeries =
     permissions.role === "OWNER" || permissions.role === "ADMIN";
+  const plannerPermissions = useMemo(
+    () => ({
+      ...permissions,
+      canDeleteTask: canManageSeries,
+      canEditTask: canManageSeries || permissions.canEditTask,
+      canMoveTask: canManageSeries || permissions.canMoveTask,
+    }),
+    [permissions, canManageSeries],
+  );
 
   const assigneeMap: AssigneeMap = useMemo(() => {
     const map: AssigneeMap = {};
@@ -542,18 +549,19 @@ export default function RecurringTasksPage() {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (taskId: string) => deleteTask(taskId),
+    mutationFn: (taskId: string) => deleteRecurringRun(taskId),
     onSuccess: (_data, taskId) => {
       queryClient.invalidateQueries({ queryKey: ["recurring-board", selectedProjectId] });
       queryClient.invalidateQueries({ queryKey: ["recurring-summary"] });
       queryClient.invalidateQueries({ queryKey: ["recurring-templates"] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-template-history"] });
       if (selectedTaskId === taskId) setSelectedTaskId(null);
       setDeleteTarget(null);
-      toast({ title: "Task deleted" });
+      toast({ title: "Run deleted", variant: "success" });
     },
     onError: (err) => {
       toast({
-        title: "Failed to delete task",
+        title: "Failed to delete run",
         description: isRateLimited(err) ? "Too many requests. Try again later." : parseApiError(err),
         variant: "error",
       });
@@ -1318,7 +1326,7 @@ export default function RecurringTasksPage() {
                   subtaskMap={subtaskMap}
                   filters={filters}
                   quickActions={quickActions}
-                  permissions={permissions}
+                  permissions={plannerPermissions}
                   currentUserId={currentUserId}
                   boardVariant="recurring"
                   recurringTemplateMap={recurringTemplateMap}
@@ -1332,7 +1340,7 @@ export default function RecurringTasksPage() {
                     assigneeMap={assigneeMap}
                     subtaskMap={subtaskMap}
                     onTaskClick={(task) => setSelectedTaskId(task.id)}
-                    permissions={permissions}
+                    permissions={plannerPermissions}
                   />
                 </div>
               )}

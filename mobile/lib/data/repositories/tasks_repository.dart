@@ -105,8 +105,8 @@ class TasksRepository {
 
   Future<Task> fetchTask(String taskId) async {
     try {
-      final response = await _api.dio.get<Map<String, dynamic>>('/tasks/$taskId');
-      return Task.fromJson(response.data!);
+      final response = await _api.dio.get<dynamic>('/tasks/$taskId');
+      return Task.fromJson(_requireJsonMap(response.data, 'task'));
     } on DioException catch (error) {
       throw ApiException.fromDio(error);
     }
@@ -143,12 +143,12 @@ class TasksRepository {
         if (subtasks != null && subtasks.isNotEmpty)
           'subtasks': subtasks.map((s) => s.toJson()).toList(),
       };
-      final response = await _api.dio.post<Map<String, dynamic>>(
+      final response = await _api.dio.post<dynamic>(
         '/tasks',
         data: payload,
         options: _api.withOrgHeader(organizationId),
       );
-      return Task.fromJson(response.data!);
+      return Task.fromJson(_requireJsonMap(response.data, 'task'));
     } on DioException catch (error) {
       throw ApiException.fromDio(error);
     }
@@ -189,11 +189,11 @@ class TasksRepository {
           requireLocation: requireLocation,
           omitSubtaskKeys: omitSubtaskKeys,
         );
-        final response = await _api.dio.patch<Map<String, dynamic>>(
+        final response = await _api.dio.patch<dynamic>(
           '/tasks/$taskId',
           data: data,
         );
-        return Task.fromJson(response.data!);
+        return Task.fromJson(_requireJsonMap(response.data, 'task'));
       } on DioException catch (error) {
         lastError = error;
         if (_mentionsForbiddenProperty(error, 'requireLocation')) {
@@ -514,12 +514,22 @@ class TasksRepository {
       final response = await _api.dio.get<List<dynamic>>('/tasks/$taskId/attachments');
       final list = response.data ?? const [];
       return list
-          .whereType<Map<String, dynamic>>()
-          .map(TaskAttachment.fromJson)
+          .whereType<Map>()
+          .map((row) => TaskAttachment.fromJson(Map<String, dynamic>.from(row)))
           .toList();
     } on DioException catch (error) {
       throw ApiException.fromDio(error);
     }
+  }
+
+  /// Dio on Flutter web often fails the `Map<String, dynamic>` generic cast and
+  /// leaves `response.data` null even when the body parsed as a JS object/Map.
+  static Map<String, dynamic> _requireJsonMap(dynamic data, String label) {
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+    throw ApiException(
+      message: 'Invalid $label response from server',
+    );
   }
 }
 

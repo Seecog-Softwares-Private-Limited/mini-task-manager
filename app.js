@@ -192,6 +192,34 @@ function ensureStandaloneAssets() {
   return true;
 }
 
+function isLocalhostHttpUrl(url) {
+  try {
+    const host = new URL(url).hostname;
+    return host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0';
+  } catch {
+    return /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?/i.test(url);
+  }
+}
+
+/**
+ * Prefer an explicit remote API (VPS) so local Next never talks to a local Nest
+ * that would split uploads from the live app.
+ */
+function resolveFrontendBackendUrl(apiPort) {
+  const candidates = [
+    process.env.MINI_TM_BACKEND_URL,
+    process.env.BACKEND_INTERNAL_URL,
+    process.env.PUBLIC_API_URL,
+  ];
+  for (const raw of candidates) {
+    const value = String(raw || '').trim().replace(/\/$/, '');
+    if (value && !isLocalhostHttpUrl(value)) {
+      return value;
+    }
+  }
+  return `http://127.0.0.1:${apiPort}`;
+}
+
 function startFrontend(mode) {
   if (!fs.existsSync(FRONTEND_DIR) || !fs.existsSync(path.join(FRONTEND_DIR, 'package.json'))) {
     console.error('[app.js] Frontend folder not found.');
@@ -201,7 +229,7 @@ function startFrontend(mode) {
   const frontendPort = process.env.FRONTEND_PORT || '3001';
   const apiPort = process.env.PORT || '3000';
   // Next API proxy (app/api/v1/[...path]) uses this so it always matches Nest, regardless of cwd.
-  const miniTmBackendUrl = `http://127.0.0.1:${apiPort}`;
+  const miniTmBackendUrl = resolveFrontendBackendUrl(apiPort);
   const nextBin = path.join(FRONTEND_DIR, 'node_modules', 'next', 'dist', 'bin', 'next');
   if (!fs.existsSync(nextBin)) {
     console.error(
@@ -277,14 +305,34 @@ function main() {
   checkEnvFile();
   checkDbEnv();
 
+  const apiPort = process.env.PORT || '3000';
+  const frontendBackendUrl = resolveFrontendBackendUrl(apiPort);
+  const useRemoteApiOnly = !isLocalhostHttpUrl(frontendBackendUrl);
+
   if (mode === 'production') {
+    if (useRemoteApiOnly) {
+      console.log(
+        '[app.js] Remote API only — skipping local Nest. Next proxy → ' + frontendBackendUrl,
+      );
+      startFrontend('production');
+      return;
+    }
     runProduction();
     scheduleFrontend('production');
-  } else {
-    console.log('[app.js] Starting backend in development mode (source: src/main.ts)');
-    runDevelopment();
-    scheduleFrontend('development');
+    return;
   }
+
+  if (useRemoteApiOnly) {
+    console.log(
+      '[app.js] Remote API only — skipping local Nest. Next proxy → ' + frontendBackendUrl,
+    );
+    startFrontend('development');
+    return;
+  }
+
+  console.log('[app.js] Starting backend in development mode (source: src/main.ts)');
+  runDevelopment();
+  scheduleFrontend('development');
 }
 
 main();

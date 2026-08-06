@@ -212,6 +212,102 @@ class RecurringRepository {
     }
   }
 
+  /// Deletes one planner run (task + occurrence) so board sync cannot recreate it.
+  ///
+  /// Prefers `DELETE /recurring-tasks/tasks/:id`. If the VPS is still on an older
+  /// build (404), falls back to marking the occurrence COMPLETED via a DONE
+  /// status patch, then deleting the task — which existing VPS code already
+  /// supports and which stops rematerialization.
+  Future<void> deleteRun({
+    required String taskId,
+    required String organizationId,
+  }) async {
+    try {
+      await _api.dio.delete<Map<String, dynamic>>(
+        '/recurring-tasks/tasks/$taskId',
+        options: _api.withOrgHeader(organizationId),
+      );
+      return;
+    } on DioException catch (error) {
+      final status = error.response?.statusCode;
+      if (status != 404) {
+        throw ApiException.fromDio(error);
+      }
+    }
+
+    await _deleteRunLegacyFallback(
+      taskId: taskId,
+      organizationId: organizationId,
+    );
+  }
+
+  Future<void> _deleteRunLegacyFallback({
+    required String taskId,
+    required String organizationId,
+  }) async {
+    try {
+      final taskRes = await _api.dio.get<Map<String, dynamic>>(
+        '/tasks/$taskId',
+        options: _api.withOrgHeader(organizationId),
+      );
+      final task = taskRes.data ?? const <String, dynamic>{};
+      final projectId = (task['projectId'] ?? task['project_id'])?.toString();
+      if (projectId == null || projectId.isEmpty) {
+        throw const ApiException(message: 'Could not resolve project for this run.');
+      }
+
+      final workflowsRes = await _api.dio.get<List<dynamic>>(
+        '/workflows/project/$projectId',
+        options: _api.withOrgHeader(organizationId),
+      );
+      final workflows = workflowsRes.data ?? const [];
+      String? doneStatusId;
+      for (final raw in workflows) {
+        if (raw is! Map<String, dynamic>) continue;
+        final workflowId = (raw['id'] ?? '').toString();
+        if (workflowId.isEmpty) continue;
+        final statusesRes = await _api.dio.get<List<dynamic>>(
+          '/workflows/$workflowId/statuses',
+          options: _api.withOrgHeader(organizationId),
+        );
+        for (final s in statusesRes.data ?? const []) {
+          if (s is! Map<String, dynamic>) continue;
+          final type = (s['type'] ?? '').toString().toUpperCase();
+          if (type == 'DONE') {
+            doneStatusId = (s['id'] ?? '').toString();
+            break;
+          }
+        }
+        if (doneStatusId != null && doneStatusId.isNotEmpty) break;
+      }
+
+      if (doneStatusId != null && doneStatusId.isNotEmpty) {
+        await _api.dio.patch<Map<String, dynamic>>(
+          '/tasks/$taskId',
+          data: {'statusId': doneStatusId},
+          options: _api.withOrgHeader(organizationId),
+        );
+      }
+
+      try {
+        await _api.dio.delete<void>(
+          '/tasks/$taskId',
+          options: _api.withOrgHeader(organizationId),
+        );
+      } on DioException catch (error) {
+        // Older VPS: admin can mark done (stops rematerialize) but not delete task.
+        if (error.response?.statusCode == 403 &&
+            doneStatusId != null &&
+            doneStatusId.isNotEmpty) {
+          return;
+        }
+        rethrow;
+      }
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
   Future<void> pauseTemplate({
     required String templateId,
     required String organizationId,

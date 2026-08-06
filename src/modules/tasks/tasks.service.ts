@@ -766,6 +766,12 @@ export class TasksService {
       await this.assertCanDeleteTask(task, organizationId, userId);
     }
 
+    // Planner runs rematerialize on board sync if the occurrence stays PENDING.
+    // Remove the occurrence first so deleting a run actually sticks.
+    if (task.recurringTemplateId) {
+      await this.recurringTasksService.removeOccurrenceForTask(taskId);
+    }
+
     const attachments = await this.taskAttachmentsRepository.findByTask(taskId);
     const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
     for (const attachment of attachments) {
@@ -795,11 +801,11 @@ export class TasksService {
   ): Promise<void> {
     const membership = await this.organizationsService.getMembership(organizationId, userId);
     const role = membership?.role?.toLowerCase() ?? '';
-    if (role === 'owner') return;
+    if (role === 'owner' || role === 'admin') return;
 
     if (isTaskReporter(task, userId)) return;
 
-    throw new ForbiddenException('Only the workspace owner or task creator can delete this task');
+    throw new ForbiddenException('Only the workspace owner, admin, or task creator can delete this task');
   }
 
   private async assertCanUpdateTask(
