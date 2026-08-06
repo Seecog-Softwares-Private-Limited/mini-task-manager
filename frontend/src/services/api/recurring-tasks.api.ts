@@ -80,6 +80,55 @@ export async function deleteRecurringSeries(templateId: string): Promise<void> {
   await apiClient.delete(`/recurring-tasks/${templateId}`);
 }
 
+/** Delete one planner run so board sync cannot rematerialize it. */
+export async function deleteRecurringRun(taskId: string): Promise<void> {
+  try {
+    await apiClient.delete(`/recurring-tasks/tasks/${taskId}`);
+    return;
+  } catch (err: unknown) {
+    const status = (err as { response?: { status?: number } })?.response?.status;
+    if (status !== 404) throw err;
+  }
+
+  // Older VPS without DELETE /recurring-tasks/tasks/:id — mark DONE then delete task.
+  const { data: task } = await apiClient.get<{
+    projectId?: string;
+    statusId?: string;
+  }>(`/tasks/${taskId}`);
+  const projectId = task.projectId;
+  if (!projectId) {
+    await apiClient.delete(`/tasks/${taskId}`);
+    return;
+  }
+
+  const { data: workflows } = await apiClient.get<Array<{ id: string }>>(
+    `/workflows/project/${projectId}`
+  );
+  let doneStatusId: string | undefined;
+  for (const workflow of workflows ?? []) {
+    const { data: statuses } = await apiClient.get<
+      Array<{ id: string; type?: string }>
+    >(`/workflows/${workflow.id}/statuses`);
+    const done = (statuses ?? []).find(
+      (s) => String(s.type ?? "").toUpperCase() === "DONE"
+    );
+    if (done?.id) {
+      doneStatusId = done.id;
+      break;
+    }
+  }
+  if (doneStatusId) {
+    await apiClient.patch(`/tasks/${taskId}`, { statusId: doneStatusId });
+  }
+  try {
+    await apiClient.delete(`/tasks/${taskId}`);
+  } catch (err: unknown) {
+    const status = (err as { response?: { status?: number } })?.response?.status;
+    if (status === 403 && doneStatusId) return;
+    throw err;
+  }
+}
+
 export async function duplicateRecurringTemplate(
   templateId: string
 ): Promise<{ id: string; success: boolean }> {

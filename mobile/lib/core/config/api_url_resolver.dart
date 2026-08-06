@@ -1,16 +1,18 @@
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/storage_keys.dart';
 import 'app_config.dart';
 
 /// Resolves the API base URL from saved settings, build-time defines, and flavor defaults.
+///
+/// Dev and prod both use the Hostinger VPS — never localhost Nest — so uploads,
+/// comments, and attachments stay consistent for live users and local development.
 abstract final class ApiUrlResolver {
   static String resolve(SharedPreferences prefs) {
     // Build/run --dart-define wins over stale saved browser/device settings.
     const envOverride = String.fromEnvironment('API_BASE_URL');
     if (envOverride.isNotEmpty) {
-      return _preferLocalProxyOnWeb(normalizeAndMigrate(envOverride));
+      return normalizeAndMigrate(envOverride);
     }
 
     const flavor = String.fromEnvironment('FLAVOR', defaultValue: 'dev');
@@ -18,16 +20,16 @@ abstract final class ApiUrlResolver {
     final saved = prefs.getString(StorageKeys.apiBaseUrl)?.trim();
     if (saved != null && saved.isNotEmpty) {
       final normalized = _repairSavedUrl(prefs, saved);
-      // Stale localhost / emulator URLs must not shadow Hostinger VPS.
+      // Local Nest URLs mix up live VPS data/files — always prefer Hostinger.
       if (isLocalDevUrl(normalized)) {
         final vps = normalizeAndMigrate(AppConfig.productionApiBaseUrl);
         prefs.setString(StorageKeys.apiBaseUrl, vps);
-        return _preferLocalProxyOnWeb(vps);
+        return vps;
       }
-      return _preferLocalProxyOnWeb(normalized);
+      return normalized;
     }
 
-    return _preferLocalProxyOnWeb(normalizeAndMigrate(_defaultBaseUrlForFlavor(flavor)));
+    return normalizeAndMigrate(_defaultBaseUrlForFlavor(flavor));
   }
 
   static String normalizeAndMigrate(String raw) {
@@ -60,7 +62,12 @@ abstract final class ApiUrlResolver {
         origin.host.startsWith('127.') ||
         RegExp(r'^192\.168\.|^10\.|^172\.(1[6-9]|2\d|3[01])\.').hasMatch(origin.host);
 
-    if (origin.hasPort && origin.port == 3007 && !isLocalHost) {
+    // Never keep a local Nest URL — live app + local web must share the VPS API.
+    if (isLocalHost) {
+      return AppConfig.productionApiBaseUrl;
+    }
+
+    if (origin.hasPort && origin.port == 3007) {
       return AppConfig.normalizeBaseUrl(
         Uri(
           scheme: origin.scheme,
@@ -87,25 +94,6 @@ abstract final class ApiUrlResolver {
     }
   }
 
-  /// On Flutter web during local `flutter run -d chrome`, keep an explicit remote
-  /// Hostinger/production URL. Only fall back to local Nest when the URL is local.
-  static String _preferLocalProxyOnWeb(String url) {
-    if (!kIsWeb) return url;
-    final host = Uri.base.host;
-    if (host != 'localhost' && host != '127.0.0.1') {
-      return url;
-    }
-    final apiHost = Uri.tryParse(url)?.host ?? '';
-    final isLocalApi = apiHost == 'localhost' ||
-        apiHost == '127.0.0.1' ||
-        apiHost == '10.0.2.2' ||
-        apiHost.isEmpty;
-    if (isLocalApi) {
-      return 'http://localhost:3007/api/v1';
-    }
-    return url;
-  }
-
   static bool isLocalDevUrl(String url) {
     final uri = Uri.tryParse(url);
     if (uri == null) return false;
@@ -120,7 +108,7 @@ abstract final class ApiUrlResolver {
     if (flavor == 'staging') {
       return 'https://staging.your-host/api/v1';
     }
-    // Dev + prod both default to Hostinger VPS (not localhost / RDS).
+    // Dev + prod both default to Hostinger VPS (not localhost Nest).
     return AppConfig.productionApiBaseUrl;
   }
 }

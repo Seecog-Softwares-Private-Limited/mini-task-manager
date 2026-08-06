@@ -23,6 +23,8 @@ import '../../shared/widgets/user_avatar.dart';
 import '../auth/session_controller.dart';
 import '../kanban/kanban_providers.dart';
 import '../projects/projects_providers.dart';
+import '../recurring/recurring_actions.dart';
+import '../recurring/recurring_providers.dart';
 import 'subtask_completion_sheet.dart';
 import 'subtask_completion_utils.dart';
 import 'subtask_compact_row.dart';
@@ -1027,7 +1029,17 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       _error = null;
     });
     try {
-      await ref.read(tasksRepositoryProvider).deleteTask(_task.id);
+      final orgId = ref.read(sessionControllerProvider).orgId ?? '';
+      final isRun = _task.recurringTemplateId != null &&
+          _task.recurringTemplateId!.trim().isNotEmpty;
+      if (isRun && orgId.isNotEmpty) {
+        await ref.read(recurringRepositoryProvider).deleteRun(
+              taskId: _task.id,
+              organizationId: orgId,
+            );
+      } else {
+        await ref.read(tasksRepositoryProvider).deleteTask(_task.id);
+      }
       if (!mounted) return;
       widget.onDeleted?.call();
       widget.onUpdated();
@@ -1115,12 +1127,12 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
         );
     final allowChecklistStructureEdit = canEditSubtasks && !isPastRecurringRun;
     final canCompleteSubtasks = canEditSubtasks;
-    final canDelete = !isPastRecurringRun &&
-        canDeleteTask(
+    final canDelete = canDeleteTask(
           org: org,
           userId: currentUserId,
           task: _task,
-        );
+        ) &&
+        (!isPastRecurringRun || canManageRecurring(ref));
     final checklistDone = _subtasks.where((s) => s.completed).length;
     final checklistTotal = _subtasks.length;
     final checklistPercent =

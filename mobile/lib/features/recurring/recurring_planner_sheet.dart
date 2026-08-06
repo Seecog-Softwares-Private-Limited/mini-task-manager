@@ -229,12 +229,18 @@ class _RecurringPlannerSheetState extends ConsumerState<_RecurringPlannerSheet> 
                     itemBuilder: (context, index) {
                       final occurrence = occurrences[index];
                       final taskId = occurrence.taskId;
+                      final canDeleteRun = canManageRecurring(ref) &&
+                          taskId != null &&
+                          taskId.isNotEmpty;
                       return _OccurrenceTile(
                         occurrence: occurrence,
                         loading: taskId != null && taskId == _openingTaskId,
                         onOpen: taskId == null || taskId.isEmpty
                             ? null
                             : () => _openTask(context, taskId),
+                        onDelete: canDeleteRun
+                            ? () => _deleteRun(context, taskId)
+                            : null,
                       );
                     },
                   ),
@@ -290,6 +296,51 @@ class _RecurringPlannerSheetState extends ConsumerState<_RecurringPlannerSheet> 
     );
     if (deleted && mounted) {
       Navigator.of(context).pop();
+    }
+  }
+
+  Future<void> _deleteRun(BuildContext context, String taskId) async {
+    final orgId = ref.read(sessionControllerProvider).orgId;
+    if (orgId == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete run?'),
+        content: const Text(
+          'Remove this planner run? It will not come back on the next sync.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(recurringRepositoryProvider).deleteRun(
+            taskId: taskId,
+            organizationId: orgId,
+          );
+      if (!mounted) return;
+      ref.invalidate(recurringBoardTasksProvider);
+      ref.invalidate(recurringTemplateHistoryProvider(template.id));
+      ref.invalidate(recurringTemplatesProvider);
+      ref.invalidate(recurringSummaryProvider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Run deleted')),
+      );
+    } on ApiException catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
     }
   }
 
@@ -363,11 +414,13 @@ class _OccurrenceTile extends StatelessWidget {
   const _OccurrenceTile({
     required this.occurrence,
     this.onOpen,
+    this.onDelete,
     this.loading = false,
   });
 
   final RecurringOccurrence occurrence;
   final VoidCallback? onOpen;
+  final VoidCallback? onDelete;
   final bool loading;
 
   @override
@@ -418,6 +471,13 @@ class _OccurrenceTile extends StatelessWidget {
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ] else if (onDelete != null) ...[
+                IconButton(
+                  tooltip: 'Delete run',
+                  onPressed: onDelete,
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.delete_outline, color: AppColors.danger),
                 ),
               ] else if (onOpen != null) ...[
                 const SizedBox(width: AppSpacing.xs),

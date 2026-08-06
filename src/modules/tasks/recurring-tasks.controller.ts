@@ -138,6 +138,16 @@ export class RecurringTasksController {
     return this.recurringTasksService.duplicateTemplate(id, organizationId);
   }
 
+  /** Delete one planner run (task + occurrence) so it cannot rematerialize. */
+  @Delete('tasks/:taskId')
+  async deleteRun(
+    @Param('taskId') taskId: string,
+    @TenantId() organizationId: string,
+    @CurrentUserId() userId: string,
+  ) {
+    return this.recurringTasksService.deleteRun(taskId, organizationId, userId);
+  }
+
   @UseGuards(RolesGuard)
   @Roles('owner', 'admin')
   @Delete(':id')
