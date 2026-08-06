@@ -1604,6 +1604,9 @@ export class RecurringTasksService {
         const recipientIds = assigneeIdsForItem(subtask);
         if (recipientIds.length) {
           const title = (subtask.title || task.title || 'Checklist item').trim() || 'Checklist item';
+          this.logger.log(
+            `Checklist reminder due: "${title}" → ${recipientIds.length} assignee(s) (notify ${notifyMinutesBefore}m before ${itemDueYmd} ${itemDueTime})`,
+          );
           await this.taskNotifications.notifyRitualDue({
             title,
             recipientIds,
@@ -1613,6 +1616,10 @@ export class RecurringTasksService {
             occurrenceId: occurrence.id,
             subtaskId: subtask.id,
           });
+        } else {
+          this.logger.warn(
+            `Checklist reminder skipped (no assignees): "${subtask.title}" @ ${itemDueYmd} ${itemDueTime}`,
+          );
         }
         await markSent(key);
       }
@@ -1647,7 +1654,11 @@ function isInRemindWindow(
   const dueAtMs = Date.parse(`${dueYmd}T${dueTime}:00+05:30`);
   if (!Number.isFinite(dueAtMs)) return false;
   const remindAtMs = dueAtMs - notifyMinutesBefore * 60_000;
-  return nowMs >= remindAtMs && nowMs < remindAtMs + 60_000;
+  // Fire from the remind moment until shortly after due.
+  // Previously this was a 60s window — any delayed cron tick permanently missed the push.
+  // Dedup is handled by occurrence.remindersSent keys, so a wider window is safe.
+  const graceAfterDueMs = 2 * 60_000;
+  return nowMs >= remindAtMs && nowMs < dueAtMs + graceAfterDueMs;
 }
 
 function assigneeIdsForItem(item: {
