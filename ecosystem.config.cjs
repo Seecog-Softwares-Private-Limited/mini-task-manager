@@ -21,7 +21,7 @@ if (fs.existsSync(envPath)) {
   require(path.join(ROOT, 'scripts/resolve-env-urls.cjs')).applyEnvironmentUrls();
 }
 
-const apiPort = process.env.PORT || '3000';
+const apiPort = process.env.PORT || (process.env.FRONTEND_PORT === '3000' ? '3007' : '3000');
 const frontendPort = process.env.FRONTEND_PORT || '3001';
 const backendUrl = `http://127.0.0.1:${apiPort}`;
 const defaultJwt = 'change-me-in-production';

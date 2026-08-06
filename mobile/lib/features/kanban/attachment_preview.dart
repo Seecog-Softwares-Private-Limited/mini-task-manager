@@ -265,6 +265,7 @@ class _AttachmentThumbnailState extends ConsumerState<_AttachmentThumbnail> {
   Uint8List? _bytes;
   bool _loading = false;
   bool _failed = false;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -282,6 +283,7 @@ class _AttachmentThumbnailState extends ConsumerState<_AttachmentThumbnail> {
         oldWidget.organizationId != widget.organizationId) {
       _bytes = null;
       _failed = false;
+      _errorMessage = null;
       if (isImageAttachment(widget.attachment)) {
         _loading = true;
         _load();
@@ -301,6 +303,9 @@ class _AttachmentThumbnailState extends ConsumerState<_AttachmentThumbnail> {
           setState(() {
             _failed = true;
             _loading = false;
+            _errorMessage = orgId.isEmpty
+                ? 'Workspace missing'
+                : 'Invalid attachment';
           });
         }
         return;
@@ -312,11 +317,15 @@ class _AttachmentThumbnailState extends ConsumerState<_AttachmentThumbnail> {
             preferPreview: true,
           );
       if (!mounted) return;
-      if (!_looksLikeImageBytes(bytes)) {
+      // Prefer showing whatever the server returned when MIME says image.
+      // Magic-byte rejection hid valid screenshots (and some web byte shapes).
+      final mimeSaysImage = isImageAttachment(widget.attachment);
+      if (!mimeSaysImage && !_looksLikeImageBytes(bytes)) {
         setState(() {
           _failed = true;
           _loading = false;
           _bytes = null;
+          _errorMessage = 'Not an image';
         });
         return;
       }
@@ -324,13 +333,21 @@ class _AttachmentThumbnailState extends ConsumerState<_AttachmentThumbnail> {
         _bytes = bytes;
         _failed = false;
         _loading = false;
+        _errorMessage = null;
       });
-    } catch (_) {
+    } catch (error) {
+      debugPrint(
+        'Attachment thumbnail failed id=${widget.attachment.id} '
+        'name=${widget.attachment.fileName}: $error',
+      );
       if (mounted) {
         setState(() {
           _failed = true;
           _loading = false;
           _bytes = null;
+          _errorMessage = error is ApiException
+              ? error.message
+              : 'Could not load image';
         });
       }
     }
@@ -427,10 +444,33 @@ class _AttachmentThumbnailState extends ConsumerState<_AttachmentThumbnail> {
             ? null
             : Border.all(color: Theme.of(context).dividerColor.withValues(alpha: 0.4)),
       ),
-      child: Icon(
-        _failed ? Icons.broken_image_outlined : iconForAttachment(widget.attachment),
-        size: widget.expand ? 28 : 22,
-        color: AppColors.textMuted,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            _failed ? Icons.broken_image_outlined : iconForAttachment(widget.attachment),
+            size: widget.expand ? 28 : 22,
+            color: AppColors.textMuted,
+          ),
+          if (_failed && widget.expand) ...[
+            const SizedBox(height: 6),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(
+                _errorMessage?.trim().isNotEmpty == true
+                    ? _errorMessage!
+                    : 'Tap to open',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: AppColors.textMuted,
+                      fontSize: 9,
+                    ),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

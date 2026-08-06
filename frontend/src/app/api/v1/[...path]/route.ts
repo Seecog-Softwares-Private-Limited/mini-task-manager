@@ -140,9 +140,17 @@ function applyCorsHeaders(headers: Headers, request: NextRequest): void {
   );
 }
 
-function proxyUnavailableResponse(base: string, targetUrl: string, err: unknown, timedOut: boolean) {
+function proxyUnavailableResponse(
+  request: NextRequest,
+  base: string,
+  targetUrl: string,
+  err: unknown,
+  timedOut: boolean,
+) {
   const upstreamTimeoutMs = 45_000;
   console.error("[mini-tm api proxy] fetch failed:", targetUrl, err);
+  const headers = new Headers({ "Content-Type": "application/json" });
+  applyCorsHeaders(headers, request);
   return NextResponse.json(
     {
       statusCode: 503,
@@ -150,7 +158,7 @@ function proxyUnavailableResponse(base: string, targetUrl: string, err: unknown,
         ? `API proxy timed out (${upstreamTimeoutMs / 1000}s) calling ${targetUrl}. Is the VPS API up at ${base}?`
         : `Cannot reach API at ${base} (connection reset). Check PUBLIC_API_URL / MINI_TM_BACKEND_URL.`,
     },
-    { status: 503 }
+    { status: 503, headers },
   );
 }
 
@@ -207,12 +215,12 @@ async function proxy(request: NextRequest, pathSegments: string[] | undefined) {
         await sleep(250);
         continue;
       }
-      return proxyUnavailableResponse(base, targetUrl, err, timedOut);
+      return proxyUnavailableResponse(request, base, targetUrl, err, timedOut);
     }
   }
 
   if (!upstream) {
-    return proxyUnavailableResponse(base, targetUrl, lastErr, false);
+    return proxyUnavailableResponse(request, base, targetUrl, lastErr, false);
   }
 
   const outHeaders = new Headers();
@@ -239,7 +247,7 @@ async function proxy(request: NextRequest, pathSegments: string[] | undefined) {
     });
   } catch (err) {
     if (isUpstreamConnectionError(err)) {
-      return proxyUnavailableResponse(base, targetUrl, err, false);
+      return proxyUnavailableResponse(request, base, targetUrl, err, false);
     }
     throw err;
   }

@@ -130,7 +130,11 @@ export class AttachmentsService {
     taskIdHint?: string,
   ): Promise<AttachmentEntity[]> {
     await this.assertEntityAccess(entityType, entityId, organizationId, taskIdHint);
-    return this.attachmentsRepository.findByEntity(entityType, entityId);
+    return this.attachmentsRepository.findByEntityInWorkspace(
+      entityType,
+      entityId,
+      organizationId,
+    );
   }
 
   async upload(
@@ -214,8 +218,8 @@ export class AttachmentsService {
     });
 
     await this.planLimitService.incrementStorageUsed(userId, file.size);
-    // Fire-and-forget: copy bytes to production host so mobile (VPS API) can preview.
-    void this.mirrorUploadBytes(storageKey, file.buffer);
+    // Await mirror so mobile/VPS can preview immediately after local/web upload.
+    await this.mirrorUploadBytes(storageKey, file.buffer);
     return attachment;
   }
 
@@ -228,16 +232,8 @@ export class AttachmentsService {
     storageKey: string,
     contentBase64: string,
   ): Promise<{ ok: true }> {
-    const expected = this.configService.get('uploadsMirrorSecret', { infer: true }) ?? '';
-    if (!expected || !secret || secret !== expected) {
-      throw new ForbiddenException('Invalid mirror secret');
-    }
-    const key = String(storageKey ?? '')
-      .replace(/\\/g, '/')
-      .replace(/^\/+/, '');
-    if (!key || key.includes('..') || !key.startsWith('attachments/')) {
-      throw new BadRequestException('Invalid storageKey');
-    }
+    this.assertMirrorSecret(secret);
+    const key = this.normalizeStorageKey(storageKey);
     let buffer: Buffer;
     try {
       buffer = Buffer.from(String(contentBase64 ?? ''), 'base64');
@@ -247,65 +243,182 @@ export class AttachmentsService {
     if (!buffer.length || buffer.length > MAX_FILE_SIZE) {
       throw new BadRequestException('Invalid file size');
     }
-    const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
-    const fullPath = path.join(uploadsPath, key);
-    await fs.mkdir(path.dirname(fullPath), { recursive: true });
-    await fs.writeFile(fullPath, buffer);
+    await this.writeStorageKey(key, buffer);
     return { ok: true };
   }
 
-  private async mirrorUploadBytes(storageKey: string, buffer: Buffer): Promise<void> {
-    const publicApiUrl = this.configService.get('publicApiUrl', { infer: true }) ?? '';
-    const secret = this.configService.get('uploadsMirrorSecret', { infer: true }) ?? '';
-    if (!publicApiUrl || !secret) return;
+  /**
+   * Server-to-server: return file bytes so another host can pull a missing upload.
+   */
+  async provideMirroredUpload(
+    secret: string | undefined,
+    storageKey: string,
+  ): Promise<{ storageKey: string; contentBase64: string }> {
+    this.assertMirrorSecret(secret);
+    const key = this.normalizeStorageKey(storageKey);
+    const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
+    let fullPath: string;
+    try {
+      fullPath = await findExistingUploadPath(uploadsPath, key);
+    } catch {
+      throw new NotFoundException('Attachment file is not on this host');
+    }
+    const buffer = await fs.readFile(fullPath);
+    if (!buffer.length || buffer.length > MAX_FILE_SIZE) {
+      throw new BadRequestException('Invalid file size');
+    }
+    return { storageKey: key, contentBase64: buffer.toString('base64') };
+  }
 
-    // Skip when this process is already the public host (production).
+  private assertMirrorSecret(secret: string | undefined): void {
+    const expected = this.configService.get('uploadsMirrorSecret', { infer: true }) ?? '';
+    if (!expected || !secret || secret !== expected) {
+      throw new ForbiddenException('Invalid mirror secret');
+    }
+  }
+
+  private normalizeStorageKey(storageKey: string): string {
+    const key = String(storageKey ?? '')
+      .replace(/\\/g, '/')
+      .replace(/^\/+/, '');
+    if (
+      !key ||
+      key.includes('..') ||
+      (!key.startsWith('attachments/') && !key.startsWith('task-attachments/'))
+    ) {
+      throw new BadRequestException('Invalid storageKey');
+    }
+    return key;
+  }
+
+  private async writeStorageKey(storageKey: string, buffer: Buffer): Promise<string> {
+    const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
+    const fullPath = path.join(uploadsPath, storageKey);
+    await fs.mkdir(path.dirname(fullPath), { recursive: true });
+    await fs.writeFile(fullPath, buffer);
+    return fullPath;
+  }
+
+  private canonicalApiBase(): string | null {
+    const publicApiUrl = (this.configService.get('publicApiUrl', { infer: true }) ?? '')
+      .trim()
+      .replace(/\/$/, '');
+    if (!publicApiUrl) return null;
     try {
       const target = new URL(publicApiUrl);
-      const port = this.configService.get('port', { infer: true });
       const isLoopback =
         target.hostname === 'localhost' ||
         target.hostname === '127.0.0.1' ||
         target.hostname === '0.0.0.0';
-      if (isLoopback) return;
-      // If we're listening as the public host on the same port, don't self-POST.
-      // (Local:3007 → VPS:3000 is the intended path.)
-      if (
-        process.env.APP_MODE === 'production' &&
-        String(target.port || (target.protocol === 'https:' ? 443 : 80)) === String(port)
-      ) {
-        return;
-      }
+      if (isLoopback) return null;
+      return publicApiUrl;
     } catch {
+      return null;
+    }
+  }
+
+  private isSelfCanonicalHost(publicApiUrl: string): boolean {
+    // Production is the canonical store — never pull from itself.
+    if (process.env.APP_MODE === 'production') return true;
+    try {
+      const target = new URL(publicApiUrl);
+      const port = this.configService.get('port', { infer: true });
+      const targetPort = String(
+        target.port || (target.protocol === 'https:' ? 443 : 80),
+      );
+      return targetPort === String(port);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Push bytes to the canonical (production) API so mobile/web on VPS can preview
+   * files uploaded from local Nest while sharing the same DB.
+   */
+  private async mirrorUploadBytes(storageKey: string, buffer: Buffer): Promise<void> {
+    if (process.env.APP_MODE === 'production') return;
+
+    const publicApiUrl = this.canonicalApiBase();
+    const secret = this.configService.get('uploadsMirrorSecret', { infer: true }) ?? '';
+    if (!publicApiUrl || !secret) {
+      this.logger.warn(
+        `Upload mirror skipped for ${storageKey}: set PUBLIC_API_URL and UPLOADS_MIRROR_SECRET (or JWT_SECRET)`,
+      );
       return;
     }
 
     const endpoint = `${publicApiUrl}/api/v1/attachments/mirror-blob`;
+    let lastError = '';
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Uploads-Mirror-Secret': secret,
+          },
+          body: JSON.stringify({
+            storageKey,
+            contentBase64: buffer.toString('base64'),
+          }),
+          signal: AbortSignal.timeout(30_000),
+        });
+        if (res.ok) {
+          this.logger.log(`Upload mirrored to ${publicApiUrl} (${storageKey})`);
+          return;
+        }
+        lastError = `${res.status} ${(await res.text().catch(() => '')).slice(0, 160)}`;
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err);
+      }
+      if (attempt < 3) {
+        await new Promise((r) => setTimeout(r, 400 * attempt));
+      }
+    }
+    this.logger.error(
+      `Upload mirror FAILED for ${storageKey} after 3 attempts → ${publicApiUrl}: ${lastError}`,
+    );
+  }
+
+  /**
+   * If this host is missing the file, pull from the canonical production API.
+   */
+  private async pullFromCanonicalIfMissing(storageKey: string): Promise<string | null> {
+    const publicApiUrl = this.canonicalApiBase();
+    const secret = this.configService.get('uploadsMirrorSecret', { infer: true }) ?? '';
+    if (!publicApiUrl || !secret) return null;
+    if (this.isSelfCanonicalHost(publicApiUrl)) return null;
+
+    const endpoint =
+      `${publicApiUrl}/api/v1/attachments/mirror-fetch` +
+      `?storageKey=${encodeURIComponent(storageKey)}`;
     try {
       const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Uploads-Mirror-Secret': secret,
-        },
-        body: JSON.stringify({
-          storageKey,
-          contentBase64: buffer.toString('base64'),
-        }),
-        signal: AbortSignal.timeout(20_000),
+        method: 'GET',
+        headers: { 'X-Uploads-Mirror-Secret': secret },
+        signal: AbortSignal.timeout(30_000),
       });
       if (!res.ok) {
-        const text = await res.text().catch(() => '');
         this.logger.warn(
-          `Upload mirror failed (${res.status}) for ${storageKey}: ${text.slice(0, 160)}`,
+          `Pull mirror miss for ${storageKey} from ${publicApiUrl}: ${res.status}`,
         );
+        return null;
       }
+      const body = (await res.json()) as { contentBase64?: string; storageKey?: string };
+      if (!body?.contentBase64) return null;
+      const buffer = Buffer.from(body.contentBase64, 'base64');
+      if (!buffer.length) return null;
+      const fullPath = await this.writeStorageKey(storageKey, buffer);
+      this.logger.log(`Pulled missing attachment from ${publicApiUrl}: ${storageKey}`);
+      return fullPath;
     } catch (err) {
       this.logger.warn(
-        `Upload mirror error for ${storageKey}: ${
+        `Pull mirror error for ${storageKey}: ${
           err instanceof Error ? err.message : String(err)
         }`,
       );
+      return null;
     }
   }
 
@@ -339,7 +452,10 @@ export class AttachmentsService {
       throw new BadRequestException('Preview is not available for this file type.');
     }
     const uploadsPath = this.configService.get('uploadsPath', { infer: true })!;
-    const fullPath = await findExistingUploadPath(uploadsPath, attachment.storageKey);
+    const fullPath = await this.assertAttachmentFileExists(
+      uploadsPath,
+      attachment.storageKey,
+    );
     let buffer: Buffer;
     try {
       buffer = await fs.readFile(fullPath);
@@ -411,7 +527,13 @@ export class AttachmentsService {
     uploadsPath: string,
     storageKey: string,
   ): Promise<string> {
-    return findExistingUploadPath(uploadsPath, storageKey);
+    try {
+      return await findExistingUploadPath(uploadsPath, storageKey);
+    } catch (err) {
+      const pulled = await this.pullFromCanonicalIfMissing(storageKey);
+      if (pulled) return pulled;
+      throw err;
+    }
   }
 
   private async getAttachmentOrThrow(
@@ -447,16 +569,19 @@ export class AttachmentsService {
     }
 
     if (entityType === 'SUBTASK') {
-      let task = taskIdHint
-        ? await this.tasksRepository.findByIdAndOrganization(taskIdHint, organizationId)
-        : null;
-      if (task) {
-        const hasSubtask = task.subtasks?.some((s) => s.id === entityId);
-        if (!hasSubtask) task = null;
+      // Prefer taskId hint: mobile client ids may not match JSON_SEARCH, and
+      // checklist edits can drop a subtask while attachments remain. Org scope
+      // comes from the task row (then attachments filtered by workspaceId).
+      if (taskIdHint) {
+        const hinted = await this.tasksRepository.findByIdAndOrganization(
+          taskIdHint,
+          organizationId,
+        );
+        if (hinted) {
+          return { projectId: hinted.projectId, taskId: hinted.id };
+        }
       }
-      if (!task) {
-        task = await this.findTaskContainingSubtask(entityId, organizationId);
-      }
+      let task = await this.findTaskContainingSubtask(entityId, organizationId);
       if (!task) throw new NotFoundException('Subtask not found');
       return { projectId: task.projectId, taskId: task.id };
     }

@@ -173,6 +173,8 @@ const _imageExtensions = {
   'webp',
   'bmp',
   'svg',
+  'heic',
+  'heif',
 };
 
 const _audioExtensions = {
