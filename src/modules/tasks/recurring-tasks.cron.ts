@@ -37,13 +37,13 @@ export class RecurringTasksCron {
     }
   }
 
-  /** Every minute: notify checklist assignees before ritual due time. */
+  /** Every minute: notify checklist assignees before ritual / item due time. */
   @Cron(CronExpression.EVERY_MINUTE)
   async sendRitualDueReminders() {
     try {
       const result = await this.recurringTasksService.sendDueRitualReminders();
       if (result.sent > 0) {
-        this.logger.log(`Sent ${result.sent} ritual due reminder(s)`);
+        this.logger.log(`Sent ${result.sent} ritual/checklist due reminder(s)`);
       }
     } catch (error) {
       this.logger.error(
