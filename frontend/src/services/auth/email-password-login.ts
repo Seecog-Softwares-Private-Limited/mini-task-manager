@@ -44,7 +44,7 @@ export async function loginWithEmailPassword(
       return {
         ok: false,
         network: true,
-        message: `Sign-in timed out after ${loginTimeoutMs / 1000}s. Is the API running on PORT from properties.env? Try restarting: node app.js`,
+        message: `Sign-in timed out after ${loginTimeoutMs / 1000}s. Is the API running on PORT from .env? Try restarting: node app.js`,
       };
     }
     const reset =
@@ -57,7 +57,7 @@ export async function loginWithEmailPassword(
       network: true,
       message: reset
         ? "Connection to the API was reset. From the repo root run: node app.js (starts API + frontend)."
-        : "Cannot reach the API. From the repo root run: node app.js or npm run start:dev on the PORT in properties.env.",
+        : "Cannot reach the API. From the repo root run: node app.js or npm run start:dev on the PORT in .env.",
     };
   }
 

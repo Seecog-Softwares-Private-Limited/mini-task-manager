@@ -6,8 +6,8 @@ const fs = require('fs');
 const net = require('net');
 const { spawn } = require('child_process');
 
-// Load ports (and other vars) from properties.env so they're available before Nest loads
-require('dotenv').config({ path: path.join(__dirname, 'properties.env') });
+// Load ports (and other vars) from .env so they're available before Nest loads
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 const { applyEnvironmentUrls, getAppMode } = require('./scripts/resolve-env-urls.cjs');
 const resolvedUrls = applyEnvironmentUrls();
 
@@ -36,16 +36,16 @@ function checkNodeVersion() {
 }
 
 function checkEnvFile() {
-  const envPath = path.join(ROOT, 'properties.env');
+  const envPath = path.join(ROOT, '.env');
   if (!fs.existsSync(envPath)) {
     console.warn(
-      '[app.js] No properties.env file found. Create properties.env and set DB_*, JWT_SECRET, etc.'
+      '[app.js] No .env file found. Create .env and set DB_*, JWT_SECRET, etc.'
     );
   }
-  const legacyDotEnv = path.join(ROOT, '.env');
-  if (fs.existsSync(legacyDotEnv)) {
+  const legacyProps = path.join(ROOT, 'properties.env');
+  if (fs.existsSync(legacyProps)) {
     console.warn(
-      '[app.js] Found .env — this project does not load it. Move variables into properties.env and remove .env.'
+      '[app.js] Found legacy properties.env — this project loads .env only. Move variables into .env and remove properties.env.'
     );
   }
 }
@@ -57,7 +57,7 @@ function checkDbEnv() {
     console.warn(
       '[app.js] Database env not set: ' +
         missing.join(', ') +
-        '. Set them in properties.env for the API to connect.'
+        '. Set them in .env for the API to connect.'
     );
   }
 }

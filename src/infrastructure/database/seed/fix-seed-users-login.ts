@@ -7,7 +7,7 @@
  */
 import * as path from 'path';
 import * as dotenv from 'dotenv';
-dotenv.config({ path: path.join(process.cwd(), 'properties.env') });
+dotenv.config({ path: path.join(process.cwd(), '.env') });
 
 import { DataSource } from 'typeorm';
 import { configuration } from '../../../config/configuration';
@@ -45,7 +45,7 @@ async function main() {
   }
 
   await dataSource.destroy();
-  console.log('\nDone. Use SEED_USER_PASSWORD from properties.env, or Password123! if unset.\n');
+  console.log('\nDone. Use SEED_USER_PASSWORD from .env, or Password123! if unset.\n');
 }
 
 main().catch((e) => {

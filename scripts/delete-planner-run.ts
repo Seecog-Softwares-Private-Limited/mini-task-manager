@@ -10,7 +10,7 @@ import * as path from 'path';
 import { config as loadEnv } from 'dotenv';
 import * as mysql from 'mysql2/promise';
 
-loadEnv({ path: path.join(process.cwd(), 'properties.env') });
+loadEnv({ path: path.join(process.cwd(), '.env') });
 
 function arg(name: string): string | undefined {
   const prefix = `--${name}=`;

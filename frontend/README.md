@@ -13,13 +13,13 @@ Next.js 14 (App Router) SaaS frontend for the OpsPick backend.
 ## Prerequisites
 
 - Node 20+
-- Backend running (port from repo-root `properties.env`, default `3000`). Optional: set `NEXT_PUBLIC_API_URL` in **`../properties.env`** if the API is not same-origin.
+- Backend running (port from repo-root `.env`, default `3000`). Optional: set `NEXT_PUBLIC_API_URL` in **`../.env`** if the API is not same-origin.
 
 ## Run locally
 
 ```bash
 cd frontend
-# Env: repo-root ../properties.env (loaded by scripts/dev.mjs + next.config.mjs)
+# Env: repo-root ../.env (loaded by scripts/dev.mjs + next.config.mjs)
 npm install
 npm run dev
 ```

@@ -1,5 +1,5 @@
 /**
- * Run Next dev with repo-root `properties.env` loaded first (override: true).
+ * Run Next dev with repo-root `.env` loaded first (override: true).
  * Avoid relying on `frontend/.env` / `.env.local` for app configuration.
  */
 import { spawn } from "node:child_process";
@@ -19,7 +19,7 @@ const nextBin = path.join(frontendRoot, "node_modules", "next", "dist", "bin", "
 const { ensureDevNextCache } = require("./ensure-dev-next-cache.cjs");
 ensureDevNextCache(frontendRoot);
 
-dotenv.config({ path: path.join(repoRoot, "properties.env"), override: true });
+dotenv.config({ path: path.join(repoRoot, ".env"), override: true });
 
 const apiPort = process.env.PORT || "3000";
 const frontendPort = process.env.FRONTEND_PORT || "3001";

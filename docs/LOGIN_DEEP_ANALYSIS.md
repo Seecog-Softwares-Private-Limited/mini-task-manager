@@ -10,7 +10,7 @@ This document explains how email/password login works, what broke in the past, a
 3. **Next.js** receives `/api/v1/*` on the **Next server** (not the browser).
 4. **`app/api/v1/[...path]/route.ts`**: server-side `fetch` to **Nest**  
    `http://127.0.0.1:<PORT>/api/v1/auth/login` where `PORT` comes from `process.env.PORT`,  
-   or is read from repo-root `properties.env` if `PORT` is unset (e.g. `next dev` from `frontend/` only).
+   or is read from repo-root `.env` if `PORT` is unset (e.g. `next dev` from `frontend/` only).
 5. **Nest** (`AuthController` → `AuthService.login`): validates user, returns `{ accessToken, user }`.
 6. **Response** flows back through the proxy to the browser.
 7. **Client** (`setStoredToken`): stores JWT in `localStorage` and sets cookie `mini_tm_signed_in=1` (see `client.ts`).
@@ -53,7 +53,7 @@ Source: **`performance.js:44`**
 | `BACKEND_INTERNAL_URL` | Optional override for the proxy base URL (Docker / custom host). |
 | `BACKEND_HOST` | Optional; default `127.0.0.1` when building URL from `PORT`. |
 
-If you start **only** Next (`cd frontend && npm run dev`) without `app.js`, set `MINI_TM_BACKEND_URL` or `BACKEND_INTERNAL_URL` in repo-root **`properties.env`** to match Nest; the API route also scans parent dirs for `properties.env` (standalone `next start` cwd may differ).
+If you start **only** Next (`cd frontend && npm run dev`) without `app.js`, set `MINI_TM_BACKEND_URL` or `BACKEND_INTERNAL_URL` in repo-root **`.env`** to match Nest; the API route also scans parent dirs for `.env` (standalone `next start` cwd may differ).
 
 ## Quick verification
 

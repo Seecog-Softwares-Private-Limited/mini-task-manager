@@ -5,7 +5,7 @@ import { configuration } from './configuration';
 import { validate } from './env.validation';
 
 /** Single env file at repo root (`bootstrap-env.ts` also loads this before Nest starts). */
-const PROPERTIES_ENV = join(process.cwd(), 'properties.env');
+const ROOT_ENV = join(process.cwd(), '.env');
 
 @Module({
   imports: [
@@ -13,7 +13,7 @@ const PROPERTIES_ENV = join(process.cwd(), 'properties.env');
       isGlobal: true,
       load: [configuration],
       validate,
-      envFilePath: [PROPERTIES_ENV],
+      envFilePath: [ROOT_ENV],
     }),
   ],
 })

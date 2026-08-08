@@ -1,9 +1,9 @@
 'use strict';
 
 /**
- * Picks FRONTEND_URL + CORS_ORIGIN from properties.env based on APP_MODE (or NODE_ENV).
+ * Picks FRONTEND_URL + CORS_ORIGIN from .env based on APP_MODE (or NODE_ENV).
  *
- * properties.env:
+ * .env:
  *   APP_MODE=development|production
  *   FRONTEND_URL_LOCAL=http://localhost:3008
  *   CORS_ORIGIN_LOCAL=http://localhost:3008
@@ -74,7 +74,7 @@ function applyEnvironmentUrls() {
     } else if (!process.env.FRONTEND_URL || isLocalhostUrl(process.env.FRONTEND_URL)) {
       console.warn(
         '[resolve-env-urls] APP_MODE=production but FRONTEND_URL_PRODUCTION is missing — ' +
-          'invitation emails may use localhost links. Set FRONTEND_URL_PRODUCTION in properties.env.',
+          'invitation emails may use localhost links. Set FRONTEND_URL_PRODUCTION in .env.',
       );
     }
     if (prodCors) {

@@ -164,7 +164,7 @@ export class BillingService {
           error: 'RazorpayError',
           message: parsed.message,
           hint:
-            'Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in properties.env using Test keys from https://dashboard.razorpay.com/app/keys (fallback keys in repo are often revoked).',
+            'Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in .env using Test keys from https://dashboard.razorpay.com/app/keys (fallback keys in repo are often revoked).',
         },
         HttpStatus.BAD_GATEWAY,
       );

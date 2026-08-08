@@ -17,14 +17,14 @@ const HOP_BY_HOP = new Set([
 ]);
 
 /**
- * Find PORT in repo-root properties.env. Tries several cwd layouts (frontend/, standalone/, etc.).
+ * Find PORT in repo-root .env. Tries several cwd layouts (frontend/, standalone/, etc.).
  */
-function readFromRepoPropertiesEnv(key: string): string | undefined {
+function readFromRepoEnv(key: string): string | undefined {
   const candidates = [
-    path.join(process.cwd(), "..", "properties.env"),
-    path.join(process.cwd(), "..", "..", "properties.env"),
-    path.join(process.cwd(), "..", "..", "..", "properties.env"),
-    path.join(process.cwd(), "properties.env"),
+    path.join(process.cwd(), "..", ".env"),
+    path.join(process.cwd(), "..", "..", ".env"),
+    path.join(process.cwd(), "..", "..", "..", ".env"),
+    path.join(process.cwd(), ".env"),
   ];
   for (const envPath of candidates) {
     try {
@@ -40,8 +40,8 @@ function readFromRepoPropertiesEnv(key: string): string | undefined {
   return undefined;
 }
 
-function readPortFromRepoPropertiesEnv(): string | undefined {
-  return readFromRepoPropertiesEnv("PORT");
+function readPortFromRepoEnv(): string | undefined {
+  return readFromRepoEnv("PORT");
 }
 
 function isLocalhostHttpUrl(url: string): boolean {
@@ -64,21 +64,21 @@ function upstreamBaseUrl(): string {
   const fromEnv = process.env.MINI_TM_BACKEND_URL?.replace(/\/$/, "");
   if (fromEnv) return fromEnv;
 
-  const fromFile = readFromRepoPropertiesEnv("MINI_TM_BACKEND_URL")?.replace(/\/$/, "");
+  const fromFile = readFromRepoEnv("MINI_TM_BACKEND_URL")?.replace(/\/$/, "");
   if (fromFile) return fromFile;
 
   // Fall back to PUBLIC_API_URL when set to a remote host (shared live API).
   const publicApi =
     process.env.PUBLIC_API_URL?.trim() ||
-    readFromRepoPropertiesEnv("PUBLIC_API_URL");
+    readFromRepoEnv("PUBLIC_API_URL");
   if (publicApi) {
     const base = publicApi.replace(/\/$/, "");
     if (!isLocalhostHttpUrl(base)) return base;
   }
 
   const port =
-    process.env.PORT || readPortFromRepoPropertiesEnv() || "3000";
-  const host = process.env.BACKEND_HOST || readFromRepoPropertiesEnv("BACKEND_HOST") || "127.0.0.1";
+    process.env.PORT || readPortFromRepoEnv() || "3000";
+  const host = process.env.BACKEND_HOST || readFromRepoEnv("BACKEND_HOST") || "127.0.0.1";
   return `http://${host}:${port}`;
 }
 

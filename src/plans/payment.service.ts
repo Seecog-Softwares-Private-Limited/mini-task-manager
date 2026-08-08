@@ -64,7 +64,7 @@ export class PaymentService {
           error: 'RazorpayError',
           message: parsed.message,
           hint:
-            'Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in properties.env with Test keys from https://dashboard.razorpay.com/app/keys',
+            'Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in .env with Test keys from https://dashboard.razorpay.com/app/keys',
         },
         HttpStatus.BAD_GATEWAY,
       );

@@ -1,6 +1,6 @@
 /**
  * Prefer empty NEXT_PUBLIC_API_URL so the browser uses same-origin `/api/v1` (Next.js rewrites → API).
- * Prefer repo-root `properties.env` (loaded by next.config + `npm run dev`). Avoid duplicate keys in `frontend/.env*`.
+ * Prefer repo-root `.env` (loaded by next.config + `npm run dev`). Avoid duplicate keys in `frontend/.env*`.
  */
 const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL ?? "";
 const API_PREFIX = "/api/v1";
