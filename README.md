@@ -15,7 +15,7 @@ cd frontend && npm install && cd ..
 
 ### 2) Configure environment
 
-Create **`properties.env`** at the repo root (copy from `properties.env.example`). **Do not use `.env`** — it is not loaded anywhere.
+Create **`.env`** at the repo root with your credentials. It is gitignored — never commit it.
 
 MySQL and app values:
 
@@ -28,14 +28,14 @@ DB_DATABASE=mini_task_manager
 JWT_SECRET=replace-with-your-secret
 ```
 
-Optional seed overrides in `properties.env`:
+Optional seed overrides in `.env`:
 
 ```env
 SEED_USER_PASSWORD=YourStrongPassword123!
 SEED_INVITED_EMAIL=invitee@example.com
 ```
 
-The backend, migrations, seed scripts, frontend (`next.config.mjs` + `npm run dev` in `frontend/`), Cypress, and Docker Compose (`env_file: properties.env` for the API) use **only** repo-root **`properties.env`**. There is no `.env` or `.env.example` in this repo. Optional SMTP, OAuth, Razorpay, and test vars belong in `properties.env` (see `properties.env.example`).
+The backend, migrations, seed scripts, frontend (`next.config.mjs` + `npm run dev` in `frontend/`), Cypress, and Docker Compose (`env_file: .env` for the API) use **only** repo-root **`.env`**. Optional SMTP, OAuth, Razorpay, and test vars belong there too.
 
 ### 3) Run migrations
 
@@ -68,7 +68,7 @@ Password is:
 - `SEED_USER_PASSWORD` (if set), otherwise
 - `Password123!`
 
-**Login blocked (“verify email”)?** By default, a **correct password** logs you in and sets `is_email_verified` in the database (so older accounts are not stuck). To require a verified inbox before login (stricter production), set in `properties.env`:
+**Login blocked (“verify email”)?** By default, a **correct password** logs you in and sets `is_email_verified` in the database (so older accounts are not stuck). To require a verified inbox before login (stricter production), set in `.env`:
 
 `REQUIRE_EMAIL_VERIFIED_FOR_LOGIN=true`
 
@@ -130,7 +130,7 @@ Open:
 - Frontend: `http://localhost:3001`
 - Backend API: `http://localhost:3000/api/v1`
 
-> **Note:** Prefer same-origin `/api/v1` (leave `NEXT_PUBLIC_API_URL` empty). If the API is on another host, set `NEXT_PUBLIC_API_URL` in repo-root **`properties.env`** only. Ensure the backend is running on `PORT` from that file.
+> **Note:** Prefer same-origin `/api/v1` (leave `NEXT_PUBLIC_API_URL` empty). If the API is on another host, set `NEXT_PUBLIC_API_URL` in repo-root **`.env`** only. Ensure the backend is running on `PORT` from that file.
 
 **Migration and seed order (fresh install):** Create DB → run migrations (`npm run migration:run`) → run seed (`npm run seed`) → start app.
 
@@ -144,13 +144,13 @@ Full step-by-step (browser → Next → Nest → DB) and past failure modes: **`
 |-------|-------------|
 | **`node app.js` in prod says "Production mode requires a build"** | Run `npm run build`, then `NODE_ENV=production node app.js` or `npm run start:app:prod`. |
 | **Dev: "ts-node" or "tsconfig-paths" not found** | Run `npm install`; both are devDependencies. |
-| **DB connection refused / ECONNREFUSED** | Ensure MySQL is running; check `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE` in `properties.env`. Create the database if it does not exist: `CREATE DATABASE mini_task_manager ...`. |
+| **DB connection refused / ECONNREFUSED** | Ensure MySQL is running; check `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_DATABASE` in `.env`. Create the database if it does not exist: `CREATE DATABASE mini_task_manager ...`. |
 | **"Table doesn't exist" or migration errors** | Run migrations: `npm run migration:run`. On a fresh DB, create the database first, then run migrations, then seed. |
-| **JWT_SECRET must be set in production** | Set `JWT_SECRET` in `properties.env` to a non-default value when `NODE_ENV=production`. |
-| **Invite / reset / verify emails link to localhost** | Set `FRONTEND_URL` on the **API server** to your public app URL (e.g. `http://3.110.214.243:3000`). See `properties.env.production.example`. Restart the API after changing. |
-| **Port 3000 already in use** | Stop the process using port 3000 or set `PORT` in `properties.env`. |
+| **JWT_SECRET must be set in production** | Set `JWT_SECRET` in `.env` to a non-default value when `NODE_ENV=production`. |
+| **Invite / reset / verify emails link to localhost** | Set `FRONTEND_URL` on the **API server** to your public app URL (e.g. `http://3.110.214.243:3000`) in `.env`. Restart the API after changing. |
+| **Port 3000 already in use** | Stop the process using port 3000 or set `PORT` in `.env`. |
 | **Login never succeeds / "HTML instead of JSON"** | Next **middleware must not protect `/api/*`**. Those paths are rewritten to Nest; redirecting them to `/login` breaks `POST /api/v1/auth/login` (fixed in `frontend/src/middleware.ts`). Restart Next after pulling. |
-| **Login shows "Network Error" (0 B in DevTools)** | Ensure the **API** is running on `PORT` from `properties.env` (same port Next rewrites to). Restart the API so it loads `properties.env`. |
+| **Login shows "Network Error" (0 B in DevTools)** | Ensure the **API** is running on `PORT` from `.env` (same port Next rewrites to). Restart the API so it loads `.env`. |
 | **Console: `Receiving end does not exist` (`performance.js`)** | Comes from a **browser extension**, not this app. Ignore it or use a clean profile / disable extensions to reduce noise. |
 | **Frontend can't reach API (CORS)** | In production, set `CORS_ORIGIN` to your frontend origin (e.g. `https://app.example.com`). In local dev, leave `CORS_ORIGIN` unset unless you need a fixed origin. |
 

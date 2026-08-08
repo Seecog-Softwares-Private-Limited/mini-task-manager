@@ -15,7 +15,7 @@ uploads/
 
 *.zip
 
-# Do not use .env / .env.local / .env.* — Nest, Next, seeds, and Cypress load properties.env at repo root.
+# Secrets — repo-root `.env` only (never commit)
 .env
 .env.*
 **/.env

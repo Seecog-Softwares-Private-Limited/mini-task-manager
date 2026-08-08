@@ -2,12 +2,12 @@
  * Adds admin user and project ADMIN role to existing seed data.
  * Run when you already have seed data and need superadmin@example.com to send invites.
  * Usage: npx ts-node -r tsconfig-paths/register src/infrastructure/database/seed/add-admin.ts
- * Loads env from properties.env at repo root.
+ * Loads env from .env at repo root.
  */
 
 import * as path from 'path';
 import * as dotenv from 'dotenv';
-dotenv.config({ path: path.join(process.cwd(), 'properties.env') });
+dotenv.config({ path: path.join(process.cwd(), '.env') });
 
 import { DataSource } from 'typeorm';
 import { configuration } from '../../../config/configuration';

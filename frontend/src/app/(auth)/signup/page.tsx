@@ -108,7 +108,7 @@ function SignupForm() {
         const msg = parseApiError(err);
         const isNetwork = !(err as { response?: unknown })?.response || /network|connection|refused|fetch/i.test(msg);
         setError(isNetwork
-          ? "Could not reach the server. Ensure the backend is running (see properties.env PORT) and the frontend is using the same port, then try again."
+          ? "Could not reach the server. Ensure the backend is running (see .env PORT) and the frontend is using the same port, then try again."
           : msg);
       }
     }
@@ -246,7 +246,7 @@ function SignupForm() {
                 } catch (err) {
                   const msg = parseApiError(err);
                   const isNetwork = /network|connection|refused|fetch/i.test(msg) || (err as { code?: string })?.code === "ERR_NETWORK";
-                  setResendMsg(isNetwork ? "Cannot reach the server. Check that the backend is running (see properties.env PORT)." : msg || "Failed to resend. Please try again.");
+                  setResendMsg(isNetwork ? "Cannot reach the server. Check that the backend is running (see .env PORT)." : msg || "Failed to resend. Please try again.");
                 } finally {
                   setResending(false);
                 }

@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Repo-root config (same file as Nest). Override so this wins over stray .env* in frontend/.
 dotenv.config({
-  path: path.join(__dirname, '..', 'properties.env'),
+  path: path.join(__dirname, '..', '.env'),
   override: true,
 });
 

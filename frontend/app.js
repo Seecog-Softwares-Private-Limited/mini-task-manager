@@ -5,8 +5,8 @@ const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 
-// Load properties.env from repo root so FRONTEND_PORT / APP_MODE are available
-const propsPath = path.join(__dirname, '..', 'properties.env');
+// Load .env from repo root so FRONTEND_PORT / APP_MODE are available
+const propsPath = path.join(__dirname, '..', '.env');
 if (fs.existsSync(propsPath)) {
   require('dotenv').config({ path: propsPath });
 }

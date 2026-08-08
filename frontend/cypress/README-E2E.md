@@ -14,7 +14,7 @@
 
 ## Environment
 
-Set in repo-root **`properties.env`** (Cypress loads it via `cypress.config.ts`) or export vars in the shell before `npm run test:e2e`:
+Set in repo-root **`.env`** (Cypress loads it via `cypress.config.ts`) or export vars in the shell before `npm run test:e2e`:
 
 | Variable | Description | Example |
 |----------|-------------|--------|

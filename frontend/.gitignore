@@ -1,4 +1,4 @@
-# Env lives at repo root: ../properties.env (not .env / .env.local)
+# Env lives at repo root: ../.env
 .env
 .env.*
 

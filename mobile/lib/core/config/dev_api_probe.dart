@@ -5,7 +5,7 @@ import 'api_reachability_probe.dart';
 
 /// On local dev builds, picks the first reachable API URL (Nest or Next proxy).
 abstract final class DevApiProbe {
-  /// Matches repo-root `properties.env` defaults and common local setups.
+  /// Matches repo-root `.env` defaults and common local setups.
   static const localCandidates = <String>[
     'http://localhost:3007/api/v1',
     'http://127.0.0.1:3007/api/v1',

@@ -11,7 +11,7 @@
 
 import * as path from 'path';
 import * as dotenv from 'dotenv';
-dotenv.config({ path: path.join(process.cwd(), 'properties.env') });
+dotenv.config({ path: path.join(process.cwd(), '.env') });
 
 import { DataSource, Repository } from 'typeorm';
 import { configuration } from '../../../config/configuration';

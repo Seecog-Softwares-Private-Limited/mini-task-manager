@@ -99,7 +99,7 @@ export class InvitationsService {
     if (isLocalhostUrl(directAppUrl)) {
       this.logger.warn(
         `Invitation link uses localhost — invitees cannot open it from Gmail and the Accept button is hidden. ` +
-          `Set FRONTEND_URL_PRODUCTION=http://YOUR_SERVER:3000 and APP_MODE=production in properties.env, then pm2 restart all.`,
+          `Set FRONTEND_URL_PRODUCTION=http://YOUR_SERVER:3000 and APP_MODE=production in .env, then pm2 restart all.`,
       );
     } else {
       this.logger.log(`Invitation accept URL is public: ${directAppUrl}`);

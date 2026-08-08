@@ -1,5 +1,5 @@
 # Optional: run backend and frontend together.
-# Copy properties.env.example → properties.env at repo root (not .env). Backend loads vars from properties.env.
+# Create .env at repo root. Backend loads vars from .env.
 #
 # Local dev email: docker compose up -d mailhog
 # View captured emails at http://localhost:8025
@@ -17,7 +17,7 @@ services:
     ports:
       - "3000:3000"
     env_file:
-      - properties.env
+      - .env
     environment:
       NODE_ENV: production
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}

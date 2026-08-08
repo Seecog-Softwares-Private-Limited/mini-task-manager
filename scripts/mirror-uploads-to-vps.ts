@@ -8,7 +8,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { config as loadEnv } from 'dotenv';
 
-loadEnv({ path: path.join(process.cwd(), 'properties.env') });
+loadEnv({ path: path.join(process.cwd(), '.env') });
 
 const PUBLIC_API_URL = (process.env.PUBLIC_API_URL || '').replace(/\/$/, '');
 const SECRET =
@@ -37,7 +37,7 @@ async function walk(dir: string, base = dir): Promise<string[]> {
 
 async function main() {
   if (!PUBLIC_API_URL || !SECRET) {
-    console.error('Need PUBLIC_API_URL and JWT_SECRET (or UPLOADS_MIRROR_SECRET) in properties.env');
+    console.error('Need PUBLIC_API_URL and JWT_SECRET (or UPLOADS_MIRROR_SECRET) in .env');
     process.exit(1);
   }
   const root = path.join(UPLOADS, 'attachments');

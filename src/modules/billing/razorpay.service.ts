@@ -60,7 +60,7 @@ export class RazorpayService {
     const fromEnv = !!(process.env.RAZORPAY_KEY_ID?.trim() && process.env.RAZORPAY_KEY_SECRET?.trim());
     if (!fromEnv && process.env.NODE_ENV !== 'production') {
       this.logger.warn(
-        'Razorpay: using fallback test keys from code. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in properties.env (Razorpay Dashboard → API Keys). Revoked keys cause create-order to fail.',
+        'Razorpay: using fallback test keys from code. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in .env (Razorpay Dashboard → API Keys). Revoked keys cause create-order to fail.',
       );
     }
     this.logger.log('Razorpay initialized with key: ' + this.keyId.slice(0, 12) + '...');

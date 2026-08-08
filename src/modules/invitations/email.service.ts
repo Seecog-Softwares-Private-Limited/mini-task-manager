@@ -101,7 +101,7 @@ export class EmailService implements OnModuleInit {
       this.logger.error(
         `SMTP verification failed (${this.smtp.host}:${this.smtp.port}): ${detail}. ` +
           'Emails will not deliver until SMTP is reachable. ' +
-          'For local dev run MailHog (docker compose up -d mailhog) or configure SMTP_* in properties.env.',
+          'For local dev run MailHog (docker compose up -d mailhog) or configure SMTP_* in .env.',
       );
     }
   }
@@ -397,14 +397,14 @@ ${emailExpiryNote('1 hour')}
       return (
         'Gmail rejected the SMTP credentials. Use a Google App Password (not your normal Gmail password): ' +
         'Google Account → Security → 2-Step Verification → App passwords. ' +
-        'Set SMTP_USER to your Gmail address and SMTP_PASS to the 16-character app password in properties.env, then restart the API.'
+        'Set SMTP_USER to your Gmail address and SMTP_PASS to the 16-character app password in .env, then restart the API.'
       );
     }
 
     if (provider === 'ses' && badCredentials) {
       return (
         'Amazon SES rejected the SMTP credentials. In AWS Console → SES → SMTP settings, create SMTP credentials ' +
-        '(not IAM access keys). Set SMTP_USER and SMTP_PASS in properties.env, then restart the API.'
+        '(not IAM access keys). Set SMTP_USER and SMTP_PASS in .env, then restart the API.'
       );
     }
 
@@ -427,7 +427,7 @@ ${emailExpiryNote('1 hour')}
     }
 
     return (
-      `Could not send email (${detail}). Check SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASS in properties.env and restart the API.`
+      `Could not send email (${detail}). Check SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASS in .env and restart the API.`
     );
   }
 
