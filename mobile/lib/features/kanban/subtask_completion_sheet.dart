@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/api/api_exception.dart';
 import '../../core/services/device_info_service.dart';
 import '../../core/services/geofence_service.dart';
 import '../../core/services/location_service.dart';
@@ -281,7 +282,7 @@ class _SubtaskCompletionSheetState extends State<_SubtaskCompletionSheet> {
       if (!mounted) return;
       setState(() {
         _submitting = false;
-        _error = 'Could not complete: $e';
+        _error = userFacingError(e, fallback: 'Could not complete this item. Please try again.');
       });
     }
   }

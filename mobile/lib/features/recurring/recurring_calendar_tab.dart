@@ -904,8 +904,7 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
         .showSnackBar(SnackBar(content: Text(message)));
   }
 
-  String _msg(Object error) =>
-      error is ApiException ? error.message : error.toString();
+  String _msg(Object error) => userFacingError(error);
 
   Future<void> _toggleSubtask(Task task, int subIndex, bool value) async {
     final ti = _tasks.indexWhere((t) => t.id == task.id);

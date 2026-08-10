@@ -221,7 +221,7 @@ class _SubtaskNotesThreadSheetState
       if (!mounted) return;
       if (widget.subtask.id.trim() != expectedSubtaskId) return;
       setState(() {
-        _error = e.toString();
+        _error = userFacingError(e);
         _loading = false;
       });
     }
@@ -410,7 +410,7 @@ class _SubtaskNotesThreadSheetState
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = userFacingError(e));
     } finally {
       if (mounted) setState(() => _posting = false);
     }
@@ -462,7 +462,7 @@ class _SubtaskNotesThreadSheetState
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (e) {
-      if (mounted) setState(() => _error = e.toString());
+      if (mounted) setState(() => _error = userFacingError(e));
     }
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/api/api_exception.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../data/models/recurring.dart';
@@ -47,7 +48,7 @@ class RecurringInsightsTab extends ConsumerWidget {
               child: EmptyState(
                 icon: Icons.error_outline_rounded,
                 title: 'Could not load insights',
-                message: '$error',
+                message: userFacingError(error),
               ),
             ),
           ),

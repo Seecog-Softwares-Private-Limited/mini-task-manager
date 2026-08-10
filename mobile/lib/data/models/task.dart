@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../core/utils/calendar_date.dart';
 import '../../core/utils/html_plain_text.dart';
 import 'subtask_completion_record.dart';
 
@@ -77,7 +78,7 @@ class TaskSubtask {
       description: _nullableString(json['description']),
       assigneeId: _nullableString(json['assigneeId']),
       assigneeIds: _parseStringList(json['assigneeIds']),
-      dueDate: _nullableDateString(json['dueDate']),
+      dueDate: calendarDateString(json['dueDate']),
       dueTime: _nullableString(json['dueTime']),
       notifyMinutesBefore: _nullableInt(json['notifyMinutesBefore']),
       status: _nullableString(json['status']),
@@ -236,7 +237,7 @@ class Task {
       assigneeIds: _parseStringList(json['assigneeIds']),
       tags: _parseTags(json['tags']),
       reporterId: _asString(json['reporterId']),
-      dueDate: _nullableDateString(json['dueDate']),
+      dueDate: calendarDateString(json['dueDate']),
       dueTime: _nullableString(json['dueTime']),
       completedAt: _nullableDateString(json['completedAt']),
       loggedMinutes: json['loggedMinutes'] is int

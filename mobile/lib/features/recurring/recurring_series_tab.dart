@@ -86,7 +86,7 @@ class RecurringSeriesTab extends ConsumerWidget {
               children: [
                 EmptyState(
                   title: 'Series unavailable',
-                  message: error.toString(),
+        message: userFacingError(error),
                   icon: Icons.library_books_outlined,
                 ),
                 if (isNetwork) ...[

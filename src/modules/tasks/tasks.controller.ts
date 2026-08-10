@@ -28,6 +28,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { TenantId } from '../../common/decorators/tenant.decorator';
 import { formatUuid } from '../../common/utils/uuid.util';
+import { formatCalendarDate } from '../../common/utils/calendar-date';
 import { CurrentUserId } from '../../common/decorators/current-user.decorator';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { CreateTaskCommentDto } from './dto/create-task-comment.dto';
@@ -504,7 +505,7 @@ export class TasksController {
       reporterId: formatUuid(t.reporterId as string | Buffer) ?? String(t.reporterId),
       parentTaskId: t.parentTaskId ? formatUuid(t.parentTaskId as string | Buffer) : undefined,
       storyPoints: t.storyPoints ?? undefined,
-      dueDate: t.dueDate ?? undefined,
+      dueDate: formatCalendarDate(t.dueDate),
       dueTime: t.dueTime ?? undefined,
       completedAt: t.completedAt ?? undefined,
       estimatedMinutes: t.estimatedMinutes ?? undefined,
@@ -516,7 +517,14 @@ export class TasksController {
       recurrenceType: t.recurrenceType ?? undefined,
       recurrenceSequence: t.recurrenceSequence ?? undefined,
       tags: t.tags ?? undefined,
-      subtasks: t.subtasks ?? undefined,
+      subtasks: Array.isArray(t.subtasks)
+        ? t.subtasks.map((s) => ({
+            ...s,
+            dueDate: formatCalendarDate(
+              (s as { dueDate?: Date | string | null }).dueDate,
+            ),
+          }))
+        : t.subtasks ?? undefined,
       createdAt: t.createdAt,
       updatedAt: t.updatedAt,
     };

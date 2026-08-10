@@ -77,7 +77,7 @@ class ApiConnectionService {
       return ApiConnectionResult(
         ok: false,
         url: url,
-        message: 'Connection failed: ${error.message ?? error.type.name}. $hint',
+        message: 'Could not connect to the server. $hint',
       );
     } catch (error) {
       return ApiConnectionResult(
