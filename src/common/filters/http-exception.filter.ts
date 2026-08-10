@@ -17,7 +17,6 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
-    const isDev = process.env.NODE_ENV !== 'production';
 
     let status: number;
     let body: Record<string, unknown>;
@@ -29,24 +28,26 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         typeof message === 'object' && message !== null
           ? { ...(message as object), statusCode: status }
           : { message, statusCode: status };
-    } else if (exception instanceof QueryFailedError && isDev) {
+    } else if (exception instanceof QueryFailedError) {
       status = HttpStatus.INTERNAL_SERVER_ERROR;
-      const driver = exception.driverError as { sqlMessage?: string; code?: string } | undefined;
+      const driver = exception.driverError as
+        | { sqlMessage?: string; code?: string }
+        | undefined;
       const sqlMessage = driver?.sqlMessage ?? exception.message;
-      let hint = '';
-      if (/icon_url|Unknown column.*projects/i.test(sqlMessage)) {
-        hint =
-          ' Fix: from repo root run `npm run migration:run` or `npm run db:ensure-project-icon-url`, then restart the API.';
-      }
+      this.logger.error(
+        `${request.method} ${request.url} DatabaseError: ${sqlMessage}`,
+        exception.stack,
+      );
       body = {
         statusCode: status,
-        error: 'DatabaseError',
-        message: `${sqlMessage}${hint}`,
-        detail: sqlMessage,
+        message: 'Something went wrong. Please try again.',
       };
     } else {
       status = HttpStatus.INTERNAL_SERVER_ERROR;
-      body = { statusCode: status, message: 'Internal server error' };
+      body = {
+        statusCode: status,
+        message: 'Something went wrong. Please try again.',
+      };
     }
 
     if (status >= 500) {

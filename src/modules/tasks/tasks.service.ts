@@ -220,10 +220,8 @@ export class TasksService {
   }
 
   /**
-   * Workspace home dashboard: aggregates the same Total / Overdue style stats
-   * users see on each project board (across active projects), plus due-today
-   * and this week's completions. Planner/recurring runs stay out so numbers
-   * match the Projects tab.
+   * Workspace home dashboard: Total / Overdue match project boards (non-planner).
+   * Due today includes planner/recurring runs across active projects.
    */
   async getHomeDashboard(_userId: string, organizationId: string) {
     const now = new Date();
@@ -238,9 +236,20 @@ export class TasksService {
       this.projectsService.findByOrganization(organizationId),
     ]);
 
+    const archived = new Set(
+      projects
+        .filter((p) => p.isArchived)
+        .map((p) => normalizeAssigneeUserId(p.id))
+        .filter((id): id is string => !!id),
+    );
+    const inActiveProject = (t: TaskEntity) => {
+      const projId = normalizeAssigneeUserId(t.projectId);
+      return !(projId && archived.has(projId));
+    };
+
     // Same population as project boards (active projects, no planner runs).
-    // Assignee-only filtering made Home show 0 while Projects showed Total/Overdue.
     const scope = this.filterWorkspaceBoardTasks(tasks, projects);
+    const activeIncludingPlanner = tasks.filter(inActiveProject);
     const dateOnly = TasksService.dateOnly;
 
     const isOverdueDue = (t: TaskEntity) => {
@@ -252,14 +261,13 @@ export class TasksService {
       return due != null && due.getTime() === todayStart.getTime();
     };
 
-    // Match project boards: Total = all visible tasks; Overdue = past due date.
     const overdueTasks = scope
       .filter(isOverdueDue)
       .sort(
         (a, b) =>
           dateOnly(a.dueDate)!.getTime() - dateOnly(b.dueDate)!.getTime(),
       );
-    const dueTodayTasks = scope.filter(
+    const dueTodayTasks = activeIncludingPlanner.filter(
       (t) => isDueToday(t) && !t.completedAt,
     );
     const open = scope.filter((t) => !t.completedAt);
@@ -287,7 +295,6 @@ export class TasksService {
       count,
     }));
 
-    // Needs-attention list: incomplete overdue + due today (actionable).
     const attentionOverdue = overdueTasks.filter((t) => !t.completedAt);
     const attentionDueToday = dueTodayTasks;
 
@@ -316,6 +323,13 @@ export class TasksService {
     value: Date | string | null | undefined,
   ): Date | null {
     if (!value) return null;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+        const [y, m, d] = trimmed.split('-').map(Number);
+        return new Date(y, m - 1, d);
+      }
+    }
     const d = value instanceof Date ? value : new Date(value);
     if (Number.isNaN(d.getTime())) return null;
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());

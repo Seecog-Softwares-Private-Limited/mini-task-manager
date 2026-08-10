@@ -1,4 +1,38 @@
+import '../../core/utils/calendar_date.dart';
 import 'task.dart';
+
+bool _isSubtaskDone(TaskSubtask subtask) {
+  final status = subtask.status?.toUpperCase();
+  if (status == 'DONE') return true;
+  return subtask.completed;
+}
+
+/// One actionable row on Home → Due today (checklist item or leaf task).
+class HomeDueTodayItem {
+  const HomeDueTodayItem({
+    required this.task,
+    this.subtask,
+  });
+
+  final Task task;
+  final TaskSubtask? subtask;
+
+  String get title {
+    final sub = subtask?.title.trim();
+    if (sub != null && sub.isNotEmpty) return sub;
+    return task.title;
+  }
+
+  /// Parent ritual/task name when this row is a checklist item.
+  String? get parentTitle {
+    if (subtask == null) return null;
+    final parent = task.title.trim();
+    return parent.isEmpty ? null : parent;
+  }
+
+  String get key =>
+      subtask == null ? task.id : '${task.id}:${subtask!.id}';
+}
 
 /// Workspace home stats — usually built client-side from project board tasks.
 class HomeDashboard {
@@ -6,29 +40,32 @@ class HomeDashboard {
     required this.counts,
     required this.weeklyTrend,
     required this.overdueTasks,
-    required this.dueTodayTasks,
+    required this.dueTodayItems,
+    this.dueTodayTasks = const [],
   });
 
   final HomeCounts counts;
   final List<HomeTrendPoint> weeklyTrend;
   final List<Task> overdueTasks;
+
+  /// Checklist items (and leaf tasks) due today — what Home lists.
+  final List<HomeDueTodayItem> dueTodayItems;
+
+  /// Legacy parent-task list (API / older callers). Prefer [dueTodayItems].
   final List<Task> dueTodayTasks;
 
-  /// Aggregate Total / Overdue / Due today from workspace project tasks
-  /// (same population as each project board).
-  factory HomeDashboard.fromWorkspaceTasks(List<Task> tasks) {
+  /// Aggregate Total / Overdue from board (non-planner) tasks, and Due today
+  /// from [dueTodayCandidates] as **checklist items** (not parent rituals).
+  factory HomeDashboard.fromWorkspaceTasks(
+    List<Task> tasks, {
+    List<Task>? dueTodayCandidates,
+  }) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final weekAgo = today.subtract(const Duration(days: 6));
     final weekEnd = today.add(const Duration(days: 7));
 
-    DateTime? dateOnly(String? raw) {
-      if (raw == null || raw.isEmpty) return null;
-      final parsed = DateTime.tryParse(raw);
-      if (parsed == null) return null;
-      final local = parsed.toLocal();
-      return DateTime(local.year, local.month, local.day);
-    }
+    DateTime? dateOnly(String? raw) => parseCalendarDate(raw);
 
     bool isCompleted(Task t) =>
         t.completedAt != null && t.completedAt!.trim().isNotEmpty;
@@ -43,11 +80,38 @@ class HomeDashboard {
         return da.compareTo(db);
       });
 
-    final dueToday = tasks.where((t) {
-      if (isCompleted(t)) return false;
-      final due = dateOnly(t.dueDate);
-      return due != null && due == today;
-    }).toList();
+    final todaySource = dueTodayCandidates ?? tasks;
+    final seen = <String>{};
+    final dueTodayItems = <HomeDueTodayItem>[];
+    final dueTodayParents = <Task>[];
+
+    for (final t in todaySource) {
+      if (isCompleted(t)) continue;
+      final parentDue = dateOnly(t.dueDate);
+
+      if (t.subtasks.isNotEmpty) {
+        var addedParent = false;
+        for (final sub in t.subtasks) {
+          if (_isSubtaskDone(sub)) continue;
+          final subDue = dateOnly(sub.dueDate) ?? parentDue;
+          if (subDue != today) continue;
+          final key = '${t.id}:${sub.id}';
+          if (!seen.add(key)) continue;
+          dueTodayItems.add(HomeDueTodayItem(task: t, subtask: sub));
+          if (!addedParent) {
+            dueTodayParents.add(t);
+            addedParent = true;
+          }
+        }
+        continue;
+      }
+
+      // Leaf task (no checklist): show the task itself when due today.
+      if (parentDue != today) continue;
+      if (!seen.add(t.id)) continue;
+      dueTodayItems.add(HomeDueTodayItem(task: t));
+      dueTodayParents.add(t);
+    }
 
     final open = tasks.where((t) => !isCompleted(t)).toList();
     final dueThisWeek = open.where((t) {
@@ -83,8 +147,8 @@ class HomeDashboard {
 
     return HomeDashboard(
       counts: HomeCounts(
-        dueToday: dueToday.length,
-        overdue: overdue.length,
+        dueToday: dueTodayItems.length,
+        overdue: attentionOverdue.length,
         dueThisWeek: dueThisWeek,
         completedThisWeek: completedRecently.length,
         openAssigned: open.length,
@@ -95,7 +159,8 @@ class HomeDashboard {
           HomeTrendPoint(date: e.key, count: e.value),
       ],
       overdueTasks: attentionOverdue.take(5).toList(),
-      dueTodayTasks: dueToday.take(5).toList(),
+      dueTodayItems: dueTodayItems,
+      dueTodayTasks: dueTodayParents,
     );
   }
 
@@ -105,6 +170,7 @@ class HomeDashboard {
         .map(Task.fromJson)
         .toList();
 
+    final parents = parseTasks(json['dueTodayTasks']);
     return HomeDashboard(
       counts: HomeCounts.fromJson(
         (json['counts'] as Map<String, dynamic>?) ?? const {},
@@ -114,7 +180,16 @@ class HomeDashboard {
           .map(HomeTrendPoint.fromJson)
           .toList(),
       overdueTasks: parseTasks(json['overdueTasks']),
-      dueTodayTasks: parseTasks(json['dueTodayTasks']),
+      dueTodayTasks: parents,
+      // API still returns parent tasks; expand to checklist items client-side.
+      dueTodayItems: [
+        for (final t in parents)
+          if (t.subtasks.isEmpty)
+            HomeDueTodayItem(task: t)
+          else
+            for (final s in t.subtasks)
+              if (!_isSubtaskDone(s)) HomeDueTodayItem(task: t, subtask: s),
+      ],
     );
   }
 }

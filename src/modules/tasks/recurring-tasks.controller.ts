@@ -9,6 +9,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { RecurringTasksService } from './recurring-tasks.service';
 import { TaskResponseDto } from './dto/task-response.dto';
 import { formatUuid } from '../../common/utils/uuid.util';
+import { formatCalendarDate } from '../../common/utils/calendar-date';
 import {
   CompleteRecurringTaskDto,
   RecurringTasksQueryDto,
@@ -204,7 +205,7 @@ export class RecurringTasksController {
       reporterId: formatUuid(t.reporterId as string | Buffer) ?? String(t.reporterId),
       parentTaskId: t.parentTaskId ? formatUuid(t.parentTaskId as string | Buffer) : undefined,
       storyPoints: t.storyPoints ?? undefined,
-      dueDate: t.dueDate ?? undefined,
+      dueDate: formatCalendarDate(t.dueDate),
       completedAt: t.completedAt ?? undefined,
       estimatedMinutes: t.estimatedMinutes ?? undefined,
       loggedMinutes: t.loggedMinutes,

@@ -188,7 +188,7 @@ class _RecurringPlannerSheetState extends ConsumerState<_RecurringPlannerSheet> 
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(error.toString(), textAlign: TextAlign.center),
+                      Text(userFacingError(error), textAlign: TextAlign.center),
                       const SizedBox(height: AppSpacing.md),
                       PrimaryButton(
                         label: 'Retry',

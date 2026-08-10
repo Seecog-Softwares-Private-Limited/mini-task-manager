@@ -8,6 +8,7 @@ import '../../core/preferences/app_preferences.dart';
 import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/utils/calendar_date.dart';
 import '../../data/models/task.dart';
 import '../../data/models/workflow.dart';
 import '../../shared/widgets/app_widgets.dart';
@@ -1098,22 +1099,19 @@ _PriorityMeta _priorityMeta(String priority) {
 }
 
 _DueMeta? _dueMeta(String? dueDate) {
-  if (dueDate == null || dueDate.isEmpty) return null;
-  final parsed = DateTime.tryParse(dueDate);
-  if (parsed == null) return null;
+  final due = parseCalendarDate(dueDate);
+  if (due == null) return null;
 
-  final local = parsed.toLocal();
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
-  final due = DateTime(local.year, local.month, local.day);
   final overdue = due.isBefore(today);
   final dueToday = due == today;
 
   final label = overdue
-      ? 'Overdue · ${DateFormat('MMM d').format(local)}'
+      ? 'Overdue · ${DateFormat('MMM d').format(due)}'
       : dueToday
           ? 'Due today'
-          : DateFormat('MMM d').format(local);
+          : DateFormat('MMM d').format(due);
 
   return _DueMeta(
     label: label,

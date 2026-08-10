@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/utils/calendar_date.dart';
 import '../../core/utils/recurrence_display.dart';
 import '../../data/models/task.dart';
 import '../../data/models/workflow.dart';
@@ -269,12 +270,5 @@ final projectWorkflowStatusesProvider =
 });
 
 bool _isTaskOverdue(String? dueDate) {
-  if (dueDate == null || dueDate.isEmpty) return false;
-  final parsed = DateTime.tryParse(dueDate);
-  if (parsed == null) return false;
-  final local = parsed.toLocal();
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
-  final due = DateTime(local.year, local.month, local.day);
-  return due.isBefore(today);
+  return isCalendarDateBeforeToday(dueDate);
 }

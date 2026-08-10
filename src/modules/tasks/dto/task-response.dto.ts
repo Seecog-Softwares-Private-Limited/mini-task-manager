@@ -32,7 +32,7 @@ export class TaskResponseDto {
   reporterId!: string;
   parentTaskId?: string;
   storyPoints?: number;
-  dueDate?: Date;
+  dueDate?: string;
   /** Optional local time HH:mm when dueDate is set. */
   dueTime?: string | null;
   completedAt?: Date | null;

@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/preferences/app_preferences.dart';
+import '../../core/utils/calendar_date.dart';
 import '../../data/models/my_tasks.dart';
 import '../../data/models/paginated_result.dart';
 import '../../data/models/project_member.dart';
@@ -156,14 +157,7 @@ bool _assigneeListContains(List<String> assignees, String userId) {
 }
 
 bool isTaskDueOverdue(String? dueDate) {
-  if (dueDate == null || dueDate.isEmpty) return false;
-  final parsed = DateTime.tryParse(dueDate);
-  if (parsed == null) return false;
-  final local = parsed.toLocal();
-  final now = DateTime.now();
-  final today = DateTime(now.year, now.month, now.day);
-  final due = DateTime(local.year, local.month, local.day);
-  return due.isBefore(today);
+  return isCalendarDateBeforeToday(dueDate);
 }
 
 bool matchesTasksBoardFilters(
@@ -200,10 +194,14 @@ bool matchesTasksBoardFilters(
 }
 
 /// Tasks tab: board tasks for the selected project (or all projects).
+/// "Today" includes planner/recurring runs so it matches Home Due today.
 final myWorkProvider = FutureProvider.autoDispose<MyTasksResult>((ref) async {
   final filter = ref.watch(myWorkFilterProvider);
   final projectId = ref.watch(tasksSelectedProjectIdProvider);
-  final tasks = await ref.watch(workspaceBoardTasksProvider.future);
+  final includePlanner = filter == MyWorkFilter.today;
+  final tasks = includePlanner
+      ? await ref.watch(workspaceAllProjectTasksProvider.future)
+      : await ref.watch(workspaceBoardTasksProvider.future);
   final scoped = projectId == null
       ? const <Task>[]
       : isAllProjectsSelection(projectId)
@@ -218,13 +216,7 @@ MyTasksResult _myTasksFromWorkspace(List<Task> tasks, MyWorkFilter filter) {
   final weekEnd = today.add(const Duration(days: 7));
   final completedSince = today.subtract(const Duration(days: 30));
 
-  DateTime? dateOnly(String? raw) {
-    if (raw == null || raw.isEmpty) return null;
-    final parsed = DateTime.tryParse(raw);
-    if (parsed == null) return null;
-    final local = parsed.toLocal();
-    return DateTime(local.year, local.month, local.day);
-  }
+  DateTime? dateOnly(String? raw) => parseCalendarDate(raw);
 
   bool isCompleted(Task t) =>
       t.completedAt != null && t.completedAt!.trim().isNotEmpty;

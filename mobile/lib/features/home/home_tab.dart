@@ -16,6 +16,7 @@ import '../projects/projects_providers.dart';
 import '../recurring/recurring_providers.dart';
 import '../workspaces/workspace_switcher_sheet.dart';
 import 'home_providers.dart';
+import 'due_today_screen.dart';
 import 'my_work_providers.dart';
 
 class HomeTab extends ConsumerWidget {
@@ -41,6 +42,7 @@ class HomeTab extends ConsumerWidget {
     return RefreshIndicator(
       onRefresh: () async {
         ref.invalidate(projectsProvider);
+        ref.invalidate(workspaceAllProjectTasksProvider);
         ref.invalidate(workspaceBoardTasksProvider);
         ref.invalidate(homeDashboardProvider);
         ref.invalidate(myWorkProvider);
@@ -67,11 +69,16 @@ class HomeTab extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.lg),
           _SectionHeader(
-            title: 'Needs attention',
-            icon: Icons.priority_high_rounded,
+            title: 'Due today',
+            icon: Icons.today_rounded,
             trailing: TextButton(
-              onPressed: () =>
-                  onNavigateTab(1, tasksFilter: MyWorkFilter.open),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const DueTodayScreen(),
+                  ),
+                );
+              },
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.primary,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -84,7 +91,12 @@ class HomeTab extends ConsumerWidget {
           const SizedBox(height: AppSpacing.sm),
           _NeedsAttention(
             dashboardAsync: dashboardAsync,
-            onOpenTask: (task) => _openTask(context, ref, task),
+            onOpenItem: (item) => _openTask(
+              context,
+              ref,
+              item.task,
+              initialSubtaskId: item.subtask?.id,
+            ),
           ),
           const SizedBox(height: AppSpacing.lg),
           _MomentumCard(
@@ -146,7 +158,12 @@ class HomeTab extends ConsumerWidget {
     );
   }
 
-  Future<void> _openTask(BuildContext context, WidgetRef ref, Task task) async {
+  Future<void> _openTask(
+    BuildContext context,
+    WidgetRef ref,
+    Task task, {
+    String? initialSubtaskId,
+  }) async {
     List<WorkflowStatus> statuses = const [];
     try {
       statuses = await ref
@@ -164,6 +181,7 @@ class HomeTab extends ConsumerWidget {
           task: task,
           statuses: statuses,
           projectId: task.projectId,
+          initialSubtaskId: initialSubtaskId,
           onUpdated: () => ref.invalidate(homeDashboardProvider),
           onDeleted: () => ref.invalidate(homeDashboardProvider),
         );
@@ -346,7 +364,13 @@ class _StatRow extends StatelessWidget {
             value: '${d.counts.dueToday}',
             color: AppColors.sky,
             icon: Icons.today_rounded,
-            onTap: () => onOpenFilter(MyWorkFilter.today),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const DueTodayScreen(),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -464,20 +488,17 @@ class _SectionHeader extends StatelessWidget {
 class _NeedsAttention extends StatelessWidget {
   const _NeedsAttention({
     required this.dashboardAsync,
-    required this.onOpenTask,
+    required this.onOpenItem,
   });
 
   final AsyncValue<HomeDashboard> dashboardAsync;
-  final ValueChanged<Task> onOpenTask;
+  final ValueChanged<HomeDueTodayItem> onOpenItem;
 
   @override
   Widget build(BuildContext context) {
     return dashboardAsync.when(
       data: (d) {
-        final items = <_AttentionItem>[
-          for (final t in d.overdueTasks) _AttentionItem(t, overdue: true),
-          for (final t in d.dueTodayTasks) _AttentionItem(t, overdue: false),
-        ];
+        final items = d.dueTodayItems.take(5).toList();
         if (items.isEmpty) {
           return SurfaceCard(
             child: Row(
@@ -496,11 +517,11 @@ class _NeedsAttention extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('You are all caught up',
+                      Text('Nothing due today',
                           style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: 2),
                       Text(
-                        'No tasks are overdue or due today.',
+                        'Checklist items due today will show up here.',
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                     ],
@@ -513,7 +534,7 @@ class _NeedsAttention extends StatelessWidget {
         return Column(
           children: [
             for (final item in items) ...[
-              _AttentionRow(item: item, onTap: () => onOpenTask(item.task)),
+              _AttentionRow(item: item, onTap: () => onOpenItem(item)),
               const SizedBox(height: AppSpacing.xs),
             ],
           ],
@@ -539,23 +560,16 @@ class _NeedsAttention extends StatelessWidget {
   }
 }
 
-class _AttentionItem {
-  const _AttentionItem(this.task, {required this.overdue});
-  final Task task;
-  final bool overdue;
-}
-
 class _AttentionRow extends StatelessWidget {
   const _AttentionRow({required this.item, required this.onTap});
 
-  final _AttentionItem item;
+  final HomeDueTodayItem item;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final color = _priorityColor(item.task.priority);
-    final chipColor = item.overdue ? AppColors.danger : AppColors.sky;
-    final chipLabel = item.overdue ? 'Overdue' : 'Today';
+    final color = _priorityColor(item.subtask?.priority ?? item.task.priority);
+    final parent = item.parentTitle;
     return SurfaceCard(
       padding: const EdgeInsets.all(AppSpacing.sm),
       onTap: onTap,
@@ -563,7 +577,7 @@ class _AttentionRow extends StatelessWidget {
         children: [
           Container(
             width: 4,
-            height: 36,
+            height: parent == null ? 36 : 44,
             decoration: BoxDecoration(
               color: color,
               borderRadius: BorderRadius.circular(4),
@@ -571,15 +585,33 @@ class _AttentionRow extends StatelessWidget {
           ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
-            child: Text(
-              item.task.title,
-              style: Theme.of(context).textTheme.bodyLarge,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  style: Theme.of(context).textTheme.bodyLarge,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (parent != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    parent,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textMuted,
+                        ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ],
             ),
           ),
           const SizedBox(width: AppSpacing.xs),
-          StatusChip(label: chipLabel, color: chipColor),
+          const StatusChip(label: 'Today', color: AppColors.sky),
+          const SizedBox(width: 4),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
         ],
       ),
     );

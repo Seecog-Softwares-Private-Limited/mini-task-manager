@@ -64,6 +64,7 @@ class TaskDetailSheet extends ConsumerStatefulWidget {
     required this.onUpdated,
     this.onDeleted,
     this.mode = TaskDetailMode.full,
+    this.initialSubtaskId,
   });
 
   final Task task;
@@ -72,6 +73,7 @@ class TaskDetailSheet extends ConsumerStatefulWidget {
   final VoidCallback onUpdated;
   final VoidCallback? onDeleted;
   final TaskDetailMode mode;
+  final String? initialSubtaskId;
 
   @override
   ConsumerState<TaskDetailSheet> createState() => _TaskDetailSheetState();
@@ -117,6 +119,11 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     _titleFocusNode.addListener(_onTitleFocusChange);
     _descriptionFocusNode.addListener(_onDescriptionFocusChange);
     _subtasks = List.of(widget.task.subtasks);
+    final focusId = widget.initialSubtaskId;
+    if (focusId != null && focusId.isNotEmpty) {
+      final index = _subtasks.indexWhere((s) => s.id == focusId);
+      if (index >= 0) _expandedSubtaskIndex = index;
+    }
     _loadMeta();
     _peerSyncTimer = Timer.periodic(
       const Duration(seconds: 12),

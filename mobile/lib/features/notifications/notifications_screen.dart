@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/api/api_exception.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../shared/widgets/app_widgets.dart';
@@ -18,7 +19,7 @@ class NotificationsScreen extends ConsumerWidget {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => EmptyState(
         title: 'Notifications unavailable',
-        message: error.toString(),
+        message: userFacingError(error),
         icon: Icons.notifications_off_outlined,
       ),
       data: (items) {
