@@ -5,7 +5,11 @@ import 'package:intl/intl.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../data/models/notification.dart';
+import '../../data/models/workflow.dart';
 import '../../shared/widgets/app_widgets.dart';
+import '../kanban/kanban_providers.dart';
+import '../kanban/task_detail_sheet.dart';
 import 'notifications_providers.dart';
 
 class NotificationsScreen extends ConsumerWidget {
@@ -59,16 +63,12 @@ class NotificationsScreen extends ConsumerWidget {
               final whenLabel = when != null
                   ? DateFormat('MMM d, h:mm a').format(when.toLocal())
                   : '';
+              final canOpenTask = item.taskId != null;
 
               return SurfaceCard(
-                onTap: item.isRead
-                    ? null
-                    : () async {
-                        await ref
-                            .read(notificationsRepositoryProvider)
-                            .markAsRead(item.id);
-                        ref.invalidate(notificationsProvider);
-                      },
+                onTap: canOpenTask || !item.isRead
+                    ? () => _onNotificationTap(context, ref, item)
+                    : null,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -102,5 +102,55 @@ class NotificationsScreen extends ConsumerWidget {
         );
       },
     );
+  }
+
+  Future<void> _onNotificationTap(
+    BuildContext context,
+    WidgetRef ref,
+    AppNotification item,
+  ) async {
+    if (!item.isRead) {
+      try {
+        await ref.read(notificationsRepositoryProvider).markAsRead(item.id);
+        ref.invalidate(notificationsProvider);
+      } catch (_) {
+        // Still attempt deep-link even if mark-read fails.
+      }
+    }
+
+    final taskId = item.taskId;
+    if (taskId == null || !context.mounted) return;
+
+    try {
+      final task = await ref.read(tasksRepositoryProvider).fetchTask(taskId);
+      List<WorkflowStatus> statuses = const [];
+      try {
+        statuses =
+            await ref.read(projectWorkflowStatusesProvider(task.projectId).future);
+      } catch (_) {
+        statuses = const [];
+      }
+      if (!context.mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) {
+          return TaskDetailSheet(
+            task: task,
+            statuses: statuses,
+            projectId: task.projectId,
+            initialSubtaskId: item.subtaskId,
+            onUpdated: () => ref.invalidate(notificationsProvider),
+            onDeleted: () => ref.invalidate(notificationsProvider),
+          );
+        },
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(userFacingError(error))),
+      );
+    }
   }
 }
