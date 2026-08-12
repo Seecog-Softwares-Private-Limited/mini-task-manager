@@ -119,10 +119,14 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     _titleFocusNode.addListener(_onTitleFocusChange);
     _descriptionFocusNode.addListener(_onDescriptionFocusChange);
     _subtasks = List.of(widget.task.subtasks);
-    final focusId = widget.initialSubtaskId;
+    final focusId = widget.initialSubtaskId?.trim();
     if (focusId != null && focusId.isNotEmpty) {
       final index = _subtasks.indexWhere((s) => s.id == focusId);
       if (index >= 0) _expandedSubtaskIndex = index;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _stabilizeChecklistScroll(focusId, alignment: 0.08);
+      });
     }
     _loadMeta();
     _peerSyncTimer = Timer.periodic(
@@ -278,16 +282,27 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
         );
         widget.onUpdated();
       }
+      final focusId = widget.initialSubtaskId?.trim();
       setState(() {
         _members = members;
         _task = task;
         // Keep local completion stamps if the server omitted them this round-trip.
         _subtasks = _mergeSubtasksPreservingOrder(_subtasks, task.subtasks);
+        if (focusId != null && focusId.isNotEmpty) {
+          final index = _subtasks.indexWhere((s) => s.id == focusId);
+          if (index >= 0) _expandedSubtaskIndex = index;
+        }
         _attachments = results[2] as List<_TaskAttachmentItem>;
         _comments = results[3] as List<TaskComment>;
         _loadingMeta = false;
         _syncTextControllersFromTask();
       });
+      if (focusId != null && focusId.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _stabilizeChecklistScroll(focusId, alignment: 0.08);
+        });
+      }
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {

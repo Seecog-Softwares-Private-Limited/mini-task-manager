@@ -102,7 +102,10 @@ class HomeTab extends ConsumerWidget {
           _MomentumCard(
             dashboardAsync: dashboardAsync,
             analyticsAsync: analyticsAsync,
-            onTap: () => onNavigateTab(3),
+            onTap: () {
+              ref.read(recurringTabIndexProvider.notifier).state = 2;
+              onNavigateTab(3);
+            },
           ),
           const SizedBox(height: AppSpacing.lg),
           const _SectionHeader(title: 'Quick actions', icon: Icons.bolt_rounded),

@@ -138,6 +138,25 @@ class AuthRepository {
     }
   }
 
+  Future<String> resetPassword({
+    required String token,
+    required String password,
+  }) async {
+    try {
+      final response = await _api.dio.post<Map<String, dynamic>>(
+        '/auth/reset-password',
+        data: {
+          'token': token.trim(),
+          'password': password,
+        },
+      );
+      return response.data?['message'] as String? ??
+          'Password reset successfully. You can now sign in.';
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
   Future<bool> fetchHasPassword() async {
     try {
       final response = await _api.dio.get<Map<String, dynamic>>('/auth/password-status');

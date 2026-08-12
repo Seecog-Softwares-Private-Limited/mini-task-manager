@@ -7,6 +7,7 @@ import '../../core/messaging/app_messenger.dart';
 import '../../features/auth/auth_splash_screen.dart';
 import '../../features/auth/forgot_password_screen.dart';
 import '../../features/auth/login_screen.dart';
+import '../../features/auth/reset_password_screen.dart';
 import '../../features/auth/signup_screen.dart';
 import '../../features/auth/session_controller.dart';
 import '../../features/home/home_shell.dart';
@@ -18,6 +19,7 @@ abstract final class AppRoutes {
   static const login = '/login';
   static const signup = '/signup';
   static const forgotPassword = '/forgot-password';
+  static const resetPassword = '/reset-password';
   static const workspaces = '/workspaces';
   static const home = '/';
   static String projectBoard(String projectId) => '/projects/$projectId/board';
@@ -52,6 +54,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       if (status == SessionStatus.unauthenticated) {
         if (path == AppRoutes.login ||
             path == AppRoutes.forgotPassword ||
+            path == AppRoutes.resetPassword ||
             path == AppRoutes.signup) {
           return null;
         }
@@ -65,7 +68,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       if (status == SessionStatus.authenticated) {
         if (path == AppRoutes.splash ||
             path == AppRoutes.login ||
-            path == AppRoutes.signup) {
+            path == AppRoutes.signup ||
+            path == AppRoutes.forgotPassword ||
+            path == AppRoutes.resetPassword) {
           return AppRoutes.home;
         }
         // Workspace picker is only for the post-login selection flow.
@@ -96,6 +101,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.forgotPassword,
         builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.resetPassword,
+        builder: (context, state) {
+          final token = state.uri.queryParameters['token'];
+          return ResetPasswordScreen(initialToken: token);
+        },
       ),
       GoRoute(
         path: AppRoutes.workspaces,

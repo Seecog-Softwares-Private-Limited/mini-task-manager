@@ -9,6 +9,7 @@ import '../../data/models/organization.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../auth/session_controller.dart';
 import '../projects/projects_providers.dart';
+import 'invite_member_sheet.dart';
 import 'workspace_icon_picker.dart';
 
 class WorkspaceSettingsSheet extends ConsumerStatefulWidget {
@@ -176,7 +177,7 @@ class _WorkspaceSettingsSheetState extends ConsumerState<WorkspaceSettingsSheet>
                         Text('Workspace settings', style: Theme.of(context).textTheme.titleLarge),
                         const SizedBox(height: AppSpacing.xs),
                         Text(
-                          'Update name and icon.',
+                          'Update name and icon, or invite teammates.',
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                         const SizedBox(height: AppSpacing.lg),
@@ -217,6 +218,19 @@ class _WorkspaceSettingsSheetState extends ConsumerState<WorkspaceSettingsSheet>
                             label: 'Save changes',
                             loading: _saving,
                             onPressed: !_hasChanges || _saving ? null : _save,
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          SecondaryButton(
+                            label: 'Invite member',
+                            onPressed: () {
+                              final org = _org;
+                              if (org == null) return;
+                              showInviteMemberSheet(
+                                context: context,
+                                organizationId: org.id,
+                                organizationName: org.name,
+                              );
+                            },
                           ),
                         ],
                         const SizedBox(height: AppSpacing.sm),

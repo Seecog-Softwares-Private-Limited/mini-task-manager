@@ -8,14 +8,60 @@ import '../../shared/widgets/app_widgets.dart';
 import '../projects/projects_providers.dart';
 import '../auth/session_controller.dart';
 import 'recurring_calendar_tab.dart';
+import 'recurring_insights_tab.dart';
 import 'recurring_providers.dart';
 import 'recurring_series_tab.dart';
 
-class RecurringScreen extends ConsumerWidget {
+class RecurringScreen extends ConsumerStatefulWidget {
   const RecurringScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<RecurringScreen> createState() => _RecurringScreenState();
+}
+
+class _RecurringScreenState extends ConsumerState<RecurringScreen>
+    with SingleTickerProviderStateMixin {
+  static const _tabCount = 3;
+
+  late final TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = ref.read(recurringTabIndexProvider).clamp(0, _tabCount - 1);
+    _tabController = TabController(
+      length: _tabCount,
+      vsync: this,
+      initialIndex: initial,
+    );
+    _tabController.addListener(_onTabControllerChanged);
+  }
+
+  void _onTabControllerChanged() {
+    if (_tabController.indexIsChanging) return;
+    final index = _tabController.index;
+    if (ref.read(recurringTabIndexProvider) != index) {
+      ref.read(recurringTabIndexProvider.notifier).state = index;
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController
+      ..removeListener(_onTabControllerChanged)
+      ..dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<int>(recurringTabIndexProvider, (prev, next) {
+      final index = next.clamp(0, _tabCount - 1);
+      if (_tabController.index != index) {
+        _tabController.animateTo(index);
+      }
+    });
+
     final session = ref.watch(sessionControllerProvider);
     final projectsAsync = ref.watch(projectsProvider);
     final selectedProjectId = ref.watch(recurringSelectedProjectIdProvider);
@@ -60,10 +106,8 @@ class RecurringScreen extends ConsumerWidget {
         }
         return false;
       },
-      child: DefaultTabController(
-        length: 2,
-        child: Column(
-          children: [
+      child: Column(
+        children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.md,
@@ -121,9 +165,10 @@ class RecurringScreen extends ConsumerWidget {
             ),
             orElse: () => const SizedBox(height: AppSpacing.sm),
           ),
-          const TabBar(
+          TabBar(
+            controller: _tabController,
             labelColor: AppColors.primary,
-            tabs: [
+            tabs: const [
               Tab(
                 icon: Icon(Icons.calendar_month, color: AppColors.sky),
                 text: 'Calendar',
@@ -132,20 +177,25 @@ class RecurringScreen extends ConsumerWidget {
                 icon: Icon(Icons.library_books_outlined, color: AppColors.violet),
                 text: 'Series',
               ),
+              Tab(
+                icon: Icon(Icons.insights_rounded, color: AppColors.primary),
+                text: 'Insights',
+              ),
             ],
           ),
-          const Expanded(
+          Expanded(
             child: TabBarView(
-              children: [
+              controller: _tabController,
+              children: const [
                 RecurringCalendarTab(),
                 RecurringSeriesTab(),
+                RecurringInsightsTab(),
               ],
             ),
           ),
         ],
       ),
-    ),
-  );
+    );
   }
 }
 
