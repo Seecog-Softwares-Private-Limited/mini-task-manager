@@ -134,6 +134,7 @@ import {
   X,
   FileText,
   Repeat,
+  RefreshCw,
 } from "lucide-react";
 
 const TAG_COLORS = [
@@ -311,6 +312,18 @@ export function TaskDetailModal({
   const [commentMentionedIds, setCommentMentionedIds] = React.useState<string[]>([]);
   const [newCheckItem, setNewCheckItem] = React.useState("");
   const [expandedSubtaskId, setExpandedSubtaskId] = React.useState<string | null>(null);
+  const [isRefreshingChecklist, setIsRefreshingChecklist] = React.useState(false);
+
+  const handleRefreshChecklist = React.useCallback(async () => {
+    if (!taskId || isRefreshingChecklist) return;
+    setIsRefreshingChecklist(true);
+    try {
+      await queryClient.invalidateQueries({ queryKey: ["task", taskId] });
+    } finally {
+      setIsRefreshingChecklist(false);
+    }
+  }, [taskId, isRefreshingChecklist, queryClient]);
+
   const [isEditingTitle, setIsEditingTitle] = React.useState(false);
   const [editingTitle, setEditingTitle] = React.useState("");
   const closeRef = React.useRef<HTMLButtonElement>(null);
@@ -1371,7 +1384,21 @@ export function TaskDetailModal({
                           <CheckSquare className="h-4 w-4" aria-hidden />
                         </span>
                         <div>
-                          <h3 className={tdMainSectionHeading}>Checklist</h3>
+                          <div className="flex items-center gap-1.5">
+                            <h3 className={tdMainSectionHeading}>Checklist</h3>
+                            <button
+                              type="button"
+                              onClick={handleRefreshChecklist}
+                              disabled={isRefreshingChecklist}
+                              aria-label="Refresh checklist"
+                              className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:bg-violet-500/10 hover:text-violet-600 disabled:opacity-40 dark:hover:text-violet-400"
+                            >
+                              <RefreshCw
+                                className={`h-3.5 w-3.5 ${isRefreshingChecklist ? "animate-spin" : ""}`}
+                                aria-hidden
+                              />
+                            </button>
+                          </div>
                           <p className="mt-0.5 text-xs text-muted-foreground/75">
                             Subtasks, owners, and dates
                           </p>
@@ -1422,11 +1449,12 @@ export function TaskDetailModal({
                           Add
                         </Button>
                       </div>
-                      {checklist.map((item) => {
+                      {checklist.map((item, idx) => {
                         const expanded = expandedSubtaskId === item.id;
                         return (
                           <div key={item.id} className="space-y-0">
                             <SubtaskCompactRow
+                              subtaskNumber={checklist.length - idx}
                               title={item.title}
                               completed={resolveSubtaskStatus(item) === "DONE"}
                               status={resolveSubtaskStatus(item)}

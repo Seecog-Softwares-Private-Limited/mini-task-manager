@@ -51,6 +51,14 @@ class ProjectsRepository {
     }
   }
 
+  Future<void> deleteProject({required String projectId}) async {
+    try {
+      await _api.dio.delete<void>('/projects/$projectId');
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
   Future<List<ProjectMember>> fetchProjectMembers({
     required String projectId,
     required String organizationId,

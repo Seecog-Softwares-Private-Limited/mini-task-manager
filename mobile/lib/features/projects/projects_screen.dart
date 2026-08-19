@@ -105,7 +105,7 @@ class ProjectsScreen extends ConsumerWidget {
   }
 }
 
-class _PremiumProjectCard extends StatelessWidget {
+class _PremiumProjectCard extends ConsumerStatefulWidget {
   const _PremiumProjectCard({
     required this.project,
     required this.isDark,
@@ -117,7 +117,64 @@ class _PremiumProjectCard extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  ConsumerState<_PremiumProjectCard> createState() =>
+      _PremiumProjectCardState();
+}
+
+class _PremiumProjectCardState extends ConsumerState<_PremiumProjectCard> {
+  bool _deleting = false;
+
+  Future<void> _confirmDelete(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Delete project?'),
+        content: Text(
+          'This will permanently delete "${widget.project.name}" and all its tasks. '
+          'This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deleting = true);
+    try {
+      await ref
+          .read(projectsRepositoryProvider)
+          .deleteProject(projectId: widget.project.id);
+      if (!mounted) return;
+      ref.invalidate(projectsProvider);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e is ApiException ? e.message : 'Failed to delete project.',
+          ),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final project = widget.project;
+    final isDark = widget.isDark;
     final description = stripHtmlToPlainText(project.description);
     final visibility = _visibilityMeta(project.visibility);
     final initial = project.name.trim().isEmpty
@@ -128,7 +185,7 @@ class _PremiumProjectCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
+        onTap: _deleting ? null : widget.onTap,
         child: Ink(
           decoration: BoxDecoration(
             color: isDark ? const Color(0xFF1E293B) : AppColors.surface,
@@ -211,10 +268,41 @@ class _PremiumProjectCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: AppSpacing.xs),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.textMuted.withValues(alpha: 0.7),
-                ),
+                if (_deleting)
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  PopupMenuButton<String>(
+                    icon: Icon(
+                      Icons.more_vert_rounded,
+                      color: AppColors.textMuted.withValues(alpha: 0.7),
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    onSelected: (value) {
+                      if (value == 'delete') _confirmDelete(context);
+                    },
+                    itemBuilder: (_) => [
+                      PopupMenuItem<String>(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_outline_rounded,
+                                size: 18, color: AppColors.danger),
+                            const SizedBox(width: 10),
+                            Text(
+                              'Delete project',
+                              style: TextStyle(color: AppColors.danger),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
               ],
             ),
           ),

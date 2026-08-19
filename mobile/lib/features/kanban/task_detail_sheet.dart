@@ -162,6 +162,28 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     super.dispose();
   }
 
+  bool _refreshingChecklist = false;
+
+  Future<void> _manualRefreshChecklist() async {
+    if (!mounted || _refreshingChecklist) return;
+    setState(() => _refreshingChecklist = true);
+    try {
+      final task =
+          await ref.read(tasksRepositoryProvider).fetchTask(widget.task.id);
+      if (!mounted) return;
+      final merged = _mergeSubtasksPreservingOrder(_subtasks, task.subtasks);
+      setState(() {
+        _task = task;
+        _subtasks = merged;
+      });
+      widget.onUpdated();
+    } catch (_) {
+      // Soft refresh.
+    } finally {
+      if (mounted) setState(() => _refreshingChecklist = false);
+    }
+  }
+
   /// Refresh checklist completion from server so peer checkmarks appear.
   Future<void> _syncChecklistPeers() async {
     if (!mounted ||
@@ -1332,7 +1354,37 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Checklist', style: Theme.of(context).textTheme.titleMedium),
+                            Row(
+                              children: [
+                                Text('Checklist', style: Theme.of(context).textTheme.titleMedium),
+                                const SizedBox(width: 4),
+                                SizedBox(
+                                  width: 26,
+                                  height: 26,
+                                  child: _refreshingChecklist
+                                      ? Padding(
+                                          padding: const EdgeInsets.all(5),
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 1.8,
+                                            color: AppColors.primary.withValues(alpha: 0.6),
+                                          ),
+                                        )
+                                      : Material(
+                                          color: Colors.transparent,
+                                          borderRadius: BorderRadius.circular(6),
+                                          child: InkWell(
+                                            borderRadius: BorderRadius.circular(6),
+                                            onTap: _manualRefreshChecklist,
+                                            child: Icon(
+                                              Icons.refresh_rounded,
+                                              size: 16,
+                                              color: AppColors.primary.withValues(alpha: 0.55),
+                                            ),
+                                          ),
+                                        ),
+                                ),
+                              ],
+                            ),
                             Text(
                               'Subtasks, owners, and dates',
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -1451,6 +1503,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                           enabled: !_saving && _savingSubtaskIndex == null,
                           canComplete: canCompleteSubtasks,
                           canExpand: canExpandSubtask,
+                          subtaskNumber: _subtasks.length - index,
+                          showDoneAtChip: false,
                           // Run checklist is for checking off work — no assignee editing.
                           canChangeAssignees:
                               allowChecklistStructureEdit && !isRunChecklist,

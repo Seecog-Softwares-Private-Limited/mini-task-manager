@@ -409,9 +409,6 @@ export function emailTaskAssignmentBody(params: TaskAssignmentTemplateParams): s
     focusSubtasks,
   } = params;
 
-  const descriptionText = taskDescription?.trim()
-    ? stripHtmlForEmail(taskDescription)
-    : 'No description';
   const projectLine = projectName
     ? `<p style="margin:0 0 20px;font-size:13px;color:${BRAND.textMuted};text-align:center;">
         Project: <strong style="color:${BRAND.text};">${escapeHtml(projectName)}</strong>
@@ -447,7 +444,7 @@ ${projectLine}
     ${emailDetailRow('Assigned to', allAssigneesLabel)}
     ${emailDetailRow('Your email', assigneeEmail)}
     ${emailDetailRow('Due date', dueDateLabel)}
-    ${emailDetailRow('Description', descriptionText, { preserveLineBreaks: true })}
+    ${emailDetailRow('Title', escapeHtml(taskTitle))}
     <tr>
       <td style="padding:12px 0;border-bottom:1px solid ${BRAND.cardBorder};vertical-align:top;width:132px;">
         <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:${BRAND.textLight};">
@@ -477,9 +474,6 @@ export function emailPlainTextTaskAssignment(params: TaskAssignmentTemplateParam
   const headline = params.headline ?? 'Task assigned';
   const displayTitle = params.highlightTitle ?? params.taskTitle;
   const subtasksToShow = params.focusSubtasks ?? params.subtasks;
-  const descriptionText = params.taskDescription?.trim()
-    ? stripHtmlForEmail(params.taskDescription)
-    : 'No description';
   const subtasksText = subtasksToShow.length
     ? subtasksToShow.map((s) => `- ${s.title}${s.completed ? ' (done)' : ''}`).join('\n')
     : 'No subtasks';
@@ -500,9 +494,7 @@ export function emailPlainTextTaskAssignment(params: TaskAssignmentTemplateParam
     `Assigned to: ${params.allAssigneesLabel}`,
     `Your email: ${params.assigneeEmail}`,
     `Due date: ${params.dueDateLabel}`,
-    '',
-    'Description:',
-    descriptionText,
+    `Title: ${params.taskTitle}`,
     '',
     'Subtasks:',
     subtasksText,

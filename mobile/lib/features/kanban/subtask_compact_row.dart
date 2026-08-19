@@ -26,6 +26,8 @@ class SubtaskCompactRow extends StatelessWidget {
     this.canExpand = true,
     this.canChangeAssignees = true,
     this.showUnassignedChip = true,
+    this.subtaskNumber,
+    this.showDoneAtChip = true,
   });
 
   final TaskSubtask subtask;
@@ -45,6 +47,13 @@ class SubtaskCompactRow extends StatelessWidget {
 
   /// When false, hide the person+ chip if nobody is assigned.
   final bool showUnassignedChip;
+
+  /// 1-based position number shown below the checkbox (e.g. #1, #2).
+  final int? subtaskNumber;
+
+  /// When false, the green completed-at time chip is hidden.
+  /// Keep true in the planner/recurring section, false in regular task detail.
+  final bool showDoneAtChip;
 
   @override
   Widget build(BuildContext context) {
@@ -86,25 +95,47 @@ class SubtaskCompactRow extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
                 child: Row(
                   children: [
-                    SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: Checkbox(
-                        value: subtask.completed,
-                        onChanged: !enabled || !canComplete || isEmptyTitle
-                            ? null
-                            : (value) {
-                                if (value == null) return;
-                                onToggleComplete(value);
-                              },
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        visualDensity: VisualDensity.compact,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(5),
-                        ),
-                        side: BorderSide(
-                          color: AppColors.border.withValues(alpha: 0.9),
-                        ),
+                    Align(
+                      alignment: Alignment.topCenter,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: Checkbox(
+                              value: subtask.completed,
+                              onChanged: !enabled || !canComplete || isEmptyTitle
+                                  ? null
+                                  : (value) {
+                                      if (value == null) return;
+                                      onToggleComplete(value);
+                                    },
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                              visualDensity: VisualDensity.compact,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(5),
+                              ),
+                              side: BorderSide(
+                                color: AppColors.border.withValues(alpha: 0.9),
+                              ),
+                            ),
+                          ),
+                          if (subtaskNumber != null) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              '#$subtaskNumber',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primary.withValues(alpha: 0.55),
+                                height: 1,
+                                letterSpacing: 0.1,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -124,37 +155,74 @@ class SubtaskCompactRow extends StatelessWidget {
                               vertical: 6,
                               horizontal: 2,
                             ),
-                            child: Text(
-                              title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w500,
-                                    letterSpacing: -0.1,
-                                    height: 1.25,
-                                    color: isEmptyTitle
-                                        ? AppColors.textMuted
-                                        : subtask.completed
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w500,
+                                        letterSpacing: -0.1,
+                                        height: 1.25,
+                                        color: isEmptyTitle
                                             ? AppColors.textMuted
-                                            : AppColors.textPrimary,
-                                    fontStyle: isEmptyTitle
-                                        ? FontStyle.italic
-                                        : FontStyle.normal,
-                                    decoration: subtask.completed
-                                        ? TextDecoration.lineThrough
-                                        : TextDecoration.none,
-                                    decorationColor:
-                                        AppColors.textMuted.withValues(alpha: 0.5),
+                                            : subtask.completed
+                                                ? AppColors.textMuted
+                                                : AppColors.textPrimary,
+                                        fontStyle: isEmptyTitle
+                                            ? FontStyle.italic
+                                            : FontStyle.normal,
+                                        decoration: subtask.completed
+                                            ? TextDecoration.lineThrough
+                                            : TextDecoration.none,
+                                        decorationColor:
+                                            AppColors.textMuted.withValues(alpha: 0.5),
+                                      ),
+                                ),
+                                if (subtask.dueDate != null &&
+                                    subtask.dueDate!.isNotEmpty) ...[
+                                  const SizedBox(height: 3),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text(
+                                        'Due Date',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.danger,
+                                          letterSpacing: 0.1,
+                                          height: 1,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        _formatSubtaskDue(
+                                            subtask.dueDate, subtask.dueTime),
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w500,
+                                          color: Color(0xFF444444),
+                                          letterSpacing: 0,
+                                          height: 1,
+                                        ),
+                                      ),
+                                    ],
                                   ),
+                                ],
+                              ],
                             ),
                           ),
                         ),
                       ),
                     ),
-                    if (doneAtLabel != null) ...[
+                    if (showDoneAtChip && doneAtLabel != null) ...[
                       const SizedBox(width: 6),
                       _DoneAtChip(label: doneAtLabel),
                     ],
@@ -355,6 +423,26 @@ List<String> _assigneeIdsOf(TaskSubtask subtask) {
     return [subtask.assigneeId!];
   }
   return const [];
+}
+
+String _formatSubtaskDue(String? dueDate, String? dueTime) {
+  if (dueDate == null || dueDate.isEmpty) return '';
+  final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})').firstMatch(dueDate);
+  if (match == null) return dueDate;
+  final dt = DateTime(
+    int.parse(match.group(1)!),
+    int.parse(match.group(2)!),
+    int.parse(match.group(3)!),
+  );
+  final datePart = DateFormat('MMM d, yyyy').format(dt);
+  if (dueTime == null || dueTime.isEmpty) return datePart;
+  final timeMatch = RegExp(r'^([01]\d|2[0-3]):([0-5]\d)').firstMatch(dueTime);
+  if (timeMatch == null) return datePart;
+  final h = int.parse(timeMatch.group(1)!);
+  final m = int.parse(timeMatch.group(2)!);
+  final timeDt = DateTime(dt.year, dt.month, dt.day, h, m);
+  final timePart = DateFormat('h:mm a').format(timeDt);
+  return '$datePart · $timePart';
 }
 
 String? _completedAtLabel(TaskSubtask subtask) {

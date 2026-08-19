@@ -440,9 +440,13 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     });
   }
 
+  bool get _dueDateTimeValid =>
+      widget.templateMode || (_dueDate != null && _dueTime != null);
+
   Future<void> _handleSave() async {
     final title = _titleController.text.trim();
     if (title.isEmpty || title.length > subtaskTitleMaxLength) return;
+    if (!_dueDateTimeValid) return;
 
     final movingToDone = _status == 'DONE' && !isSubtaskDone(widget.subtask);
     var record = _completionRecord ?? widget.subtask.completionRecord;
@@ -1055,11 +1059,16 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: widget.saving ? null : _pickDueDate,
-                          icon:
-                              const Icon(Icons.calendar_today_rounded, size: 18),
+                          style: _dueDate == null
+                              ? OutlinedButton.styleFrom(
+                                  side: const BorderSide(
+                                      color: AppColors.danger, width: 1.2),
+                                )
+                              : null,
+                          icon: const Icon(Icons.calendar_today_rounded, size: 18),
                           label: Text(
                             dueDate == null
-                                ? 'Due date'
+                                ? 'Due date *'
                                 : DateFormat('MMM d, yyyy').format(dueDate),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -1069,31 +1078,21 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
                       Expanded(
                         child: OutlinedButton.icon(
                           onPressed: widget.saving ? null : _pickDueTime,
+                          style: _dueTime == null
+                              ? OutlinedButton.styleFrom(
+                                  side: const BorderSide(
+                                      color: AppColors.danger, width: 1.2),
+                                )
+                              : null,
                           icon: const Icon(Icons.schedule_rounded, size: 18),
                           label: Text(
                             _dueTime == null
-                                ? 'Time'
+                                ? 'Time *'
                                 : _formatDueTimeLabel(_dueTime!),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ),
-                      if (_dueDate != null || _dueTime != null) ...[
-                        const SizedBox(width: AppSpacing.xs),
-                        IconButton(
-                          tooltip: _dueTime != null ? 'Clear time' : 'Clear date',
-                          onPressed: widget.saving
-                              ? null
-                              : () {
-                                  if (_dueTime != null) {
-                                    _clearDueTime();
-                                  } else {
-                                    _clearDueDate();
-                                  }
-                                },
-                          icon: const Icon(Icons.clear_rounded),
-                        ),
-                      ],
                     ],
                     const SizedBox(width: AppSpacing.sm),
                     OutlinedButton(
@@ -1171,21 +1170,23 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
                         ),
                   ),
                 ],
-                if (!widget.templateMode && _dueDate != null)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton(
-                      onPressed: widget.saving
-                          ? null
-                          : (_dueTime != null ? _clearDueTime : _clearDueDate),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        visualDensity: VisualDensity.compact,
+                if (!widget.templateMode && !_dueDateTimeValid) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Row(
+                    children: [
+                      const Icon(Icons.info_outline_rounded,
+                          size: 13, color: AppColors.danger),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Due date and time are required',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.danger,
+                              fontWeight: FontWeight.w600,
+                            ),
                       ),
-                      child:
-                          Text(_dueTime != null ? 'Clear time' : 'Clear date'),
-                    ),
+                    ],
                   ),
+                ],
                 if (!widget.templateMode && !widget.canComplete) ...[
                   const SizedBox(height: AppSpacing.xs),
                   Text(
@@ -1277,7 +1278,8 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
                   loading: widget.saving,
                   onPressed: widget.saving ||
                           _titleController.text.trim().isEmpty ||
-                          _titleController.text.length > subtaskTitleMaxLength
+                          _titleController.text.length > subtaskTitleMaxLength ||
+                          !_dueDateTimeValid
                       ? null
                       : _handleSave,
                 ),
