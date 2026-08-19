@@ -423,7 +423,12 @@ export class TasksController {
       const message = isMention
         ? `${commenterName} mentioned you in "${task.title}"${projectName ? ` in ${projectName}` : ''}.`
         : `${commenterName} commented on "${task.title}"${projectName ? ` in ${projectName}` : ''}.`;
-      await this.notificationsService.createNotification(targetId, title, message);
+      await this.notificationsService.createNotification(targetId, title, message, {
+        type: isMention ? 'mention' : 'comment',
+        taskId: String(task.id),
+        projectId: String(task.projectId),
+        open: 'alerts',
+      });
     }
   }
 

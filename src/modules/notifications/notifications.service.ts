@@ -49,6 +49,7 @@ export class NotificationsService {
       userId: normalizedUserId,
       title,
       message,
+      data: data && Object.keys(data).length > 0 ? data : null,
     });
 
     // Await so assignment flows reliably reach every registered device.
