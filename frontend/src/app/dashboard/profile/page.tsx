@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   BadgeCheck,
@@ -14,6 +16,14 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
@@ -22,8 +32,8 @@ import { WorkspaceThumb } from "@/components/workspaces/workspace-thumb";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenant } from "@/context/tenant-context";
 import { fetchOrganizations } from "@/services/api/organizations.api";
-import { updateCurrentUserProfile } from "@/services/api/users.api";
-import { parseApiError } from "@/services/api/client";
+import { updateCurrentUserProfile, deleteMyAccount } from "@/services/api/users.api";
+import { clearAuth, parseApiError } from "@/services/api/client";
 
 function formatRole(role?: string): string {
   if (!role) return "Member";
@@ -35,9 +45,12 @@ export default function ProfilePage() {
   const { orgId } = useTenant();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const [fullName, setFullName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (user?.fullName && user.fullName !== user.email) {
@@ -59,6 +72,24 @@ export default function ProfilePage() {
     () => [...organizations].sort((a, b) => a.name.localeCompare(b.name)),
     [organizations]
   );
+
+  async function handleDeleteAccount() {
+    setDeleting(true);
+    try {
+      await deleteMyAccount();
+      clearAuth();
+      router.replace("/login");
+    } catch (err) {
+      toast({
+        title: "Could not delete account",
+        description: parseApiError(err),
+        variant: "error",
+      });
+    } finally {
+      setDeleting(false);
+      setDeleteDialogOpen(false);
+    }
+  }
 
   async function handleSave() {
     if (!dirty || !trimmed) return;
@@ -207,6 +238,51 @@ export default function ProfilePage() {
           )}
         </CardContent>
       </Card>
+
+      <Card className="border-destructive/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg text-destructive">
+            <AlertTriangle className="h-5 w-5" />
+            Danger zone
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Permanently delete your account and all associated data. This action cannot be undone.
+          </p>
+          <Button
+            variant="outline"
+            className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            onClick={() => setDeleteDialogOpen(true)}
+          >
+            Delete my account
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete your account?</DialogTitle>
+            <DialogDescription>
+              This will permanently delete your account, all your data, and remove you from all
+              workspaces. This action <strong>cannot be undone</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeleteDialogOpen(false)} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => void handleDeleteAccount()}
+              disabled={deleting}
+            >
+              {deleting ? "Deleting…" : "Yes, delete my account"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Button variant="ghost" size="sm" asChild className="text-muted-foreground">
         <Link href="/dashboard/settings">

@@ -12,7 +12,6 @@ import '../../data/models/task.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../auth/session_controller.dart';
 import '../kanban/assignee_picker_sheet.dart';
-import '../kanban/kanban_providers.dart';
 import '../kanban/new_subtask_composer.dart';
 import '../kanban/subtask_compact_row.dart';
 import '../kanban/subtask_detail_panel.dart';

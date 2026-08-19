@@ -150,6 +150,7 @@ class _PremiumProjectCardState extends ConsumerState<_PremiumProjectCard> {
     if (confirmed != true || !mounted) return;
 
     setState(() => _deleting = true);
+    final messenger = ScaffoldMessenger.of(context);
     try {
       await ref
           .read(projectsRepositoryProvider)
@@ -157,8 +158,7 @@ class _PremiumProjectCardState extends ConsumerState<_PremiumProjectCard> {
       if (!mounted) return;
       ref.invalidate(projectsProvider);
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: Text(
             e is ApiException ? e.message : 'Failed to delete project.',

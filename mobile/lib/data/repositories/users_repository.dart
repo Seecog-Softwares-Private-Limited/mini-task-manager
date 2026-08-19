@@ -60,6 +60,14 @@ class UsersRepository {
       throw ApiException.fromDio(error);
     }
   }
+
+  Future<void> deleteAccount() async {
+    try {
+      await _api.dio.delete<void>('/users/me');
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
 }
 
 final usersRepositoryProvider = Provider<UsersRepository>((ref) {

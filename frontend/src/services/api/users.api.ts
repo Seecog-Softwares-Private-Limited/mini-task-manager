@@ -33,3 +33,7 @@ export async function uploadMyAvatar(file: File): Promise<CurrentUserProfile> {
 export async function deleteMyAvatar(): Promise<void> {
   await apiClient.delete("users/me/avatar");
 }
+
+export async function deleteMyAccount(): Promise<void> {
+  await apiClient.delete("users/me");
+}

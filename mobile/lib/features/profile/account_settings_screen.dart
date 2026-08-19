@@ -1,9 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/api/api_exception.dart';
+import '../../core/messaging/app_messenger.dart';
 import '../../core/preferences/app_preferences.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../data/repositories/users_repository.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../../shared/widgets/workspace_avatar.dart';
 import '../auth/session_controller.dart';
@@ -15,6 +19,43 @@ import 'security_screen.dart';
 
 class AccountSettingsScreen extends ConsumerWidget {
   const AccountSettingsScreen({super.key});
+
+  Future<void> _confirmDeleteAccount(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete account?'),
+        content: const Text(
+          'This will permanently delete your account and all your data. '
+          'This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete my account'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await ref.read(usersRepositoryProvider).deleteAccount();
+      if (context.mounted) {
+        await ref.read(sessionControllerProvider.notifier).logout();
+      }
+    } on ApiException catch (e) {
+      showAppMessage(e.message, isError: true);
+    } catch (_) {
+      showAppMessage('Could not delete account. Please try again.', isError: true);
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -45,15 +86,19 @@ class AccountSettingsScreen extends ConsumerWidget {
               MaterialPageRoute<void>(builder: (_) => const SecurityScreen()),
             ),
           ),
-          _SettingsTile(
-            icon: Icons.workspace_premium_rounded,
-            iconColor: AppColors.warning,
-            title: 'Plans & Pricing',
-            subtitle: 'View plans and upgrade your account',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const PlansBillingScreen()),
+          // Apple App Store policy: digital subscriptions must use Apple IAP.
+          // The Plans & Pricing screen uses a third-party payment provider and
+          // is therefore only shown on Android / web builds.
+          if (defaultTargetPlatform != TargetPlatform.iOS)
+            _SettingsTile(
+              icon: Icons.workspace_premium_rounded,
+              iconColor: AppColors.warning,
+              title: 'Plans & Pricing',
+              subtitle: 'View plans and upgrade your account',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const PlansBillingScreen()),
+              ),
             ),
-          ),
           _SettingsTile(
             icon: Icons.business_outlined,
             iconColor: AppColors.primary,
@@ -84,6 +129,32 @@ class AccountSettingsScreen extends ConsumerWidget {
                   onSelectionChanged: (selection) {
                     ref.read(themeModeProvider.notifier).setThemeMode(selection.first);
                   },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          SurfaceCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Danger zone', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: AppColors.danger)),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  'Permanently delete your account and all associated data. This cannot be undone.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textMuted),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.danger,
+                      side: BorderSide(color: AppColors.danger.withValues(alpha: 0.4)),
+                    ),
+                    onPressed: () => _confirmDeleteAccount(context, ref),
+                    child: const Text('Delete my account'),
+                  ),
                 ),
               ],
             ),
