@@ -296,9 +296,6 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     });
   }
 
-  void _clearDueDate() => setState(() {
-        _dueDate = null;
-      });
 
   void _clearDueTime() => setState(() {
         _dueTime = null;
