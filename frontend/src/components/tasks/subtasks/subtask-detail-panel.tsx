@@ -471,6 +471,12 @@ export function SubtaskDetailPanel({
           }}
           disabled={fieldsDisabled}
         />
+        {!dailyRunMode && (!draft.dueDate || !draft.dueTime) && !readOnly && (
+          <p className="flex items-center gap-1 text-[11px] font-semibold text-red-500">
+            <span aria-hidden>⚠</span>
+            Due date and time are required
+          </p>
+        )}
         {draft.dueTime ? (
           <div className="w-full min-w-[180px] flex-1 sm:max-w-[240px]">
             <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
@@ -576,7 +582,8 @@ export function SubtaskDetailPanel({
                 disabled ||
                 saving ||
                 !draft.title.trim() ||
-                draft.title.length > SUBTASK_TITLE_MAX_LENGTH
+                draft.title.length > SUBTASK_TITLE_MAX_LENGTH ||
+                (!dailyRunMode && (!draft.dueDate || !draft.dueTime))
               }
               onClick={() => commitDraft()}
             >

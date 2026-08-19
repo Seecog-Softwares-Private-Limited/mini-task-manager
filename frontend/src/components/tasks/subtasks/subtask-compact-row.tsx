@@ -57,6 +57,8 @@ interface SubtaskCompactRowProps {
   onDueDateChange?: (dueDate?: string, dueTime?: string) => void;
   /** Opens threaded checklist comments (planner notes). */
   onNotesClick?: () => void;
+  /** 1-based position number shown below the checkbox (e.g. #1). */
+  subtaskNumber?: number;
 }
 
 function dueDateInputValue(value?: string): string {
@@ -113,6 +115,7 @@ export function SubtaskCompactRow({
   onAssigneeChange,
   onDueDateChange,
   onNotesClick,
+  subtaskNumber,
 }: SubtaskCompactRowProps) {
   const resolvedAssigneeIds = getSubtaskAssigneeIds({ assigneeId, assigneeIds });
   const hasNote = Boolean(note?.trim());
@@ -153,34 +156,49 @@ export function SubtaskCompactRow({
       )}
       style={getSubtaskRowStyle(rowInput)}
     >
-      <input
-        type="checkbox"
-        checked={completed}
-        disabled={editDisabled}
-        onChange={(e) => {
-          e.stopPropagation();
-          onToggleComplete();
-        }}
-        onClick={(e) => e.stopPropagation()}
-        className="h-3.5 w-3.5 shrink-0 rounded-[4px] border-input/80 accent-primary"
-        aria-label={`Mark "${title}" complete`}
-      />
+      <div className="flex shrink-0 flex-col items-center gap-[3px] self-start pt-[1px]">
+        <input
+          type="checkbox"
+          checked={completed}
+          disabled={editDisabled}
+          onChange={(e) => {
+            e.stopPropagation();
+            onToggleComplete();
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="h-3.5 w-3.5 rounded-[4px] border-input/80 accent-primary"
+          aria-label={`Mark "${title}" complete`}
+        />
+        {subtaskNumber != null && (
+          <span className="select-none text-[10px] font-bold leading-none text-primary/50">
+            #{subtaskNumber}
+          </span>
+        )}
+      </div>
       <button
         type="button"
         onClick={onRowClick}
         className={cn(
-          "flex min-w-0 flex-1 items-center gap-2 text-left",
+          "flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left",
           "rounded-md px-0.5 py-0.5 transition-colors hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
         )}
       >
         <span
           className={cn(
-            "min-w-0 flex-1 truncate text-[13px] font-medium tracking-tight text-foreground/90",
+            "min-w-0 w-full truncate text-[13px] font-medium tracking-tight text-foreground/90",
             completed && "text-muted-foreground/80 line-through decoration-muted-foreground/40"
           )}
         >
           {title || "Untitled subtask"}
         </span>
+        {dueDate && (
+          <span className="flex items-baseline gap-1.5 leading-none">
+            <span className="text-[10px] font-bold text-red-500">Due Date</span>
+            <span className="text-[10px] font-medium text-foreground/50">
+              {formatDueDateLabel(dueDate, dueTime)}
+            </span>
+          </span>
+        )}
       </button>
       <div
         className="flex shrink-0 items-center gap-1.5"
