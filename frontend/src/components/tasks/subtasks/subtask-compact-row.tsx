@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import {
-  SUBTASK_STATUS_OPTIONS,
   resolveSubtaskStatus,
   type SubtaskStatus,
 } from "@/lib/subtask-status";
@@ -25,6 +24,7 @@ import type { OrgMember } from "@/types/api";
 import { getSubtaskAssigneeIds } from "@/lib/subtask-assignees";
 import { normalizeAssigneeUserId } from "@/lib/task-assignees";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { SubtaskStatusSelector } from "@/components/tasks/subtask-status-selector";
 
 /** Above sheet/drawer overlay (z-50). */
 const DROPDOWN_Z = "z-[110]";
@@ -117,9 +117,6 @@ export function SubtaskCompactRow({
   const resolvedAssigneeIds = getSubtaskAssigneeIds({ assigneeId, assigneeIds });
   const hasNote = Boolean(note?.trim());
   const resolvedStatus = resolveSubtaskStatus({ status, completed });
-  const selectedStatus =
-    SUBTASK_STATUS_OPTIONS.find((option) => option.value === resolvedStatus) ??
-    SUBTASK_STATUS_OPTIONS[0];
 
   const assigneeMembers = resolvedAssigneeIds
     .map((id) => knownMembers?.find((m) => m.id === id) ?? { id, name: "User" })
@@ -189,6 +186,15 @@ export function SubtaskCompactRow({
         className="flex shrink-0 items-center gap-1.5"
         onClick={(e) => e.stopPropagation()}
       >
+        {onStatusChange ? (
+          <SubtaskStatusSelector
+            value={resolvedStatus}
+            completed={completed}
+            onChange={onStatusChange}
+            disabled={editDisabled}
+            variant="row"
+          />
+        ) : null}
         {assigneeMembers.length === 1 ? (
           <UserAvatar
             userId={assigneeMembers[0].id}
@@ -240,48 +246,6 @@ export function SubtaskCompactRow({
                 <MessageSquare className="mr-2 h-3.5 w-3.5" />
                 {hasNote ? "Notes" : "Add note"}
               </DropdownMenuItem>
-            ) : null}
-
-            {onStatusChange ? (
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger disabled={editDisabled} className="gap-2">
-                  <span
-                    className={cn(
-                      "h-2 w-2 shrink-0 rounded-full",
-                      selectedStatus.dotClass
-                    )}
-                    aria-hidden
-                  />
-                  <span className="flex-1 truncate">Status</span>
-                  <span className="text-xs text-muted-foreground">
-                    {selectedStatus.label}
-                  </span>
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className={cn("min-w-[10rem] p-1", DROPDOWN_Z)}>
-                  {SUBTASK_STATUS_OPTIONS.map((option) => {
-                    const isCurrent = option.value === selectedStatus.value;
-                    return (
-                      <DropdownMenuItem
-                        key={option.value}
-                        disabled={editDisabled}
-                        onSelect={() => onStatusChange(option.value)}
-                      >
-                        <span
-                          className={cn(
-                            "mr-2 h-2.5 w-2.5 shrink-0 rounded-full",
-                            option.dotClass
-                          )}
-                          aria-hidden
-                        />
-                        <span className="flex-1">{option.label}</span>
-                        {isCurrent ? (
-                          <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
-                        ) : null}
-                      </DropdownMenuItem>
-                    );
-                  })}
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
             ) : null}
 
             {onAssigneeChange ? (

@@ -17,6 +17,10 @@ export class NotificationEntity {
   @Column({ type: 'text', nullable: true })
   message!: string | null;
 
+  /** Deep-link payload (taskId, subtaskId, type, projectId, …). */
+  @Column({ type: 'json', nullable: true })
+  data!: Record<string, string> | null;
+
   @Column({ name: 'is_read', type: 'boolean', default: false })
   isRead!: boolean;
 
