@@ -1,5 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
+    <!-- Plugins merge broad media permissions; Play requires system photo picker instead. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"
+        tools:node="remove" />
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
@@ -7,12 +15,6 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <!-- Android 13+ notification permission for FCM. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    <!-- open_filex merges broad media access. Strip it: gallery uses the
-         system photo picker, and we only open files in the app sandbox. -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" tools:node="remove"/>
-    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" tools:node="remove"/>
-    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" tools:node="remove"/>
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <application
         android:label="OpsPick"
