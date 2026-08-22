@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/config/api_reachability_probe.dart';
+import 'core/media/android_photo_picker.dart';
 import 'core/messaging/app_messenger.dart';
 import 'core/preferences/app_preferences.dart';
 import 'core/router/app_router.dart';
@@ -16,6 +17,7 @@ import 'firebase_bootstrap.dart';
 
 Future<void> bootstrap() async {
   WidgetsFlutterBinding.ensureInitialized();
+  enableAndroidPhotoPicker();
 
   final prefs = await SharedPreferences.getInstance();
 
