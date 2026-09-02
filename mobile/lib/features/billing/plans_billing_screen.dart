@@ -1,8 +1,13 @@
+import 'dart:io';
+
+import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/config/app_config.dart';
 import '../../core/messaging/app_messenger.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -11,6 +16,7 @@ import '../../data/repositories/plans_repository.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../auth/session_controller.dart';
 import 'plan_checkout_service.dart';
+import 'apple_iap_checkout_service.dart';
 
 class PlansBillingScreen extends ConsumerStatefulWidget {
   const PlansBillingScreen({super.key});
@@ -22,8 +28,31 @@ class PlansBillingScreen extends ConsumerStatefulWidget {
 class _PlansBillingScreenState extends ConsumerState<PlansBillingScreen> {
   String? _upgradingSlug;
   String? _validatingSlug;
+  bool _restoring = false;
+  Map<String, ProductDetails> _appleProducts = {};
   final Map<String, TextEditingController> _couponControllers = {};
   final Map<String, CouponValidation?> _appliedCoupons = {};
+
+  bool get _isIos => Platform.isIOS;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isIos) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadAppleProducts());
+    }
+  }
+
+  Future<void> _loadAppleProducts() async {
+    try {
+      final products =
+          await AppleIapCheckoutService(repository: ref.read(plansRepositoryProvider))
+              .loadProducts();
+      if (mounted) setState(() => _appleProducts = products);
+    } catch (_) {
+      // Store prices fall back to API price labels.
+    }
+  }
 
   @override
   void dispose() {
@@ -81,7 +110,8 @@ class _PlansBillingScreenState extends ConsumerState<PlansBillingScreen> {
 
   Future<void> _upgrade(String plan) async {
     final applied = _appliedCoupons[plan];
-    final couponCode = applied?.valid == true ? applied!.code : null;
+    final couponCode =
+        !_isIos && applied?.valid == true ? applied!.code : null;
     final user = ref.read(sessionControllerProvider).user;
 
     setState(() => _upgradingSlug = plan);
@@ -108,13 +138,47 @@ class _PlansBillingScreenState extends ConsumerState<PlansBillingScreen> {
     }
   }
 
+  Future<void> _restorePurchases() async {
+    setState(() => _restoring = true);
+    try {
+      final plan = await PlanCheckoutService(
+        repository: ref.read(plansRepositoryProvider),
+      ).restorePurchases();
+      showAppMessage('Restored ${UserPlans.displayName(plan)} plan.');
+      await _refresh();
+    } on PlanCheckoutException catch (e) {
+      showAppMessage(e.message, isError: true);
+    } on ApiException catch (e) {
+      showAppMessage(e.message, isError: true);
+    } catch (e) {
+      showAppMessage('Restore failed. Please try again.', isError: true);
+    } finally {
+      if (mounted) setState(() => _restoring = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final plansAsync = ref.watch(userPlansListProvider);
     final currentAsync = ref.watch(currentUserPlanProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Plans & Pricing')),
+      appBar: AppBar(
+        title: const Text('Plans & Pricing'),
+        actions: [
+          if (_isIos)
+            TextButton(
+              onPressed: _restoring ? null : _restorePurchases,
+              child: _restoring
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Restore'),
+            ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: _refresh,
         child: ListView(
@@ -128,14 +192,16 @@ class _PlansBillingScreenState extends ConsumerState<PlansBillingScreen> {
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
-              'Transparent pricing for your account: Free, Silver, and Gold.',
+              _isIos
+                  ? 'Subscribe with Apple In-App Purchase. Already subscribed on another device? Tap Restore.'
+                  : 'Transparent pricing for your account: Free, Silver, and Gold.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppColors.textMuted,
                   ),
             ),
             const SizedBox(height: AppSpacing.md),
             currentAsync.when(
-              data: (current) => _CurrentPlanCard(current: current),
+              data: (current) => _CurrentPlanCard(current: current, isIos: _isIos),
               loading: () => const SurfaceCard(
                 child: Padding(
                   padding: EdgeInsets.all(AppSpacing.md),
@@ -166,6 +232,12 @@ class _PlansBillingScreenState extends ConsumerState<PlansBillingScreen> {
                           validatingCoupon: _validatingSlug == plan.slug,
                           couponController: _couponControllerFor(plan.slug),
                           appliedCoupon: _appliedCoupons[plan.slug],
+                          storePriceLabel: _isIos &&
+                                  plan.appleProductId != null
+                              ? _appleProducts[plan.appleProductId!]?.price
+                              : null,
+                          hideCoupons: _isIos,
+                          hideApiPrice: _isIos,
                           onApplyCoupon: () => _applyCoupon(plan.slug),
                           onUpgrade: () => _upgrade(plan.slug),
                         ),
@@ -184,6 +256,34 @@ class _PlansBillingScreenState extends ConsumerState<PlansBillingScreen> {
                 ),
               ),
             ),
+            if (_isIos) ...[
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                'Silver and Gold are auto-renewable monthly subscriptions. '
+                'Payment is charged to your Apple ID at confirmation of purchase. '
+                'Your subscription renews automatically unless it is canceled at '
+                'least 24 hours before the end of the current period. Manage or '
+                'cancel anytime in your device Settings > Apple ID > Subscriptions.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textMuted,
+                    ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              const Wrap(
+                spacing: AppSpacing.md,
+                runSpacing: AppSpacing.xs,
+                children: [
+                  _LegalLink(
+                    label: 'Terms of Use (EULA)',
+                    url: AppConfig.termsOfUseUrl,
+                  ),
+                  _LegalLink(
+                    label: 'Privacy Policy',
+                    url: AppConfig.privacyPolicyUrl,
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -192,9 +292,10 @@ class _PlansBillingScreenState extends ConsumerState<PlansBillingScreen> {
 }
 
 class _CurrentPlanCard extends StatelessWidget {
-  const _CurrentPlanCard({required this.current});
+  const _CurrentPlanCard({required this.current, this.isIos = false});
 
   final CurrentPlan current;
+  final bool isIos;
 
   @override
   Widget build(BuildContext context) {
@@ -202,6 +303,12 @@ class _CurrentPlanCard extends StatelessWidget {
     final renews = current.planExpiresAt != null && current.plan != UserPlans.free
         ? DateFormat.yMMMd().format(current.planExpiresAt!.toLocal())
         : null;
+    // Never surface the INR (Razorpay) price on iOS — App Store pricing only.
+    final priceText = isIos
+        ? 'Current plan'
+        : (current.definition.priceLabel.isNotEmpty
+            ? current.definition.priceLabel
+            : 'Current plan');
 
     return SurfaceCard(
       child: Column(
@@ -216,9 +323,7 @@ class _CurrentPlanCard extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                current.definition.priceLabel.isNotEmpty
-                    ? current.definition.priceLabel
-                    : 'Current plan',
+                priceText,
                 style: Theme.of(context).textTheme.titleSmall,
               ),
             ],
@@ -291,6 +396,9 @@ class _PlanCard extends StatelessWidget {
     required this.appliedCoupon,
     required this.onApplyCoupon,
     required this.onUpgrade,
+    this.storePriceLabel,
+    this.hideCoupons = false,
+    this.hideApiPrice = false,
   });
 
   final PlanListItem plan;
@@ -301,12 +409,19 @@ class _PlanCard extends StatelessWidget {
   final CouponValidation? appliedCoupon;
   final VoidCallback onApplyCoupon;
   final VoidCallback onUpgrade;
+  final String? storePriceLabel;
+  final bool hideCoupons;
+
+  /// On iOS the API/INR (Razorpay) price must never be shown; only the App
+  /// Store price is valid. Prevents a price mismatch that fails App Review.
+  final bool hideApiPrice;
 
   @override
   Widget build(BuildContext context) {
     final isCurrent = plan.slug == currentSlug;
     final canUpgrade = UserPlans.canUpgradeTo(currentSlug, plan.slug);
-    final showCoupon = plan.allowCoupon && plan.slug != UserPlans.free && canUpgrade;
+    final showCoupon =
+        !hideCoupons && plan.allowCoupon && plan.slug != UserPlans.free && canUpgrade;
     final ctaEnabled = UserPlans.ctaEnabled(plan.slug, currentSlug);
     final ctaLabel = UserPlans.ctaLabel(plan.slug, currentSlug);
     final accent = switch (plan.slug) {
@@ -348,7 +463,12 @@ class _PlanCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            plan.priceLabel,
+            storePriceLabel ??
+                (hideApiPrice
+                    ? (plan.slug == UserPlans.free
+                        ? 'Free'
+                        : 'Shown at checkout')
+                    : plan.priceLabel),
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: accent,
@@ -430,6 +550,38 @@ class _PlanCard extends StatelessWidget {
             onPressed: ctaEnabled && !upgrading ? onUpgrade : null,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _LegalLink extends StatelessWidget {
+  const _LegalLink({required this.label, required this.url});
+
+  final String label;
+  final String url;
+
+  Future<void> _open() async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      showAppMessage('Could not open $label.', isError: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _open,
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: AppColors.violet,
+              decoration: TextDecoration.underline,
+              fontWeight: FontWeight.w600,
+            ),
       ),
     );
   }

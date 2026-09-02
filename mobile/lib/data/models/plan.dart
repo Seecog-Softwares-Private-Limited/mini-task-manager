@@ -85,6 +85,7 @@ class PlanListItem extends Equatable {
     required this.limits,
     required this.benefits,
     this.allowCoupon = false,
+    this.appleProductId,
   });
 
   final String slug;
@@ -95,6 +96,7 @@ class PlanListItem extends Equatable {
   final PlanLimits limits;
   final List<String> benefits;
   final bool allowCoupon;
+  final String? appleProductId;
 
   factory PlanListItem.fromJson(Map<String, dynamic> json) {
     return PlanListItem(
@@ -111,12 +113,22 @@ class PlanListItem extends Equatable {
               .toList() ??
           const [],
       allowCoupon: json['allowCoupon'] as bool? ?? false,
+      appleProductId: json['appleProductId'] as String?,
     );
   }
 
   @override
-  List<Object?> get props =>
-      [slug, name, price, currency, priceLabel, limits, benefits, allowCoupon];
+  List<Object?> get props => [
+        slug,
+        name,
+        price,
+        currency,
+        priceLabel,
+        limits,
+        benefits,
+        allowCoupon,
+        appleProductId,
+      ];
 }
 
 class PlanUsageBucket extends Equatable {

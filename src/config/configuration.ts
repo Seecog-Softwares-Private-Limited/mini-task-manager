@@ -95,6 +95,19 @@ export const configuration = () => {
     /** Optional raw JSON string (useful for secrets managers). */
     serviceAccountJson: process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '',
   },
+  appleIap: {
+    bundleId:
+      process.env.APPLE_IAP_BUNDLE_ID ||
+      'com.seecog.minitaskmanager.miniTaskManager',
+    issuerId: process.env.APPLE_IAP_ISSUER_ID || '',
+    keyId: process.env.APPLE_IAP_KEY_ID || '',
+    privateKey: process.env.APPLE_IAP_PRIVATE_KEY || '',
+    privateKeyPath: process.env.APPLE_IAP_PRIVATE_KEY_PATH || '',
+    environment: process.env.APPLE_IAP_ENVIRONMENT || 'Sandbox',
+    fallbackSandbox:
+      String(process.env.APPLE_IAP_FALLBACK_SANDBOX ?? 'true').toLowerCase() !==
+      'false',
+  },
   };
 };
 

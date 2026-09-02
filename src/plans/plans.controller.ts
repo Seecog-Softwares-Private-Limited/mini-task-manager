@@ -6,6 +6,7 @@ import { UpgradePlanDto } from './dto/upgrade-plan.dto';
 import { ValidateCouponDto } from './dto/validate-coupon.dto';
 import { CreateUserPlanOrderDto } from './dto/create-user-plan-order.dto';
 import { VerifyUserPlanPaymentDto } from './dto/verify-user-plan-payment.dto';
+import { VerifyApplePurchaseDto } from './dto/verify-apple-purchase.dto';
 
 type AuthUser = { userId: string; organizationId?: string };
 
@@ -52,5 +53,21 @@ export class PlansController {
   @Post('upgrade')
   upgrade(@Req() req: { user: AuthUser }, @Body() dto: UpgradePlanDto) {
     return this.plansService.createOrder(req.user.userId, dto.plan, dto.couponCode);
+  }
+
+  /** Verify Apple In-App Purchase (purchase or restore). */
+  @Post('apple/verify')
+  verifyApplePurchase(
+    @Req() req: { user: AuthUser },
+    @Body() dto: VerifyApplePurchaseDto,
+  ) {
+    return this.plansService.verifyApplePurchase(req.user.userId, dto);
+  }
+
+  /** App Store Server Notifications V2 webhook. */
+  @Public()
+  @Post('apple/notifications')
+  handleAppleNotification(@Body() body: { signedPayload?: string }) {
+    return this.plansService.handleAppleNotification(body);
   }
 }
