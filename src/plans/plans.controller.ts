@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Headers, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../modules/auth/guards/jwt-auth.guard';
 import { Public } from '../common/decorators/public.decorator';
 import { PlansService } from './plans.service';
@@ -67,6 +68,8 @@ export class PlansController {
   /** App Store Server Notifications V2 webhook. */
   @Public()
   @Post('apple/notifications')
+  @HttpCode(200)
+  @SkipThrottle()
   handleAppleNotification(@Body() body: { signedPayload?: string }) {
     return this.plansService.handleAppleNotification(body);
   }

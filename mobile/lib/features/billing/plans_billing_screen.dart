@@ -29,6 +29,8 @@ class _PlansBillingScreenState extends ConsumerState<PlansBillingScreen> {
   String? _upgradingSlug;
   String? _validatingSlug;
   bool _restoring = false;
+  bool _appleProductsLoading = false;
+  String? _appleProductsError;
   Map<String, ProductDetails> _appleProducts = {};
   final Map<String, TextEditingController> _couponControllers = {};
   final Map<String, CouponValidation?> _appliedCoupons = {};
@@ -44,13 +46,35 @@ class _PlansBillingScreenState extends ConsumerState<PlansBillingScreen> {
   }
 
   Future<void> _loadAppleProducts() async {
+    if (!_isIos) return;
+    setState(() {
+      _appleProductsLoading = true;
+      _appleProductsError = null;
+    });
     try {
       final products =
           await AppleIapCheckoutService(repository: ref.read(plansRepositoryProvider))
               .loadProducts();
-      if (mounted) setState(() => _appleProducts = products);
-    } catch (_) {
-      // Store prices fall back to API price labels.
+      if (!mounted) return;
+      final missing = AppleIapProducts.all
+          .where((id) => !products.containsKey(id))
+          .toList();
+      setState(() {
+        _appleProducts = products;
+        _appleProductsLoading = false;
+        if (missing.isNotEmpty) {
+          _appleProductsError =
+              'Some subscriptions are not available from the App Store yet. '
+              'Pull to refresh or try again shortly.';
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _appleProductsLoading = false;
+        _appleProductsError =
+            'Could not load App Store prices. Check your connection and try again.';
+      });
     }
   }
 
@@ -73,6 +97,7 @@ class _PlansBillingScreenState extends ConsumerState<PlansBillingScreen> {
       ref.read(userPlansListProvider.future),
       ref.read(currentUserPlanProvider.future),
     ]);
+    if (_isIos) await _loadAppleProducts();
   }
 
   Future<void> _applyCoupon(String plan) async {
@@ -200,6 +225,36 @@ class _PlansBillingScreenState extends ConsumerState<PlansBillingScreen> {
                   ),
             ),
             const SizedBox(height: AppSpacing.md),
+            if (_isIos && _appleProductsError != null) ...[
+              SurfaceCard(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline_rounded, color: AppColors.warning, size: 20),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        _appleProductsError!,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.textMuted,
+                            ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _appleProductsLoading ? null : _loadAppleProducts,
+                      child: _appleProductsLoading
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+            ],
             currentAsync.when(
               data: (current) => _CurrentPlanCard(current: current, isIos: _isIos),
               loading: () => const SurfaceCard(
@@ -423,7 +478,10 @@ class _PlanCard extends StatelessWidget {
     final showCoupon =
         !hideCoupons && plan.allowCoupon && plan.slug != UserPlans.free && canUpgrade;
     final ctaEnabled = UserPlans.ctaEnabled(plan.slug, currentSlug);
-    final ctaLabel = UserPlans.ctaLabel(plan.slug, currentSlug);
+    var ctaLabel = UserPlans.ctaLabel(plan.slug, currentSlug);
+    if (hideApiPrice && ctaLabel == 'Contact support to downgrade') {
+      ctaLabel = 'Manage in Settings';
+    }
     final accent = switch (plan.slug) {
       UserPlans.gold => const Color(0xFFF59E0B),
       UserPlans.silver => const Color(0xFF64748B),
@@ -474,6 +532,15 @@ class _PlanCard extends StatelessWidget {
                   color: accent,
                 ),
           ),
+          if (hideApiPrice && plan.slug != UserPlans.free) ...[
+            const SizedBox(height: 2),
+            Text(
+              'Auto-renewable subscription · 1 month',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.textMuted,
+                  ),
+            ),
+          ],
           const SizedBox(height: AppSpacing.sm),
           Text(
             'Workspaces: ${UserPlans.limitLabel(plan.limits.maxWorkspaces)} · '
