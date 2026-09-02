@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -86,19 +85,15 @@ class AccountSettingsScreen extends ConsumerWidget {
               MaterialPageRoute<void>(builder: (_) => const SecurityScreen()),
             ),
           ),
-          // Apple App Store policy: digital subscriptions must use Apple IAP.
-          // The Plans & Pricing screen uses a third-party payment provider and
-          // is therefore only shown on Android / web builds.
-          if (defaultTargetPlatform != TargetPlatform.iOS)
-            _SettingsTile(
-              icon: Icons.workspace_premium_rounded,
-              iconColor: AppColors.warning,
-              title: 'Plans & Pricing',
-              subtitle: 'View plans and upgrade your account',
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(builder: (_) => const PlansBillingScreen()),
-              ),
+          _SettingsTile(
+            icon: Icons.workspace_premium_rounded,
+            iconColor: AppColors.warning,
+            title: 'Plans & Pricing',
+            subtitle: 'View plans and upgrade your account',
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const PlansBillingScreen()),
             ),
+          ),
           _SettingsTile(
             icon: Icons.business_outlined,
             iconColor: AppColors.primary,

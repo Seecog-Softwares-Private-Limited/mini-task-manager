@@ -20,6 +20,8 @@ import { CouponCodeEntity } from './entities/coupon-code.entity';
 import { CouponRedemptionEntity } from './entities/coupon-redemption.entity';
 import { CouponCodesRepository } from './repositories/coupon-codes.repository';
 import { CouponCodesService } from './coupon-codes.service';
+import { AppleIapService } from './apple-iap.service';
+import { AppleSubscriptionEntity } from './entities/apple-subscription.entity';
 
 @Module({
   imports: [
@@ -32,6 +34,7 @@ import { CouponCodesService } from './coupon-codes.service';
       PlanConfigurationEntity,
       CouponCodeEntity,
       CouponRedemptionEntity,
+      AppleSubscriptionEntity,
     ]),
   ],
   controllers: [PlansController, PlanConfigurationsController],
@@ -46,11 +49,13 @@ import { CouponCodesService } from './coupon-codes.service';
     PlansService,
     PaymentService,
     PlanExpiryCronService,
+    AppleIapService,
   ],
   exports: [
     PlanLimitService,
     PlansService,
     PaymentService,
+    AppleIapService,
     PlanConfigurationsService,
     CouponCodesService,
   ],

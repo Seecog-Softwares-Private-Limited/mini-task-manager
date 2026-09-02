@@ -55,6 +55,10 @@ export class UserEntity extends BaseEntity {
   @Column({ name: 'plan_expires_at', type: 'timestamp', nullable: true })
   planExpiresAt!: Date | null;
 
+  /** 'razorpay' | 'apple' | null (legacy / free). */
+  @Column({ name: 'plan_billing_source', type: 'varchar', length: 20, nullable: true })
+  planBillingSource!: string | null;
+
   @Column({ name: 'storage_used', type: 'bigint', default: 0 })
   storageUsed!: string;
 }
