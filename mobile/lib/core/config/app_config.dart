@@ -38,6 +38,14 @@ class AppConfig {
   /// Public Hostinger VPS IP (was AWS Lightsail 3.110.214.243).
   static const productionHost = '200.97.172.61';
 
+  /// Public HTTPS URLs required by App Review for auto-renewable subscriptions
+  /// (Guideline 3.1.2). Update [privacyPolicyUrl] to the live marketing domain.
+  static const privacyPolicyUrl = 'https://opspick.app/privacypolicy';
+
+  /// Apple's standard EULA. Replace with a custom Terms of Use URL if you host one.
+  static const termsOfUseUrl =
+      'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
+
   /// Next.js on port 3000 (works on Wi‑Fi / desktop; many mobile carriers block this port).
   static const productionApiBaseUrl = 'http://$productionHost:3000/api/v1';
 

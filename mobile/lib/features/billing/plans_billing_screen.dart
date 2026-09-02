@@ -4,8 +4,10 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/config/app_config.dart';
 import '../../core/messaging/app_messenger.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -199,7 +201,7 @@ class _PlansBillingScreenState extends ConsumerState<PlansBillingScreen> {
             ),
             const SizedBox(height: AppSpacing.md),
             currentAsync.when(
-              data: (current) => _CurrentPlanCard(current: current),
+              data: (current) => _CurrentPlanCard(current: current, isIos: _isIos),
               loading: () => const SurfaceCard(
                 child: Padding(
                   padding: EdgeInsets.all(AppSpacing.md),
@@ -235,6 +237,7 @@ class _PlansBillingScreenState extends ConsumerState<PlansBillingScreen> {
                               ? _appleProducts[plan.appleProductId!]?.price
                               : null,
                           hideCoupons: _isIos,
+                          hideApiPrice: _isIos,
                           onApplyCoupon: () => _applyCoupon(plan.slug),
                           onUpgrade: () => _upgrade(plan.slug),
                         ),
@@ -265,6 +268,21 @@ class _PlansBillingScreenState extends ConsumerState<PlansBillingScreen> {
                       color: AppColors.textMuted,
                     ),
               ),
+              const SizedBox(height: AppSpacing.sm),
+              const Wrap(
+                spacing: AppSpacing.md,
+                runSpacing: AppSpacing.xs,
+                children: [
+                  _LegalLink(
+                    label: 'Terms of Use (EULA)',
+                    url: AppConfig.termsOfUseUrl,
+                  ),
+                  _LegalLink(
+                    label: 'Privacy Policy',
+                    url: AppConfig.privacyPolicyUrl,
+                  ),
+                ],
+              ),
             ],
           ],
         ),
@@ -274,9 +292,10 @@ class _PlansBillingScreenState extends ConsumerState<PlansBillingScreen> {
 }
 
 class _CurrentPlanCard extends StatelessWidget {
-  const _CurrentPlanCard({required this.current});
+  const _CurrentPlanCard({required this.current, this.isIos = false});
 
   final CurrentPlan current;
+  final bool isIos;
 
   @override
   Widget build(BuildContext context) {
@@ -284,6 +303,12 @@ class _CurrentPlanCard extends StatelessWidget {
     final renews = current.planExpiresAt != null && current.plan != UserPlans.free
         ? DateFormat.yMMMd().format(current.planExpiresAt!.toLocal())
         : null;
+    // Never surface the INR (Razorpay) price on iOS — App Store pricing only.
+    final priceText = isIos
+        ? 'Current plan'
+        : (current.definition.priceLabel.isNotEmpty
+            ? current.definition.priceLabel
+            : 'Current plan');
 
     return SurfaceCard(
       child: Column(
@@ -298,9 +323,7 @@ class _CurrentPlanCard extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                current.definition.priceLabel.isNotEmpty
-                    ? current.definition.priceLabel
-                    : 'Current plan',
+                priceText,
                 style: Theme.of(context).textTheme.titleSmall,
               ),
             ],
@@ -375,6 +398,7 @@ class _PlanCard extends StatelessWidget {
     required this.onUpgrade,
     this.storePriceLabel,
     this.hideCoupons = false,
+    this.hideApiPrice = false,
   });
 
   final PlanListItem plan;
@@ -387,6 +411,10 @@ class _PlanCard extends StatelessWidget {
   final VoidCallback onUpgrade;
   final String? storePriceLabel;
   final bool hideCoupons;
+
+  /// On iOS the API/INR (Razorpay) price must never be shown; only the App
+  /// Store price is valid. Prevents a price mismatch that fails App Review.
+  final bool hideApiPrice;
 
   @override
   Widget build(BuildContext context) {
@@ -435,7 +463,12 @@ class _PlanCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            storePriceLabel ?? plan.priceLabel,
+            storePriceLabel ??
+                (hideApiPrice
+                    ? (plan.slug == UserPlans.free
+                        ? 'Free'
+                        : 'Shown at checkout')
+                    : plan.priceLabel),
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: accent,
@@ -517,6 +550,38 @@ class _PlanCard extends StatelessWidget {
             onPressed: ctaEnabled && !upgrading ? onUpgrade : null,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _LegalLink extends StatelessWidget {
+  const _LegalLink({required this.label, required this.url});
+
+  final String label;
+  final String url;
+
+  Future<void> _open() async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return;
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      showAppMessage('Could not open $label.', isError: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _open,
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: AppColors.violet,
+              decoration: TextDecoration.underline,
+              fontWeight: FontWeight.w600,
+            ),
       ),
     );
   }
