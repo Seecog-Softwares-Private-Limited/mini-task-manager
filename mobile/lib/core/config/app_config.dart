@@ -39,8 +39,8 @@ class AppConfig {
   static const productionHost = '200.97.172.61';
 
   /// Public HTTPS URLs required by App Review for auto-renewable subscriptions
-  /// (Guideline 3.1.2). Update [privacyPolicyUrl] to the live marketing domain.
-  static const privacyPolicyUrl = 'https://opspick.app/privacypolicy';
+  /// (Guideline 3.1.2).
+  static const privacyPolicyUrl = 'https://opspick.com/privacypolicy';
 
   /// Apple's standard EULA. Replace with a custom Terms of Use URL if you host one.
   static const termsOfUseUrl =
