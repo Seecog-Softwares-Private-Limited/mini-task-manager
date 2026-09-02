@@ -24,6 +24,9 @@ OpsPick sells Free / Silver / Gold digital plans. On **iOS**, those plans must b
    `https://<your-api-host>/api/v1/plans/apple/notifications`
 
 8. Submit the IAP products **with** the next iOS binary (build > 18).
+9. In **App Information**, set Privacy Policy URL to `https://opspick.com/privacypolicy` (must load over HTTPS).
+10. In the version **App Description**, include the Terms of Use link when using Apple's standard EULA:
+    `https://www.apple.com/legal/internet-services/itunes/dev/stdeula/`
 
 ## Server environment
 
@@ -90,3 +93,6 @@ Automated checks: `npx jest src/plans/apple-iap.integration-spec.ts`
 - [ ] Restore Purchases works
 - [ ] Razorpay checkout never shown on iOS
 - [ ] Review notes include 3.1.3(b) explanation
+- [ ] Privacy Policy URL live at https://opspick.com/privacypolicy
+- [ ] App Description includes Apple standard EULA link (if using standard EULA)
+- [ ] New build uploaded and submitted (> build 18)
