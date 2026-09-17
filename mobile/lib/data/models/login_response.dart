@@ -5,12 +5,14 @@ class AuthUser extends Equatable {
     required this.id,
     required this.email,
     required this.fullName,
+    this.phone,
     this.avatarUrl,
   });
 
   final String id;
   final String email;
   final String fullName;
+  final String? phone;
   final String? avatarUrl;
 
   factory AuthUser.fromJson(Map<String, dynamic> json) {
@@ -18,12 +20,29 @@ class AuthUser extends Equatable {
       id: json['id'] as String,
       email: json['email'] as String,
       fullName: json['fullName'] as String? ?? json['email'] as String,
+      phone: json['phone'] as String?,
       avatarUrl: json['avatarUrl'] as String?,
     );
   }
 
+  AuthUser copyWith({
+    String? id,
+    String? email,
+    String? fullName,
+    String? phone,
+    String? avatarUrl,
+  }) {
+    return AuthUser(
+      id: id ?? this.id,
+      email: email ?? this.email,
+      fullName: fullName ?? this.fullName,
+      phone: phone ?? this.phone,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+    );
+  }
+
   @override
-  List<Object?> get props => [id, email, fullName, avatarUrl];
+  List<Object?> get props => [id, email, fullName, phone, avatarUrl];
 }
 
 class LoginResponse extends Equatable {

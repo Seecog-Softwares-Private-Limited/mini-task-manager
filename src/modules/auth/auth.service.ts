@@ -508,12 +508,7 @@ export class AuthService {
     return this.jwtService.sign(payload);
   }
 
-  async sendOtp(phone: string): Promise<{ message: string }> {
-    const normalized = this.smsService.normalizePhone(phone.replace(/\s/g, ''));
-    if (!normalized) {
-      throw new BadRequestException('Invalid phone number. Use format: +1234567890 or 1234567890');
-    }
-
+  private async issueAndStoreOtp(normalized: string): Promise<void> {
     const code = crypto.randomInt(100000, 999999).toString();
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + 10);
@@ -530,16 +525,9 @@ export class AuthService {
     if (!sent) {
       throw new BadRequestException('SMS service is not configured. Please contact support.');
     }
-
-    return { message: 'Verification code sent to your phone.' };
   }
 
-  async verifyOtp(phone: string, code: string): Promise<LoginResponseDto> {
-    const normalized = this.smsService.normalizePhone(phone.replace(/\s/g, ''));
-    if (!normalized) {
-      throw new BadRequestException('Invalid phone number.');
-    }
-
+  private async consumeOtp(normalized: string, code: string): Promise<void> {
     const record = await this.otpCodeRepo.findOne({
       where: { phone: normalized, code },
     });
@@ -550,8 +538,42 @@ export class AuthService {
       await this.otpCodeRepo.delete(record.id);
       throw new UnauthorizedException('Verification code has expired. Please request a new one.');
     }
-
     await this.otpCodeRepo.delete(record.id);
+  }
+
+  private toLoginResponse(user: UserEntity): LoginResponseDto {
+    const payload = { sub: user.id, email: user.email };
+    const accessToken = this.jwtService.sign(payload);
+    return {
+      accessToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        phone: user.phone ?? null,
+        avatarUrl: user.avatarUrl ?? undefined,
+        isPlatformAdmin: user.isPlatformAdmin,
+      },
+    };
+  }
+
+  async sendOtp(phone: string): Promise<{ message: string }> {
+    const normalized = this.smsService.normalizePhone(phone.replace(/\s/g, ''));
+    if (!normalized) {
+      throw new BadRequestException('Invalid phone number. Use format: +919876543210');
+    }
+
+    await this.issueAndStoreOtp(normalized);
+    return { message: 'Verification code sent to your phone.' };
+  }
+
+  async verifyOtp(phone: string, code: string): Promise<LoginResponseDto> {
+    const normalized = this.smsService.normalizePhone(phone.replace(/\s/g, ''));
+    if (!normalized) {
+      throw new BadRequestException('Invalid phone number.');
+    }
+
+    await this.consumeOtp(normalized, code);
 
     let user = await this.usersService.findByPhone(normalized);
     if (!user) {
@@ -578,16 +600,56 @@ export class AuthService {
       if (!user) throw new BadRequestException('Failed to create user.');
     }
 
-    const payload = { sub: user.id, email: user.email };
-    const accessToken = this.jwtService.sign(payload);
+    return this.toLoginResponse(user);
+  }
+
+  /** Signed-in user: send OTP to attach/change phone on their account. */
+  async sendPhoneLinkOtp(userId: string, phone: string): Promise<{ message: string }> {
+    const normalized = this.smsService.normalizePhone(phone.replace(/\s/g, ''));
+    if (!normalized) {
+      throw new BadRequestException('Invalid phone number. Use format: +919876543210');
+    }
+
+    const existing = await this.usersService.findByPhone(normalized);
+    if (existing && existing.id !== userId) {
+      throw new ConflictException('This phone number is already linked to another account.');
+    }
+
+    const me = await this.usersService.findById(userId);
+    if (!me) throw new BadRequestException('User not found.');
+    if (me.phone === normalized) {
+      throw new BadRequestException('This phone number is already on your account.');
+    }
+
+    await this.issueAndStoreOtp(normalized);
+    return { message: 'Verification code sent to your phone.' };
+  }
+
+  /** Signed-in user: verify OTP and set users.phone. */
+  async verifyPhoneLink(
+    userId: string,
+    phone: string,
+    code: string,
+  ): Promise<LoginResponseDto & { message: string }> {
+    const normalized = this.smsService.normalizePhone(phone.replace(/\s/g, ''));
+    if (!normalized) {
+      throw new BadRequestException('Invalid phone number.');
+    }
+
+    const existing = await this.usersService.findByPhone(normalized);
+    if (existing && existing.id !== userId) {
+      throw new ConflictException('This phone number is already linked to another account.');
+    }
+
+    await this.consumeOtp(normalized, code);
+    await this.usersService.updatePhone(userId, normalized);
+
+    const user = await this.usersService.findById(userId);
+    if (!user) throw new BadRequestException('User not found.');
+
     return {
-      accessToken,
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        avatarUrl: user.avatarUrl ?? undefined,
-      },
+      ...this.toLoginResponse(user),
+      message: 'Phone number verified and saved to your account.',
     };
   }
 

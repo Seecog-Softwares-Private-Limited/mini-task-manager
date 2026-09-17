@@ -1,5 +1,7 @@
 # Frontend Authentication Strategy
 
+Phone OTP signup/login and profile phone verify (BlackSMS): see [SMS_OTP_LOGIN.md](./SMS_OTP_LOGIN.md).
+
 ## Current implementation (localStorage + cookie)
 
 - **Token:** Stored in `localStorage` under `mini_tm_token`. Sent on every API request via `Authorization: Bearer <token>`.

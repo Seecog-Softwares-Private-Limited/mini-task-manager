@@ -251,6 +251,18 @@ class SessionController extends Notifier<SessionState> {
     await _applyLoginResponse(response, generation: generation);
   }
 
+  Future<void> loginWithOtp({
+    required String phone,
+    required String code,
+  }) async {
+    final generation = ++_operationGeneration;
+
+    final response = await _authRepository.verifyOtp(phone: phone, code: code);
+    if (_isStale(generation)) return;
+
+    await _applyLoginResponse(response, generation: generation);
+  }
+
   /// Completes session after signup / email verification when the API returns a token.
   Future<void> completeAuthenticatedSession(LoginResponse response) async {
     final generation = ++_operationGeneration;

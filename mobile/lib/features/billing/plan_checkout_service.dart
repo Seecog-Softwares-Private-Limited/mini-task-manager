@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 import '../../data/models/plan.dart';
 import '../../data/repositories/plans_repository.dart';
+import 'apple_iap_checkout_service.dart';
 
 class PlanCheckoutException implements Exception {
   PlanCheckoutException(this.message);
@@ -14,7 +16,7 @@ class PlanCheckoutException implements Exception {
   String toString() => message;
 }
 
-/// Opens Razorpay Checkout for a user plan upgrade and verifies on the API.
+/// Opens checkout for a user plan upgrade (Apple IAP on iOS, Razorpay elsewhere).
 class PlanCheckoutService {
   PlanCheckoutService({required PlansRepository repository})
       : _repository = repository;
@@ -27,6 +29,16 @@ class PlanCheckoutService {
     String? userName,
     String? userEmail,
   }) async {
+    if (Platform.isIOS) {
+      try {
+        return await AppleIapCheckoutService(repository: _repository).upgrade(
+          plan: plan,
+        );
+      } on AppleIapCheckoutException catch (e) {
+        throw PlanCheckoutException(e.message);
+      }
+    }
+
     final order = await _repository.createOrder(
       plan: plan,
       couponCode: couponCode,
@@ -65,6 +77,17 @@ class PlanCheckoutService {
       couponCode: couponCode,
     );
     return verified.plan;
+  }
+
+  Future<String> restorePurchases() async {
+    if (!Platform.isIOS) {
+      throw PlanCheckoutException('Restore is only available on iOS.');
+    }
+    try {
+      return await AppleIapCheckoutService(repository: _repository).restore();
+    } on AppleIapCheckoutException catch (e) {
+      throw PlanCheckoutException(e.message);
+    }
   }
 
   Future<({String orderId, String paymentId, String signature})> _openRazorpay({

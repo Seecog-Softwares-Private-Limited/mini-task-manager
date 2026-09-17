@@ -1,0 +1,90 @@
+{
+  "identifier" : "AE8ADBF0",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_storeKitErrors" : [
+
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "opspick_plans",
+      "localizations" : [
+        {
+          "description" : "OpsPick subscription plans",
+          "displayName" : "OpsPick Plans",
+          "locale" : "en_US"
+        }
+      ],
+      "name" : "opspick_plans",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "5.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "SILVER001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Silver plan — more members and storage",
+              "displayName" : "OpsPick Silver",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "opspick.silver.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "OpsPick Silver Monthly",
+          "subscriptionGroupID" : "opspick_plans",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "9.99",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "GOLD00001",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Gold plan — more workspaces, unlimited members",
+              "displayName" : "OpsPick Gold",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "opspick.gold.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "OpsPick Gold Monthly",
+          "subscriptionGroupID" : "opspick_plans",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

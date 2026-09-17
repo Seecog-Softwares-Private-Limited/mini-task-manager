@@ -104,6 +104,31 @@ class PlansRepository {
       throw ApiException.fromDio(error);
     }
   }
+
+  Future<({String plan, String? planExpiresAt})> verifyApplePurchase({
+    required String transactionId,
+    String? signedTransaction,
+    String? productId,
+  }) async {
+    try {
+      final response = await _api.dio.post<Map<String, dynamic>>(
+        '/plans/apple/verify',
+        data: {
+          'transactionId': transactionId,
+          if (signedTransaction != null && signedTransaction.isNotEmpty)
+            'signedTransaction': signedTransaction,
+          if (productId != null && productId.isNotEmpty) 'productId': productId,
+        },
+      );
+      final data = response.data ?? const {};
+      return (
+        plan: data['plan'] as String? ?? UserPlans.free,
+        planExpiresAt: data['planExpiresAt'] as String?,
+      );
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
 }
 
 final plansRepositoryProvider = Provider<PlansRepository>((ref) {

@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Headers, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, Post, Req, UseGuards } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../modules/auth/guards/jwt-auth.guard';
 import { Public } from '../common/decorators/public.decorator';
 import { PlansService } from './plans.service';
@@ -6,6 +7,7 @@ import { UpgradePlanDto } from './dto/upgrade-plan.dto';
 import { ValidateCouponDto } from './dto/validate-coupon.dto';
 import { CreateUserPlanOrderDto } from './dto/create-user-plan-order.dto';
 import { VerifyUserPlanPaymentDto } from './dto/verify-user-plan-payment.dto';
+import { VerifyApplePurchaseDto } from './dto/verify-apple-purchase.dto';
 
 type AuthUser = { userId: string; organizationId?: string };
 
@@ -52,5 +54,23 @@ export class PlansController {
   @Post('upgrade')
   upgrade(@Req() req: { user: AuthUser }, @Body() dto: UpgradePlanDto) {
     return this.plansService.createOrder(req.user.userId, dto.plan, dto.couponCode);
+  }
+
+  /** Verify Apple In-App Purchase (purchase or restore). */
+  @Post('apple/verify')
+  verifyApplePurchase(
+    @Req() req: { user: AuthUser },
+    @Body() dto: VerifyApplePurchaseDto,
+  ) {
+    return this.plansService.verifyApplePurchase(req.user.userId, dto);
+  }
+
+  /** App Store Server Notifications V2 webhook. */
+  @Public()
+  @Post('apple/notifications')
+  @HttpCode(200)
+  @SkipThrottle()
+  handleAppleNotification(@Body() body: { signedPayload?: string }) {
+    return this.plansService.handleAppleNotification(body);
   }
 }
