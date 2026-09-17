@@ -23,6 +23,7 @@ function toUserDto(user: {
   id: string;
   fullName: string;
   email: string;
+  phone?: string | null;
   avatarUrl: string | null;
   isEmailVerified: boolean;
   isActive: boolean;
@@ -32,6 +33,7 @@ function toUserDto(user: {
     id: user.id,
     fullName: user.fullName,
     email: user.email,
+    phone: user.phone ?? null,
     avatarUrl: user.avatarUrl ?? undefined,
     isEmailVerified: user.isEmailVerified,
     isActive: user.isActive,

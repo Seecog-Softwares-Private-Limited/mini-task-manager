@@ -60,6 +60,7 @@ export function useAuth() {
                 ...prev,
                 fullName: p.fullName,
                 email: p.email,
+                phone: p.phone,
                 avatarUrl: p.avatarUrl,
                 isPlatformAdmin: p.isPlatformAdmin,
               }
@@ -67,6 +68,7 @@ export function useAuth() {
                 id: p.id,
                 email: p.email,
                 fullName: p.fullName,
+                phone: p.phone,
                 avatarUrl: p.avatarUrl,
                 isPlatformAdmin: p.isPlatformAdmin,
               }

@@ -13,6 +13,7 @@ import '../../shared/widgets/workspace_avatar.dart';
 import '../auth/session_controller.dart';
 import 'avatar_crop_sheet.dart';
 import 'change_email_screen.dart';
+import 'change_phone_screen.dart';
 
 class MyProfileScreen extends ConsumerStatefulWidget {
   const MyProfileScreen({super.key});
@@ -176,6 +177,7 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
         id: updated.id,
         email: updated.email,
         fullName: updated.fullName,
+        phone: updated.phone,
         avatarUrl: updated.avatarUrl == null || updated.avatarUrl!.isEmpty
             ? null
             : '${updated.avatarUrl!.split('?').first}?t=${DateTime.now().millisecondsSinceEpoch}',
@@ -206,6 +208,7 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                 id: user.id,
                 email: user.email,
                 fullName: user.fullName,
+                phone: user.phone,
               ),
             );
       }
@@ -434,6 +437,32 @@ class _MyProfileScreenState extends ConsumerState<MyProfileScreen> {
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: busy
+                              ? null
+                              : () async {
+                                  final changed = await Navigator.of(context)
+                                      .push<bool>(
+                                    MaterialPageRoute<bool>(
+                                      builder: (_) =>
+                                          const ChangePhoneScreen(),
+                                    ),
+                                  );
+                                  if (changed == true && mounted) {
+                                    await _refreshProfile();
+                                  }
+                                },
+                          icon: const Icon(Icons.smartphone_outlined),
+                          label: Text(
+                            (user?.phone == null || user!.phone!.isEmpty)
+                                ? 'Add phone number'
+                                : 'Change phone (${user.phone})',
+                          ),
+                        ),
                       ),
                     ],
                   ),

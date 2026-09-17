@@ -107,6 +107,23 @@ export async function verifyOtp(phone: string, code: string): Promise<LoginRespo
   return data;
 }
 
+export async function sendPhoneLinkOtp(phone: string): Promise<{ message: string }> {
+  const { data } = await apiClient.post<{ message: string }>("auth/phone/send-otp", { phone });
+  return data;
+}
+
+export async function verifyPhoneLink(
+  phone: string,
+  code: string
+): Promise<LoginResponse & { message: string }> {
+  const { data } = await apiClient.post<LoginResponse & { message: string }>("auth/phone/verify", {
+    phone,
+    code,
+  });
+  if (data.accessToken) setStoredToken(data.accessToken);
+  return data;
+}
+
 export async function signupWithInvite(
   payload: SignupWithInvitePayload
 ): Promise<LoginResponse> {

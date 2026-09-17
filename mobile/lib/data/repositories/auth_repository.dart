@@ -225,4 +225,76 @@ class AuthRepository {
       throw ApiException.fromDio(error);
     }
   }
+
+  Future<String> sendOtp(String phone) async {
+    try {
+      final response = await _api.dio.post<Map<String, dynamic>>(
+        '/auth/send-otp',
+        data: {'phone': phone.trim()},
+      );
+      return response.data?['message'] as String? ??
+          'Verification code sent to your phone.';
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<LoginResponse> verifyOtp({
+    required String phone,
+    required String code,
+  }) async {
+    try {
+      final response = await _api.dio.post<Map<String, dynamic>>(
+        '/auth/verify-otp',
+        data: {'phone': phone.trim(), 'code': code.trim()},
+      );
+      final login = LoginResponse.fromJson(response.data!);
+      await _storage.writeToken(login.accessToken);
+      await _storage.writeUser(login.user);
+      if (login.organizationId != null) {
+        await _storage.writeOrgId(login.organizationId);
+      }
+      return login;
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<String> sendPhoneLinkOtp(String phone) async {
+    try {
+      final response = await _api.dio.post<Map<String, dynamic>>(
+        '/auth/phone/send-otp',
+        data: {'phone': phone.trim()},
+      );
+      return response.data?['message'] as String? ??
+          'Verification code sent to your phone.';
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<({String message, LoginResponse login})> verifyPhoneLink({
+    required String phone,
+    required String code,
+  }) async {
+    try {
+      final response = await _api.dio.post<Map<String, dynamic>>(
+        '/auth/phone/verify',
+        data: {'phone': phone.trim(), 'code': code.trim()},
+      );
+      final data = response.data!;
+      final login = LoginResponse.fromJson(data);
+      await _storage.writeToken(login.accessToken);
+      await _storage.writeUser(login.user);
+      if (login.organizationId != null) {
+        await _storage.writeOrgId(login.organizationId);
+      }
+      return (
+        message: data['message'] as String? ?? 'Phone number verified',
+        login: login,
+      );
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
 }

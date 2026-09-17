@@ -13,6 +13,7 @@ import {
   KeyRound,
   Mail,
   ShieldCheck,
+  Smartphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,11 +30,14 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { DashboardProfileAvatar } from "@/components/dashboard/dashboard-profile-avatar";
 import { WorkspaceThumb } from "@/components/workspaces/workspace-thumb";
+import { PhoneInput } from "@/components/auth/phone-input";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenant } from "@/context/tenant-context";
 import { fetchOrganizations } from "@/services/api/organizations.api";
 import { updateCurrentUserProfile, deleteMyAccount } from "@/services/api/users.api";
+import { sendPhoneLinkOtp, verifyPhoneLink } from "@/services/api/auth.api";
 import { clearAuth, parseApiError } from "@/services/api/client";
+import { DEFAULT_COUNTRY_ISO, formatFullPhone } from "@/lib/country-codes";
 
 function formatRole(role?: string): string {
   if (!role) return "Member";
@@ -41,7 +45,7 @@ function formatRole(role?: string): string {
 }
 
 export default function ProfilePage() {
-  const { user, mergeUser } = useAuth();
+  const { user, mergeUser, refreshProfile } = useAuth();
   const { orgId } = useTenant();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -51,6 +55,13 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  const [phoneCountryIso, setPhoneCountryIso] = useState(DEFAULT_COUNTRY_ISO);
+  const [phoneLocal, setPhoneLocal] = useState("");
+  const phoneFull = formatFullPhone(phoneCountryIso, phoneLocal);
+  const [phoneCode, setPhoneCode] = useState("");
+  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
+  const [phoneBusy, setPhoneBusy] = useState(false);
 
   useEffect(() => {
     if (user?.fullName && user.fullName !== user.email) {
@@ -96,7 +107,7 @@ export default function ProfilePage() {
     setSaving(true);
     try {
       const updated = await updateCurrentUserProfile({ fullName: trimmed });
-      mergeUser({ fullName: updated.fullName, avatarUrl: updated.avatarUrl });
+      mergeUser({ fullName: updated.fullName, avatarUrl: updated.avatarUrl, phone: updated.phone });
       await queryClient.invalidateQueries({ queryKey: ["organizations"] });
       toast({ title: "Profile updated", variant: "success" });
     } catch (err) {
@@ -107,6 +118,51 @@ export default function ProfilePage() {
       });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSendPhoneOtp() {
+    if (phoneLocal.replace(/\D/g, "").length < 7) return;
+    setPhoneBusy(true);
+    try {
+      await sendPhoneLinkOtp(phoneFull);
+      setPhoneOtpSent(true);
+      toast({ title: "Code sent", description: `Check SMS at ${phoneFull}`, variant: "success" });
+    } catch (err) {
+      toast({
+        title: "Could not send code",
+        description: parseApiError(err),
+        variant: "error",
+      });
+    } finally {
+      setPhoneBusy(false);
+    }
+  }
+
+  async function handleVerifyPhone() {
+    if (phoneCode.length !== 6) return;
+    setPhoneBusy(true);
+    try {
+      const result = await verifyPhoneLink(phoneFull, phoneCode);
+      mergeUser({
+        phone: result.user.phone,
+        fullName: result.user.fullName,
+        email: result.user.email,
+        avatarUrl: result.user.avatarUrl,
+      });
+      await refreshProfile();
+      setPhoneOtpSent(false);
+      setPhoneCode("");
+      setPhoneLocal("");
+      toast({ title: "Phone verified", description: result.message, variant: "success" });
+    } catch (err) {
+      toast({
+        title: "Could not verify phone",
+        description: parseApiError(err),
+        variant: "error",
+      });
+    } finally {
+      setPhoneBusy(false);
     }
   }
 
@@ -141,6 +197,12 @@ export default function ProfilePage() {
               <Mail className="h-3.5 w-3.5" />
               <span className="truncate">{user.email}</span>
             </div>
+            {user.phone ? (
+              <div className="mt-1 flex items-center justify-center gap-1.5 text-sm text-muted-foreground sm:justify-start">
+                <Smartphone className="h-3.5 w-3.5" />
+                <span className="truncate">{user.phone}</span>
+              </div>
+            ) : null}
             <p className="mt-2 text-xs text-muted-foreground">
               Click the avatar to upload, crop, or remove your photo.
             </p>
@@ -178,6 +240,75 @@ export default function ProfilePage() {
               {saving ? "Saving…" : "Save changes"}
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Smartphone className="h-5 w-5 text-primary" />
+            Phone number
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            {user.phone
+              ? `Verified: ${user.phone}. Add a new number below to change it (SMS verification required).`
+              : "Add a mobile number to sign in with Phone OTP on web and mobile."}
+          </p>
+          {!phoneOtpSent ? (
+            <>
+              <PhoneInput
+                countryIso={phoneCountryIso}
+                phoneNumber={phoneLocal}
+                onCountryChange={setPhoneCountryIso}
+                onPhoneNumberChange={setPhoneLocal}
+                id="profile-phone"
+              />
+              <Button
+                type="button"
+                disabled={phoneBusy || phoneLocal.replace(/\D/g, "").length < 7}
+                onClick={() => void handleSendPhoneOtp()}
+              >
+                {phoneBusy ? "Sending…" : user.phone ? "Send code to change phone" : "Send verification code"}
+              </Button>
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground">
+                Enter the 6-digit code sent to <span className="font-medium text-foreground">{phoneFull}</span>
+              </p>
+              <Input
+                inputMode="numeric"
+                maxLength={6}
+                value={phoneCode}
+                onChange={(e) => setPhoneCode(e.target.value.replace(/\D/g, ""))}
+                placeholder="000000"
+                className="max-w-[12rem] text-center tracking-[0.3em]"
+                autoComplete="one-time-code"
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  disabled={phoneBusy || phoneCode.length !== 6}
+                  onClick={() => void handleVerifyPhone()}
+                >
+                  {phoneBusy ? "Verifying…" : "Verify & save"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={phoneBusy}
+                  onClick={() => {
+                    setPhoneOtpSent(false);
+                    setPhoneCode("");
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 

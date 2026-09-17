@@ -27,6 +27,7 @@ export interface LoginResponse {
     id: string;
     email: string;
     fullName: string;
+    phone?: string | null;
     avatarUrl?: string;
     isPlatformAdmin?: boolean;
   };
@@ -37,6 +38,7 @@ export interface User {
   id: string;
   fullName: string;
   email: string;
+  phone?: string | null;
   avatarUrl?: string;
   isEmailVerified: boolean;
   isActive: boolean;
