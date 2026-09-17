@@ -294,7 +294,7 @@ function LoginForm() {
                 />
                 <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Smartphone className="h-3.5 w-3.5" />
-                  We&apos;ll text you a one-time verification code
+                  We&apos;ll text a one-time code. New numbers create an account; existing numbers sign you in.
                 </p>
               </div>
               {displayError && (

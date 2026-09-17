@@ -152,6 +152,7 @@ export class AuthController {
     return this.authService.verifyEmailChange(req.user.userId, dto.token);
   }
 
+  /** Public phone OTP for signup or login. Rate-limited by auth throttler (per IP). */
   @Public()
   @SkipThrottle({ default: true })
   @Post('send-otp')
@@ -164,6 +165,27 @@ export class AuthController {
   @Post('verify-otp')
   async verifyOtp(@Body() dto: VerifyOtpDto): Promise<LoginResponseDto> {
     return this.authService.verifyOtp(dto.phone, dto.code);
+  }
+
+  /** Authenticated: add/change phone on the current account via OTP. */
+  @UseGuards(JwtAuthGuard)
+  @SkipThrottle({ default: true })
+  @Post('phone/send-otp')
+  async sendPhoneLinkOtp(
+    @Req() req: { user: { userId: string } },
+    @Body() dto: SendOtpDto,
+  ): Promise<{ message: string }> {
+    return this.authService.sendPhoneLinkOtp(req.user.userId, dto.phone);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @SkipThrottle({ default: true })
+  @Post('phone/verify')
+  async verifyPhoneLink(
+    @Req() req: { user: { userId: string } },
+    @Body() dto: VerifyOtpDto,
+  ): Promise<LoginResponseDto & { message: string }> {
+    return this.authService.verifyPhoneLink(req.user.userId, dto.phone, dto.code);
   }
 
   @Public()

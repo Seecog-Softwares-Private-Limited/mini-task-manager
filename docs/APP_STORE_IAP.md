@@ -77,7 +77,7 @@ Automated checks: `npx jest src/plans/apple-iap.integration-spec.ts`
 
 ## Resubmit to App Review
 
-1. Bump build in Xcode / `mobile/pubspec.yaml` (current: `2.0.1+19`).
+1. Bump build in Xcode / `mobile/pubspec.yaml` (current: `1.0.0+21`).
 2. Archive iOS release; upload to App Store Connect.
 3. Attach IAP products `opspick.silver.monthly` and `opspick.gold.monthly` to the version.
 4. Deploy API with Apple env vars + run migration on production DB.
@@ -95,4 +95,4 @@ Automated checks: `npx jest src/plans/apple-iap.integration-spec.ts`
 - [ ] Review notes include 3.1.3(b) explanation
 - [ ] Privacy Policy URL live at https://opspick.com/privacypolicy
 - [ ] App Description includes Apple standard EULA link (if using standard EULA)
-- [ ] New build uploaded and submitted (> build 18)
+- [ ] New build uploaded and submitted (> build 19; current target: **21**)

@@ -148,6 +148,10 @@ export class UsersService {
     await this.usersRepository.update(userId, { fullName });
   }
 
+  async updatePhone(userId: string, phone: string | null): Promise<void> {
+    await this.usersRepository.update(userId, { phone });
+  }
+
   /** Update editable profile fields for the current user and return the fresh entity. */
   async updateProfile(
     userId: string,
