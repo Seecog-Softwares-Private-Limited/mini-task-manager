@@ -28,3 +28,9 @@ config/firebase-service.json
 *-firebase-adminsdk-*.json
 **/firebase-service-account.json
 **/*-firebase-adminsdk-*.json
+
+# Android upload signing (never commit)
+*.jks
+*.keystore
+upload_certificate.pem
+**/key.properties
