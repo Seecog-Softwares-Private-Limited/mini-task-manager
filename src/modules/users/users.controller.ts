@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Patch,
   Post,
@@ -10,6 +11,8 @@ import {
   NotFoundException,
   StreamableFile,
   ParseUUIDPipe,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { UsersService } from './users.service';
@@ -18,6 +21,7 @@ import { CurrentUserId } from '../../common/decorators/current-user.decorator';
 import { UserResponseDto } from './dto/user-response.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { Public } from '../../common/decorators/public.decorator';
+import { AdminService } from '../admin/admin.service';
 
 function toUserDto(user: {
   id: string;
@@ -45,7 +49,11 @@ function toUserDto(user: {
 @SkipThrottle({ auth: true })
 @UseGuards(JwtAuthGuard)
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    @Inject(forwardRef(() => AdminService))
+    private readonly adminService: AdminService,
+  ) {}
 
   @Get('me/onboarding-status')
   async getOnboardingStatus(@CurrentUserId() userId: string) {
@@ -74,6 +82,13 @@ export class UsersController {
       fullName: dto.fullName,
     });
     return toUserDto(user);
+  }
+
+  /** Self-service account deletion (App Store Guideline 5.1.1(v)). */
+  @Delete('me')
+  async deleteMe(@CurrentUserId() userId: string): Promise<{ success: true }> {
+    await this.adminService.deleteUserCompletely(userId);
+    return { success: true };
   }
 
   /** Public: browsers load <img src> without Authorization. */

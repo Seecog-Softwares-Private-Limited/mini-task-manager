@@ -189,7 +189,7 @@ class _PlansBillingScreenState extends ConsumerState<PlansBillingScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Plans & Pricing'),
+        title: Text(_isIos ? 'Subscription Plans' : 'Plans & Pricing'),
         actions: [
           if (_isIos)
             TextButton(
@@ -200,7 +200,7 @@ class _PlansBillingScreenState extends ConsumerState<PlansBillingScreen> {
                       height: 18,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Restore'),
+                  : const Text('Restore Purchases'),
             ),
         ],
       ),
@@ -218,7 +218,7 @@ class _PlansBillingScreenState extends ConsumerState<PlansBillingScreen> {
             const SizedBox(height: AppSpacing.xs),
             Text(
               _isIos
-                  ? 'Subscribe with Apple In-App Purchase. Already subscribed on another device? Tap Restore.'
+                  ? 'Subscribe with Apple In-App Purchase. Already subscribed on another device? Tap Restore Purchases.'
                   : 'Transparent pricing for your account: Free, Silver, and Gold.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: AppColors.textMuted,
@@ -335,6 +335,10 @@ class _PlansBillingScreenState extends ConsumerState<PlansBillingScreen> {
                   _LegalLink(
                     label: 'Privacy Policy',
                     url: AppConfig.privacyPolicyUrl,
+                  ),
+                  _LegalLink(
+                    label: 'Support',
+                    url: AppConfig.supportUrl,
                   ),
                 ],
               ),

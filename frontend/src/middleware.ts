@@ -15,7 +15,10 @@ function isPublic(pathname: string) {
     pathname === "/verify-email" ||
     pathname === "/auth/callback" ||
     pathname.startsWith("/auth/callback/") ||
-    pathname === "/super-admin/login"
+    pathname === "/super-admin/login" ||
+    // App Store Connect metadata URLs (must load without sign-in)
+    pathname === "/privacypolicy" ||
+    pathname === "/support"
   );
 }
 
