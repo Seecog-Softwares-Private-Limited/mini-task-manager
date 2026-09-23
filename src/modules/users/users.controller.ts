@@ -11,8 +11,6 @@ import {
   NotFoundException,
   StreamableFile,
   ParseUUIDPipe,
-  Inject,
-  forwardRef,
 } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { UsersService } from './users.service';
@@ -21,7 +19,7 @@ import { CurrentUserId } from '../../common/decorators/current-user.decorator';
 import { UserResponseDto } from './dto/user-response.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { Public } from '../../common/decorators/public.decorator';
-import { AdminService } from '../admin/admin.service';
+import { AccountDeletionService } from './account-deletion.service';
 
 function toUserDto(user: {
   id: string;
@@ -51,8 +49,7 @@ function toUserDto(user: {
 export class UsersController {
   constructor(
     private readonly usersService: UsersService,
-    @Inject(forwardRef(() => AdminService))
-    private readonly adminService: AdminService,
+    private readonly accountDeletionService: AccountDeletionService,
   ) {}
 
   @Get('me/onboarding-status')
@@ -87,7 +84,7 @@ export class UsersController {
   /** Self-service account deletion (App Store Guideline 5.1.1(v)). */
   @Delete('me')
   async deleteMe(@CurrentUserId() userId: string): Promise<{ success: true }> {
-    await this.adminService.deleteUserCompletely(userId);
+    await this.accountDeletionService.deleteUserCompletely(userId);
     return { success: true };
   }
 
