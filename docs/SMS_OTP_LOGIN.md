@@ -15,6 +15,54 @@ OTP is **not** 2FA on top of password. Codes are 6 digits, expire in **10 minute
 
 Clients: **web** and **Flutter mobile** share the same API.
 
+## End-to-end flow (storage, verify, before/after)
+
+### Where the OTP is stored
+
+| Store | What | When |
+|-------|------|------|
+| MySQL table **`otp_codes`** | `phone` (E.164), `code` (6 digits, plaintext), `expires_at` (+10 min), `id` | On every successful **send** |
+| MySQL **`users.phone`** | Verified number on the account (unique, nullable) | After successful **verify** (signup or profile link) |
+| BlackSMS | Delivery only — **not** the source of truth for login | During send |
+| Browser / app | JWT after verify — **not** the OTP | After verify |
+
+Before a new send for the same phone, any existing `otp_codes` row for that phone is **deleted**, then the new one is inserted.
+
+### Before send
+
+1. Client collects phone (country + local → E.164, e.g. `+919876543210`).
+2. API validates phone format.
+3. SMS must be configured (`BLACKSMS_*` in env on the API host); otherwise send fails with 400.
+
+### Send (`POST /auth/send-otp` or `POST /auth/phone/send-otp`)
+
+1. Normalize phone to E.164.
+2. Generate 6-digit code (`100000`–`999999`).
+3. **Store** in `otp_codes` (replace any prior row for that phone).
+4. Call BlackSMS with 10-digit `numbers` + `variables_values` = code.
+5. Return generic success (OTP **never** in the HTTP response).
+
+### Verify (`POST /auth/verify-otp` or `POST /auth/phone/verify`)
+
+1. Normalize phone the same way as send.
+2. Look up **`otp_codes` WHERE `phone` = ? AND `code` = ?**.
+3. No row → **401** (wrong code, never sent, or already used).
+4. Past `expires_at` → delete row → **401** expired.
+5. OK → **delete** that OTP row (one-time use).
+6. Then:
+   - **Public verify-otp:** find user by `phone` → login; or create user + workspace → signup; issue JWT.
+   - **Profile phone/verify:** set `users.phone` on the signed-in user; issue JWT.
+
+### After verify
+
+| Outcome | What changed |
+|---------|----------------|
+| Login | Existing user; JWT; OTP row gone |
+| Signup | New `users` row with `phone`; default workspace; JWT; OTP row gone |
+| Profile link | `users.phone` updated; OTP row gone; number usable for later Phone OTP login |
+
+**Phone↔OTP binding:** only OpsPick DB (match on both fields). BlackSMS does not verify.
+
 ## Provider: BlackSMS
 
 Primary SMS gateway for India (~₹0.30/OTP). Twilio remains an optional fallback via env.
