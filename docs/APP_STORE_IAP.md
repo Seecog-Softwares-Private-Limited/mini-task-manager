@@ -25,7 +25,10 @@ OpsPick sells Free / Silver / Gold digital plans. On **iOS**, those plans must b
 
 8. Submit the IAP products **with** the next iOS binary (build > 18).
 9. In **App Information**, set Privacy Policy URL to `https://opspick.com/privacypolicy` (must load over HTTPS).
-10. In the version **App Description**, include the Terms of Use link when using Apple's standard EULA:
+10. In **App Information**, set **Support URL** to `https://opspick.com/support` (must load over HTTPS).
+    - **Never** use `https://opspick.com/#pricing` or any page with plan prices / upgrade / external checkout CTAs.
+11. If **Marketing URL** is set, use `https://opspick.com` (no `#pricing` hash). Leave blank if unused.
+12. In the version **App Description**, include the Terms of Use link when using Apple's standard EULA:
     `https://www.apple.com/legal/internet-services/itunes/dev/stdeula/`
 
 ## Server environment
@@ -62,6 +65,18 @@ Test account: <review login email / password>
 Sandbox Apple ID: <sandbox tester>
 ```
 
+## App Review reply — Guideline 3.1.1 Support URL (paste into ASC rejection thread)
+
+Use when Apple cites the Support URL pointing at marketing pricing (`#pricing`) or other external purchase links:
+
+```
+We fixed the Support URL that pointed to our marketing pricing section.
+
+Support URL is now https://opspick.com/support — help and contact only; no plans, prices, or external checkout.
+
+iOS subscriptions are sold only via In-App Purchase (opspick.silver.monthly, opspick.gold.monthly). Web/Android billing is separate; customers who subscribed elsewhere keep access on iOS under guideline 3.1.3(b).
+```
+
 ## Sandbox / StoreKit test steps
 
 1. Configure server `APPLE_IAP_*` vars (Sandbox environment).
@@ -74,6 +89,14 @@ Sandbox Apple ID: <sandbox tester>
 8. Log in with a web/Razorpay-upgraded account on iOS and confirm paid limits work without repurchasing (3.1.3(b)).
 
 Automated checks: `npx jest src/plans/apple-iap.integration-spec.ts`
+
+## Resubmit after Support URL rejection (3.1.1 metadata)
+
+1. Deploy frontend so `https://opspick.com/support` returns 200 (push `frontend/**` to `lakshya` to trigger Lightsail deploy, or deploy manually).
+2. App Store Connect → **App Information** → Support URL = `https://opspick.com/support`.
+3. Confirm Marketing URL is not `#pricing` (use `https://opspick.com` or blank).
+4. Reply in the rejection thread with the **Guideline 3.1.1 Support URL** reply above (also paste into App Review Information).
+5. Resubmit version **1.0.0 (22)** (or newer). No new binary required for this metadata-only fix unless you already have other binary changes.
 
 ## Resubmit to App Review
 
@@ -94,5 +117,8 @@ Automated checks: `npx jest src/plans/apple-iap.integration-spec.ts`
 - [ ] Razorpay checkout never shown on iOS
 - [ ] Review notes include 3.1.3(b) explanation
 - [ ] Privacy Policy URL live at https://opspick.com/privacypolicy
+- [ ] Support URL live at https://opspick.com/support (no pricing / checkout CTAs)
+- [ ] Support URL in ASC is **not** `#pricing` or any external purchase page
+- [ ] Marketing URL (if set) is https://opspick.com — not `#pricing`
 - [ ] App Description includes Apple standard EULA link (if using standard EULA)
 - [ ] New build uploaded and submitted (> build 19; current target: **21**)

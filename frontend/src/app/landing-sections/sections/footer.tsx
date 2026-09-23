@@ -12,6 +12,7 @@ const FOOTER_LINKS = {
     { label: "Sign in", href: "/login" },
     { label: "Create account", href: "/signup" },
     { label: "Dashboard", href: "/dashboard" },
+    { label: "Support", href: "/support" },
     { label: "Privacy Policy", href: "/privacypolicy" },
   ],
 };
@@ -51,9 +52,14 @@ export function Footer() {
           <p className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} OpsPick · Seecog Softwares Pvt. Ltd. All rights reserved.
           </p>
-          <Link href="/privacypolicy" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            Privacy Policy
-          </Link>
+          <div className="flex flex-wrap items-center gap-4">
+            <Link href="/support" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Support
+            </Link>
+            <Link href="/privacypolicy" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Privacy Policy
+            </Link>
+          </div>
         </div>
       </div>
     </footer>
