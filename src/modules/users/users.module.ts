@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserEntity } from './entities/user.entity';
 import { UsersRepository } from './repositories/users.repository';
@@ -6,16 +6,15 @@ import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { UserAvatarController } from './user-avatar.controller';
 import { OrganizationsModule } from '../organizations/organizations.module';
-import { AdminModule } from '../admin/admin.module';
+import { AccountDeletionService } from './account-deletion.service';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([UserEntity]),
     OrganizationsModule,
-    forwardRef(() => AdminModule),
   ],
   controllers: [UserAvatarController, UsersController],
-  providers: [UsersRepository, UsersService],
-  exports: [UsersService, UsersRepository],
+  providers: [UsersRepository, UsersService, AccountDeletionService],
+  exports: [UsersService, UsersRepository, AccountDeletionService],
 })
 export class UsersModule {}
