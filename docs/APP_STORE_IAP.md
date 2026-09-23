@@ -92,11 +92,18 @@ Automated checks: `npx jest src/plans/apple-iap.integration-spec.ts`
 
 ## Resubmit after Support URL rejection (3.1.1 metadata)
 
-1. Deploy frontend so `https://opspick.com/support` returns 200 (push `frontend/**` to `lakshya` to trigger Lightsail deploy, or deploy manually).
+1. Deploy frontend from `vinik` (includes `/support` + middleware allowing `/support` and `/privacypolicy` without login) so both URLs return **200** without redirecting to `/login`.
 2. App Store Connect → **App Information** → Support URL = `https://opspick.com/support`.
 3. Confirm Marketing URL is not `#pricing` (use `https://opspick.com` or blank).
 4. Reply in the rejection thread with the **Guideline 3.1.1 Support URL** reply above (also paste into App Review Information).
 5. Resubmit version **1.0.0 (22)** (or newer). No new binary required for this metadata-only fix unless you already have other binary changes.
+
+**Verify before resubmit:**
+
+```bash
+curl -sI https://opspick.com/support | head -5        # expect 200, not 307→/login
+curl -sI https://opspick.com/privacypolicy | head -5  # expect 200, not 307→/login
+```
 
 ## Resubmit to App Review
 
