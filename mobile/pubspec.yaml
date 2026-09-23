@@ -1,7 +1,7 @@
 name: mini_task_manager
 description: Native Flutter client for OpsPick (Android & iOS).
 publish_to: "none"
-version: 1.0.0+21
+version: 1.0.0+23
 
 environment:
   sdk: ^3.5.0

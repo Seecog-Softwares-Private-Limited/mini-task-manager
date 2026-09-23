@@ -137,12 +137,14 @@ const SECTIONS: { id: string; title: string; body: ReactNode }[] = [
     title: "11. Account Deletion",
     body: (
       <p>
-        To request deletion of your OpsPick account and associated server data (including name and
-        email), contact{" "}
+        You can delete your OpsPick account in the mobile app under{" "}
+        <strong>Account Settings → Delete my account</strong>, or by contacting{" "}
         <a className="text-primary underline-offset-2 hover:underline" href="mailto:info@seecogsoftwares.com">
           info@seecogsoftwares.com
         </a>
-        . Workspace owners may also manage workspaces through the web application where applicable.
+        . Deleting your account removes your profile and associated server data, including name and
+        email, subject to legal retention requirements. Workspace owners may also manage workspaces
+        through the web application where applicable.
       </p>
     ),
   },
@@ -184,14 +186,14 @@ const SECTIONS: { id: string; title: string; body: ReactNode }[] = [
       <p>
         Seecog Softwares Pvt. Ltd.
         <br />
-        OpsPick:{" "}
+        OpsPick support:{" "}
         <a
           className="text-primary underline-offset-2 hover:underline"
-          href="https://opspick.com"
+          href="https://opspick.com/support"
           target="_blank"
           rel="noopener noreferrer"
         >
-          https://opspick.com
+          https://opspick.com/support
         </a>
         <br />
         Company website:{" "}
@@ -218,12 +220,12 @@ export default function PrivacyPolicyPage() {
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border/60">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-6 py-5">
-          <Link href="/" className="inline-flex items-center gap-2.5" aria-label="OpsPick home">
+          <div className="inline-flex items-center gap-2.5" aria-label="OpsPick">
             <OpsPickLogo className="h-9 w-9" />
             <span className="text-[1.0625rem] font-semibold tracking-tight">OpsPick</span>
-          </Link>
-          <Link href="/" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-            Back to home
+          </div>
+          <Link href="/support" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+            Support
           </Link>
         </div>
       </header>
@@ -261,11 +263,11 @@ export default function PrivacyPolicyPage() {
               {" · "}
               <a
                 className="text-primary underline-offset-2 hover:underline"
-                href="https://opspick.com"
+                href="https://opspick.com/support"
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                opspick.com
+                opspick.com/support
               </a>
               {" · "}
               <a

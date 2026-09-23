@@ -39,8 +39,12 @@ class AppConfig {
   static const productionHost = '200.97.172.61';
 
   /// Public HTTPS URLs required by App Review for auto-renewable subscriptions
-  /// (Guideline 3.1.2).
+  /// (Guideline 3.1.2). Must load without login.
   static const privacyPolicyUrl = 'https://opspick.com/privacypolicy';
+
+  /// App Store Connect Support URL target — purchase-free help page only.
+  /// Never use https://opspick.com/#pricing.
+  static const supportUrl = 'https://opspick.com/support';
 
   /// Apple's standard EULA. Replace with a custom Terms of Use URL if you host one.
   static const termsOfUseUrl =

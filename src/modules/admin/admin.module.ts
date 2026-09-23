@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { UsersModule } from '../users/users.module';
@@ -29,7 +29,7 @@ import { FeedbacksModule } from '../feedbacks/feedbacks.module';
 @Module({
   imports: [
     AuthModule,
-    UsersModule,
+    forwardRef(() => UsersModule),
     OrganizationsModule,
     BillingModule,
     PlansModule,
@@ -53,5 +53,6 @@ import { FeedbacksModule } from '../feedbacks/feedbacks.module';
   ],
   controllers: [AdminController, SuperAdminController],
   providers: [AdminService, PlatformAdminGuard, SuperAdminService],
+  exports: [AdminService],
 })
 export class AdminModule {}

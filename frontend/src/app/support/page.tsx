@@ -8,18 +8,17 @@ export const metadata: Metadata = {
     "Get help with OpsPick — contact Seecog Softwares Pvt. Ltd. for account and product support.",
 };
 
+/**
+ * App Store Connect Support URL target.
+ * Must stay purchase-free: no plan prices, upgrade CTAs, signup-to-checkout, or home/#pricing links.
+ */
 export default function SupportPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border/60">
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-6 py-5">
-          <Link href="/" className="inline-flex items-center gap-2.5" aria-label="OpsPick home">
-            <OpsPickLogo className="h-9 w-9" />
-            <span className="text-[1.0625rem] font-semibold tracking-tight">OpsPick</span>
-          </Link>
-          <Link href="/" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-            Back to home
-          </Link>
+        <div className="mx-auto flex max-w-3xl items-center gap-2.5 px-6 py-5">
+          <OpsPickLogo className="h-9 w-9" />
+          <span className="text-[1.0625rem] font-semibold tracking-tight">OpsPick</span>
         </div>
       </header>
 
@@ -27,7 +26,7 @@ export default function SupportPage() {
         <p className="text-sm font-medium text-muted-foreground">Help</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Support</h1>
         <p className="mt-3 text-muted-foreground">
-          OpsPick is developed and operated by Seecog Softwares Pvt. Ltd. Use the contacts below for
+          OpsPick is developed and operated by Seecog Softwares Pvt. Ltd. Use the contact below for
           account help, technical issues, or product questions.
         </p>
 
@@ -45,17 +44,6 @@ export default function SupportPage() {
               info@seecogsoftwares.com
             </a>
           </p>
-          <p className="mt-3 text-[15px] leading-relaxed">
-            <span className="text-muted-foreground">Company: </span>
-            <a
-              className="font-medium text-primary underline-offset-2 hover:underline"
-              href="https://www.seecogsoftwares.com"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              www.seecogsoftwares.com
-            </a>
-          </p>
         </section>
 
         <section className="mt-10 space-y-3 text-[15px] leading-relaxed text-muted-foreground">
@@ -64,7 +52,7 @@ export default function SupportPage() {
             <li>Signing in, account access, and password resets</li>
             <li>Workspaces, invitations, and permissions</li>
             <li>Using boards, tasks, and collaboration features</li>
-            <li>Privacy or data requests (see our Privacy Policy)</li>
+            <li>Account deletion and privacy requests</li>
           </ul>
         </section>
 
@@ -80,14 +68,9 @@ export default function SupportPage() {
       <footer className="border-t border-border/60">
         <div className="mx-auto flex max-w-3xl flex-col gap-2 px-6 py-8 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} OpsPick · Seecog Softwares Pvt. Ltd.</p>
-          <div className="flex flex-wrap gap-4">
-            <Link href="/support" className="hover:text-foreground">
-              Support
-            </Link>
-            <Link href="/privacypolicy" className="hover:text-foreground">
-              Privacy Policy
-            </Link>
-          </div>
+          <Link href="/privacypolicy" className="hover:text-foreground">
+            Privacy Policy
+          </Link>
         </div>
       </footer>
     </div>
