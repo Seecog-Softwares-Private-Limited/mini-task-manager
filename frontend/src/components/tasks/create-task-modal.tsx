@@ -30,6 +30,9 @@ import {
 } from "@/components/tasks/create-task/form-section";
 import { TaskAttachmentsSection } from "@/components/tasks/task-attachments-section";
 import type { PendingSubtaskAttachment } from "@/components/tasks/subtasks/subtask-attachments-section";
+import { SubtaskSuggestionsPanel } from "@/components/tasks/subtasks/subtask-suggestions-panel";
+import { generateClientId } from "@/lib/generate-client-id";
+import { clampSubtaskTitle } from "@/lib/subtask-limits";
 import { DueDateField } from "@/components/tasks/create-task/due-date-field";
 import {
   TaskDescriptionField,
@@ -48,6 +51,7 @@ import {
   Users,
   Settings2,
   CalendarRange,
+  Sparkles,
 } from "lucide-react";
 import type { TaskRecurrenceConfig } from "@/types/api";
 import { recurrenceSummary } from "@/lib/recurrence-display";
@@ -258,6 +262,7 @@ export function CreateTaskModal({
   const selectedPriority = watch("priority");
   const selectedStatusId = watch("statusId");
   const watchedTitle = watch("title");
+  const watchedDescription = watch("description");
   const watchedSubtasks = watch("subtasks");
   const watchedRecurrence = watch("recurrence");
 
@@ -489,12 +494,19 @@ export function CreateTaskModal({
                 >
                   <div className="space-y-3">
                     <div className="space-y-1.5">
+                      <div className="flex items-center gap-2 text-sky-800 dark:text-sky-200">
+                        <Sparkles className="h-4 w-4" aria-hidden />
+                        <span className="text-sm font-semibold">Create with AI</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Tell OpsPick what you need to get done.
+                      </p>
                       <Label htmlFor="planner-name" className={CREATE_FIELD_LABEL}>
                         Planner name <span className="text-destructive/80">*</span>
                       </Label>
                       <Input
                         id="planner-name"
-                        placeholder="e.g. Daily standup, Weekly report…"
+                        placeholder="I need bike servicing"
                         data-cy="task-title-input"
                         {...register("title")}
                         autoFocus
@@ -510,6 +522,49 @@ export function CreateTaskModal({
                           <AlertCircle className="h-3 w-3" /> {errors.title.message}
                         </p>
                       ) : null}
+                      <SubtaskSuggestionsPanel
+                        variant="create"
+                        request={{
+                          draft: {
+                            title: (watchedTitle ?? "").trim(),
+                            description: watchedDescription ?? "",
+                            subtasks: (watchedSubtasks ?? [])
+                              .map((item) => item.title?.trim() ?? "")
+                              .filter((title) => title.length > 0)
+                              .map((title) => ({ title })),
+                          },
+                        }}
+                        existingTitles={(watchedSubtasks ?? []).map((item) => item.title ?? "")}
+                        disabled={isSubmitting || (watchedTitle ?? "").trim().length === 0}
+                        disabledReason={
+                          (watchedTitle ?? "").trim().length === 0
+                            ? "Describe what you need to get done before asking for suggestions."
+                            : undefined
+                        }
+                        note="Added steps are included when you create this series. They are not saved before that."
+                        onAccept={(titles) => {
+                          const taken = new Set(
+                            (watchedSubtasks ?? [])
+                              .map((item) => (item.title ?? "").trim().toLowerCase())
+                              .filter(Boolean)
+                          );
+                          for (const title of titles) {
+                            const trimmed = clampSubtaskTitle(title.trim());
+                            const key = trimmed.toLowerCase();
+                            if (!trimmed || taken.has(key)) continue;
+                            taken.add(key);
+                            append({
+                              id: generateClientId(),
+                              title: trimmed,
+                              completed: false,
+                              status: "TODO",
+                              priority: "MEDIUM",
+                              dueOffsetDays: 0,
+                              requireLocation: false,
+                            });
+                          }
+                        }}
+                      />
                     </div>
 
                     <Controller
@@ -751,19 +806,26 @@ export function CreateTaskModal({
             <>
             <CreateTaskFormSection title="Basic details">
               <div className="space-y-2">
+                <div className="flex items-center gap-2 text-sky-800 dark:text-sky-200">
+                  <Sparkles className="h-4 w-4" aria-hidden />
+                  <span className="text-sm font-semibold">Create with AI</span>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Tell OpsPick what you need to get done.
+                </p>
                 <Label htmlFor="task-title" className={CREATE_FIELD_LABEL}>
                   Task title <span className="text-destructive/80">*</span>
                 </Label>
                 <Input
                   id="task-title"
-                  placeholder="What needs to be done?"
+                  placeholder="I need bike servicing"
                   data-cy="task-title-input"
                   {...register("title")}
                   autoFocus
                   className={cn(
                     "h-11 rounded-lg border-border/55 bg-background px-3 text-[15px] font-medium shadow-sm",
                     "transition-all duration-200 placeholder:font-normal placeholder:text-muted-foreground/55",
-                    "focus-visible:border-violet-500/40 focus-visible:ring-2 focus-visible:ring-violet-500/15",
+                    "focus-visible:border-sky-500/40 focus-visible:ring-2 focus-visible:ring-sky-500/15",
                     errors.title && "border-destructive/40 focus-visible:ring-destructive/15"
                   )}
                 />
@@ -771,11 +833,48 @@ export function CreateTaskModal({
                   <p className="flex items-center gap-1 text-[11px] text-destructive">
                     <AlertCircle className="h-3 w-3" /> {errors.title.message}
                   </p>
-                ) : (
-                  <p className="text-[10px] text-muted-foreground">
-                    A clear title helps your team scan the board quickly.
-                  </p>
-                )}
+                ) : null}
+                <SubtaskSuggestionsPanel
+                  variant="create"
+                  request={{
+                    draft: {
+                      title: (watchedTitle ?? "").trim(),
+                      description: watchedDescription ?? "",
+                      subtasks: (watchedSubtasks ?? [])
+                        .map((item) => item.title?.trim() ?? "")
+                        .filter((title) => title.length > 0)
+                        .map((title) => ({ title })),
+                    },
+                  }}
+                  existingTitles={(watchedSubtasks ?? []).map((item) => item.title ?? "")}
+                  disabled={isSubmitting || (watchedTitle ?? "").trim().length === 0}
+                  disabledReason={
+                    (watchedTitle ?? "").trim().length === 0
+                      ? "Describe what you need to get done before asking for suggestions."
+                      : undefined
+                  }
+                  onAccept={(titles) => {
+                    const taken = new Set(
+                      (watchedSubtasks ?? [])
+                        .map((item) => (item.title ?? "").trim().toLowerCase())
+                        .filter(Boolean)
+                    );
+                    for (const title of titles) {
+                      const trimmed = clampSubtaskTitle(title.trim());
+                      const key = trimmed.toLowerCase();
+                      if (!trimmed || taken.has(key)) continue;
+                      taken.add(key);
+                      append({
+                        id: generateClientId(),
+                        title: trimmed,
+                        completed: false,
+                        status: "TODO",
+                        priority: "MEDIUM",
+                        requireLocation: false,
+                      });
+                    }
+                  }}
+                />
               </div>
 
               <Controller
@@ -950,9 +1049,11 @@ export function CreateTaskModal({
                 register={register}
                 setValue={setValue}
                 prepend={prepend}
+                append={append}
                 remove={remove}
                 errors={errors}
                 disabled={isSubmitting}
+                hideAiSuggestions
                 pendingAttachmentsBySubtask={pendingSubtaskAttachments}
                 onPendingAttachmentsChange={(subtaskKey, items) =>
                   setPendingSubtaskAttachments((prev) => ({ ...prev, [subtaskKey]: items }))

@@ -822,6 +822,29 @@ export class TasksService {
     throw new ForbiddenException('Only the workspace owner, admin, or task creator can delete this task');
   }
 
+  /**
+   * Owner, admin, task creator, or assignee may change the checklist.
+   * Does not write the task. Mirrors the checklist branch of assertCanUpdateTask.
+   */
+  async assertCanEditChecklist(
+    task: TaskEntity,
+    organizationId: string,
+    userId: string,
+  ): Promise<void> {
+    const membership = await this.organizationsService.getMembership(organizationId, userId);
+    const role = membership?.role?.toLowerCase() ?? '';
+    if (role === 'owner' || role === 'admin') return;
+    if (isTaskReporter(task, userId)) return;
+    const normalizedUserId = normalizeAssigneeUserId(userId);
+    const isAssignee =
+      normalizedUserId != null && taskAssigneeUserIds(task).includes(normalizedUserId);
+    if (!isAssignee) {
+      throw new ForbiddenException(
+        'Only the workspace owner, task assignee, or task creator can update this task',
+      );
+    }
+  }
+
   private async assertCanUpdateTask(
     task: TaskEntity,
     organizationId: string,

@@ -1,4 +1,7 @@
 const DEFAULT_JWT_SECRET = 'change-me-in-production';
+
+/** Used when AI_SUBTASK_MAX_SUGGESTIONS is unset or not a positive number. */
+export const DEFAULT_AI_SUBTASK_MAX_SUGGESTIONS = 8;
 import { join } from 'path';
 import { resolveFrontendPublicUrl } from '../common/utils/frontend-url.util';
 import { resolveSmtpHost, resolveSmtpPort, resolveSmtpProvider } from './smtp.config';
@@ -107,6 +110,17 @@ export const configuration = () => {
     fallbackSandbox:
       String(process.env.APPLE_IAP_FALLBACK_SANDBOX ?? 'true').toLowerCase() !==
       'false',
+  },
+  ai: {
+    provider: (process.env.AI_PROVIDER || '').trim().toLowerCase(),
+    apiKey: process.env.AI_API_KEY || '',
+    baseUrl: (process.env.AI_BASE_URL || 'https://api.groq.com/openai/v1').replace(/\/$/, ''),
+    model: (process.env.AI_MODEL || 'openai/gpt-oss-20b').trim(),
+    timeoutMs: parseInt(process.env.AI_TIMEOUT_MS || '25000', 10),
+    maxSuggestions: parseInt(
+      process.env.AI_SUBTASK_MAX_SUGGESTIONS || String(DEFAULT_AI_SUBTASK_MAX_SUGGESTIONS),
+      10,
+    ),
   },
   };
 };

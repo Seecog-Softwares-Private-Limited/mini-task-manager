@@ -32,6 +32,7 @@ import {
 import { DropdownScrollList } from "@/components/ui/dropdown-scroll-list";
 import { parseApiError } from "@/services/api/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useOrgRole } from "@/hooks/use-org-role";
 import {
   canUserDeleteTask,
   canUserEditTaskFully,
@@ -66,6 +67,7 @@ import {
   type SubtaskStatus,
 } from "@/lib/subtask-status";
 import { SubtaskCompactRow } from "@/components/tasks/subtasks/subtask-compact-row";
+import { SubtaskSuggestionsPanel } from "@/components/tasks/subtasks/subtask-suggestions-panel";
 import { TaskTimeTracking } from "@/components/tasks/task-time-tracking";
 import { AssigneeBulkActions } from "@/components/tasks/assignee-bulk-actions";
 import {
@@ -307,6 +309,7 @@ export function TaskDetailModal({
   const { toast } = useToast();
   const { showNotice, noticeDialogProps } = useNoticeDialog();
   const { user } = useAuth();
+  const { isOwner: orgRoleIsOwner, isAdmin: orgRoleIsAdmin } = useOrgRole();
   const currentUserId = user?.id ?? "";
   const [commentText, setCommentText] = React.useState("");
   const [commentMentionedIds, setCommentMentionedIds] = React.useState<string[]>([]);
@@ -543,8 +546,10 @@ export function TaskDetailModal({
     isOwner || isAdmin
   );
   const canDeleteTask = canUserDeleteTask(task ?? {}, currentUserId, isOwner);
-  const canEditWorkflowFields = isOwner || isAdmin || isAssignee || isReporter;
-  const canEditSubtasks = canManageAssignees || isAssignee || isReporter;
+  const canEditWorkflowFields =
+    isOwner || isAdmin || isAssignee || isReporter || orgRoleIsOwner || orgRoleIsAdmin;
+  const canEditSubtasks =
+    canManageAssignees || isAssignee || isReporter || orgRoleIsOwner || orgRoleIsAdmin;
   const isViewOnly = !canEditWorkflowFields;
 
   /** Subtask assignees are limited to members assigned on the parent task. */
@@ -878,6 +883,27 @@ export function TaskDetailModal({
       onTaskUpdated?.(updated);
     },
   });
+
+  const acceptSuggestedSubtasks = React.useCallback(
+    async (titles: string[]) => {
+      const additions: TaskSubtask[] = titles
+        .map((title) => clampSubtaskTitle(title.trim()))
+        .filter((title) => title.length > 0)
+        .filter((title) => {
+          const key = title.trim().toLowerCase();
+          return !checklist.some((item) => item.title.trim().toLowerCase() === key);
+        })
+        .map((title) => ({
+          id: generateClientId(),
+          title,
+          completed: false,
+          status: "TODO",
+        }));
+      if (!additions.length) return;
+      await updateSubtasksMutation.mutateAsync([...checklist, ...additions]);
+    },
+    [checklist, updateSubtasksMutation]
+  );
 
   const appendSubtask = React.useCallback(
     (title: string) => {
@@ -1449,6 +1475,23 @@ export function TaskDetailModal({
                           Add
                         </Button>
                       </div>
+                      {canEditSubtasks && taskId ? (
+                        <SubtaskSuggestionsPanel
+                          key={taskId}
+                          request={{ taskId }}
+                          existingTitles={checklist.map((item) => item.title)}
+                          purposeInput
+                          taskDescription={task?.description ?? ""}
+                          disabled={updateSubtasksMutation.isPending || false}
+                          note={
+                            task?.recurringTemplateId
+                              ? "Added steps apply to this run only, not the recurring template."
+                              : undefined
+                          }
+                          onAccept={acceptSuggestedSubtasks}
+                          reportAcceptErrors={false}
+                        />
+                      ) : null}
                       {checklist.map((item, idx) => {
                         const expanded = expandedSubtaskId === item.id;
                         return (

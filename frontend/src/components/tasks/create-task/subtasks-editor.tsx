@@ -12,8 +12,10 @@ import {
   processSubtaskComposerPaste,
   SubtaskComposerAttachments,
 } from "@/components/tasks/create-task/subtask-composer-attachments";
+import { SubtaskSuggestionsPanel } from "@/components/tasks/subtasks/subtask-suggestions-panel";
 import type {
   FieldErrors,
+  UseFieldArrayAppend,
   UseFieldArrayPrepend,
   UseFieldArrayRemove,
   UseFormRegister,
@@ -23,6 +25,7 @@ import { SubtaskDueDatePicker } from "@/components/tasks/subtask-due-date-picker
 import { Check, Pencil, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { generateClientId } from "@/lib/generate-client-id";
+import { clampSubtaskTitle } from "@/lib/subtask-limits";
 import {
   resolveSubtaskStatus,
   subtaskWithCompleted,
@@ -64,6 +67,7 @@ interface SubtasksEditorProps {
   values?: SubtaskItem[];
   register?: UseFormRegister<any>;
   prepend: UseFieldArrayPrepend<any, any>;
+  append: UseFieldArrayAppend<any, any>;
   remove: UseFieldArrayRemove;
   setValue: UseFormSetValue<any>;
   errors: FieldErrors<any>;
@@ -74,6 +78,9 @@ interface SubtasksEditorProps {
     items: PendingSubtaskAttachment[]
   ) => void;
   hideQuickAdd?: boolean;
+  taskTitle?: string;
+  taskDescription?: string;
+  hideAiSuggestions?: boolean;
 }
 
 export function SubtasksEditor({
@@ -81,6 +88,7 @@ export function SubtasksEditor({
   fields,
   values,
   prepend,
+  append,
   remove,
   setValue,
   errors,
@@ -88,6 +96,9 @@ export function SubtasksEditor({
   pendingAttachmentsBySubtask = {},
   onPendingAttachmentsChange,
   hideQuickAdd,
+  taskTitle = "",
+  taskDescription = "",
+  hideAiSuggestions = false,
 }: SubtasksEditorProps) {
   const { orgId } = useTenant();
   const { toast } = useToast();
@@ -595,6 +606,45 @@ export function SubtasksEditor({
             );
           })}
         </ul>
+      ) : null}
+
+      {!hideAiSuggestions ? (
+      <SubtaskSuggestionsPanel
+        request={{
+          draft: {
+            title: taskTitle.trim(),
+            description: taskDescription,
+            subtasks: (values ?? [])
+              .map((item) => item.title?.trim() ?? "")
+              .filter((title) => title.length > 0)
+              .map((title) => ({ title })),
+          },
+        }}
+        existingTitles={(values ?? []).map((item) => item.title ?? "")}
+        disabled={disabled || taskTitle.trim().length === 0}
+        disabledReason={
+          taskTitle.trim().length === 0 ? "Add a task title before asking for suggestions." : undefined
+        }
+        onAccept={(titles) => {
+          const taken = new Set(
+            (values ?? []).map((item) => (item.title ?? "").trim().toLowerCase()).filter(Boolean)
+          );
+          for (const title of titles) {
+            const trimmed = clampSubtaskTitle(title.trim());
+            const key = trimmed.toLowerCase();
+            if (!trimmed || taken.has(key)) continue;
+            taken.add(key);
+            append({
+              id: generateClientId(),
+              title: trimmed,
+              completed: false,
+              status: "TODO",
+              priority: "MEDIUM",
+              requireLocation: false,
+            });
+          }
+        }}
+      />
       ) : null}
 
       <ConfirmDialog
