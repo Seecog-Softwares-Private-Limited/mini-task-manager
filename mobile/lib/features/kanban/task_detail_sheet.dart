@@ -35,6 +35,7 @@ import 'attachment_picker_section.dart';
 import 'attachment_preview.dart';
 import 'assignee_picker_sheet.dart';
 import 'require_location_toggle.dart';
+import 'subtask_suggestions_panel.dart';
 
 /// How much of the task detail UI to show.
 enum TaskDetailMode {
@@ -745,6 +746,72 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     }
   }
 
+  Future<void> _acceptSuggestedSubtasks(List<String> titles) async {
+    if (_saving || _addingSubtask || _savingSubtaskIndex != null) return;
+    final taken = _subtasks
+        .map((s) => normalizeSuggestionTitle(s.title))
+        .where((t) => t.isNotEmpty)
+        .toSet();
+    final additions = <TaskSubtask>[];
+    for (final raw in titles) {
+      final trimmed = clampSubtaskTitle(raw);
+      final key = normalizeSuggestionTitle(trimmed);
+      if (trimmed.isEmpty || taken.contains(key)) continue;
+      taken.add(key);
+      additions.add(
+        TaskSubtask(
+          id: generateClientId(),
+          title: trimmed,
+          completed: false,
+          status: 'TODO',
+          priority: 'MEDIUM',
+          requireLocation: _task.requireLocation,
+        ),
+      );
+    }
+    if (additions.isEmpty) return;
+
+    final previous = List<TaskSubtask>.from(_subtasks);
+    final updated = [...additions, ...previous];
+    setState(() {
+      _subtasks = updated;
+      _addingSubtask = true;
+      _error = null;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _checklistAddKey.currentContext;
+      if (ctx != null && mounted) {
+        Scrollable.ensureVisible(
+          ctx,
+          alignment: 0.1,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+    try {
+      final saved = await ref.read(tasksRepositoryProvider).updateTask(
+            taskId: _task.id,
+            subtasks: updated,
+          );
+      if (!mounted) return;
+      setState(() {
+        _task = saved;
+        _subtasks = _mergeSubtasksPreservingOrder(updated, saved.subtasks);
+      });
+      widget.onUpdated();
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.message;
+        _subtasks = previous;
+      });
+      rethrow;
+    } finally {
+      if (mounted) setState(() => _addingSubtask = false);
+    }
+  }
+
   void _cancelSubtaskEdit(int index) {
     final id = _subtasks[index].id;
     setState(() {
@@ -1447,6 +1514,26 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                       onSubmit: _appendSubtask,
                     ),
                   ),
+                  const SizedBox(height: AppSpacing.sm),
+                  if (orgId.isNotEmpty)
+                    SubtaskSuggestionsPanel(
+                      key: ValueKey<String>('ai-suggest-${_task.id}'),
+                      organizationId: orgId,
+                      taskId: _task.id,
+                      purposeInput: true,
+                      draftDescription: stripHtmlToPlainText(_task.description),
+                      existingTitles:
+                          _subtasks.map((s) => s.title).toList(),
+                      disabled: _saving ||
+                          _addingSubtask ||
+                          _savingSubtaskIndex != null,
+                      note: (_task.recurringTemplateId != null &&
+                              _task.recurringTemplateId!.trim().isNotEmpty)
+                          ? 'Added steps apply to this run only, not the recurring template.'
+                          : null,
+                      reportAcceptErrors: false,
+                      onAccept: _acceptSuggestedSubtasks,
+                    ),
                   const SizedBox(height: AppSpacing.sm),
                 ],
                 if (_subtasks.isEmpty && allowChecklistStructureEdit)
