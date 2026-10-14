@@ -12,6 +12,7 @@ import '../../shared/widgets/workspace_avatar.dart';
 import '../auth/session_controller.dart';
 import '../workspaces/workspace_settings_sheet.dart';
 import '../workspaces/workspace_switcher_sheet.dart';
+import '../billing/ios_billing_gate.dart';
 import '../billing/plans_billing_screen.dart';
 import 'my_profile_screen.dart';
 import 'security_screen.dart';
@@ -85,15 +86,18 @@ class AccountSettingsScreen extends ConsumerWidget {
               MaterialPageRoute<void>(builder: (_) => const SecurityScreen()),
             ),
           ),
-          _SettingsTile(
-            icon: Icons.workspace_premium_rounded,
-            iconColor: AppColors.warning,
-            title: 'Plans & Pricing',
-            subtitle: 'View plans and upgrade your account',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const PlansBillingScreen()),
+          if (isPlansBillingUiEnabled)
+            _SettingsTile(
+              icon: Icons.workspace_premium_rounded,
+              iconColor: AppColors.warning,
+              title: 'Plans & Pricing',
+              subtitle: 'View plans and upgrade your account',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const PlansBillingScreen(),
+                ),
+              ),
             ),
-          ),
           _SettingsTile(
             icon: Icons.business_outlined,
             iconColor: AppColors.primary,
