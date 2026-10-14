@@ -8,6 +8,7 @@ import '../../core/theme/app_spacing.dart';
 import '../../data/models/organization.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../auth/session_controller.dart';
+import '../billing/ios_billing_gate.dart';
 import '../projects/projects_providers.dart';
 import 'invite_member_sheet.dart';
 import 'workspace_icon_picker.dart';
@@ -233,14 +234,16 @@ class _WorkspaceSettingsSheetState extends ConsumerState<WorkspaceSettingsSheet>
                             },
                           ),
                         ],
-                        const SizedBox(height: AppSpacing.sm),
-                        SecondaryButton(
-                          label: 'Plans & Pricing',
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                            openPlansBillingScreen();
-                          },
-                        ),
+                        if (isPlansBillingUiEnabled) ...[
+                          const SizedBox(height: AppSpacing.sm),
+                          SecondaryButton(
+                            label: 'Plans & Pricing',
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              openPlansBillingScreen();
+                            },
+                          ),
+                        ],
                       ],
                     ),
                   ),
