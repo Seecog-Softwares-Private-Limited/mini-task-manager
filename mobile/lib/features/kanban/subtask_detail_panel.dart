@@ -309,7 +309,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
       selectedAssigneeIds: _assigneeIds,
       sessionUser: ref.read(sessionControllerProvider).user,
       enabled: !widget.saving,
-      title: 'Assignees',
+      title: 'Assign to task member',
       showDoneButton: true,
       onSelectionChanged: (next) {
         setState(() => _assigneeIds = next);

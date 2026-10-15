@@ -12,6 +12,28 @@ import '../../shared/widgets/app_widgets.dart';
 String normalizeAssigneeUserId(String id) =>
     id.trim().toLowerCase().replaceAll('-', '');
 
+/// Subtask assignee pickers should only offer people already on the parent task
+/// (or planner series), matching web `taskAssigneesOnly`.
+List<ProjectMember> membersAssignedToParent({
+  required List<ProjectMember> allMembers,
+  required Iterable<String> parentAssigneeIds,
+}) {
+  final allowed = parentAssigneeIds
+      .map(normalizeAssigneeUserId)
+      .where((id) => id.isNotEmpty)
+      .toSet();
+  if (allowed.isEmpty) return const [];
+  final seen = <String>{};
+  final filtered = <ProjectMember>[];
+  for (final member in allMembers) {
+    final key = normalizeAssigneeUserId(member.userId);
+    if (allowed.contains(key) && seen.add(key)) {
+      filtered.add(member);
+    }
+  }
+  return filtered;
+}
+
 bool areAllAssigneesSelected(
   Iterable<String> selectedIds,
   List<ProjectMember> members,
@@ -173,7 +195,10 @@ Future<void> showAssigneePickerSheet({
                         ? Padding(
                             padding: const EdgeInsets.all(AppSpacing.lg),
                             child: Text(
-                              'No project members available.',
+                              title.toLowerCase().contains('task member')
+                                  ? 'Assign people on the main task first. Only those members can be selected here.'
+                                  : 'No project members available.',
+                              textAlign: TextAlign.center,
                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                     color: AppColors.textMuted,
                                   ),

@@ -9,6 +9,7 @@ import '../../core/router/app_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/calendar_date.dart';
+import '../../core/utils/task_display_sort.dart';
 import '../../data/models/task.dart';
 import '../../data/models/workflow.dart';
 import '../../shared/widgets/app_widgets.dart';
@@ -345,11 +346,15 @@ ProjectBoardData _applyEmbeddedFilters(
     if (isTaskDueOverdue(task.dueDate)) overdueCount++;
   }
 
+  final statusTypeById = statusTypeMapFrom(board.statuses);
   return ProjectBoardData(
     statuses: board.statuses,
-    tasks: filtered,
+    tasks: sortTasksForDisplay(filtered, statusTypeById: statusTypeById),
     projectName: board.projectName,
-    tasksByStatus: tasksByStatus,
+    tasksByStatus: sortTasksByStatusMap(
+      tasksByStatus,
+      statusTypeById: statusTypeById,
+    ),
     overdueCount: overdueCount,
   );
 }

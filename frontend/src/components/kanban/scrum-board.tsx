@@ -342,7 +342,7 @@ export function ScrumBoard({
   assigneeMap,
   commentCountMap,
   subtaskMap,
-  filters = { search: "", priority: [], assignee: [], recurrence: "normal", sortBy: "completed", sortDir: "asc" },
+  filters = { search: "", priority: [], assignee: [], recurrence: "normal", sortBy: "urgency", sortDir: "asc" },
   quickActions,
   wipLimits,
   movingTaskId,
@@ -493,7 +493,15 @@ export function ScrumBoard({
                       const cellKey = cellId(swimlane.id, status.id);
                       const tasks = tasksByCell[cellKey] ?? [];
                       const filtered = applyFilters(tasks, filters);
-                      const sorted = applyBoardSorting(filtered, filters.sortBy, filters.sortDir);
+                      const statusTypeById = Object.fromEntries(
+                        statuses.map((s) => [s.id, s.type ?? ""])
+                      );
+                      const sorted = applyBoardSorting(
+                        filtered,
+                        filters.sortBy,
+                        filters.sortDir,
+                        { statusTypeById }
+                      );
                       return (
                         <td key={cellKey} className="align-top p-2">
                           <ScrumCell

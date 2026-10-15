@@ -830,12 +830,17 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
               ...List.generate(_checklist.length, (index) {
                 final item = _checklist[index];
                 final expanded = _expandedSubtaskIndex == index;
+                // Checklist owners are limited to people assigned on the series.
+                final checklistAssigneePool = membersAssignedToParent(
+                  allMembers: _members,
+                  parentAssigneeIds: _assigneeIds,
+                );
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     SubtaskCompactRow(
                       subtask: item,
-                      members: _members,
+                      members: checklistAssigneePool,
                       expanded: expanded,
                       enabled: !_loading,
                       canComplete: false,
@@ -859,7 +864,7 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
                             padding: const EdgeInsets.all(AppSpacing.sm),
                             child: SubtaskDetailPanel(
                               subtask: item,
-                              members: _members,
+                              members: checklistAssigneePool,
                               // Series setup is not a board task — never pass template id as taskId.
                               taskId: '',
                               organizationId: widget.organizationId,

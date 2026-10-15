@@ -61,7 +61,7 @@ export interface BoardFilters {
   priority: string[];
   assignee: string[];
   recurrence: "all" | "normal" | "recurring";
-  sortBy: "created" | "priority" | "dueDate" | "title" | "completed";
+  sortBy: "urgency" | "created" | "priority" | "dueDate" | "title" | "completed";
   sortDir: "asc" | "desc";
 }
 
@@ -70,7 +70,7 @@ export const DEFAULT_FILTERS: BoardFilters = {
   priority: [],
   assignee: [],
   recurrence: "normal",
-  sortBy: "completed",
+  sortBy: "urgency",
   sortDir: "asc",
 };
 
@@ -918,16 +918,29 @@ export function KanbanBoard({
     return undefined;
   }, [activeId, tasksByStatus, statuses]);
 
+  const statusTypeById = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const status of statuses) {
+      if (status.id) map[status.id] = status.type ?? "";
+    }
+    return map;
+  }, [statuses]);
+
   const filteredTasksByStatus = useMemo(() => {
     const result: Record<string, Task[]> = {};
     const effectiveFilters =
       boardVariant === "recurring" ? { ...filters, recurrence: "all" as const } : filters;
     for (const [statusId, tasks] of Object.entries(tasksByStatus)) {
       const filtered = applyFilters(tasks, effectiveFilters);
-      result[statusId] = applyBoardSorting(filtered, effectiveFilters.sortBy, effectiveFilters.sortDir);
+      result[statusId] = applyBoardSorting(
+        filtered,
+        effectiveFilters.sortBy,
+        effectiveFilters.sortDir,
+        { statusTypeById }
+      );
     }
     return result;
-  }, [tasksByStatus, filters, boardVariant]);
+  }, [tasksByStatus, filters, boardVariant, statusTypeById]);
 
   const handleDragStart = useCallback((e: DragStartEvent) => {
     setActiveId(e.active.id as string);

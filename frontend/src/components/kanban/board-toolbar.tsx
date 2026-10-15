@@ -41,6 +41,7 @@ const PRIORITIES = [
 ];
 
 const SORT_OPTIONS = [
+  { value: "urgency", label: "Critical → In progress → Done" },
   { value: "created", label: "Date created" },
   { value: "completed", label: "Date completed" },
   { value: "priority", label: "Priority" },
@@ -120,7 +121,7 @@ export function BoardToolbar({
     filters.priority.length > 0 ||
     filters.assignee.length > 0 ||
     (showRecurrenceFilter && filters.recurrence !== "all") ||
-    filters.sortBy !== "completed" ||
+    filters.sortBy !== "urgency" ||
     filters.sortDir !== "asc";
 
   const updateFilter = useCallback(<K extends keyof BoardFilters>(key: K, value: BoardFilters[K]) => {
@@ -141,7 +142,7 @@ export function BoardToolbar({
       priority: [],
       assignee: [],
       recurrence: "normal",
-      sortBy: "completed",
+      sortBy: "urgency",
       sortDir: "asc",
     });
   }
@@ -586,13 +587,13 @@ export function BoardToolbar({
           )}
 
           {/* Sort chip */}
-          {(filters.sortBy !== "completed" || filters.sortDir !== "asc") && (
+          {(filters.sortBy !== "urgency" || filters.sortDir !== "asc") && (
             <Badge variant="secondary" className="h-6 gap-1 pl-2 pr-1 text-[11px] font-medium">
               <ArrowUpDown className="h-2.5 w-2.5" />
               {SORT_OPTIONS.find((o) => o.value === filters.sortBy)?.label}
               {filters.sortDir === "asc" ? " ↑" : " ↓"}
               <button
-                onClick={() => { updateFilter("sortBy", "completed"); updateFilter("sortDir", "asc"); }}
+                onClick={() => { updateFilter("sortBy", "urgency"); updateFilter("sortDir", "asc"); }}
                 className="ml-0.5 rounded-full hover:bg-muted-foreground/20 p-0.5 transition-colors"
               >
                 <X className="h-2.5 w-2.5" />
