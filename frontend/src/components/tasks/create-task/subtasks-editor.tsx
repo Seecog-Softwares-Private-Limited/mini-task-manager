@@ -180,17 +180,17 @@ export function SubtasksEditor({
           compareSubtasksByDisplayOrder(
             {
               title: a.value?.title ?? "",
-              priority: a.value?.priority,
               status: a.value?.status,
               completed: a.value?.completed ?? false,
               dueDate: a.value?.dueDate,
+              dueTime: a.value?.dueTime,
             },
             {
               title: b.value?.title ?? "",
-              priority: b.value?.priority,
               status: b.value?.status,
               completed: b.value?.completed ?? false,
               dueDate: b.value?.dueDate,
+              dueTime: b.value?.dueTime,
             }
           )
         ),
