@@ -25,6 +25,9 @@ describe('EmailService (integration)', () => {
   beforeEach(async () => {
     sendMailMock.mockClear();
     verifyMock.mockClear();
+    // Force MailHog path — ignoreEnvFile so repo .env Resend keys do not win.
+    process.env.RESEND_API_KEY = '';
+    process.env.SMTP_PROVIDER = '';
     process.env.SMTP_HOST = 'localhost';
     process.env.SMTP_PORT = '1025';
     process.env.SMTP_FROM = 'test@example.com';
@@ -33,6 +36,7 @@ describe('EmailService (integration)', () => {
       imports: [
         ConfigModule.forRoot({
           isGlobal: true,
+          ignoreEnvFile: true,
           load: [configuration],
         }),
       ],

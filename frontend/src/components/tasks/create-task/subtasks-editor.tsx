@@ -182,14 +182,14 @@ export function SubtasksEditor({
               title: a.value?.title ?? "",
               priority: a.value?.priority,
               status: a.value?.status,
-              completed: a.value?.completed,
+              completed: a.value?.completed ?? false,
               dueDate: a.value?.dueDate,
             },
             {
               title: b.value?.title ?? "",
               priority: b.value?.priority,
               status: b.value?.status,
-              completed: b.value?.completed,
+              completed: b.value?.completed ?? false,
               dueDate: b.value?.dueDate,
             }
           )

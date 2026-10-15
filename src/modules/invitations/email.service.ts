@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import type { Configuration } from '../../config/configuration';
 import {
   emailInvitationBody,
@@ -77,8 +78,9 @@ type SmtpConfig = Configuration['smtp'];
 @Injectable()
 export class EmailService implements OnModuleInit {
   private readonly logger = new Logger(EmailService.name);
-  private transporter!: nodemailer.Transporter;
+  private transporter?: nodemailer.Transporter;
   private fallbackTransporter?: nodemailer.Transporter;
+  private resend?: Resend;
   private smtp!: SmtpConfig;
   private readonly nodeEnv: string;
 
@@ -88,10 +90,23 @@ export class EmailService implements OnModuleInit {
   }
 
   async onModuleInit(): Promise<void> {
+    if (this.smtp.provider === 'resend') {
+      if (!this.smtp.resendApiKey) {
+        this.logger.error(
+          'Resend is configured but RESEND_API_KEY is empty. Set RESEND_API_KEY in .env and restart.',
+        );
+      } else {
+        this.logger.log('Resend API ready (no SMTP verify needed)');
+      }
+      return;
+    }
+
     if (!this.smtp.verifyOnStartup) {
       this.logger.warn('SMTP_VERIFY_ON_STARTUP=false — skipping startup SMTP verification');
       return;
     }
+
+    if (!this.transporter) return;
 
     try {
       await this.transporter.verify();
@@ -101,7 +116,7 @@ export class EmailService implements OnModuleInit {
       this.logger.error(
         `SMTP verification failed (${this.smtp.host}:${this.smtp.port}): ${detail}. ` +
           'Emails will not deliver until SMTP is reachable. ' +
-          'For local dev run MailHog (docker compose up -d mailhog) or configure SMTP_* in .env.',
+          'For local dev run MailHog (docker compose up -d mailhog) or configure SMTP_* / RESEND_API_KEY in .env.',
       );
     }
   }
@@ -247,22 +262,24 @@ ${emailExpiryNote('1 hour')}
 
   private initTransport(): void {
     this.smtp = this.configService.get('smtp', { infer: true })!;
-    const { host, port, user, pass, provider } = this.smtp;
+    const { host, port, user, pass, provider, resendApiKey } = this.smtp;
 
-    this.transporter = this.createTransport(
-      { host, port, user, pass },
-      provider,
-    );
+    if (provider === 'resend') {
+      this.resend = new Resend(resendApiKey || 'missing-resend-api-key');
+      this.logger.log('Email transport configured: Resend API');
+    } else {
+      this.transporter = this.createTransport({ host, port, user, pass }, provider);
 
-    const mode =
-      provider === 'mailhog'
-        ? ' (MailHog — view at http://localhost:8025)'
-        : provider === 'ses'
-          ? ` (Amazon SES${this.smtp.region ? `, ${this.smtp.region}` : ''})`
-          : user
-            ? ' (authenticated)'
-            : ' (no SMTP auth — suitable for local MailHog)';
-    this.logger.log(`Email transport configured: ${host}:${port}${mode}`);
+      const mode =
+        provider === 'mailhog'
+          ? ' (MailHog — view at http://localhost:8025)'
+          : provider === 'ses'
+            ? ` (Amazon SES${this.smtp.region ? `, ${this.smtp.region}` : ''})`
+            : user
+              ? ' (authenticated)'
+              : ' (no SMTP auth — suitable for local MailHog)';
+      this.logger.log(`Email transport configured: ${host}:${port}${mode}`);
+    }
 
     const fallback = this.smtp.fallback;
     if (fallback?.host) {
@@ -327,9 +344,35 @@ ${emailExpiryNote('1 hour')}
       },
     };
 
-    this.logger.log(`Sending ${kind} email to ${to} via ${this.smtp.host}:${this.smtp.port}`);
+    const via =
+      this.smtp.provider === 'resend'
+        ? 'Resend API'
+        : `${this.smtp.host}:${this.smtp.port}`;
+    this.logger.log(`Sending ${kind} email to ${to} via ${via}`);
 
     try {
+      if (this.resend) {
+        const { data, error } = await this.resend.emails.send({
+          from,
+          to,
+          subject,
+          html,
+          text,
+          ...(replyTo ? { replyTo } : {}),
+        });
+        if (error) {
+          throw new Error(error.message || JSON.stringify(error));
+        }
+        this.logger.log(
+          `${kind} email sent to ${to} (messageId=${data?.id ?? 'n/a'}, via=Resend)`,
+        );
+        return;
+      }
+
+      if (!this.transporter) {
+        throw new Error('Email transporter is not configured');
+      }
+
       const info = await this.transporter.sendMail(mail);
       this.logger.log(
         `${kind} email sent to ${to} (messageId=${info.messageId ?? 'n/a'}, response=${info.response ?? 'n/a'})`,
@@ -338,7 +381,7 @@ ${emailExpiryNote('1 hour')}
     } catch (err) {
       const detail = this.formatError(err);
       this.logger.error(
-        `Failed to send ${kind} email to ${to} via ${this.smtp.host}:${this.smtp.port}: ${detail}`,
+        `Failed to send ${kind} email to ${to} via ${via}: ${detail}`,
         err instanceof Error ? err.stack : undefined,
       );
 
@@ -393,6 +436,22 @@ ${emailExpiryNote('1 hour')}
         detail,
       );
 
+    if (provider === 'resend' && /api.?key|unauthorized|invalid.*key|401|403/i.test(detail)) {
+      return (
+        'Resend rejected the API key. Set RESEND_API_KEY in .env (from https://resend.com/api-keys), then restart the API.'
+      );
+    }
+
+    if (
+      provider === 'resend' &&
+      /not verified|domain|from address|invalid.*from|403|422/i.test(detail)
+    ) {
+      return (
+        'Resend rejected the sender. Verify your domain in Resend, or use SMTP_FROM like ' +
+        '"OpsPick <onboarding@resend.dev>" for testing. Then restart the API.'
+      );
+    }
+
     if (provider === 'gmail' && badCredentials) {
       return (
         'Gmail rejected the SMTP credentials. Use a Google App Password (not your normal Gmail password): ' +
@@ -427,7 +486,7 @@ ${emailExpiryNote('1 hour')}
     }
 
     return (
-      `Could not send email (${detail}). Check SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASS in .env and restart the API.`
+      `Could not send email (${detail}). Check RESEND_API_KEY or SMTP_* in .env and restart the API.`
     );
   }
 

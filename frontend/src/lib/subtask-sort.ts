@@ -16,8 +16,12 @@ const PRIORITY_ORDER: Record<string, number> = {
  * 4. Done at the bottom
  */
 export function compareSubtasksByDisplayOrder(
-  a: Pick<TaskSubtask, "title" | "priority" | "status" | "completed" | "dueDate">,
-  b: Pick<TaskSubtask, "title" | "priority" | "status" | "completed" | "dueDate">
+  a: Pick<TaskSubtask, "title" | "priority" | "status" | "dueDate"> & {
+    completed?: boolean;
+  },
+  b: Pick<TaskSubtask, "title" | "priority" | "status" | "dueDate"> & {
+    completed?: boolean;
+  }
 ): number {
   const aStatus = resolveSubtaskStatus(a);
   const bStatus = resolveSubtaskStatus(b);
