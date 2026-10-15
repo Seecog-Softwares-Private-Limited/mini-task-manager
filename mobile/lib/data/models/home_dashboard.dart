@@ -1,4 +1,5 @@
 import '../../core/utils/calendar_date.dart';
+import '../../core/utils/recurrence_display.dart';
 import 'task.dart';
 
 bool _isSubtaskDone(TaskSubtask subtask) {
@@ -7,31 +8,215 @@ bool _isSubtaskDone(TaskSubtask subtask) {
   return subtask.completed;
 }
 
-/// One actionable row on Home → Due today (checklist item or leaf task).
+bool _hasDateOrTime(String? date, String? time) {
+  final d = date?.trim() ?? '';
+  final t = time?.trim() ?? '';
+  return d.isNotEmpty || t.isNotEmpty;
+}
+
+List<String> _assigneeIds({
+  List<String> assigneeIds = const [],
+  String? assigneeId,
+}) {
+  if (assigneeIds.isNotEmpty) return assigneeIds;
+  if (assigneeId != null && assigneeId.trim().isNotEmpty) return [assigneeId];
+  return const [];
+}
+
+bool _assigneeContains(List<String> assignees, String userId) {
+  final target = userId.trim().toLowerCase().replaceAll(RegExp(r'[{}-]'), '');
+  if (target.isEmpty) return false;
+  for (final id in assignees) {
+    final normalized =
+        id.trim().toLowerCase().replaceAll(RegExp(r'[{}-]'), '');
+    if (normalized == target) return true;
+  }
+  return false;
+}
+
+bool _isAssignedToUser({
+  required Task task,
+  TaskSubtask? subtask,
+  required String userId,
+}) {
+  if (subtask != null) {
+    final subAssignees = _assigneeIds(
+      assigneeIds: subtask.assigneeIds,
+      assigneeId: subtask.assigneeId,
+    );
+    if (subAssignees.isNotEmpty) {
+      return _assigneeContains(subAssignees, userId);
+    }
+  }
+  return _assigneeContains(
+    _assigneeIds(assigneeIds: task.assigneeIds, assigneeId: task.assigneeId),
+    userId,
+  );
+}
+
+bool _isDueDateTimeOverdue(String? dueDate, String? dueTime) {
+  if (dueDate == null || dueDate.trim().isEmpty) return false;
+  final parsed = DateTime.tryParse(dueDate);
+  if (parsed == null) return false;
+
+  if (dueTime != null && dueTime.trim().isNotEmpty) {
+    final parts = dueTime.split(':');
+    if (parts.length >= 2) {
+      final hours = int.tryParse(parts[0]);
+      final minutes = int.tryParse(parts[1]);
+      if (hours != null && minutes != null) {
+        final due = DateTime(
+          parsed.year,
+          parsed.month,
+          parsed.day,
+          hours,
+          minutes,
+        );
+        return due.isBefore(DateTime.now());
+      }
+    }
+  }
+
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final due = DateTime(parsed.year, parsed.month, parsed.day);
+  return due.isBefore(today);
+}
+
+/// One actionable row on Home → Due Tasks (checklist item or leaf task).
 class HomeDueTodayItem {
   const HomeDueTodayItem({
     required this.task,
     this.subtask,
+    this.fromPlanner = false,
+    this.isUndated = false,
   });
 
   final Task task;
   final TaskSubtask? subtask;
+  final bool fromPlanner;
 
+  /// Open item with no date/time.
+  final bool isUndated;
+
+  /// Primary card title: subtask name when set, otherwise the (leaf) task title.
   String get title {
     final sub = subtask?.title.trim();
     if (sub != null && sub.isNotEmpty) return sub;
     return task.title;
   }
 
-  /// Parent ritual/task name when this row is a checklist item.
-  String? get parentTitle {
+  /// Parent task name under the subtask title; null for leaf tasks.
+  String? get subtitle {
     if (subtask == null) return null;
     final parent = task.title.trim();
     return parent.isEmpty ? null : parent;
   }
 
+  /// Parent ritual/task name when this row is a checklist item.
+  String? get parentTitle => subtitle;
+
   String get key =>
       subtask == null ? task.id : '${task.id}:${subtask!.id}';
+
+  String? get _effectiveDueDate =>
+      subtask != null
+          ? ((subtask!.dueDate?.trim().isNotEmpty ?? false)
+              ? subtask!.dueDate
+              : task.dueDate)
+          : task.dueDate;
+
+  String? get _effectiveDueTime {
+    if (subtask != null) {
+      if (subtask!.dueDate?.trim().isNotEmpty ?? false) {
+        return subtask!.dueTime;
+      }
+      if (subtask!.dueTime?.trim().isNotEmpty ?? false) {
+        return subtask!.dueTime;
+      }
+      return task.dueTime;
+    }
+    return task.dueTime;
+  }
+
+  bool get isCompleted {
+    if (subtask != null) return _isSubtaskDone(subtask!);
+    return task.completedAt != null && task.completedAt!.trim().isNotEmpty;
+  }
+
+  bool get isInProgress {
+    if (isCompleted) return false;
+    final status = subtask?.status?.toUpperCase();
+    return status == 'IN_PROGRESS';
+  }
+
+  bool get isOverdue {
+    if (isCompleted || isInProgress) return false;
+    return _isDueDateTimeOverdue(_effectiveDueDate, _effectiveDueTime);
+  }
+
+  bool get isDueToday {
+    final due = parseCalendarDate(_effectiveDueDate);
+    if (due == null) return false;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return due.year == today.year &&
+        due.month == today.month &&
+        due.day == today.day;
+  }
+
+  /// Belongs on Home Due Tasks (assigned open work due now — not future-dated TODOs).
+  bool get belongsInDueList {
+    if (isCompleted) return false;
+    if (isInProgress) return true;
+    if (!_hasDateOrTime(_effectiveDueDate, _effectiveDueTime)) return true;
+    if (isOverdue) return true;
+    if (isDueToday) return true;
+    return false;
+  }
+
+  /// Sort / chip bucket:
+  /// 0 no date → 1 due today (still completable) → 2 overdue → 3 in progress → 4 done
+  int get displayBucket {
+    if (isCompleted) return 4;
+    if (isInProgress) return 3;
+    if (!_hasDateOrTime(_effectiveDueDate, _effectiveDueTime)) return 0;
+    if (isOverdue) return 2;
+    // Due today (or any remaining dated item if listed) — today sorts before future via due key.
+    return 1;
+  }
+
+  String get statusLabel {
+    switch (displayBucket) {
+      case 0:
+        return 'No date';
+      case 1:
+        return isDueToday ? 'Today' : 'Remaining';
+      case 2:
+        return 'Overdue';
+      case 3:
+        return 'In progress';
+      case 4:
+        return 'Done';
+      default:
+        return 'Due';
+    }
+  }
+}
+
+int compareHomeDueItems(HomeDueTodayItem a, HomeDueTodayItem b) {
+  final bucketCmp = a.displayBucket.compareTo(b.displayBucket);
+  if (bucketCmp != 0) return bucketCmp;
+
+  final aKey =
+      '${a._effectiveDueDate ?? ''}${a._effectiveDueTime ?? ''}'.trim();
+  final bKey =
+      '${b._effectiveDueDate ?? ''}${b._effectiveDueTime ?? ''}'.trim();
+  final dueCmp = (aKey.isEmpty ? '9999' : aKey)
+      .compareTo(bKey.isEmpty ? '9999' : bKey);
+  if (dueCmp != 0) return dueCmp;
+
+  return a.title.compareTo(b.title);
 }
 
 /// Workspace home stats — usually built client-side from project board tasks.
@@ -48,17 +233,26 @@ class HomeDashboard {
   final List<HomeTrendPoint> weeklyTrend;
   final List<Task> overdueTasks;
 
-  /// Checklist items (and leaf tasks) due today — what Home lists.
+  /// Checklist items (and leaf tasks) for Due Tasks — assigned to current user.
   final List<HomeDueTodayItem> dueTodayItems;
+
+  /// Board (non-planner) due rows.
+  List<HomeDueTodayItem> get dueTodayBoardItems =>
+      dueTodayItems.where((item) => !item.fromPlanner).toList();
+
+  /// Planner / recurring due rows.
+  List<HomeDueTodayItem> get dueTodayPlannerItems =>
+      dueTodayItems.where((item) => item.fromPlanner).toList();
 
   /// Legacy parent-task list (API / older callers). Prefer [dueTodayItems].
   final List<Task> dueTodayTasks;
 
-  /// Aggregate Total / Overdue from board (non-planner) tasks, and Due today
-  /// from [dueTodayCandidates] as **checklist items** (not parent rituals).
+  /// Aggregate Total / Overdue from board (non-planner) tasks, and Due Tasks
+  /// from [dueTodayCandidates] as **checklist items** assigned to [currentUserId].
   factory HomeDashboard.fromWorkspaceTasks(
     List<Task> tasks, {
     List<Task>? dueTodayCandidates,
+    String? currentUserId,
   }) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -84,20 +278,31 @@ class HomeDashboard {
     final seen = <String>{};
     final dueTodayItems = <HomeDueTodayItem>[];
     final dueTodayParents = <Task>[];
+    final userId = currentUserId?.trim() ?? '';
 
     for (final t in todaySource) {
-      if (isCompleted(t)) continue;
-      final parentDue = dateOnly(t.dueDate);
+      final fromPlanner = isRecurringTask(t);
 
       if (t.subtasks.isNotEmpty) {
         var addedParent = false;
         for (final sub in t.subtasks) {
           if (_isSubtaskDone(sub)) continue;
-          final subDue = dateOnly(sub.dueDate) ?? parentDue;
-          if (subDue != today) continue;
+          if (userId.isEmpty ||
+              !_isAssignedToUser(task: t, subtask: sub, userId: userId)) {
+            continue;
+          }
+          final undated = !_hasDateOrTime(sub.dueDate, sub.dueTime) &&
+              !_hasDateOrTime(t.dueDate, t.dueTime);
+          final item = HomeDueTodayItem(
+            task: t,
+            subtask: sub,
+            fromPlanner: fromPlanner,
+            isUndated: undated,
+          );
+          if (!item.belongsInDueList) continue;
           final key = '${t.id}:${sub.id}';
           if (!seen.add(key)) continue;
-          dueTodayItems.add(HomeDueTodayItem(task: t, subtask: sub));
+          dueTodayItems.add(item);
           if (!addedParent) {
             dueTodayParents.add(t);
             addedParent = true;
@@ -106,12 +311,24 @@ class HomeDashboard {
         continue;
       }
 
-      // Leaf task (no checklist): show the task itself when due today.
-      if (parentDue != today) continue;
+      // Leaf task (no checklist): only if assigned to the user and still open.
+      if (isCompleted(t)) continue;
+      if (userId.isEmpty ||
+          !_isAssignedToUser(task: t, userId: userId)) {
+        continue;
+      }
+      final leaf = HomeDueTodayItem(
+        task: t,
+        fromPlanner: fromPlanner,
+        isUndated: !_hasDateOrTime(t.dueDate, t.dueTime),
+      );
+      if (!leaf.belongsInDueList) continue;
       if (!seen.add(t.id)) continue;
-      dueTodayItems.add(HomeDueTodayItem(task: t));
+      dueTodayItems.add(leaf);
       dueTodayParents.add(t);
     }
+
+    dueTodayItems.sort(compareHomeDueItems);
 
     final open = tasks.where((t) => !isCompleted(t)).toList();
     final dueThisWeek = open.where((t) {
@@ -147,7 +364,7 @@ class HomeDashboard {
 
     return HomeDashboard(
       counts: HomeCounts(
-        dueToday: dueTodayItems.length,
+        dueToday: dueTodayItems.where((i) => !i.isCompleted).length,
         overdue: attentionOverdue.length,
         dueThisWeek: dueThisWeek,
         completedThisWeek: completedRecently.length,
@@ -181,15 +398,25 @@ class HomeDashboard {
           .toList(),
       overdueTasks: parseTasks(json['overdueTasks']),
       dueTodayTasks: parents,
-      // API still returns parent tasks; expand to checklist items client-side.
       dueTodayItems: [
         for (final t in parents)
           if (t.subtasks.isEmpty)
-            HomeDueTodayItem(task: t)
+            HomeDueTodayItem(
+              task: t,
+              fromPlanner: isRecurringTask(t),
+              isUndated: !_hasDateOrTime(t.dueDate, t.dueTime),
+            )
           else
             for (final s in t.subtasks)
-              if (!_isSubtaskDone(s)) HomeDueTodayItem(task: t, subtask: s),
-      ],
+              if (!_isSubtaskDone(s))
+                HomeDueTodayItem(
+                  task: t,
+                  subtask: s,
+                  fromPlanner: isRecurringTask(t),
+                  isUndated: !_hasDateOrTime(s.dueDate, s.dueTime) &&
+                      !_hasDateOrTime(t.dueDate, t.dueTime),
+                ),
+      ]..sort(compareHomeDueItems),
     );
   }
 }

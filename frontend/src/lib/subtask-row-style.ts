@@ -12,14 +12,14 @@ export interface SubtaskRowStyleInput {
 
 /**
  * Kanban-card style: thick left accent + neutral body + subtle gray border.
- * - To Do → light red left bar
+ * - To Do → blue left bar
  * - In Progress → light yellow left bar
  * - Done → light green left bar
  * - Overdue → dark red left bar
  */
 export const SUBTASK_ROW_COLORS = {
   TODO: {
-    accentColor: "#F87171", // red-400
+    accentColor: "#60A5FA", // blue-400
   },
   IN_PROGRESS: {
     accentColor: "#EAB308", // yellow-500

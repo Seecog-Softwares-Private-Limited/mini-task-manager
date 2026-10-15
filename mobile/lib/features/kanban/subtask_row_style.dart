@@ -57,7 +57,7 @@ bool isSubtaskOverdue(TaskSubtask subtask) {
 }
 
 /// Kanban-card style: thick left accent + neutral body + subtle gray border.
-/// - To Do → light red
+/// - To Do → blue
 /// - In Progress → light yellow
 /// - Done → light green
 /// - Overdue → dark red
@@ -78,7 +78,7 @@ SubtaskRowStyle subtaskRowStyle(TaskSubtask subtask, {bool expanded = false}) {
       return SubtaskRowStyle(
         borderColor: grayBorder,
         backgroundColor: surface,
-        accentColor: const Color(0xFFF87171), // red-400
+        accentColor: const Color(0xFF60A5FA), // blue-400
       );
     case 'IN_PROGRESS':
       return SubtaskRowStyle(

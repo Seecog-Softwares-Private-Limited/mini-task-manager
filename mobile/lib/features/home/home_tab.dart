@@ -5,7 +5,6 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../data/models/home_dashboard.dart';
 import '../../data/models/recurring.dart';
-import '../../data/models/task.dart';
 import '../../data/models/workflow.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../../shared/widgets/workspace_avatar.dart';
@@ -69,7 +68,7 @@ class HomeTab extends ConsumerWidget {
           ),
           const SizedBox(height: AppSpacing.lg),
           _SectionHeader(
-            title: 'Due today',
+            title: 'Due Tasks',
             icon: Icons.today_rounded,
             trailing: TextButton(
               onPressed: () {
@@ -89,14 +88,9 @@ class HomeTab extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.sm),
-          _NeedsAttention(
+          _DueTodayTabs(
             dashboardAsync: dashboardAsync,
-            onOpenItem: (item) => _openTask(
-              context,
-              ref,
-              item.task,
-              initialSubtaskId: item.subtask?.id,
-            ),
+            onOpenItem: (item) => _openDueItem(context, ref, item),
           ),
           const SizedBox(height: AppSpacing.lg),
           _MomentumCard(
@@ -161,16 +155,17 @@ class HomeTab extends ConsumerWidget {
     );
   }
 
-  Future<void> _openTask(
+  /// Opens the parent task (board or planner). Focuses the due subtask when set.
+  Future<void> _openDueItem(
     BuildContext context,
     WidgetRef ref,
-    Task task, {
-    String? initialSubtaskId,
-  }) async {
+    HomeDueTodayItem item,
+  ) async {
+    final parent = item.task;
     List<WorkflowStatus> statuses = const [];
     try {
       statuses = await ref
-          .read(projectWorkflowStatusesProvider(task.projectId).future);
+          .read(projectWorkflowStatusesProvider(parent.projectId).future);
     } catch (_) {
       statuses = const [];
     }
@@ -181,12 +176,18 @@ class HomeTab extends ConsumerWidget {
       backgroundColor: Colors.transparent,
       builder: (_) {
         return TaskDetailSheet(
-          task: task,
+          task: parent,
           statuses: statuses,
-          projectId: task.projectId,
-          initialSubtaskId: initialSubtaskId,
-          onUpdated: () => ref.invalidate(homeDashboardProvider),
-          onDeleted: () => ref.invalidate(homeDashboardProvider),
+          projectId: parent.projectId,
+          initialSubtaskId: item.subtask?.id,
+          onUpdated: () {
+            ref.invalidate(workspaceAllProjectTasksProvider);
+            ref.invalidate(homeDashboardProvider);
+          },
+          onDeleted: () {
+            ref.invalidate(workspaceAllProjectTasksProvider);
+            ref.invalidate(homeDashboardProvider);
+          },
         );
       },
     );
@@ -488,8 +489,8 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _NeedsAttention extends StatelessWidget {
-  const _NeedsAttention({
+class _DueTodayTabs extends StatefulWidget {
+  const _DueTodayTabs({
     required this.dashboardAsync,
     required this.onOpenItem,
   });
@@ -498,53 +499,78 @@ class _NeedsAttention extends StatelessWidget {
   final ValueChanged<HomeDueTodayItem> onOpenItem;
 
   @override
+  State<_DueTodayTabs> createState() => _DueTodayTabsState();
+}
+
+class _DueTodayTabsState extends State<_DueTodayTabs>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return dashboardAsync.when(
+    return widget.dashboardAsync.when(
       data: (d) {
-        final items = d.dueTodayItems.take(5).toList();
-        if (items.isEmpty) {
-          return SurfaceCard(
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.success.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.check_rounded,
-                      color: AppColors.success),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Nothing due today',
-                          style: Theme.of(context).textTheme.titleMedium),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Checklist items due today will show up here.',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
+        final board = d.dueTodayBoardItems;
+        final planner = d.dueTodayPlannerItems;
+        final items =
+            (_tabController.index == 0 ? board : planner).take(5).toList();
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            for (final item in items) ...[
-              _AttentionRow(item: item, onTap: () => onOpenItem(item)),
-              const SizedBox(height: AppSpacing.xs),
-            ],
+            Material(
+              color: Colors.transparent,
+              child: TabBar(
+                controller: _tabController,
+                isScrollable: true,
+                tabAlignment: TabAlignment.start,
+                labelColor: AppColors.primary,
+                unselectedLabelColor: AppColors.textMuted,
+                indicatorColor: AppColors.primary,
+                indicatorSize: TabBarIndicatorSize.label,
+                labelStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                tabs: [
+                  Tab(text: 'Due Tasks (${board.length})'),
+                  Tab(text: 'Due from Planner (${planner.length})'),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            if (items.isEmpty)
+              _DueTodayEmpty(
+                forPlanner: _tabController.index == 1,
+              )
+            else
+              for (final item in items) ...[
+                _AttentionRow(
+                  item: item,
+                  onTap: () => widget.onOpenItem(item),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+              ],
           ],
         );
       },
       loading: () => const Column(
         children: [
+          ShimmerBox(height: 40),
+          SizedBox(height: AppSpacing.sm),
           ShimmerBox(height: 64),
           SizedBox(height: AppSpacing.xs),
           ShimmerBox(height: 64),
@@ -563,6 +589,49 @@ class _NeedsAttention extends StatelessWidget {
   }
 }
 
+class _DueTodayEmpty extends StatelessWidget {
+  const _DueTodayEmpty({required this.forPlanner});
+
+  final bool forPlanner;
+
+  @override
+  Widget build(BuildContext context) {
+    return SurfaceCard(
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.success.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.check_rounded, color: AppColors.success),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  forPlanner ? 'No planner items due today' : 'Nothing due today',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  forPlanner
+                      ? 'Planner checklist items and runs due today will show up here.'
+                      : 'Board checklist items due today will show up here.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _AttentionRow extends StatelessWidget {
   const _AttentionRow({required this.item, required this.onTap});
 
@@ -572,7 +641,9 @@ class _AttentionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _priorityColor(item.subtask?.priority ?? item.task.priority);
-    final parent = item.parentTitle;
+    // Large = subtask (or leaf task); small = parent task for reference.
+    final subtaskTitle = item.title;
+    final parentTitle = item.parentTitle;
     return SurfaceCard(
       padding: const EdgeInsets.all(AppSpacing.sm),
       onTap: onTap,
@@ -580,7 +651,7 @@ class _AttentionRow extends StatelessWidget {
         children: [
           Container(
             width: 4,
-            height: parent == null ? 36 : 44,
+            height: parentTitle == null ? 36 : 48,
             decoration: BoxDecoration(
               color: color,
               borderRadius: BorderRadius.circular(4),
@@ -592,17 +663,21 @@ class _AttentionRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.title,
-                  style: Theme.of(context).textTheme.bodyLarge,
+                  subtaskTitle,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (parent != null) ...[
+                if (parentTitle != null) ...[
                   const SizedBox(height: 2),
                   Text(
-                    parent,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    parentTitle,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: AppColors.textMuted,
+                          fontWeight: FontWeight.w400,
                         ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -612,7 +687,17 @@ class _AttentionRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.xs),
-          const StatusChip(label: 'Today', color: AppColors.sky),
+          StatusChip(
+            label: item.statusLabel,
+            color: switch (item.displayBucket) {
+              0 => AppColors.textMuted,
+              1 => AppColors.sky,
+              2 => AppColors.danger,
+              3 => AppColors.warning,
+              4 => AppColors.success,
+              _ => AppColors.sky,
+            },
+          ),
           const SizedBox(width: 4),
           const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
         ],
