@@ -29,6 +29,7 @@ import 'subtask_completion_sheet.dart';
 import 'subtask_completion_utils.dart';
 import 'subtask_compact_row.dart';
 import 'subtask_detail_panel.dart';
+import 'subtask_sort.dart';
 import 'move_subtask_sheet.dart';
 import 'new_subtask_composer.dart';
 import 'attachment_picker_section.dart';
@@ -1573,15 +1574,19 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                           ),
                     ),
                   ),
-                ...List.generate(_subtasks.length, (index) {
-                  final item = _subtasks[index];
-                  final expanded = _expandedSubtaskIndex == index;
-                  final canExpandSubtask = canEditSubtasks;
+                ...() {
+                  final displaySubtasks = sortSubtasksByDisplayOrder(_subtasks);
                   // Subtasks can only be assigned to people on the parent task.
                   final subtaskAssigneePool = membersAssignedToParent(
                     allMembers: _members,
                     parentAssigneeIds: activeTaskAssigneeIds(_task, _members),
                   );
+                  return List.generate(displaySubtasks.length, (displayIndex) {
+                  final item = displaySubtasks[displayIndex];
+                  final index = _subtasks.indexWhere((s) => s.id == item.id);
+                  if (index < 0) return const SizedBox.shrink();
+                  final expanded = _expandedSubtaskIndex == index;
+                  final canExpandSubtask = canEditSubtasks;
                   return Column(
                     key: ValueKey<String>('subtask-wrap-${item.id}'),
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1595,7 +1600,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                           enabled: !_saving && _savingSubtaskIndex == null,
                           canComplete: canCompleteSubtasks,
                           canExpand: canExpandSubtask,
-                          subtaskNumber: _subtasks.length - index,
+                          subtaskNumber: displaySubtasks.length - displayIndex,
                           showDoneAtChip: false,
                           // Run checklist is for checking off work — no assignee editing.
                           canChangeAssignees:
@@ -1679,7 +1684,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                         ),
                     ],
                   );
-                }),
+                });
+                }(),
               ],
               if (canDelete) ...[
                 const SizedBox(height: AppSpacing.lg),
