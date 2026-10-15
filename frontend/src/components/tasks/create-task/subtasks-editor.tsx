@@ -31,6 +31,7 @@ import {
   subtaskWithCompleted,
   type SubtaskStatus,
 } from "@/lib/subtask-status";
+import { compareSubtasksByDisplayOrder } from "@/lib/subtask-sort";
 import { getSubtaskRowClassName, getSubtaskRowStyle } from "@/lib/subtask-row-style";
 import {
   SubtaskPrioritySelector,
@@ -174,7 +175,25 @@ export function SubtasksEditor({
           value: values?.[index],
           key: values?.[index]?.id ?? field.id,
         }))
-        .filter(({ value }) => (value?.title ?? "").trim().length > 0),
+        .filter(({ value }) => (value?.title ?? "").trim().length > 0)
+        .sort((a, b) =>
+          compareSubtasksByDisplayOrder(
+            {
+              title: a.value?.title ?? "",
+              priority: a.value?.priority,
+              status: a.value?.status,
+              completed: a.value?.completed,
+              dueDate: a.value?.dueDate,
+            },
+            {
+              title: b.value?.title ?? "",
+              priority: b.value?.priority,
+              status: b.value?.status,
+              completed: b.value?.completed,
+              dueDate: b.value?.dueDate,
+            }
+          )
+        ),
     [fields, values]
   );
 

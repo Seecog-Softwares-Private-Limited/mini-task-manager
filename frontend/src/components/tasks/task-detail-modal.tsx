@@ -66,6 +66,7 @@ import {
   subtaskWithStatus,
   type SubtaskStatus,
 } from "@/lib/subtask-status";
+import { sortSubtasksByDisplayOrder } from "@/lib/subtask-sort";
 import { SubtaskCompactRow } from "@/components/tasks/subtasks/subtask-compact-row";
 import { SubtaskSuggestionsPanel } from "@/components/tasks/subtasks/subtask-suggestions-panel";
 import { TaskTimeTracking } from "@/components/tasks/task-time-tracking";
@@ -618,7 +619,10 @@ export function TaskDetailModal({
     }
   }, [activityPage, activityPageCount]);
 
-  const checklist = task?.subtasks ?? [];
+  const checklist = React.useMemo(
+    () => sortSubtasksByDisplayOrder(task?.subtasks ?? []),
+    [task?.subtasks]
+  );
 
   React.useEffect(() => {
     if (!open || !taskId) return;

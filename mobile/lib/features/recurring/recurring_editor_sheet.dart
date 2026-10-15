@@ -15,6 +15,7 @@ import '../kanban/assignee_picker_sheet.dart';
 import '../kanban/new_subtask_composer.dart';
 import '../kanban/subtask_compact_row.dart';
 import '../kanban/subtask_detail_panel.dart';
+import '../kanban/subtask_sort.dart';
 import '../kanban/subtask_suggestions_panel.dart';
 import '../projects/projects_providers.dart';
 import 'recurring_actions.dart';
@@ -827,14 +828,18 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
                         ),
                   ),
                 ),
-              ...List.generate(_checklist.length, (index) {
-                final item = _checklist[index];
-                final expanded = _expandedSubtaskIndex == index;
+              ...() {
+                final displayChecklist = sortSubtasksByDisplayOrder(_checklist);
                 // Checklist owners are limited to people assigned on the series.
                 final checklistAssigneePool = membersAssignedToParent(
                   allMembers: _members,
                   parentAssigneeIds: _assigneeIds,
                 );
+                return List.generate(displayChecklist.length, (displayIndex) {
+                final item = displayChecklist[displayIndex];
+                final index = _checklist.indexWhere((s) => s.id == item.id);
+                if (index < 0) return const SizedBox.shrink();
+                final expanded = _expandedSubtaskIndex == index;
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -895,7 +900,8 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
                       ),
                   ],
                 );
-              }),
+              });
+              }(),
               const SizedBox(height: AppSpacing.md),
               Text('Ends', style: labelStyle),
               const SizedBox(height: AppSpacing.xs),
