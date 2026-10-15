@@ -1,47 +1,80 @@
 import type { TaskSubtask } from "@/types/api";
+import { isSubtaskOverdue } from "@/lib/subtask-due-date";
 import { resolveSubtaskStatus } from "@/lib/subtask-status";
 
-const PRIORITY_ORDER: Record<string, number> = {
-  CRITICAL: 0,
-  HIGH: 1,
-  MEDIUM: 2,
-  LOW: 3,
+type SortableSubtask = Pick<
+  TaskSubtask,
+  "title" | "status" | "dueDate" | "dueTime" | "completionRecord"
+> & {
+  completed?: boolean;
+  completedAt?: string | null;
 };
 
+function hasDueAssigned(subtask: SortableSubtask): boolean {
+  const date = subtask.dueDate?.trim() ?? "";
+  const time = subtask.dueTime?.trim() ?? "";
+  return date.length > 0 || time.length > 0;
+}
+
 /**
- * Checklist display order (matches board urgency):
- * 1. Critical (open)
- * 2. In Progress (open, non-critical)
- * 3. Other open subtasks (by priority)
- * 4. Done at the bottom
+ * Checklist display buckets:
+ * 1. No date/time assigned (open)
+ * 2. Due today and still completable (not overdue); future remaining after today via due key
+ * 3. Overdue (open)
+ * 4. In Progress
+ * 5. Completed (most recently marked done first)
  */
-export function compareSubtasksByDisplayOrder(
-  a: Pick<TaskSubtask, "title" | "priority" | "status" | "dueDate"> & {
-    completed?: boolean;
-  },
-  b: Pick<TaskSubtask, "title" | "priority" | "status" | "dueDate"> & {
-    completed?: boolean;
+function displayBucket(subtask: SortableSubtask): number {
+  const status = resolveSubtaskStatus(subtask);
+  if (status === "DONE") return 4;
+  if (status === "IN_PROGRESS") return 3;
+  if (!hasDueAssigned(subtask)) return 0;
+  if (
+    isSubtaskOverdue(subtask.dueDate, {
+      dueTime: subtask.dueTime,
+      completed: subtask.completed,
+      status: subtask.status,
+    })
+  ) {
+    return 2;
   }
+  return 1;
+}
+
+function dueSortKey(subtask: SortableSubtask): string {
+  const date = subtask.dueDate?.trim() ?? "";
+  const time = subtask.dueTime?.trim() ?? "";
+  if (!date && !time) return "9999";
+  if (!date) return `0000-00-00T${time}`;
+  if (!time) return date;
+  return `${date}T${time}`;
+}
+
+function completedAtMillis(subtask: SortableSubtask): number {
+  const raw =
+    subtask.completedAt?.trim() ||
+    subtask.completionRecord?.completedAt?.trim() ||
+    "";
+  if (!raw) return 0;
+  const ms = Date.parse(raw);
+  return Number.isNaN(ms) ? 0 : ms;
+}
+
+export function compareSubtasksByDisplayOrder(
+  a: SortableSubtask,
+  b: SortableSubtask
 ): number {
-  const aStatus = resolveSubtaskStatus(a);
-  const bStatus = resolveSubtaskStatus(b);
-  const aDone = aStatus === "DONE";
-  const bDone = bStatus === "DONE";
-  if (aDone !== bDone) return aDone ? 1 : -1;
+  const bucketCmp = displayBucket(a) - displayBucket(b);
+  if (bucketCmp !== 0) return bucketCmp;
 
-  const aCrit = (a.priority ?? "").toUpperCase() === "CRITICAL";
-  const bCrit = (b.priority ?? "").toUpperCase() === "CRITICAL";
-  if (aCrit !== bCrit) return aCrit ? -1 : 1;
+  // Within done: newest completion on top.
+  if (displayBucket(a) === 4) {
+    const doneCmp = completedAtMillis(b) - completedAtMillis(a);
+    if (doneCmp !== 0) return doneCmp;
+    return (a.title ?? "").localeCompare(b.title ?? "");
+  }
 
-  const aProg = aStatus === "IN_PROGRESS";
-  const bProg = bStatus === "IN_PROGRESS";
-  if (aProg !== bProg) return aProg ? -1 : 1;
-
-  const pa = PRIORITY_ORDER[(a.priority ?? "").toUpperCase()] ?? 99;
-  const pb = PRIORITY_ORDER[(b.priority ?? "").toUpperCase()] ?? 99;
-  if (pa !== pb) return pa - pb;
-
-  const dueCmp = (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999");
+  const dueCmp = dueSortKey(a).localeCompare(dueSortKey(b));
   if (dueCmp !== 0) return dueCmp;
 
   return (a.title ?? "").localeCompare(b.title ?? "");

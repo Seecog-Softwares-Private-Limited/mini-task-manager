@@ -65,8 +65,12 @@ final workspaceAllProjectTasksProvider = FutureProvider<List<Task>>((ref) async 
 final homeDashboardProvider = FutureProvider<HomeDashboard>((ref) async {
   final allTasks = await ref.watch(workspaceAllProjectTasksProvider.future);
   final boardTasks = allTasks.where((task) => !isRecurringTask(task)).toList();
+  final currentUserId = ref.watch(
+    sessionControllerProvider.select((session) => session.user?.id),
+  );
   return HomeDashboard.fromWorkspaceTasks(
     boardTasks,
     dueTodayCandidates: allTasks,
+    currentUserId: currentUserId,
   );
 });

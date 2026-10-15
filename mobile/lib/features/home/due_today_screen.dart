@@ -11,16 +11,46 @@ import '../kanban/task_detail_sheet.dart';
 import 'home_providers.dart';
 
 /// Full list of checklist items / leaf tasks due today across the workspace.
-class DueTodayScreen extends ConsumerWidget {
+class DueTodayScreen extends ConsumerStatefulWidget {
   const DueTodayScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DueTodayScreen> createState() => _DueTodayScreenState();
+}
+
+class _DueTodayScreenState extends ConsumerState<DueTodayScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final dashboardAsync = ref.watch(homeDashboardProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Due today'),
+        title: const Text('Due Tasks'),
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: AppColors.primary,
+          unselectedLabelColor: AppColors.textMuted,
+          indicatorColor: AppColors.primary,
+          tabs: const [
+            Tab(text: 'Due Tasks'),
+            Tab(text: 'Due from Planner'),
+          ],
+        ),
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -56,78 +86,24 @@ class DueTodayScreen extends ConsumerWidget {
             ],
           ),
           data: (dashboard) {
-            final items = dashboard.dueTodayItems;
-            if (items.isEmpty) {
-              return ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(AppSpacing.md),
-                children: [
-                  SurfaceCard(
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: AppColors.success.withValues(alpha: 0.12),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.check_rounded,
-                            color: AppColors.success,
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.sm),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Nothing due today',
-                                style: Theme.of(context).textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Checklist items and tasks due today will show up here.',
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              );
-            }
-
-            return ListView.separated(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                AppSpacing.sm,
-                AppSpacing.md,
-                AppSpacing.xl,
-              ),
-              itemCount: items.length + 1,
-              separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.xs),
-              itemBuilder: (context, index) {
-                if (index == 0) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                    child: Text(
-                      '${items.length} item${items.length == 1 ? '' : 's'} across projects',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                    ),
-                  );
-                }
-                final item = items[index - 1];
-                return _DueTodayRow(
-                  item: item,
-                  onTap: () => _openItem(context, ref, item),
-                );
-              },
+            return TabBarView(
+              controller: _tabController,
+              children: [
+                _DueTodayList(
+                  items: dashboard.dueTodayBoardItems,
+                  emptyTitle: 'Nothing due today',
+                  emptyBody:
+                      'Board checklist items and tasks due today will show up here.',
+                  onOpenItem: (item) => _openItem(context, ref, item),
+                ),
+                _DueTodayList(
+                  items: dashboard.dueTodayPlannerItems,
+                  emptyTitle: 'No planner items due today',
+                  emptyBody:
+                      'Planner checklist items and runs due today will show up here.',
+                  onOpenItem: (item) => _openItem(context, ref, item),
+                ),
+              ],
             );
           },
         ),
@@ -172,6 +148,90 @@ class DueTodayScreen extends ConsumerWidget {
   }
 }
 
+class _DueTodayList extends StatelessWidget {
+  const _DueTodayList({
+    required this.items,
+    required this.emptyTitle,
+    required this.emptyBody,
+    required this.onOpenItem,
+  });
+
+  final List<HomeDueTodayItem> items;
+  final String emptyTitle;
+  final String emptyBody;
+  final ValueChanged<HomeDueTodayItem> onOpenItem;
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(AppSpacing.md),
+        children: [
+          SurfaceCard(
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check_rounded,
+                    color: AppColors.success,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(emptyTitle, style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 2),
+                      Text(emptyBody, style: Theme.of(context).textTheme.bodyMedium),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.sm,
+        AppSpacing.md,
+        AppSpacing.xl,
+      ),
+      itemCount: items.length + 1,
+      separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.xs),
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+            child: Text(
+              '${items.length} item${items.length == 1 ? '' : 's'}',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                  ),
+            ),
+          );
+        }
+        final item = items[index - 1];
+        return _DueTodayRow(
+          item: item,
+          onTap: () => onOpenItem(item),
+        );
+      },
+    );
+  }
+}
+
 class _DueTodayRow extends StatelessWidget {
   const _DueTodayRow({required this.item, required this.onTap});
 
@@ -182,7 +242,8 @@ class _DueTodayRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final priority = item.subtask?.priority ?? item.task.priority;
     final color = _priorityColor(priority);
-    final parent = item.parentTitle;
+    final subtaskTitle = item.title;
+    final parentTitle = item.parentTitle;
     return SurfaceCard(
       padding: const EdgeInsets.all(AppSpacing.sm),
       onTap: onTap,
@@ -190,7 +251,7 @@ class _DueTodayRow extends StatelessWidget {
         children: [
           Container(
             width: 4,
-            height: parent == null ? 40 : 48,
+            height: parentTitle == null ? 40 : 52,
             decoration: BoxDecoration(
               color: color,
               borderRadius: BorderRadius.circular(4),
@@ -202,17 +263,21 @@ class _DueTodayRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.title,
-                  style: Theme.of(context).textTheme.bodyLarge,
+                  subtaskTitle,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (parent != null) ...[
+                if (parentTitle != null) ...[
                   const SizedBox(height: 2),
                   Text(
-                    parent,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    parentTitle,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: AppColors.textMuted,
+                          fontWeight: FontWeight.w400,
                         ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -222,7 +287,17 @@ class _DueTodayRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.xs),
-          const StatusChip(label: 'Today', color: AppColors.sky),
+          StatusChip(
+            label: item.statusLabel,
+            color: switch (item.displayBucket) {
+              0 => AppColors.textMuted,
+              1 => AppColors.sky,
+              2 => AppColors.danger,
+              3 => AppColors.warning,
+              4 => AppColors.success,
+              _ => AppColors.sky,
+            },
+          ),
           const SizedBox(width: 4),
           const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
         ],
