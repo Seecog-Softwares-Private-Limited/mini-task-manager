@@ -1577,6 +1577,11 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                   final item = _subtasks[index];
                   final expanded = _expandedSubtaskIndex == index;
                   final canExpandSubtask = canEditSubtasks;
+                  // Subtasks can only be assigned to people on the parent task.
+                  final subtaskAssigneePool = membersAssignedToParent(
+                    allMembers: _members,
+                    parentAssigneeIds: activeTaskAssigneeIds(_task, _members),
+                  );
                   return Column(
                     key: ValueKey<String>('subtask-wrap-${item.id}'),
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1585,7 +1590,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                         key: _subtaskRowKey(item.id),
                         child: SubtaskCompactRow(
                           subtask: item,
-                          members: _members,
+                          members: subtaskAssigneePool,
                           expanded: expanded,
                           enabled: !_saving && _savingSubtaskIndex == null,
                           canComplete: canCompleteSubtasks,
@@ -1623,7 +1628,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                               padding: const EdgeInsets.all(AppSpacing.sm),
                               child: SubtaskDetailPanel(
                                 subtask: item,
-                                members: _members,
+                                members: subtaskAssigneePool,
                                 taskId: _task.id,
                                 organizationId: orgId,
                                 fallbackReporterId: _task.reporterId,

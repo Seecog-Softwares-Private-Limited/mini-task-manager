@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/preferences/app_preferences.dart';
 import '../../core/utils/calendar_date.dart';
+import '../../core/utils/task_display_sort.dart';
 import '../../data/models/my_tasks.dart';
 import '../../data/models/paginated_result.dart';
 import '../../data/models/project_member.dart';
@@ -221,31 +222,27 @@ MyTasksResult _myTasksFromWorkspace(List<Task> tasks, MyWorkFilter filter) {
   bool isCompleted(Task t) =>
       t.completedAt != null && t.completedAt!.trim().isNotEmpty;
 
-  int byDueAsc(Task a, Task b) {
-    final da = dateOnly(a.dueDate);
-    final db = dateOnly(b.dueDate);
-    if (da != null && db != null) return da.compareTo(db);
-    if (da != null) return -1;
-    if (db != null) return 1;
-    return 0;
-  }
-
-  final open = tasks.where((t) => !isCompleted(t)).toList();
-  final overdueAll = tasks.where((t) {
-    final due = dateOnly(t.dueDate);
-    return due != null && due.isBefore(today);
-  }).toList()
-    ..sort(byDueAsc);
-  final todayList = open.where((t) {
-    final due = dateOnly(t.dueDate);
-    return due != null && due == today;
-  }).toList()
-    ..sort(byDueAsc);
-  final weekList = open.where((t) {
-    final due = dateOnly(t.dueDate);
-    return due != null && !due.isBefore(today) && due.isBefore(weekEnd);
-  }).toList()
-    ..sort(byDueAsc);
+  final open = sortTasksForDisplay(
+    tasks.where((t) => !isCompleted(t)).toList(),
+  );
+  final overdueAll = sortTasksForDisplay(
+    tasks.where((t) {
+      final due = dateOnly(t.dueDate);
+      return due != null && due.isBefore(today);
+    }).toList(),
+  );
+  final todayList = sortTasksForDisplay(
+    open.where((t) {
+      final due = dateOnly(t.dueDate);
+      return due != null && due == today;
+    }).toList(),
+  );
+  final weekList = sortTasksForDisplay(
+    open.where((t) {
+      final due = dateOnly(t.dueDate);
+      return due != null && !due.isBefore(today) && due.isBefore(weekEnd);
+    }).toList(),
+  );
   final completed = tasks.where((t) {
     if (!isCompleted(t)) return false;
     final done = DateTime.tryParse(t.completedAt!);
@@ -272,8 +269,8 @@ MyTasksResult _myTasksFromWorkspace(List<Task> tasks, MyWorkFilter filter) {
     MyWorkFilter.today => todayList,
     MyWorkFilter.week => weekList,
     MyWorkFilter.completed => completed,
-    MyWorkFilter.all => [...open..sort(byDueAsc), ...completed],
-    MyWorkFilter.open => open..sort(byDueAsc),
+    MyWorkFilter.all => [...open, ...completed],
+    MyWorkFilter.open => open,
   };
 
   return MyTasksResult(

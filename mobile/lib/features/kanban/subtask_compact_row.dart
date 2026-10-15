@@ -262,7 +262,7 @@ class SubtaskCompactRow extends StatelessWidget {
       members: members,
       selectedAssigneeIds: selected,
       enabled: enabled,
-      title: 'Assignees',
+      title: 'Assign to task member',
       showDoneButton: true,
       onSelectionChanged: onAssigneesChanged,
     );

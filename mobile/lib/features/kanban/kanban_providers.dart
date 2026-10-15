@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/api_client.dart';
 import '../../core/utils/calendar_date.dart';
 import '../../core/utils/recurrence_display.dart';
+import '../../core/utils/task_display_sort.dart';
 import '../../data/models/task.dart';
 import '../../data/models/workflow.dart';
 import '../../data/repositories/attachments_repository.dart';
@@ -108,11 +109,17 @@ final projectBoardProvider =
     }
   }
 
+  final statusTypeById = statusTypeMapFrom(statuses);
+  final sortedByStatus = sortTasksByStatusMap(
+    tasksByStatus,
+    statusTypeById: statusTypeById,
+  );
+
   return ProjectBoardData(
     statuses: statuses,
-    tasks: tasks,
+    tasks: sortTasksForDisplay(tasks, statusTypeById: statusTypeById),
     projectName: projectName,
-    tasksByStatus: tasksByStatus,
+    tasksByStatus: sortedByStatus,
     overdueCount: overdueCount,
   );
 });
@@ -212,11 +219,19 @@ Future<ProjectBoardData> _buildAllProjectsBoard(Ref ref, String orgId) async {
     }
   }
 
+  final statusTypeById = <String, String>{
+    for (final entry in statusById.entries) entry.key: entry.value.type,
+  };
+  final sortedByStatus = sortTasksByStatusMap(
+    tasksByStatus,
+    statusTypeById: statusTypeById,
+  );
+
   return ProjectBoardData(
     statuses: statuses,
-    tasks: allTasks,
+    tasks: sortTasksForDisplay(allTasks, statusTypeById: statusTypeById),
     projectName: 'All projects',
-    tasksByStatus: tasksByStatus,
+    tasksByStatus: sortedByStatus,
     overdueCount: overdueCount,
   );
 }

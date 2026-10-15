@@ -63,6 +63,7 @@ import {
 } from "@/components/kanban/board-command-bar";
 import { BoardTableView } from "@/components/kanban/board-table-view";
 import { BoardSkeleton } from "@/components/kanban/board-skeleton";
+import { applyBoardSorting } from "@/lib/board-sort";
 import {
   BoardSettingsModal,
   type BoardSettings,
@@ -328,8 +329,13 @@ export default function TasksPage() {
   const allTasksFlat = useMemo(() => {
     const all: Task[] = [];
     for (const s of statuses) all.push(...(tasksByStatus[s.id] ?? []));
-    return all;
-  }, [statuses, tasksByStatus]);
+    const statusTypeById = Object.fromEntries(
+      statuses.map((s) => [s.id, s.type ?? ""])
+    );
+    return applyBoardSorting(all, filters.sortBy, filters.sortDir, {
+      statusTypeById,
+    });
+  }, [statuses, tasksByStatus, filters.sortBy, filters.sortDir]);
 
   // Scrum: swimlanes = sprints (sorted) + Backlog
   const swimlanes: Swimlane[] = useMemo(() => {
