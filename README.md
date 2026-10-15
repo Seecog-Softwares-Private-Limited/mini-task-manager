@@ -166,20 +166,20 @@ More detail: see `docs/RUNTIME_AND_FEATURE_READINESS.md` for startup lifecycle a
 
 ## Email (Invitations)
 
-Production uses **Resend** (`resend` npm SDK + `RESEND_API_KEY`). Local default is MailHog (`localhost:1025`).
+Production uses **Amazon SES SMTP**. Local default is MailHog (`localhost:1025`).
 
 ```env
-RESEND_API_KEY=re_xxxxxxxx
-SMTP_PROVIDER=resend
-# Until your domain is verified in Resend:
-SMTP_FROM="OpsPick <onboarding@resend.dev>"
-# After verifying opspick.com:
-# SMTP_FROM="OpsPick <hello@opspick.com>"
+AWS_SES_REGION=ap-south-1
+SMTP_HOST=email-smtp.ap-south-1.amazonaws.com
+SMTP_PORT=587
+SMTP_USER=your-ses-smtp-username
+SMTP_PASS=your-ses-smtp-password
+SMTP_FROM="OpsPick <hello@opspick.com>"
 ```
 
 MailHog inbox: `http://localhost:8025` (`docker compose up -d mailhog`).
 
-Optional Gmail SMTP (legacy):
+Optional Gmail SMTP:
 
 ```env
 SMTP_HOST=smtp.gmail.com
