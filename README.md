@@ -166,11 +166,20 @@ More detail: see `docs/RUNTIME_AND_FEATURE_READINESS.md` for startup lifecycle a
 
 ## Email (Invitations)
 
-By default, SMTP uses `localhost:1025` (MailHog). Emails are captured locally and do not reach real inboxes.
+Production uses **Resend** (`resend` npm SDK + `RESEND_API_KEY`). Local default is MailHog (`localhost:1025`).
 
-- MailHog inbox: `http://localhost:8025`
+```env
+RESEND_API_KEY=re_xxxxxxxx
+SMTP_PROVIDER=resend
+# Until your domain is verified in Resend:
+SMTP_FROM="OpsPick <onboarding@resend.dev>"
+# After verifying opspick.com:
+# SMTP_FROM="OpsPick <hello@opspick.com>"
+```
 
-To send real emails (e.g., Gmail), set:
+MailHog inbox: `http://localhost:8025` (`docker compose up -d mailhog`).
+
+Optional Gmail SMTP (legacy):
 
 ```env
 SMTP_HOST=smtp.gmail.com
@@ -179,5 +188,3 @@ SMTP_USER=your-email@gmail.com
 SMTP_PASS=your-app-password
 SMTP_FROM=your-email@gmail.com
 ```
-
-Create a Gmail App Password: Google Account -> Security -> 2-Step Verification -> App passwords.
