@@ -37,6 +37,7 @@ export class TaskEntity extends BaseEntity {
   @Column({ name: 'assignee_ids', type: 'simple-json', nullable: true })
   assigneeIds!: string[] | null;
 
+  /** Checklist JSON — MEDIUMTEXT so large lists are not capped at 64KB. */
   @Column({ type: 'simple-json', nullable: true })
   subtasks!: Array<{
     id: string;
@@ -55,6 +56,7 @@ export class TaskEntity extends BaseEntity {
     completionRecord?: Record<string, any>;
     reporterId?: string;
     createdAt?: string;
+    updatedAt?: string;
     note?: string;
     /** When true, completing this subtask requires GPS/geofence. */
     requireLocation?: boolean;

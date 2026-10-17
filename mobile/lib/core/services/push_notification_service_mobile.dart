@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -6,13 +7,15 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'push_nav.dart';
+
 /// Top-level handler required by firebase_messaging for background isolates.
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint('FCM background message: ${message.messageId}');
 }
 
-typedef OpenAlertsCallback = void Function();
+typedef OpenAlertsCallback = void Function([PushDeepLink? link]);
 
 /// Real FCM implementation (Android / iOS only — imported via conditional export).
 class PushNotificationService {
@@ -55,11 +58,13 @@ class PushNotificationService {
       await _setupLocalNotifications();
       await _requestPermission();
 
-      // iOS: show banner/sound while app is in foreground (assignment pushes).
+      // Foreground banners are shown via flutter_local_notifications in
+      // [_showForegroundNotification] (Android never auto-displays FCM in
+      // foreground; iOS presentation options alone are unreliable). Keep badge.
       await _messaging!.setForegroundNotificationPresentationOptions(
-        alert: true,
+        alert: false,
         badge: true,
-        sound: true,
+        sound: false,
       );
 
       // iOS requires an APNs token before FCM token is available on device.
@@ -83,8 +88,8 @@ class PushNotificationService {
 
       FirebaseMessaging.onMessage.listen(_showForegroundNotification);
 
-      FirebaseMessaging.onMessageOpenedApp.listen((_) {
-        onOpenAlerts?.call();
+      FirebaseMessaging.onMessageOpenedApp.listen((message) {
+        onOpenAlerts?.call(_deepLinkFromRemote(message));
       });
 
       try {
@@ -92,7 +97,8 @@ class PushNotificationService {
             .getInitialMessage()
             .timeout(const Duration(seconds: 2));
         if (initial != null) {
-          Future.microtask(() => onOpenAlerts?.call());
+          final link = _deepLinkFromRemote(initial);
+          Future.microtask(() => onOpenAlerts?.call(link));
         }
       } catch (e) {
         debugPrint('FCM getInitialMessage skipped: $e');
@@ -108,6 +114,27 @@ class PushNotificationService {
         debugPrint('Push onInitialized callback failed: $e');
       }
     }
+  }
+
+  PushDeepLink _deepLinkFromRemote(RemoteMessage message) {
+    return PushDeepLink.fromMap(
+      message.data.map((key, value) => MapEntry(key, value)),
+    );
+  }
+
+  PushDeepLink? _deepLinkFromLocalPayload(String? payload) {
+    if (payload == null || payload.trim().isEmpty) return null;
+    try {
+      final decoded = jsonDecode(payload);
+      if (decoded is Map) {
+        return PushDeepLink.fromMap(
+          decoded.map((key, value) => MapEntry(key.toString(), value)),
+        );
+      }
+    } catch (_) {
+      // Ignore malformed payloads.
+    }
+    return null;
   }
 
   Future<void> _waitForApnsToken() async {
@@ -150,7 +177,9 @@ class PushNotificationService {
     );
     await _local!.initialize(
       settings: const InitializationSettings(android: androidInit, iOS: iosInit),
-      onDidReceiveNotificationResponse: (_) => onOpenAlerts?.call(),
+      onDidReceiveNotificationResponse: (response) {
+        onOpenAlerts?.call(_deepLinkFromLocalPayload(response.payload));
+      },
     );
 
     const channel = AndroidNotificationChannel(
@@ -168,36 +197,63 @@ class PushNotificationService {
   }
 
   Future<void> _showForegroundNotification(RemoteMessage message) async {
+    // Background/killed: OS shows the FCM `notification` payload automatically.
+    // Foreground: Android never auto-shows; iOS only if presentation options work.
+    // Always mirror to a local notification so alerts are visible while the app is open.
+    if (_local == null) return;
+
     final notification = message.notification;
-    if (notification == null || _local == null) return;
+    final data = message.data;
+    final title = (notification?.title?.trim().isNotEmpty == true)
+        ? notification!.title!.trim()
+        : (data['title']?.toString().trim().isNotEmpty == true
+            ? data['title']!.toString().trim()
+            : 'OpsPick');
+    final body = (notification?.body?.trim().isNotEmpty == true)
+        ? notification!.body!.trim()
+        : (data['body']?.toString().trim().isNotEmpty == true
+            ? data['body']!.toString().trim()
+            : '');
 
-    // On iOS, system already presents when setForegroundNotificationPresentationOptions
-    // is enabled — avoid duplicate local notifications.
-    if (defaultTargetPlatform == TargetPlatform.iOS) return;
-
-    await _local!.show(
-      id: notification.hashCode,
-      title: notification.title,
-      body: notification.body,
-      notificationDetails: NotificationDetails(
-        android: AndroidNotificationDetails(
-          'high_importance_channel',
-          'High Importance Notifications',
-          channelDescription: 'OpsPick alerts',
-          importance: Importance.high,
-          priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
-          enableVibration: true,
-          playSound: true,
-          vibrationPattern: Int64List.fromList([0, 250, 120, 250]),
-        ),
-        iOS: const DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        ),
-      ),
+    debugPrint(
+      'FCM foreground: title="$title" body="$body" '
+      'hasNotification=${notification != null} dataKeys=${data.keys.toList()}',
     );
+
+    final id = message.messageId?.hashCode ??
+        Object.hash(title, body, DateTime.now().millisecondsSinceEpoch);
+
+    final link = _deepLinkFromRemote(message);
+    final payload = jsonEncode(link.toPayloadMap());
+
+    try {
+      await _local!.show(
+        id: id & 0x7fffffff,
+        title: title,
+        body: body.isEmpty ? null : body,
+        payload: payload,
+        notificationDetails: NotificationDetails(
+          android: AndroidNotificationDetails(
+            'high_importance_channel',
+            'High Importance Notifications',
+            channelDescription: 'OpsPick alerts',
+            importance: Importance.high,
+            priority: Priority.high,
+            icon: '@mipmap/ic_launcher',
+            enableVibration: true,
+            playSound: true,
+            vibrationPattern: Int64List.fromList([0, 250, 120, 250]),
+          ),
+          iOS: const DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('FCM foreground local notification failed: $e');
+    }
   }
 
   Future<String?> getToken() async {

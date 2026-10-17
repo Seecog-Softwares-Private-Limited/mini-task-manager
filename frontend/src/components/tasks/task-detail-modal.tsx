@@ -48,7 +48,13 @@ import {
   toggleSelectAllFilteredAssignees,
 } from "@/lib/task-assignees";
 import { getSubtaskAssigneeIds, withSubtaskAssignees } from "@/lib/subtask-assignees";
-import { fetchTask, updateTask, updateTaskAssignees, deleteTask } from "@/services/api/tasks.api";
+import {
+  fetchTask,
+  updateTask,
+  updateTaskAssignees,
+  deleteTask,
+  deleteSubtask,
+} from "@/services/api/tasks.api";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { NoticeDialog, useNoticeDialog } from "@/components/ui/notice-dialog";
 import { fetchComments, addComment, deleteComment } from "@/services/api/comments.api";
@@ -279,6 +285,8 @@ export interface TaskDetailModalProps {
   /** When true, task fields cannot be edited (non-owner members). */
   /** @deprecated Modal computes permissions from org role + assignee; kept for API compat. */
   readOnly?: boolean;
+  /** Open this checklist item expanded (e.g. notification deep-link). */
+  initialSubtaskId?: string | null;
 }
 
 export function TaskDetailModal({
@@ -290,6 +298,7 @@ export function TaskDetailModal({
   onOpenChange,
   onTaskUpdated,
   readOnly: _readOnly = false,
+  initialSubtaskId = null,
 }: TaskDetailModalProps) {
   const queryClient = useQueryClient();
   const syncTaskIntoListCache = React.useCallback(
@@ -625,6 +634,18 @@ export function TaskDetailModal({
   );
 
   React.useEffect(() => {
+    if (!open) {
+      setExpandedSubtaskId(null);
+      return;
+    }
+    const focusId = initialSubtaskId?.trim();
+    if (!focusId || !task?.subtasks?.length) return;
+    if (task.subtasks.some((s) => s.id === focusId)) {
+      setExpandedSubtaskId(focusId);
+    }
+  }, [open, taskId, initialSubtaskId, task?.subtasks]);
+
+  React.useEffect(() => {
     if (!open || !taskId) return;
     void queryClient.invalidateQueries({ queryKey: ["entity-attachments", "SUBTASK"] });
     void queryClient.invalidateQueries({ queryKey: ["task-attachments", taskId] });
@@ -888,6 +909,44 @@ export function TaskDetailModal({
     },
   });
 
+  const deleteSubtaskMutation = useMutation({
+    mutationFn: (subtaskId: string) => {
+      if (!canEditWorkflowFields) {
+        return Promise.reject(new Error("You do not have permission to update subtasks"));
+      }
+      const remaining = (checklist ?? []).filter((s) => s.id !== subtaskId);
+      return deleteSubtask(taskId!, subtaskId, remaining);
+    },
+    onMutate: async (subtaskId) => {
+      await queryClient.cancelQueries({ queryKey: ["task", taskId] });
+      const previous = queryClient.getQueryData<Task>(["task", taskId]);
+      if (previous) {
+        const optimisticTask = {
+          ...previous,
+          subtasks: (previous.subtasks ?? []).filter((s) => s.id !== subtaskId),
+        };
+        queryClient.setQueryData<Task>(["task", taskId], optimisticTask);
+        syncTaskIntoListCache(optimisticTask);
+      }
+      return { previous };
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx?.previous) {
+        queryClient.setQueryData(["task", taskId], ctx.previous);
+      }
+      toast({
+        title: "Failed to delete subtask",
+        description: parseApiError(err),
+        variant: "error",
+      });
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["task", taskId], updated);
+      syncTaskIntoListCache(updated);
+      onTaskUpdated?.(updated);
+    },
+  });
+
   const acceptSuggestedSubtasks = React.useCallback(
     async (titles: string[]) => {
       const additions: TaskSubtask[] = titles
@@ -987,6 +1046,7 @@ export function TaskDetailModal({
       }
       const status = resolveSubtaskStatus(draft);
       const priority = resolveSubtaskPriority(draft.priority);
+      const updatedAt = new Date().toISOString();
       updateSubtasksMutation.mutate(
         checklist.map((item) =>
           item.id === draft.id
@@ -997,18 +1057,30 @@ export function TaskDetailModal({
                 status,
                 completed: status === "DONE",
                 priority,
+                updatedAt,
+                createdAt: draft.createdAt ?? item.createdAt ?? updatedAt,
               }
             : item
         ),
         {
-          onSuccess: () => {
+          onSuccess: (saved) => {
+            // Older APIs may strip updatedAt; keep the client stamp so sort works.
+            const serverItem = saved.subtasks?.find((s) => s.id === draft.id);
+            if (serverItem && !serverItem.updatedAt) {
+              queryClient.setQueryData<Task>(["task", taskId], {
+                ...saved,
+                subtasks: (saved.subtasks ?? []).map((s) =>
+                  s.id === draft.id ? { ...s, updatedAt, createdAt: s.createdAt ?? draft.createdAt } : s
+                ),
+              });
+            }
             setSubtaskDraftDirty(false);
             toast({ title: "Subtask saved", variant: "success" });
           },
         }
       );
     },
-    [checklist, updateSubtasksMutation, toast]
+    [checklist, updateSubtasksMutation, toast, queryClient, taskId]
   );
 
   const confirmRemoveSubtask = React.useCallback(() => {
@@ -1017,9 +1089,9 @@ export function TaskDetailModal({
       setExpandedSubtaskId(null);
       setSubtaskDraftDirty(false);
     }
-    updateSubtasksMutation.mutate(checklist.filter((i) => i.id !== subtaskDeleteTarget.id));
+    deleteSubtaskMutation.mutate(subtaskDeleteTarget.id);
     setSubtaskDeleteTarget(null);
-  }, [checklist, expandedSubtaskId, subtaskDeleteTarget, updateSubtasksMutation]);
+  }, [expandedSubtaskId, subtaskDeleteTarget, deleteSubtaskMutation]);
 
   React.useEffect(() => {
     if (!isEditingTitle) return;
@@ -2544,7 +2616,7 @@ export function TaskDetailModal({
       variant="destructive"
       icon="delete"
       elevated
-      loading={updateSubtasksMutation.isPending}
+      loading={deleteSubtaskMutation.isPending || updateSubtasksMutation.isPending}
       onConfirm={confirmRemoveSubtask}
     />
 

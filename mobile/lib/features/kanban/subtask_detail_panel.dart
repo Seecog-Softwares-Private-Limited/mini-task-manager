@@ -58,6 +58,8 @@ class SubtaskDetailPanel extends ConsumerStatefulWidget {
     this.onNoteChanged,
     this.fallbackReporterId,
     this.fallbackCreatedAt,
+    /// Broader directory for Raised By name/avatar (defaults to [members]).
+    this.memberDirectory,
     this.canEditRequireLocation = false,
     /// Planner-template editing: no completion/attachments/status; due time only.
     this.templateMode = false,
@@ -71,6 +73,7 @@ class SubtaskDetailPanel extends ConsumerStatefulWidget {
   final String organizationId;
   final String? fallbackReporterId;
   final String? fallbackCreatedAt;
+  final List<ProjectMember>? memberDirectory;
   final bool saving;
   final bool canComplete;
   final bool canEditRequireLocation;
@@ -484,6 +487,8 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
         completedAt: completed ? record?.completedAt : null,
         clearCompletedAt: !completed,
         requireLocation: widget.templateMode ? false : _requireLocation,
+        // Any save bumps updatedAt so the row rises within its color group.
+        updatedAt: DateTime.now().toUtc().toIso8601String(),
       ),
     );
   }
@@ -804,10 +809,17 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
                   controller: _titleController,
                   enabled: !widget.saving,
                   maxLength: subtaskTitleMaxLength,
+                  // Grow with content so long titles stay fully visible (list
+                  // already wraps; this form previously clipped to one line).
+                  minLines: 1,
+                  maxLines: 6,
+                  keyboardType: TextInputType.multiline,
+                  textInputAction: TextInputAction.newline,
                   scrollPadding: EdgeInsets.zero,
                   decoration: InputDecoration(
                     hintText: 'Subtask title',
                     counterText: '',
+                    alignLabelWithHint: true,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -1303,13 +1315,18 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     ProjectMember? memberFor(String? userId) {
       if (userId == null || userId.trim().isEmpty) return null;
       final normalized = _normalizeUserId(userId);
-      for (final member in widget.members) {
+      final directories = <ProjectMember>[
+        ...widget.members,
+        ...?widget.memberDirectory,
+      ];
+      for (final member in directories) {
         if (_normalizeUserId(member.userId) == normalized) return member;
       }
       return null;
     }
 
     String displayNameFor(String? userId) {
+      if (userId == null || userId.trim().isEmpty) return 'Unknown';
       final match = memberFor(userId);
       final memberUser = match?.user;
       if (memberUser != null) {
@@ -1319,7 +1336,6 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
       }
       final currentUser = ref.read(sessionControllerProvider).user;
       if (currentUser != null &&
-          userId != null &&
           _normalizeUserId(currentUser.id) == _normalizeUserId(userId)) {
         return currentUser.fullName.trim().isNotEmpty
             ? currentUser.fullName
@@ -1340,20 +1356,23 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
       return null;
     }
 
-    final assigneeIds = _assigneeIds;
-    final hasAssignees = assigneeIds.isNotEmpty;
-    final primaryUserId = hasAssignees ? assigneeIds.first : reporterId;
-    final hasPerson =
-        primaryUserId != null && primaryUserId.trim().isNotEmpty;
-    if (!hasPerson && !hasDate) return const SizedBox.shrink();
+    final assigneeIds = _assigneeIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toList();
+    final hasReporter = reporterId != null && reporterId.trim().isNotEmpty;
+    if (!hasReporter && assigneeIds.isEmpty && !hasDate) {
+      return const SizedBox.shrink();
+    }
 
-    final name = hasPerson ? displayNameFor(primaryUserId) : 'Unassigned';
-    final avatarUrl = hasPerson ? avatarFor(primaryUserId) : null;
-    final extraAssignees = hasAssignees && assigneeIds.length > 1
-        ? ' +${assigneeIds.length - 1}'
-        : '';
+    final raisedByName = hasReporter ? displayNameFor(reporterId) : 'Unknown';
+    final assignedToLabel = assigneeIds.isEmpty
+        ? 'Unassigned'
+        : assigneeIds.length == 1
+            ? displayNameFor(assigneeIds.first)
+            : '${displayNameFor(assigneeIds.first)} +${assigneeIds.length - 1}';
 
-    String? dateLabel;
+    String dateLabel = 'Unavailable';
     if (hasDate) {
       final parsed = DateTime.tryParse(createdAtRaw);
       dateLabel = parsed == null
@@ -1361,8 +1380,44 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
           : DateFormat('MMM d, yyyy · h:mm a').format(parsed.toLocal());
     }
 
+    final avatarUserId = hasReporter
+        ? reporterId
+        : (assigneeIds.isNotEmpty ? assigneeIds.first : null);
     final apiBaseUrl = ref.watch(appConfigProvider).apiBaseUrl;
-    final imageUrl = resolveUserAvatarUrl(apiBaseUrl, avatarUrl);
+    final imageUrl = resolveUserAvatarUrl(apiBaseUrl, avatarFor(avatarUserId));
+
+    TextStyle labelStyle() => Theme.of(context).textTheme.labelSmall!.copyWith(
+          color: AppColors.textMuted,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.2,
+        );
+    TextStyle valueStyle() => Theme.of(context).textTheme.titleSmall!.copyWith(
+          fontWeight: FontWeight.w700,
+          height: 1.2,
+        );
+
+    Widget labeledRow(String label, String value) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 96,
+              child: Text(label, style: labelStyle()),
+            ),
+            Expanded(
+              child: Text(
+                value,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: valueStyle(),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Container(
       width: double.infinity,
@@ -1378,11 +1433,15 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
         border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _ReporterAvatar(
-            name: name,
-            imageUrl: imageUrl,
-            size: 40,
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: _ReporterAvatar(
+              name: raisedByName,
+              imageUrl: imageUrl,
+              size: 40,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1390,56 +1449,44 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  hasAssignees ? 'Assignee' : 'Raised by',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: AppColors.textMuted,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.2,
-                      ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '$name$extraAssignees',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        height: 1.2,
-                      ),
-                ),
-                const SizedBox(height: 4),
-                if (dateLabel != null)
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.schedule_rounded,
-                        size: 14,
-                        color: AppColors.textMuted.withValues(alpha: 0.95),
-                      ),
-                      const SizedBox(width: 5),
-                      Expanded(
-                        child: Text(
-                          dateLabel,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                labeledRow('Raised By :', raisedByName),
+                labeledRow('Assigned To :', assignedToLabel),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 96,
+                      child: Text('Date Time :', style: labelStyle()),
+                    ),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.schedule_rounded,
+                            size: 14,
+                            color: AppColors.textMuted.withValues(alpha: 0.95),
+                          ),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              dateLabel,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
                                     color: AppColors.textMuted,
                                     fontWeight: FontWeight.w600,
                                     height: 1.2,
                                   ),
-                        ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  )
-                else
-                  Text(
-                    'Created date unavailable',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textMuted,
-                        ),
-                  ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),

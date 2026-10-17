@@ -210,6 +210,8 @@ class TasksRepository {
           // Keep full completionRecord; top-level completedAt may be stripped
           // on older APIs (chip still uses completionRecord.completedAt).
           ..remove('completionRecord');
+        // updatedAt/createdAt may be omitted on older APIs; local coalesce keeps
+        // them for checklist ordering after a successful retry.
         final next = forbidden.difference(omitSubtaskKeys);
         if (next.isEmpty) break;
         omitSubtaskKeys.addAll(next);
@@ -217,6 +219,21 @@ class TasksRepository {
     }
 
     throw ApiException.fromDio(lastError!);
+  }
+
+  /// Delete a single checklist item without rewriting the full list.
+  Future<Task> deleteSubtask({
+    required String taskId,
+    required String subtaskId,
+  }) async {
+    try {
+      final response = await _api.dio.delete<dynamic>(
+        '/tasks/$taskId/subtasks/$subtaskId',
+      );
+      return Task.fromJson(_requireJsonMap(response.data, 'task'));
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
   }
 
   /// Move a checklist item to another task in the same project.
@@ -314,6 +331,8 @@ class TasksRepository {
         put('status', s.status);
         put('priority', s.priority);
         put('statusId', s.statusId);
+        put('createdAt', s.createdAt);
+        put('updatedAt', s.updatedAt);
         if (!omitSubtaskKeys.contains('completionRecord') &&
             s.completionRecord != null) {
           row['completionRecord'] = s.completionRecord!.toJson();

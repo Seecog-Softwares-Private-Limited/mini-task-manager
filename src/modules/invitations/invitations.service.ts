@@ -21,6 +21,8 @@ import { buildInviteAcceptUrls } from '../../common/utils/frontend-url.util';
 import { isLocalhostUrl } from './email-template.util';
 import { PlanLimitService } from '../../plans/plan-limit.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ProjectsService } from '../projects/projects.service';
+import { ProjectsRepository } from '../projects/repositories/projects.repository';
 
 const INVITE_EXPIRY_DAYS = 7;
 
@@ -47,6 +49,9 @@ export class InvitationsService {
     @Inject(forwardRef(() => PlanLimitService))
     private readonly planLimitService: PlanLimitService,
     private readonly notificationsService: NotificationsService,
+    @Inject(forwardRef(() => ProjectsService))
+    private readonly projectsService: ProjectsService,
+    private readonly projectsRepository: ProjectsRepository,
   ) {}
 
   async createInvitation(
@@ -54,6 +59,7 @@ export class InvitationsService {
     email: string,
     role: string,
     invitedByUserId: string,
+    projectIds?: string[] | null,
   ): Promise<OrganizationInvitationEntity> {
     const normalizedEmail = email.toLowerCase().trim();
 
@@ -76,12 +82,21 @@ export class InvitationsService {
     await this.planLimitService.assertMemberLimit(organizationId);
 
     const existingUser = await this.usersService.findByEmail(normalizedEmail);
+    const normalizedRole = (role ?? '').trim().toLowerCase();
+    if (!normalizedRole) {
+      throw new BadRequestException('Role is required');
+    }
+    const normalizedProjectIds = await this.normalizeInviteProjectIds(
+      organizationId,
+      projectIds,
+    );
 
     const token = generateToken();
     const invitation = await this.invitationsRepo.create({
       organizationId,
       email: normalizedEmail,
-      role,
+      role: normalizedRole,
+      projectIds: normalizedProjectIds.length ? normalizedProjectIds : null,
       token,
       invitedBy: invitedByUserId,
       status: 'PENDING',
@@ -274,21 +289,63 @@ export class InvitationsService {
       invitation.organizationId,
       user.id,
     );
-    if (existing) {
-      await this.invitationsRepo.updateStatus(invitation.id, 'ACCEPTED');
-      return { organizationId: invitation.organizationId };
+    if (!existing) {
+      await this.orgMembersRepo.create({
+        id: generateUuid(),
+        organizationId: invitation.organizationId,
+        userId: user.id,
+        role: invitation.role,
+        status: 'ACTIVE',
+      });
     }
 
-    await this.orgMembersRepo.create({
-      id: generateUuid(),
-      organizationId: invitation.organizationId,
-      userId: user.id,
-      role: invitation.role,
-      status: 'ACTIVE',
-    });
+    await this.applyInviteProjectAccess(invitation, user.id);
     await this.invitationsRepo.updateStatus(invitation.id, 'ACCEPTED');
 
     return { organizationId: invitation.organizationId };
+  }
+
+  private async normalizeInviteProjectIds(
+    organizationId: string,
+    projectIds?: string[] | null,
+  ): Promise<string[]> {
+    const raw = (projectIds ?? [])
+      .map((id) => String(id ?? '').trim())
+      .filter(Boolean);
+    if (!raw.length) return [];
+    const unique = [...new Set(raw)];
+    const valid: string[] = [];
+    for (const projectId of unique) {
+      const project = await this.projectsRepository.findByIdAndOrganization(
+        projectId,
+        organizationId,
+      );
+      if (project) valid.push(projectId);
+    }
+    return valid;
+  }
+
+  private async applyInviteProjectAccess(
+    invitation: OrganizationInvitationEntity,
+    userId: string,
+  ): Promise<void> {
+    const projectIds = await this.normalizeInviteProjectIds(
+      invitation.organizationId,
+      invitation.projectIds,
+    );
+    for (const projectId of projectIds) {
+      try {
+        await this.projectsService.addProjectMember(projectId, userId, 'CONTRIBUTOR');
+      } catch (err) {
+        // Already a member is fine (e.g. re-accept / race).
+        if (err instanceof ConflictException) continue;
+        this.logger.warn(
+          `Failed to add invitee ${userId} to project ${projectId}: ${
+            err instanceof Error ? err.message : err
+          }`,
+        );
+      }
+    }
   }
 
   async cancelInvitation(invitationId: string, organizationId: string): Promise<void> {

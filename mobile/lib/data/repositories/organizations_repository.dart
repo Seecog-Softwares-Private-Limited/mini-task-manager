@@ -112,6 +112,46 @@ class OrganizationsRepository {
     }
   }
 
+  Future<ProjectMember> updateMemberRole({
+    required String organizationId,
+    required String memberId,
+    required String role,
+  }) async {
+    try {
+      final response = await _api.dio.patch<Map<String, dynamic>>(
+        '/organizations/$organizationId/members/$memberId',
+        data: {'role': role.trim().toLowerCase()},
+        options: _api.withOrgHeader(organizationId),
+      );
+      final raw = response.data ?? const <String, dynamic>{};
+      return ProjectMember(
+        id: raw['id'] as String? ?? memberId,
+        projectId: '',
+        userId: raw['userId'] as String? ?? '',
+        role: raw['role'] as String? ?? role,
+        user: raw['user'] is Map<String, dynamic>
+            ? ProjectMemberUser.fromJson(raw['user'] as Map<String, dynamic>)
+            : null,
+      );
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<void> removeMember({
+    required String organizationId,
+    required String memberId,
+  }) async {
+    try {
+      await _api.dio.delete<void>(
+        '/organizations/$organizationId/members/$memberId',
+        options: _api.withOrgHeader(organizationId),
+      );
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
   Future<Organization> updateOrganization(
     String orgId, {
     String? name,

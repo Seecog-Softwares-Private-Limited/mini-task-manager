@@ -36,9 +36,14 @@ export function useCreateInvitation(orgId: string | null) {
   const { toast } = useToast();
 
   const mutation = useMutation({
-    mutationFn: (params: { email: string; role: string }) => {
+    mutationFn: (params: { email: string; role: string; projectIds?: string[] }) => {
       if (!orgId) throw new Error("Organization ID is required");
-      return createInvitation(orgId, params);
+      if (!params.role?.trim()) throw new Error("Role is required");
+      return createInvitation(orgId, {
+        email: params.email,
+        role: params.role,
+        projectIds: params.projectIds ?? [],
+      });
     },
     onSuccess: () => {
       if (orgId) {

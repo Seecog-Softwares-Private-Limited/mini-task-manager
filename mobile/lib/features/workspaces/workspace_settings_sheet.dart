@@ -222,14 +222,16 @@ class _WorkspaceSettingsSheetState extends ConsumerState<WorkspaceSettingsSheet>
                           ),
                           const SizedBox(height: AppSpacing.sm),
                           SecondaryButton(
-                            label: 'Invite member',
+                            label: 'Members',
                             onPressed: () {
                               final org = _org;
                               if (org == null) return;
-                              showInviteMemberSheet(
+                              showMembersSheet(
                                 context: context,
                                 organizationId: org.id,
                                 organizationName: org.name,
+                                ownerId: org.ownerId,
+                                myRole: org.myRole,
                               );
                             },
                           ),

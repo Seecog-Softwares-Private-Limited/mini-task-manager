@@ -21,6 +21,7 @@ class TaskSubtask {
     this.completionRecord,
     this.reporterId,
     this.createdAt,
+    this.updatedAt,
     this.completedAt,
     this.note,
     this.requireLocation = false,
@@ -42,6 +43,8 @@ class TaskSubtask {
   final SubtaskCompletionRecord? completionRecord;
   final String? reporterId;
   final String? createdAt;
+  /// Bumped on status / meaningful edits so the item rises within its list bucket.
+  final String? updatedAt;
   /// ISO timestamp when marked done (lightweight; survives when full record is omitted).
   final String? completedAt;
   final String? note;
@@ -87,14 +90,15 @@ class TaskSubtask {
       completionRecord: record,
       reporterId: _nullableString(json['reporterId']),
       createdAt: _nullableString(json['createdAt']),
+      updatedAt: _nullableString(json['updatedAt']),
       completedAt: completedAt,
       note: _nullableString(json['note']),
       requireLocation: json['requireLocation'] == true,
     );
   }
 
-  /// Prefer [server] fields, but keep a local completion stamp if the API
-  /// response dropped it (common after older servers / web toggles).
+  /// Prefer [server] fields, but keep local stamps the API may drop
+  /// (completionRecord, updatedAt on older servers that whitelist-strip extras).
   static TaskSubtask coalesce(TaskSubtask local, TaskSubtask server) {
     var next = server;
     final serverStamp = server.effectiveCompletedAt;
@@ -115,6 +119,25 @@ class TaskSubtask {
         serverStamp != null &&
         serverStamp.isNotEmpty) {
       next = next.copyWith(completedAt: serverStamp);
+    }
+
+    final localCreated = local.createdAt?.trim();
+    if ((next.createdAt == null || next.createdAt!.trim().isEmpty) &&
+        localCreated != null &&
+        localCreated.isNotEmpty) {
+      next = next.copyWith(createdAt: localCreated);
+    }
+
+    final localUpdated = local.updatedAt?.trim();
+    if (localUpdated != null && localUpdated.isNotEmpty) {
+      final localMs =
+          DateTime.tryParse(localUpdated)?.millisecondsSinceEpoch ?? 0;
+      final serverMs = DateTime.tryParse(next.updatedAt?.trim() ?? '')
+              ?.millisecondsSinceEpoch ??
+          0;
+      if (localMs >= serverMs) {
+        next = next.copyWith(updatedAt: localUpdated);
+      }
     }
     return next;
   }
@@ -137,6 +160,7 @@ class TaskSubtask {
     bool clearCompletionRecord = false,
     String? reporterId,
     String? createdAt,
+    String? updatedAt,
     String? completedAt,
     bool clearCompletedAt = false,
     String? note,
@@ -165,6 +189,7 @@ class TaskSubtask {
           clearCompletionRecord ? null : (completionRecord ?? this.completionRecord),
       reporterId: reporterId ?? this.reporterId,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
       completedAt:
           clearCompletedAt ? null : (completedAt ?? this.completedAt),
       note: clearNote ? null : (note ?? this.note),

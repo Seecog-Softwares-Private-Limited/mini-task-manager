@@ -428,8 +428,8 @@ export default function SettingsMembersPage() {
       <InviteMemberModal
         open={inviteOpen}
         onOpenChange={setInviteOpen}
-        onSubmit={(email, role) => {
-          createInvite({ email, role }, {
+        onSubmit={(email, role, projectIds) => {
+          createInvite({ email, role, projectIds }, {
             onSuccess: () => {
               setInviteOpen(false);
               queryClient.invalidateQueries({ queryKey: ["org-members", orgId!] });

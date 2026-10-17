@@ -78,6 +78,9 @@ export function serializeSubtasksForApi(subtasks: TaskSubtask[]): TaskSubtask[] 
     if (s.completionRecord && typeof s.completionRecord === "object") {
       item.completionRecord = s.completionRecord;
     }
+    if (s.createdAt?.trim()) item.createdAt = s.createdAt.trim().slice(0, 40);
+    if (s.updatedAt?.trim()) item.updatedAt = s.updatedAt.trim().slice(0, 40);
+    if (s.completedAt?.trim()) item.completedAt = s.completedAt.trim().slice(0, 40);
     return item;
   });
 }
@@ -157,6 +160,34 @@ export interface UpdateTaskPayload {
   subtasks?: TaskSubtask[];
   requireLocation?: boolean;
   recurrence?: TaskRecurrenceConfig;
+}
+
+/** Delete one checklist item by id (avoids full-list PATCH races). */
+export async function deleteSubtask(
+  taskId: string,
+  subtaskId: string,
+  /** Remaining checklist — used only if the API lacks DELETE /subtasks/:id. */
+  fallbackSubtasks?: TaskSubtask[]
+): Promise<Task> {
+  try {
+    const { data } = await apiClient.delete<Task>(
+      `/tasks/${taskId}/subtasks/${encodeURIComponent(subtaskId)}`
+    );
+    return data;
+  } catch (err: unknown) {
+    const response = (err as { response?: { status?: number; data?: { message?: unknown } } })
+      ?.response;
+    const status = response?.status;
+    const message = String(response?.data?.message ?? "");
+    // Route missing on older API builds (not "item already gone").
+    const routeMissing =
+      status === 404 &&
+      (message.includes("Cannot DELETE") || message.includes("Cannot delete"));
+    if (routeMissing && fallbackSubtasks) {
+      return updateTask(taskId, { subtasks: fallbackSubtasks });
+    }
+    throw err;
+  }
 }
 
 export async function updateTask(

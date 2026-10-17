@@ -155,7 +155,7 @@ export default function ProjectOverviewPage({ params }: { params: { id: string }
   function handleInviteSubmit(values: { email: string; role: string; message?: string }) {
     const orgRole = values.role === "ADMIN" ? "admin" : "member";
     createInvite(
-      { email: values.email, role: orgRole },
+      { email: values.email, role: orgRole, projectIds: [id] },
       {
         onSuccess: () => {
           setInviteModalOpen(false);

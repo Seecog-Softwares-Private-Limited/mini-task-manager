@@ -77,4 +77,40 @@ class ProjectsRepository {
       throw ApiException.fromDio(error);
     }
   }
+
+  Future<ProjectMember> addProjectMember({
+    required String projectId,
+    required String organizationId,
+    required String userId,
+    String role = 'CONTRIBUTOR',
+  }) async {
+    try {
+      final response = await _api.dio.post<Map<String, dynamic>>(
+        '/projects/$projectId/members',
+        data: {
+          'userId': userId,
+          'role': role,
+        },
+        options: _api.withOrgHeader(organizationId),
+      );
+      return ProjectMember.fromJson(response.data!);
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  Future<void> removeProjectMember({
+    required String projectId,
+    required String organizationId,
+    required String memberId,
+  }) async {
+    try {
+      await _api.dio.delete<void>(
+        '/projects/$projectId/members/$memberId',
+        options: _api.withOrgHeader(organizationId),
+      );
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
 }

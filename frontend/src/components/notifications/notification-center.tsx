@@ -1,12 +1,16 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useNotificationsOptional } from "@/context/notifications-context";
+import { notificationDeepLinkHref } from "@/lib/notification-deep-link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Bell, CheckCheck } from "lucide-react";
+import type { Notification } from "@/types/api";
 
 export function NotificationCenter() {
+  const router = useRouter();
   const ctx = useNotificationsOptional();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -23,6 +27,15 @@ export function NotificationCenter() {
   if (!ctx) return null;
 
   const { notifications, unreadCount, markRead, markAllRead, isLoading } = ctx;
+
+  const openNotification = async (n: Notification) => {
+    if (!n.isRead) {
+      await markRead(n.id);
+    }
+    const href = notificationDeepLinkHref(n);
+    setOpen(false);
+    if (href) router.push(href);
+  };
 
   return (
     <div className="relative" ref={ref}>
@@ -78,7 +91,7 @@ export function NotificationCenter() {
                     "w-full border-b px-4 py-3 text-left text-sm transition-colors last:border-b-0 hover:bg-muted/30",
                     !n.isRead && "bg-primary/5 border-l-2 border-l-primary"
                   )}
-                  onClick={() => ctx.markRead(n.id)}
+                  onClick={() => void openNotification(n)}
                 >
                   <p className="font-semibold text-xs">{n.title}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{n.message}</p>

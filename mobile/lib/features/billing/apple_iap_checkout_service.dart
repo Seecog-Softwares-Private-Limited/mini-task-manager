@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
 import '../../data/models/plan.dart';
@@ -48,7 +48,7 @@ class AppleIapCheckoutService {
   final InAppPurchase _iap = InAppPurchase.instance;
 
   Future<Map<String, ProductDetails>> loadProducts() async {
-    if (!Platform.isIOS) return {};
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) return {};
     final available = await _iap.isAvailable();
     if (!available) {
       throw AppleIapCheckoutException(
@@ -109,7 +109,7 @@ class AppleIapCheckoutService {
   }
 
   void _assertIos() {
-    if (!Platform.isIOS) {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) {
       throw AppleIapCheckoutException('Apple IAP is only available on iOS.');
     }
   }

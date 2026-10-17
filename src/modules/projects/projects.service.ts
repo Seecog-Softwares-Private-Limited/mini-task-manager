@@ -47,6 +47,26 @@ export class ProjectsService {
     return this.projectsRepository.findByOrganization(organizationId);
   }
 
+  /**
+   * Owners/admins see every workspace project.
+   * Members only see projects they were explicitly added to.
+   */
+  async findVisibleForUser(
+    organizationId: string,
+    userId: string,
+    orgRole?: string | null,
+  ): Promise<ProjectEntity[]> {
+    const all = await this.projectsRepository.findByOrganization(organizationId);
+    const role = (orgRole ?? '').toLowerCase();
+    if (role === 'owner' || role === 'admin') {
+      return all;
+    }
+    const allowedIds = new Set(
+      await this.projectMembersRepository.findProjectIdsByUser(userId),
+    );
+    return all.filter((p) => allowedIds.has(p.id));
+  }
+
   async countByOrganization(organizationId: string): Promise<number> {
     return this.projectsRepository.countByOrganization(organizationId);
   }
@@ -61,6 +81,18 @@ export class ProjectsService {
       iconUrl: iconTrimmed && iconTrimmed.length > 0 ? dto.iconUrl! : null,
       visibility: dto.visibility ?? 'PRIVATE',
     });
+    // Creator always has project access (members otherwise only see invited projects).
+    const existing = await this.projectMembersRepository.findByProjectAndUser(
+      project.id,
+      createdBy,
+    );
+    if (!existing) {
+      await this.projectMembersRepository.create({
+        projectId: project.id,
+        userId: createdBy,
+        role: 'ADMIN',
+      });
+    }
     this.activityLogsService
       .log({ organizationId, userId: createdBy, entityType: 'project', entityId: project.id, action: 'create', metadata: { name: project.name } })
       .catch(() => {});

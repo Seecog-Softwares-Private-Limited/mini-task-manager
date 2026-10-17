@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 /// Temporary gate for App Review while Apple IAP products are not submitted.
 ///
@@ -12,6 +12,7 @@ const bool kIosPlansPurchaseEnabled = false;
 
 /// Whether the in-app Plans & Pricing screen / Upgrade CTAs should be shown.
 bool get isPlansBillingUiEnabled {
-  if (!Platform.isIOS) return true;
+  // Use defaultTargetPlatform — dart:io Platform crashes on Flutter web.
+  if (defaultTargetPlatform != TargetPlatform.iOS) return true;
   return kIosPlansPurchaseEnabled;
 }

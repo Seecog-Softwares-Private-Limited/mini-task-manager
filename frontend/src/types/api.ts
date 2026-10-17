@@ -240,6 +240,10 @@ export interface TaskSubtask {
   /** User who created this subtask (audit / permission checks). */
   reporterId?: string | null;
   createdAt?: string;
+  /** Bumped on status / meaningful edits so the item rises within its list bucket. */
+  updatedAt?: string;
+  /** Lightweight done stamp (also mirrored in completionRecord). */
+  completedAt?: string | null;
   note?: string;
   /** When true, completing this subtask requires GPS/geofence. */
   requireLocation?: boolean;

@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SubtaskAssigneeSelector } from "@/components/tasks/subtask-assignee-selector";
@@ -79,6 +78,9 @@ export type SubtaskDraft = Pick<
   | "priority"
   | "requireLocation"
   | "completionRecord"
+  | "createdAt"
+  | "updatedAt"
+  | "completedAt"
 >;
 
 interface SubtaskDetailPanelProps {
@@ -147,7 +149,15 @@ export function SubtaskDetailPanel({
   const [draft, setDraft] = React.useState(initialDraft);
   const [discardConfirmOpen, setDiscardConfirmOpen] = React.useState(false);
   const baselineRef = React.useRef(initialDraft);
+  const titleRef = React.useRef<HTMLTextAreaElement>(null);
   const descriptionRef = React.useRef<HTMLTextAreaElement>(null);
+
+  React.useLayoutEffect(() => {
+    const el = titleRef.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }, [draft.title]);
   const attachmentQueryKey = ["entity-attachments", "SUBTASK", initialDraft.id];
   const fieldsDisabled = Boolean(disabled || readOnly);
   const locationDisabled = Boolean(fieldsDisabled || !canEditRequireLocation);
@@ -280,6 +290,8 @@ export function SubtaskDetailPanel({
       completed: resolveSubtaskStatus(next) === "DONE",
       priority: resolveSubtaskPriority(next.priority),
       requireLocation: next.requireLocation === true,
+      // Any save bumps updatedAt so the row rises within its color group.
+      updatedAt: new Date().toISOString(),
     });
   };
 
@@ -377,12 +389,14 @@ export function SubtaskDetailPanel({
             {draft.title.length}/{SUBTASK_TITLE_MAX_LENGTH}
           </span>
         </div>
-        <Input
+        <Textarea
+          ref={titleRef}
           value={draft.title}
           maxLength={SUBTASK_TITLE_MAX_LENGTH}
           onChange={(e) => update("title", clampSubtaskTitle(e.target.value))}
           disabled={fieldsDisabled}
-          className="h-10 bg-background/90"
+          rows={1}
+          className="min-h-10 resize-none overflow-hidden bg-background/90 py-2.5 leading-snug"
           placeholder="Subtask title"
           aria-describedby="subtask-title-limit-hint"
         />

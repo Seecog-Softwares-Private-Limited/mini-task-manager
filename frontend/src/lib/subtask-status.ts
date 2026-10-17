@@ -44,22 +44,29 @@ function lightweightCompletionStamp(actor?: {
 export function subtaskWithStatus<
   T extends Pick<TaskSubtask, "status" | "completed"> & {
     completionRecord?: TaskSubtask["completionRecord"];
+    updatedAt?: TaskSubtask["updatedAt"];
+    completedAt?: string | null;
   },
 >(subtask: T, status: SubtaskStatus, actor?: { id?: string; name?: string }): T {
+  const nowIso = new Date().toISOString();
   const next: T = {
     ...subtask,
     status,
     completed: status === "DONE",
+    updatedAt: nowIso,
   };
   if (status === "DONE") {
+    const stamp = subtask.completionRecord ?? lightweightCompletionStamp(actor);
     return {
       ...next,
-      completionRecord: subtask.completionRecord ?? lightweightCompletionStamp(actor),
+      completionRecord: stamp,
+      completedAt: stamp.completedAt ?? nowIso,
     };
   }
   return {
     ...next,
     completionRecord: null,
+    completedAt: null,
   };
 }
 

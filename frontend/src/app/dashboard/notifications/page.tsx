@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useNotificationsOptional } from "@/context/notifications-context";
 import { useAuth } from "@/hooks/use-auth";
 import { isNetworkError } from "@/lib/error";
+import { notificationDeepLinkHref } from "@/lib/notification-deep-link";
 import { fetchNotifications } from "@/services/api/notifications.api";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,15 +14,28 @@ import { ListPagination } from "@/components/ui/list-pagination";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollablePageLayout } from "@/components/dashboard/scrollable-page-layout";
 import { Bell, CheckCheck, RefreshCw } from "lucide-react";
+import type { Notification } from "@/types/api";
 
 const REFETCH_INTERVAL_MS = 15_000;
 const PAGE_SIZE_OPTIONS = [5, 10, 20, 50];
 
 export default function NotificationsPage() {
+  const router = useRouter();
   const { isAuthenticated } = useAuth();
   const ctx = useNotificationsOptional();
   const { markRead, markAllRead } = ctx ?? {};
   const hasUnread = (ctx?.unreadCount ?? 0) > 0;
+
+  const openNotification = useCallback(
+    async (n: Notification) => {
+      if (!n.isRead) {
+        await markRead?.(n.id);
+      }
+      const href = notificationDeepLinkHref(n);
+      if (href) router.push(href);
+    },
+    [markRead, router]
+  );
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -132,7 +147,7 @@ export default function NotificationsPage() {
                       className={`w-full px-4 py-4 text-left transition-colors hover:bg-muted/30 ${
                         !n.isRead ? "border-l-4 border-l-primary bg-primary/5" : ""
                       }`}
-                      onClick={() => markRead?.(n.id)}
+                      onClick={() => void openNotification(n)}
                     >
                       <p className="text-sm font-semibold">{n.title ?? "Notification"}</p>
                       {n.message && (

@@ -383,6 +383,7 @@ export class RecurringTasksService {
             tags: template.tags ?? undefined,
             subtasks: cloneTemplateSubtasksForOccurrence(template.templateSubtasks, nextDueDate),
           },
+          { skipAssignmentNotify: true },
         );
         await this.tasksRepository.update(createdTask.id, {
           recurringTemplateId: template.id,
@@ -679,6 +680,7 @@ export class RecurringTasksService {
           tags: template.tags ?? undefined,
           subtasks: cloneTemplateSubtasksForOccurrence(template.templateSubtasks, dueYmd),
         },
+        { skipAssignmentNotify: true },
       );
       await this.tasksRepository.update(createdTask.id, {
         recurringTemplateId: template.id,
@@ -1353,7 +1355,7 @@ export class RecurringTasksService {
     const assigneesChanged = dto.assigneeIds !== undefined;
     const checklistChanged = dto.subtasks !== undefined;
     if (assigneesChanged || checklistChanged) {
-      const syncedTaskIds = await this.syncPendingOccurrenceAssignmentsFromTemplate({
+      const syncResult = await this.syncPendingOccurrenceAssignmentsFromTemplate({
         beforeTemplate: template,
         afterTemplate: updated,
         actorUserId,
@@ -1361,8 +1363,9 @@ export class RecurringTasksService {
         syncChecklist: checklistChanged,
       });
 
-      // No open run to carry the assignment — still push for newly assigned people.
-      if (syncedTaskIds.length === 0) {
+      // Only when there is no pending run at all. Past overdue pendings are
+      // synced silently — do not fall back to a series-wide assignment blast.
+      if (!syncResult.hadPendingOccurrence && syncResult.notifiedTaskIds.length === 0) {
         this.taskNotifications.scheduleTemplateAssignment({
           actorUserId,
           projectId: updated.projectId,
@@ -1385,7 +1388,8 @@ export class RecurringTasksService {
 
   /**
    * Mirror planner assignee / checklist assignee changes onto PENDING occurrence
-   * tasks so current runs stay in sync and assignment pushes fire via scheduleOnUpdate.
+   * tasks so current runs stay in sync. Assignment push/email only fires for
+   * current/future cycles — never for months-old overdue pending runs.
    */
   private async syncPendingOccurrenceAssignmentsFromTemplate(params: {
     beforeTemplate: import('./entities/recurring-task-template.entity').RecurringTaskTemplateEntity;
@@ -1393,17 +1397,24 @@ export class RecurringTasksService {
     actorUserId: string;
     syncAssignees: boolean;
     syncChecklist: boolean;
-  }): Promise<string[]> {
+  }): Promise<{ notifiedTaskIds: string[]; hadPendingOccurrence: boolean }> {
     const { afterTemplate, actorUserId, syncAssignees, syncChecklist } = params;
     const occurrences = await this.occurrencesRepository.findByTemplate(afterTemplate.id);
     const pending = occurrences.filter((o) => o.state === 'PENDING' && !!o.taskId);
-    const syncedTaskIds: string[] = [];
+    const notifiedTaskIds: string[] = [];
+    const todayYmd = nowYmd();
+    let hadPendingOccurrence = false;
 
     for (const occurrence of pending) {
       const taskId = occurrence.taskId;
       if (!taskId) continue;
       const task = await this.tasksRepository.findById(taskId);
       if (!task) continue;
+      hadPendingOccurrence = true;
+      const occurrenceDueYmd = String(occurrence.dueDate).slice(0, 10);
+      const isCurrentOrFutureCycle =
+        /^\d{4}-\d{2}-\d{2}$/.test(occurrenceDueYmd) &&
+        occurrenceDueYmd >= todayYmd;
 
       const patch: Partial<TaskEntity> = {};
       if (syncAssignees) {
@@ -1510,17 +1521,20 @@ export class RecurringTasksService {
       await this.tasksRepository.update(task.id, patch as never);
       const refreshed = await this.tasksRepository.findById(task.id);
       if (!refreshed) continue;
-      this.taskNotifications.scheduleOnUpdate(task, refreshed, actorUserId);
-      syncedTaskIds.push(task.id);
+      // Past overdue runs still get assignee data synced, but no spam push/email.
+      if (isCurrentOrFutureCycle) {
+        this.taskNotifications.scheduleOnUpdate(task, refreshed, actorUserId);
+        notifiedTaskIds.push(task.id);
+      }
     }
 
-    return syncedTaskIds;
+    return { notifiedTaskIds, hadPendingOccurrence };
   }
 
   /**
    * Push title-only reminders for:
-   * - the ritual itself (ruleConfig.dueTime) → all checklist assignees, ritual title
-   * - each checklist item with its own dueTime → that item's assignees, item title
+   * - the ritual itself (ruleConfig.dueTime) → series/task assignees only
+   * - each checklist item with its own dueTime → that item's assignees only
    * Lead time: each checklist item uses its own notifyMinutesBefore.
    * Ritual-level uses ruleConfig.notifyMinutesBefore (Asia/Kolkata wall clock).
    */
@@ -1576,14 +1590,11 @@ export class RecurringTasksService {
         sent += 1;
       };
 
-      // 1) Ritual-level reminder → every checklist assignee, ritual title.
+      // 1) Ritual-level reminder → only series/task assignees (not every checklist member).
       const ritualDueTime = parseHHmm(rule.dueTime);
       if (seriesNotify != null && ritualDueTime && !sentKeys.has('ritual')) {
         if (isInRemindWindow(runDueYmd, ritualDueTime, seriesNotify, nowMs)) {
-          const recipientIds = collectChecklistAssigneeIds(
-            task.subtasks,
-            template.templateSubtasks,
-          );
+          const recipientIds = seriesAssigneeIds(task, template);
           if (recipientIds.length) {
             const title = (task.title || template.title || 'Ritual').trim() || 'Ritual';
             await this.taskNotifications.notifyRitualDue({
@@ -1596,6 +1607,10 @@ export class RecurringTasksService {
               dueTime: ritualDueTime,
               notifyMinutesBefore: seriesNotify,
             });
+          } else {
+            this.logger.warn(
+              `Ritual reminder skipped (no series assignees): "${template.title}" @ ${runDueYmd} ${ritualDueTime}`,
+            );
           }
           await markSent('ritual');
         }
@@ -1713,16 +1728,22 @@ function assigneeIdsForItem(item: {
   ];
 }
 
-function collectChecklistAssigneeIds(
-  taskSubtasks: TaskEntity['subtasks'] | null | undefined,
-  templateSubtasks: RecurringTaskTemplateEntity['templateSubtasks'] | null | undefined,
+/** Ritual-level recipients: task assignees, else template series assignees. */
+function seriesAssigneeIds(
+  task: Pick<TaskEntity, 'assigneeId' | 'assigneeIds'>,
+  template: Pick<
+    RecurringTaskTemplateEntity,
+    'assigneeId' | 'assigneeIds'
+  >,
 ): string[] {
-  const ids = new Set<string>();
-  const source =
-    taskSubtasks?.length ? taskSubtasks : templateSubtasks?.length ? templateSubtasks : [];
-  for (const item of source) {
-    for (const id of assigneeIdsForItem(item)) ids.add(id);
-  }
-  return Array.from(ids);
+  const fromTask = assigneeIdsForItem({
+    assigneeId: task.assigneeId,
+    assigneeIds: task.assigneeIds,
+  });
+  if (fromTask.length) return fromTask;
+  return assigneeIdsForItem({
+    assigneeId: template.assigneeId,
+    assigneeIds: template.assigneeIds,
+  });
 }
 

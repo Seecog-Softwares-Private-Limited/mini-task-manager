@@ -13,6 +13,7 @@ class InvitationsRepository {
     required String organizationId,
     required String email,
     required String role,
+    List<String> projectIds = const [],
   }) async {
     try {
       final response = await _api.dio.post<Map<String, dynamic>>(
@@ -20,6 +21,7 @@ class InvitationsRepository {
         data: {
           'email': email.trim(),
           'role': role.trim(),
+          'projectIds': projectIds,
         },
         options: _api.withOrgHeader(organizationId),
       );

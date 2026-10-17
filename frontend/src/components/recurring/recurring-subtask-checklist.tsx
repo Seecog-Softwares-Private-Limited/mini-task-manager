@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import { updateTask } from "@/services/api/tasks.api";
+import { deleteSubtask as deleteSubtaskApi, updateTask } from "@/services/api/tasks.api";
 import { ensureRecurringOccurrenceSubtasks } from "@/services/api/recurring-tasks.api";
 import { parseApiError } from "@/services/api/client";
 import { generateClientId } from "@/lib/generate-client-id";
@@ -136,6 +136,46 @@ export function RecurringSubtaskChecklist({
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (subtaskId: string) =>
+      deleteSubtaskApi(
+        taskId!,
+        subtaskId,
+        (task?.subtasks ?? []).filter((s) => s.id !== subtaskId)
+      ),
+    onMutate: async (subtaskId) => {
+      if (boardQueryKey) {
+        await queryClient.cancelQueries({ queryKey: [...boardQueryKey] });
+      }
+      await queryClient.cancelQueries({ queryKey: ["task", taskId ?? ""] });
+      const fromTaskCache = queryClient.getQueryData<Task>(["task", taskId ?? ""]);
+      const base = fromTaskCache ?? task;
+      if (!base) return {} as { previous?: Task };
+      const optimistic = {
+        ...base,
+        subtasks: (base.subtasks ?? []).filter((s) => s.id !== subtaskId),
+      };
+      queryClient.setQueryData(["task", taskId], optimistic);
+      onTaskUpdated?.(optimistic);
+      return { previous: base };
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx?.previous) {
+        queryClient.setQueryData(["task", taskId], ctx.previous);
+        onTaskUpdated?.(ctx.previous);
+      }
+      toast({
+        title: "Could not delete subtask",
+        description: parseApiError(err),
+        variant: "error",
+      });
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["task", taskId], updated);
+      onTaskUpdated?.(updated);
+    },
+  });
+
   const subtasks = task?.subtasks ?? [];
   const progress = useMemo(() => getOccurrenceSubtaskProgress(subtasks), [subtasks]);
   const allDone = allOccurrenceSubtasksDone(subtasks);
@@ -223,7 +263,7 @@ export function RecurringSubtaskChecklist({
   function deleteSubtask(subtaskId: string) {
     if (readOnly || !task) return;
     if (expandedSubtaskId === subtaskId) setExpandedSubtaskId(null);
-    updateMutation.mutate(subtasks.filter((s) => s.id !== subtaskId));
+    deleteMutation.mutate(subtaskId);
   }
 
   function saveSubtaskDetail(draft: SubtaskDraft) {
