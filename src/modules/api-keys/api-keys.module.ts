@@ -12,8 +12,8 @@ import { OrganizationsModule } from '../organizations/organizations.module';
   imports: [
     TypeOrmModule.forFeature([ApiKeyEntity]),
     forwardRef(() => AuthModule),
-    BillingModule,
-    OrganizationsModule,
+    forwardRef(() => BillingModule),
+    forwardRef(() => OrganizationsModule),
   ],
   controllers: [ApiKeysController],
   providers: [ApiKeysRepository, ApiKeysService],

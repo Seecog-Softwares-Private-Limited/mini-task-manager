@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
@@ -9,7 +9,12 @@ import { SprintsService } from './sprints.service';
 import { SprintsController } from './sprints.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([SprintEntity]), AuthModule, OrganizationsModule, ProjectsModule],
+  imports: [
+    TypeOrmModule.forFeature([SprintEntity]),
+    forwardRef(() => AuthModule),
+    forwardRef(() => OrganizationsModule),
+    forwardRef(() => ProjectsModule),
+  ],
   controllers: [SprintsController],
   providers: [SprintsRepository, SprintsService],
   exports: [SprintsService, SprintsRepository],

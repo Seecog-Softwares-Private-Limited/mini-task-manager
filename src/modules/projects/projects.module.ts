@@ -17,8 +17,10 @@ import { ProjectsController } from './projects.controller';
 @Module({
   imports: [
     TypeOrmModule.forFeature([ProjectEntity, ProjectMemberEntity]),
-    AuthModule,
-    OrganizationsModule,
+    // Auth/Orgs are mid-init when InvitationsModule pulls ProjectsModule in
+    // (Auth → Invitations → Projects → Auth). forwardRef avoids undefined imports.
+    forwardRef(() => AuthModule),
+    forwardRef(() => OrganizationsModule),
     forwardRef(() => WorkflowsModule),
     forwardRef(() => TasksModule),
     forwardRef(() => BillingModule),

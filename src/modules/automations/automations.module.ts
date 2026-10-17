@@ -13,9 +13,9 @@ import { AutomationsController } from './automations.controller';
 @Module({
   imports: [
     TypeOrmModule.forFeature([AutomationRuleEntity]),
-    AuthModule,
-    BillingModule,
-    OrganizationsModule,
+    forwardRef(() => AuthModule),
+    forwardRef(() => BillingModule),
+    forwardRef(() => OrganizationsModule),
     NotificationsModule,
     forwardRef(() => TasksModule),
   ],

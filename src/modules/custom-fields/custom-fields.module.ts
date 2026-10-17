@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
@@ -13,9 +13,9 @@ import { CustomFieldsController } from './custom-fields.controller';
 @Module({
   imports: [
     TypeOrmModule.forFeature([CustomFieldEntity, TaskCustomFieldValueEntity]),
-    AuthModule,
-    OrganizationsModule,
-    ProjectsModule,
+    forwardRef(() => AuthModule),
+    forwardRef(() => OrganizationsModule),
+    forwardRef(() => ProjectsModule),
   ],
   controllers: [CustomFieldsController],
   providers: [CustomFieldsRepository, TaskCustomFieldValuesRepository, CustomFieldsService],

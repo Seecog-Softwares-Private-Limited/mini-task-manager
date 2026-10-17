@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { BillingModule } from '../billing/billing.module';
@@ -11,9 +11,9 @@ import { SavedViewsController } from './saved-views.controller';
 @Module({
   imports: [
     TypeOrmModule.forFeature([SavedBoardViewEntity]),
-    AuthModule,
-    BillingModule,
-    OrganizationsModule,
+    forwardRef(() => AuthModule),
+    forwardRef(() => BillingModule),
+    forwardRef(() => OrganizationsModule),
   ],
   controllers: [SavedViewsController],
   providers: [SavedViewsRepository, SavedViewsService],

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { ActivityLogEntity } from '../activity-logs/entities/activity-log.entity';
@@ -13,12 +13,12 @@ import { AnalyticsController } from './analytics.controller';
 @Module({
   imports: [
     TypeOrmModule.forFeature([ActivityLogEntity]),
-    AuthModule,
-    OrganizationsModule,
-    ProjectsModule,
-    TasksModule,
-    InvitationsModule,
-    BillingModule,
+    forwardRef(() => AuthModule),
+    forwardRef(() => OrganizationsModule),
+    forwardRef(() => ProjectsModule),
+    forwardRef(() => TasksModule),
+    forwardRef(() => InvitationsModule),
+    forwardRef(() => BillingModule),
   ],
   controllers: [AnalyticsController],
   providers: [AnalyticsService],
