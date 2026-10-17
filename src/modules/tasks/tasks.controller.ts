@@ -247,6 +247,22 @@ export class TasksController {
     return { success: true };
   }
 
+  @Delete(':id/subtasks/:subtaskId')
+  async deleteSubtask(
+    @Param('id') taskId: string,
+    @Param('subtaskId') subtaskId: string,
+    @TenantId() tenantId: string,
+    @CurrentUserId() userId: string,
+  ): Promise<TaskResponseDto> {
+    const task = await this.tasksService.deleteSubtask({
+      taskId,
+      subtaskId,
+      organizationId: tenantId,
+      userId,
+    });
+    return this.toResponse(task);
+  }
+
   @Post(':id/subtasks/:subtaskId/move')
   async moveSubtask(
     @Param('id') taskId: string,

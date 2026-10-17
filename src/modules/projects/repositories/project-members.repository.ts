@@ -27,6 +27,14 @@ export class ProjectMembersRepository {
     return this.repo.findOne({ where: { projectId, userId } });
   }
 
+  async findProjectIdsByUser(userId: string): Promise<string[]> {
+    const rows = await this.repo.find({
+      where: { userId },
+      select: ['projectId'],
+    });
+    return [...new Set(rows.map((r) => r.projectId).filter(Boolean))];
+  }
+
   async create(data: Partial<ProjectMemberEntity>): Promise<ProjectMemberEntity> {
     const id = data.id ?? generateUuid();
     const entity = this.repo.create({ ...data, id });

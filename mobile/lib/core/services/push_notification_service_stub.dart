@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 
-typedef OpenAlertsCallback = void Function();
+import 'push_nav.dart';
+
+typedef OpenAlertsCallback = void Function([PushDeepLink? link]);
 
 /// No-op push service for web (and any non-IO target).
 /// Keeps Chrome free of Firebase.initializeApp / FCM requirements.

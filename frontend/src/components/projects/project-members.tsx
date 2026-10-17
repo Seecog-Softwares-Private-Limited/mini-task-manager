@@ -117,7 +117,11 @@ export function ProjectMembers({
 
   const handleInviteSubmit = (params: { email: string; role: string; message?: string }) => {
     createInvite(
-      { email: params.email, role: projectRoleToOrgRole(params.role as ProjectMemberRole) },
+      {
+        email: params.email,
+        role: projectRoleToOrgRole(params.role as ProjectMemberRole),
+        projectIds: [projectId],
+      },
       {
         onSuccess: () => {
           setInviteModalOpen(false);

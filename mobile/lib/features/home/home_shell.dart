@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../workspaces/workspace_switcher_sheet.dart';
+import '../../core/api/api_exception.dart';
 import '../../core/branding/opspick_logo.dart';
 import '../../core/services/push_nav.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/models/workflow.dart';
 import '../auth/session_controller.dart';
+import '../kanban/kanban_providers.dart';
+import '../kanban/task_detail_sheet.dart';
 import '../notifications/notifications_providers.dart';
 import '../notifications/notifications_screen.dart';
 import '../profile/header_account_menu.dart';
@@ -151,11 +155,61 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
     return null;
   }
 
+  Future<void> _openPushDeepLink(PushDeepLink link) async {
+    final taskId = link.taskId?.trim();
+    if (taskId == null || taskId.isEmpty || !mounted) return;
+
+    try {
+      final task = await ref.read(tasksRepositoryProvider).fetchTask(taskId);
+      List<WorkflowStatus> statuses = const [];
+      try {
+        statuses =
+            await ref.read(projectWorkflowStatusesProvider(task.projectId).future);
+      } catch (_) {
+        statuses = const [];
+      }
+      if (!mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) {
+          return TaskDetailSheet(
+            task: task,
+            statuses: statuses,
+            projectId: task.projectId,
+            initialSubtaskId: link.subtaskId,
+            onUpdated: () {
+              ref.invalidate(notificationsProvider);
+              ref.invalidate(projectBoardProvider(task.projectId));
+            },
+            onDeleted: () {
+              ref.invalidate(notificationsProvider);
+              ref.invalidate(projectBoardProvider(task.projectId));
+            },
+          );
+        },
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(userFacingError(error))),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Phase 11: push tap / cold start → Alerts tab.
+    // Push tap / cold start → Alerts tab, then open task + subtask when present.
     ref.listen<int>(openAlertsTabTickProvider, (_, __) {
       _selectTab(kAlertsTabIndex);
+      final link = ref.read(pendingPushDeepLinkProvider);
+      if (link == null || !link.hasTask) return;
+      ref.read(pendingPushDeepLinkProvider.notifier).state = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _openPushDeepLink(link);
+      });
     });
 
     final orgId = ref.watch(

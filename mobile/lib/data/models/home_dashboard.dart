@@ -90,6 +90,7 @@ class HomeDueTodayItem {
     this.subtask,
     this.fromPlanner = false,
     this.isUndated = false,
+    this.projectName,
   });
 
   final Task task;
@@ -98,6 +99,16 @@ class HomeDueTodayItem {
 
   /// Open item with no date/time.
   final bool isUndated;
+
+  /// Resolved project display name (from workspace projects map).
+  final String? projectName;
+
+  /// Project line for cards.
+  String get projectLabel {
+    final name = projectName?.trim();
+    if (name != null && name.isNotEmpty) return name;
+    return 'Project';
+  }
 
   /// Primary card title: subtask name when set, otherwise the (leaf) task title.
   String get title {
@@ -115,6 +126,16 @@ class HomeDueTodayItem {
 
   /// Parent ritual/task name when this row is a checklist item.
   String? get parentTitle => subtitle;
+
+  /// Task title line (parent when this row is a subtask, else the leaf task).
+  String get taskLabel => task.title.trim().isEmpty ? 'Task' : task.title.trim();
+
+  /// Subtask title when present.
+  String? get subtaskLabel {
+    final sub = subtask?.title.trim();
+    if (sub == null || sub.isEmpty) return null;
+    return sub;
+  }
 
   String get key =>
       subtask == null ? task.id : '${task.id}:${subtask!.id}';
@@ -253,6 +274,7 @@ class HomeDashboard {
     List<Task> tasks, {
     List<Task>? dueTodayCandidates,
     String? currentUserId,
+    Map<String, String>? projectNamesById,
   }) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -298,6 +320,7 @@ class HomeDashboard {
             subtask: sub,
             fromPlanner: fromPlanner,
             isUndated: undated,
+            projectName: projectNamesById?[t.projectId],
           );
           if (!item.belongsInDueList) continue;
           final key = '${t.id}:${sub.id}';
@@ -321,6 +344,7 @@ class HomeDashboard {
         task: t,
         fromPlanner: fromPlanner,
         isUndated: !_hasDateOrTime(t.dueDate, t.dueTime),
+        projectName: projectNamesById?[t.projectId],
       );
       if (!leaf.belongsInDueList) continue;
       if (!seen.add(t.id)) continue;

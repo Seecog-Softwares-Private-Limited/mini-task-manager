@@ -61,6 +61,7 @@ export class InvitationsController {
       dto.email,
       dto.role,
       userId,
+      dto.projectIds,
     );
     return this.toResponse(invitation);
   }
@@ -226,6 +227,7 @@ export class InvitationsController {
       organizationName: inv.organization?.name,
       email: inv.email,
       role: inv.role,
+      projectIds: inv.projectIds?.length ? inv.projectIds : undefined,
       status: inv.status,
       expiresAt: inv.expiresAt,
       createdAt: inv.createdAt,

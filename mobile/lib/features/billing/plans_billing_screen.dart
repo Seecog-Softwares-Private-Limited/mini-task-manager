@@ -1,6 +1,5 @@
-import 'dart:io';
-
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -35,7 +34,8 @@ class _PlansBillingScreenState extends ConsumerState<PlansBillingScreen> {
   final Map<String, TextEditingController> _couponControllers = {};
   final Map<String, CouponValidation?> _appliedCoupons = {};
 
-  bool get _isIos => Platform.isIOS;
+  bool get _isIos =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
   @override
   void initState() {

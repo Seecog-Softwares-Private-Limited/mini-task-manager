@@ -162,84 +162,64 @@ export class TaskNotificationsService {
     newAssigneeIds?: string[];
     isCreate?: boolean;
   }): Promise<void> {
-    const { actorUserId, after, before, isCreate } = params;
+    const { actorUserId, after, before } = params;
+
+    // Past planner/ritual cycles: sync assignees silently. New people get
+    // push/email only on the next current/future cycle reminder — not for
+    // months-old overdue runs they were just added to.
+    if (this.isPastRecurringCycle(after) && !params.isCreate) {
+      this.logger.log(
+        `Skipping assignment notify/email for past planner cycle "${after.title}" (due ${String(after.dueDate).slice(0, 10)})`,
+      );
+      return;
+    }
+
     const beforeAssignees = before ? this.getTaskAssigneeIds(before) : [];
     const afterAssignees = this.getTaskAssigneeIds(after);
     const newAssigneeIds =
       params.newAssigneeIds ??
       (before ? this.getNewIds(beforeAssignees, afterAssignees) : afterAssignees);
 
-    const notifiedUserIds = new Set<string>();
-
     if (newAssigneeIds.length > 0) {
       this.logger.log(
         `Task "${after.title}" — sending assignment emails to ${newAssigneeIds.length} assignee(s)`,
       );
-      const sent = await this.notifyAssignees(after, actorUserId, newAssigneeIds);
-      sent.forEach((id) => {
-        const key = normalizeUserIdForCompare(id);
-        if (key) notifiedUserIds.add(key);
-      });
+      await this.notifyAssignees(after, actorUserId, newAssigneeIds);
     }
 
     const beforeSubtasks = this.coerceSubtasks(before?.subtasks);
     const afterSubtasks = this.coerceSubtasks(after.subtasks);
     if (afterSubtasks.length === 0) return;
 
-    const beforeSubtaskIdKeys = new Set(
-      beforeSubtasks
-        .map((subtask) => normalizeUserIdForCompare(subtask.id))
-        .filter((id): id is string => !!id),
-    );
-    const addedSubtasks = isCreate
-      ? afterSubtasks
-      : afterSubtasks.filter((subtask) => {
-          const key = normalizeUserIdForCompare(subtask.id);
-          return !key || !beforeSubtaskIdKeys.has(key);
-        });
-
+    // Checklist assignment pushes go only to newly assigned people on that
+    // subtask — never to parent-task assignees / the whole task audience.
     for (let index = 0; index < afterSubtasks.length; index++) {
       const subtask = afterSubtasks[index];
       const previous = this.findPreviousSubtask(beforeSubtasks, subtask, index);
       const previousAssignees = previous ? this.getSubtaskAssigneeIds(previous) : [];
       const nextAssignees = this.getSubtaskAssigneeIds(subtask);
-      // Always notify newly assigned subtask members (even if they also got
-      // task_assigned in this same update) so every assignment sends a push.
       const newlyAssigned = this.getNewIds(previousAssignees, nextAssignees).filter(
         (assigneeId) => !this.isSameUser(assigneeId, actorUserId),
       );
 
       for (const assigneeId of newlyAssigned) {
-        const sent = await this.notifySubtaskAssignee(after, subtask, actorUserId, assigneeId);
-        if (sent) {
-          const key = normalizeUserIdForCompare(sent);
-          if (key) notifiedUserIds.add(key);
-        }
+        await this.notifySubtaskAssignee(after, subtask, actorUserId, assigneeId);
       }
     }
+  }
 
-    const subtasksNeedingTaskAssigneeNotice = addedSubtasks.filter((subtask) => {
-      const assigneeIds = this.getSubtaskAssigneeIds(subtask);
-      return (
-        assigneeIds.length === 0 ||
-        assigneeIds.every((id) => !notifiedUserIds.has(normalizeUserIdForCompare(id) ?? ''))
-      );
-    });
-    if (subtasksNeedingTaskAssigneeNotice.length > 0) {
-      const taskAssigneeTargets = afterAssignees.filter(
-        (id) =>
-          !this.isSameUser(id, actorUserId) &&
-          !notifiedUserIds.has(normalizeUserIdForCompare(id) ?? ''),
-      );
-      if (taskAssigneeTargets.length > 0) {
-        await this.notifyTaskAssigneesAboutSubtasks(
-          after,
-          actorUserId,
-          taskAssigneeTargets,
-          subtasksNeedingTaskAssigneeNotice,
-        );
-      }
-    }
+  /** Recurring occurrence whose due date is before today (Asia/Kolkata calendar day). */
+  private isPastRecurringCycle(task: TaskEntity): boolean {
+    if (!task.recurringTemplateId) return false;
+    const dueYmd = String(task.dueDate ?? '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dueYmd)) return false;
+    const todayYmd = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
+    return dueYmd < todayYmd;
   }
 
   private async runTemplateAssignment(params: {
@@ -398,6 +378,12 @@ export class TaskNotificationsService {
     );
   }
 
+  /** Checklist item ids are client strings (not user UUIDs). */
+  private normalizeSubtaskIdKey(id: string | undefined | null): string | null {
+    const trimmed = String(id ?? '').trim().toLowerCase();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
   private findPreviousSubtask(
     beforeSubtasks: Array<{
       id?: string;
@@ -416,10 +402,10 @@ export class TaskNotificationsService {
     assigneeId?: string;
     assigneeIds?: string[];
   } | undefined {
-    const afterKey = normalizeUserIdForCompare(subtask.id);
+    const afterKey = this.normalizeSubtaskIdKey(subtask.id);
     if (afterKey) {
       const byId = beforeSubtasks.find(
-        (item) => normalizeUserIdForCompare(item.id) === afterKey,
+        (item) => this.normalizeSubtaskIdKey(item.id) === afterKey,
       );
       if (byId) return byId;
     }
@@ -581,52 +567,6 @@ export class TaskNotificationsService {
     }
 
     return assigneeId;
-  }
-
-  private async notifyTaskAssigneesAboutSubtasks(
-    task: TaskEntity,
-    assignerUserId: string,
-    assigneeIds: string[],
-    addedSubtasks: Array<{
-      id?: string;
-      title: string;
-      completed?: boolean;
-    }>,
-  ): Promise<void> {
-    const context = await this.buildTaskEmailContext(task, assignerUserId);
-    const focusSubtasks = addedSubtasks.map((subtask) => ({
-      title: subtask.title,
-      completed: subtask.completed,
-    }));
-    const subtaskList = focusSubtasks.map((subtask) => escapeHtml(subtask.title)).join(', ');
-    const projectLine = context.projectName
-      ? ` in <strong>${escapeHtml(context.projectName)}</strong>`
-      : '';
-
-    for (const assigneeId of assigneeIds) {
-      if (this.isSameUser(assigneeId, assignerUserId)) continue;
-      await this.sendTaskEmailToUser(assigneeId, context, {
-        emailSubject: `Subtasks added to: ${task.title}`,
-        headline: 'New Subtasks on Your Task',
-        introHtml: `<p style="text-align:center;color:#64748b;font-size:15px;line-height:1.6;margin:0 0 20px;">
-  Hi <strong>{{assigneeName}}</strong>, <strong>${escapeHtml(context.assignerName)}</strong> added subtasks to "${escapeHtml(task.title)}"${projectLine}: <strong>${subtaskList}</strong>.
-</p>`,
-        focusSubtasks,
-      });
-      await this.notificationsService
-        .createNotification(
-          assigneeId,
-          `Subtasks added: ${task.title}`,
-          `${context.assignerName} added ${addedSubtasks.length} subtask(s) to "${task.title}".`,
-          {
-            type: 'subtasks_added',
-            taskId: task.id,
-            projectId: task.projectId,
-            open: 'alerts',
-          },
-        )
-        .catch((err) => this.logger.warn(`In-app/push notification failed: ${err}`));
-    }
   }
 
   private async buildTaskEmailContext(task: TaskEntity, assignerUserId: string) {

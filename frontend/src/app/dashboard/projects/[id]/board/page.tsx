@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchProject } from "@/services/api/projects.api";
 import { fetchWorkflowsByProject, fetchWorkflowStatuses, createDefaultWorkflow } from "@/services/api/workflows.api";
@@ -78,6 +79,10 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
   const { id } = params;
   const { orgId } = useTenant();
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const deepLinkTaskId = searchParams.get("task")?.trim() || null;
+  const deepLinkSubtaskId = searchParams.get("subtask")?.trim() || null;
   const { toast } = useToast();
   const { showNotice, noticeDialogProps } = useNoticeDialog();
   const { trackFirstTaskCreated } = useRetentionTracking();
@@ -88,7 +93,14 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
 
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [defaultStatusId, setDefaultStatusId] = useState<string | undefined>();
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(deepLinkTaskId);
+  const [focusSubtaskId, setFocusSubtaskId] = useState<string | null>(deepLinkSubtaskId);
+
+  useEffect(() => {
+    if (!deepLinkTaskId) return;
+    setSelectedTaskId(deepLinkTaskId);
+    setFocusSubtaskId(deepLinkSubtaskId);
+  }, [deepLinkTaskId, deepLinkSubtaskId]);
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
   const [filters, setFilters] = useState<BoardFilters>(DEFAULT_FILTERS);
@@ -1028,7 +1040,16 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
           organizationId={orgId}
           statuses={statuses}
           open={selectedTaskId !== null}
-          onOpenChange={(open) => !open && setSelectedTaskId(null)}
+          initialSubtaskId={focusSubtaskId}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedTaskId(null);
+              setFocusSubtaskId(null);
+              if (deepLinkTaskId) {
+                router.replace(`/dashboard/projects/${id}/board`);
+              }
+            }
+          }}
           readOnly={!permissions.canEditTask}
         />
       )}

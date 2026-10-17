@@ -94,8 +94,15 @@ export function FirstTimeOnboardingStepper() {
   });
 
   const inviteMutation = useMutation({
-    mutationFn: ({ orgId, email }: { orgId: string; email: string }) =>
-      createInvitation(orgId, { email, role: "member" }),
+    mutationFn: ({
+      orgId,
+      email,
+      projectIds,
+    }: {
+      orgId: string;
+      email: string;
+      projectIds: string[];
+    }) => createInvitation(orgId, { email, role: "member", projectIds }),
   });
 
   const createProjectMutation = useMutation({
@@ -143,7 +150,8 @@ export function FirstTimeOnboardingStepper() {
     if (!orgId) return;
     for (const email of inviteEmails) {
       try {
-        await inviteMutation.mutateAsync({ orgId, email });
+        // Workspace-only invite; grant project access later from Members.
+        await inviteMutation.mutateAsync({ orgId, email, projectIds: [] });
       } catch {
         // Continue with others
       }
@@ -317,6 +325,7 @@ export function FirstTimeOnboardingStepper() {
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
                 Invite team members by email. You can skip and do this later.
+                Project access can be granted after they join.
               </p>
               <div className="flex gap-2">
                 <Input

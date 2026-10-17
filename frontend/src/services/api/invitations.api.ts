@@ -7,7 +7,7 @@ import type {
 
 export async function createInvitation(
   orgId: string,
-  payload: { email: string; role: string }
+  payload: { email: string; role: string; projectIds?: string[] }
 ): Promise<OrgInvitation> {
   const { data } = await apiClient.post<OrgInvitation>(
     `/organizations/${orgId}/invitations`,

@@ -66,8 +66,8 @@ class _OpsPickAppState extends ConsumerState<OpsPickApp>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     // Safe on web: stub PushNotificationService never touches Firebase.
-    PushNotificationService.instance.onOpenAlerts = () {
-      requestOpenAlertsTab(ref);
+    PushNotificationService.instance.onOpenAlerts = ([link]) {
+      requestOpenAlertsTab(ref, link);
     };
   }
 

@@ -131,6 +131,13 @@ class PatchTaskSubtaskDto {
   @MaxLength(40)
   createdAt?: string;
 
+  /** Bumped when status (or other fields) change; used for checklist ordering. */
+  @Allow()
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  updatedAt?: string;
+
   /**
    * Lightweight done timestamp clients may echo (mobile chips). Prefer
    * completionRecord.completedAt when both are present; accepted so PATCH

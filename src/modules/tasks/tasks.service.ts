@@ -526,6 +526,7 @@ export class TasksService {
     organizationId: string,
     reporterId: string,
     dto: CreateTaskDto,
+    options?: { skipAssignmentNotify?: boolean },
   ): Promise<TaskEntity> {
     const assigneeIds = dto.assigneeIds?.length
       ? Array.from(new Set(dto.assigneeIds))
@@ -603,7 +604,11 @@ export class TasksService {
       })
       .catch(() => {});
     const finalTask = (await this.tasksRepository.findById(task.id)) ?? task;
-    this.taskNotifications.scheduleOnCreate(finalTask, reporterId);
+    // Planner occurrence materialization must not spam assignment push/email
+    // every cycle — assignees get ritual/checklist reminders instead.
+    if (!options?.skipAssignmentNotify) {
+      this.taskNotifications.scheduleOnCreate(finalTask, reporterId);
+    }
     return finalTask;
   }
 
@@ -990,6 +995,7 @@ export class TasksService {
       completionRecord?: Record<string, any>;
       reporterId?: string;
       createdAt?: string;
+      updatedAt?: string;
       /** Top-level done stamp (mobile); mirrored into/from completionRecord. */
       completedAt?: string;
       note?: string;
@@ -1000,6 +1006,7 @@ export class TasksService {
         id?: string;
         reporterId?: string;
         createdAt?: string;
+        updatedAt?: string;
         completedAt?: string;
         status?: string;
         completed?: boolean;
@@ -1023,6 +1030,7 @@ export class TasksService {
     completionRecord?: Record<string, any>;
     reporterId?: string;
     createdAt?: string;
+    updatedAt?: string;
     completedAt?: string;
     note?: string;
     requireLocation?: boolean;
@@ -1045,6 +1053,20 @@ export class TasksService {
         const reporterId =
           prior?.reporterId ?? s.reporterId ?? context?.currentUserId ?? undefined;
         const createdAt = prior?.createdAt ?? s.createdAt ?? nowIso;
+        const priorStatus = prior
+          ? this.normalizeSubtaskStatus(prior)
+          : undefined;
+        const isNew = !prior;
+        const statusChanged = !!priorStatus && priorStatus !== status;
+        const clientUpdatedAt =
+          typeof s.updatedAt === 'string' && s.updatedAt.trim().length
+            ? s.updatedAt.trim().slice(0, 40)
+            : undefined;
+        // Rise to top of the color group on create, status change, or client edit.
+        const updatedAt =
+          isNew || statusChanged || clientUpdatedAt
+            ? clientUpdatedAt ?? nowIso
+            : prior?.updatedAt ?? createdAt;
         const dueDate = s.dueDate ? String(s.dueDate).slice(0, 10) : undefined;
         const dueTimeRaw = typeof s.dueTime === 'string' ? s.dueTime.trim() : '';
         // Keep HH:mm even when dueDate is absent (checklist items may set time only).
@@ -1085,9 +1107,6 @@ export class TasksService {
           ) {
             completionRecord = prior.completionRecord;
           } else {
-            const priorStatus = prior
-              ? this.normalizeSubtaskStatus(prior)
-              : null;
             const newlyCompleted = priorStatus !== 'DONE';
             if (newlyCompleted || clientCompletedAt) {
               completionRecord = {
@@ -1130,6 +1149,7 @@ export class TasksService {
           ...(completionRecord ? { completionRecord } : {}),
           ...(reporterId ? { reporterId } : {}),
           createdAt,
+          updatedAt,
           ...(completedAt ? { completedAt } : {}),
           ...(typeof s.note === 'string' && s.note.trim().length
             ? { note: s.note.trim().slice(0, 2000) }
@@ -1386,6 +1406,64 @@ export class TasksService {
     const found = task.subtasks?.some((s) => s.id === trimmedSubtaskId);
     if (!found) throw new NotFoundException('Checklist item not found');
     return task;
+  }
+
+  /**
+   * Remove one checklist item by id from the current DB row.
+   * Avoids full-checklist PATCH races where a stale client re-saves deleted items.
+   */
+  async deleteSubtask(params: {
+    taskId: string;
+    subtaskId: string;
+    organizationId: string;
+    userId: string;
+  }): Promise<TaskEntity> {
+    const taskId = params.taskId.trim();
+    const subtaskId = params.subtaskId.trim();
+    const { organizationId, userId } = params;
+
+    if (!subtaskId) {
+      throw new BadRequestException('Checklist item id is required');
+    }
+
+    const task = await this.tasksRepository.findByIdAndOrganization(
+      taskId,
+      organizationId,
+    );
+    if (!task) throw new NotFoundException('Task not found');
+
+    await this.assertCanUpdateTask(task, organizationId, userId, {
+      subtasks: task.subtasks ?? [],
+    } as PatchTaskDto);
+
+    const existing = [...(task.subtasks ?? [])];
+    const next = existing.filter((s) => s.id !== subtaskId);
+    if (next.length === existing.length) {
+      throw new NotFoundException('Checklist item not found');
+    }
+
+    await this.tasksRepository.update(taskId, {
+      subtasks: next.length ? next : null,
+    } as never);
+
+    this.activityLogsService
+      .log({
+        organizationId,
+        userId,
+        entityType: 'task',
+        entityId: taskId,
+        action: 'update',
+        metadata: {
+          name: task.title,
+          deletedSubtaskId: subtaskId,
+        },
+      })
+      .catch(() => {});
+
+    return (
+      (await this.tasksRepository.findByIdAndOrganization(taskId, organizationId)) ??
+      ({ ...task, subtasks: next.length ? next : null } as TaskEntity)
+    );
   }
 
   /**

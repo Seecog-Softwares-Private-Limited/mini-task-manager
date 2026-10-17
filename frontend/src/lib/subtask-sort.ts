@@ -4,60 +4,70 @@ import { resolveSubtaskStatus } from "@/lib/subtask-status";
 
 type SortableSubtask = Pick<
   TaskSubtask,
-  "title" | "status" | "dueDate" | "dueTime" | "completionRecord"
+  "title" | "status" | "dueDate" | "dueTime" | "completionRecord" | "createdAt"
 > & {
+  id?: string;
   completed?: boolean;
   completedAt?: string | null;
+  updatedAt?: string | null;
 };
 
-function hasDueAssigned(subtask: SortableSubtask): boolean {
-  const date = subtask.dueDate?.trim() ?? "";
-  const time = subtask.dueTime?.trim() ?? "";
-  return date.length > 0 || time.length > 0;
-}
-
 /**
- * Checklist display buckets:
- * 1. No date/time assigned (open)
- * 2. Due today and still completable (not overdue); future remaining after today via due key
- * 3. Overdue (open)
- * 4. In Progress
- * 5. Completed (most recently marked done first)
+ * Checklist display buckets — must match row accent colors:
+ * 0. Blue — To Do (open, not overdue)
+ * 1. Red — Overdue (any open item past due, including in-progress)
+ * 2. Yellow — In Progress (not overdue)
+ * 3. Green — Done
  */
 function displayBucket(subtask: SortableSubtask): number {
   const status = resolveSubtaskStatus(subtask);
-  if (status === "DONE") return 4;
-  if (status === "IN_PROGRESS") return 3;
-  if (!hasDueAssigned(subtask)) return 0;
-  if (
-    isSubtaskOverdue(subtask.dueDate, {
-      dueTime: subtask.dueTime,
-      completed: subtask.completed,
-      status: subtask.status,
-    })
-  ) {
-    return 2;
-  }
-  return 1;
+  if (status === "DONE") return 3;
+  const overdue = isSubtaskOverdue(subtask.dueDate, {
+    dueTime: subtask.dueTime,
+    completed: subtask.completed,
+    status: subtask.status,
+  });
+  // Overdue before In Progress so red/yellow groups never interleave.
+  if (overdue) return 1;
+  if (status === "IN_PROGRESS") return 2;
+  return 0;
 }
 
-function dueSortKey(subtask: SortableSubtask): string {
-  const date = subtask.dueDate?.trim() ?? "";
-  const time = subtask.dueTime?.trim() ?? "";
-  if (!date && !time) return "9999";
-  if (!date) return `0000-00-00T${time}`;
-  if (!time) return date;
-  return `${date}T${time}`;
+function parseMillis(raw?: string | null): number {
+  const value = raw?.trim() ?? "";
+  if (!value) return 0;
+  const ms = Date.parse(value);
+  return Number.isNaN(ms) ? 0 : ms;
+}
+
+/** Client ids are often `{epochMicros}_{suffix}` — use as recency fallback. */
+function idRecencyMillis(id?: string): number {
+  if (!id) return 0;
+  const head = id.split("_")[0] ?? "";
+  const n = Number(head);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  if (n > 100000000000000) return Math.floor(n / 1000);
+  if (n > 100000000000) return n;
+  return 0;
 }
 
 function completedAtMillis(subtask: SortableSubtask): number {
-  const raw =
-    subtask.completedAt?.trim() ||
-    subtask.completionRecord?.completedAt?.trim() ||
-    "";
-  if (!raw) return 0;
-  const ms = Date.parse(raw);
-  return Number.isNaN(ms) ? 0 : ms;
+  return (
+    parseMillis(subtask.completedAt) ||
+    parseMillis(subtask.completionRecord?.completedAt) ||
+    0
+  );
+}
+
+/** Prefer updatedAt, then created / completed / id — newest on top. */
+function recencyMillis(subtask: SortableSubtask): number {
+  const updated = parseMillis(subtask.updatedAt);
+  if (updated > 0) return updated;
+  const created = parseMillis(subtask.createdAt);
+  if (created > 0) return created;
+  const completed = completedAtMillis(subtask);
+  if (completed > 0) return completed;
+  return idRecencyMillis(subtask.id);
 }
 
 export function compareSubtasksByDisplayOrder(
@@ -67,15 +77,8 @@ export function compareSubtasksByDisplayOrder(
   const bucketCmp = displayBucket(a) - displayBucket(b);
   if (bucketCmp !== 0) return bucketCmp;
 
-  // Within done: newest completion on top.
-  if (displayBucket(a) === 4) {
-    const doneCmp = completedAtMillis(b) - completedAtMillis(a);
-    if (doneCmp !== 0) return doneCmp;
-    return (a.title ?? "").localeCompare(b.title ?? "");
-  }
-
-  const dueCmp = dueSortKey(a).localeCompare(dueSortKey(b));
-  if (dueCmp !== 0) return dueCmp;
+  const recencyCmp = recencyMillis(b) - recencyMillis(a);
+  if (recencyCmp !== 0) return recencyCmp;
 
   return (a.title ?? "").localeCompare(b.title ?? "");
 }

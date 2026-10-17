@@ -54,8 +54,18 @@ export class ProjectsController {
   }
 
   @Get()
-  async findAll(@TenantId() tenantId?: string): Promise<ProjectResponseDto[]> {
-    const list = await this.projectsService.findByOrganization(tenantId!);
+  async findAll(
+    @TenantId() tenantId?: string,
+    @CurrentUserId() userId?: string,
+  ): Promise<ProjectResponseDto[]> {
+    const membership = userId
+      ? await this.organizationsService.getMembership(tenantId!, userId)
+      : null;
+    const list = await this.projectsService.findVisibleForUser(
+      tenantId!,
+      userId!,
+      membership?.role,
+    );
     return list.map((p) => this.toResponse(p));
   }
 
@@ -77,39 +87,10 @@ export class ProjectsController {
   // ── Project Members (must come before :id catch-all) ──
 
   @Get(':id/members')
-  async getMembers(
-    @Param('id') projectId: string,
-    @TenantId() tenantId?: string,
-  ) {
-    const byUserId = new Map<string, ReturnType<ProjectsController['toMemberResponse']>>();
-
-    for (const m of await this.projectsService.getProjectMembers(projectId)) {
-      byUserId.set(m.userId, this.toMemberResponse(m));
-    }
-
-    if (tenantId) {
-      const orgMembers = await this.organizationsService.getMembers(tenantId);
-      for (const om of orgMembers) {
-        if (om.status !== 'ACTIVE') continue;
-        if (byUserId.has(om.userId)) continue;
-        byUserId.set(om.userId, {
-          id: om.id,
-          projectId,
-          userId: om.userId,
-          role: om.role,
-          user: om.user
-            ? {
-                id: om.user.id,
-                fullName: om.user.fullName,
-                email: om.user.email,
-                avatarUrl: om.user.avatarUrl ?? undefined,
-              }
-            : undefined,
-        });
-      }
-    }
-
-    return Array.from(byUserId.values());
+  async getMembers(@Param('id') projectId: string) {
+    // Only people with explicit project access — not every workspace member.
+    const members = await this.projectsService.getProjectMembers(projectId);
+    return members.map((m) => this.toMemberResponse(m));
   }
 
   @Post(':id/members')

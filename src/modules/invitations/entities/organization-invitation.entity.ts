@@ -19,6 +19,10 @@ export class OrganizationInvitationEntity {
   @Column({ type: 'varchar', length: 50 })
   role!: string;
 
+  /** Projects the invitee joins on accept (empty/null = workspace only). */
+  @Column({ name: 'project_ids', type: 'json', nullable: true })
+  projectIds!: string[] | null;
+
   @Column({ type: 'varchar', length: 64, unique: true })
   token!: string;
 

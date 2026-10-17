@@ -14,9 +14,13 @@ import '../kanban/task_detail_sheet.dart';
 import '../projects/projects_providers.dart';
 import '../recurring/recurring_providers.dart';
 import '../workspaces/workspace_switcher_sheet.dart';
+import 'home_due_item_card.dart';
 import 'home_providers.dart';
 import 'due_today_screen.dart';
 import 'my_work_providers.dart';
+
+/// Preview count on Home; full list is on View all.
+const int _kHomeDuePreviewLimit = 20;
 
 class HomeTab extends ConsumerWidget {
   const HomeTab({
@@ -527,8 +531,13 @@ class _DueTodayTabsState extends State<_DueTodayTabs>
       data: (d) {
         final board = d.dueTodayBoardItems;
         final planner = d.dueTodayPlannerItems;
-        final items =
-            (_tabController.index == 0 ? board : planner).take(5).toList();
+        final full =
+            _tabController.index == 0 ? board : planner;
+        final items = full.take(_kHomeDuePreviewLimit).toList();
+        // ~88px per card; cap so Home stays usable while remaining scrollable.
+        final listHeight = items.isEmpty
+            ? 0.0
+            : (items.length * 88.0).clamp(88.0, 400.0);
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -557,13 +566,22 @@ class _DueTodayTabsState extends State<_DueTodayTabs>
                 forPlanner: _tabController.index == 1,
               )
             else
-              for (final item in items) ...[
-                _AttentionRow(
-                  item: item,
-                  onTap: () => widget.onOpenItem(item),
+              SizedBox(
+                height: listHeight,
+                child: ListView.separated(
+                  padding: EdgeInsets.zero,
+                  itemCount: items.length,
+                  separatorBuilder: (_, __) =>
+                      const SizedBox(height: AppSpacing.xs),
+                  itemBuilder: (context, index) {
+                    final item = items[index];
+                    return HomeDueItemCard(
+                      item: item,
+                      onTap: () => widget.onOpenItem(item),
+                    );
+                  },
                 ),
-                const SizedBox(height: AppSpacing.xs),
-              ],
+              ),
           ],
         );
       },
@@ -626,80 +644,6 @@ class _DueTodayEmpty extends StatelessWidget {
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AttentionRow extends StatelessWidget {
-  const _AttentionRow({required this.item, required this.onTap});
-
-  final HomeDueTodayItem item;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _priorityColor(item.subtask?.priority ?? item.task.priority);
-    // Large = subtask (or leaf task); small = parent task for reference.
-    final subtaskTitle = item.title;
-    final parentTitle = item.parentTitle;
-    return SurfaceCard(
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      onTap: onTap,
-      child: Row(
-        children: [
-          Container(
-            width: 4,
-            height: parentTitle == null ? 36 : 48,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  subtaskTitle,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (parentTitle != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    parentTitle,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: AppColors.textMuted,
-                          fontWeight: FontWeight.w400,
-                        ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          StatusChip(
-            label: item.statusLabel,
-            color: switch (item.displayBucket) {
-              0 => AppColors.textMuted,
-              1 => AppColors.sky,
-              2 => AppColors.danger,
-              3 => AppColors.warning,
-              4 => AppColors.success,
-              _ => AppColors.sky,
-            },
-          ),
-          const SizedBox(width: 4),
-          const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
         ],
       ),
     );
@@ -900,15 +844,3 @@ class _QuickAction extends StatelessWidget {
   }
 }
 
-Color _priorityColor(String priority) {
-  switch (priority.toUpperCase()) {
-    case 'CRITICAL':
-      return AppColors.danger;
-    case 'HIGH':
-      return AppColors.warning;
-    case 'LOW':
-      return AppColors.textMuted;
-    default:
-      return AppColors.sky;
-  }
-}

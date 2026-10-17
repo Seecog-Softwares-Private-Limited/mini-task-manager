@@ -8,6 +8,7 @@ import '../../data/models/workflow.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../kanban/kanban_providers.dart';
 import '../kanban/task_detail_sheet.dart';
+import 'home_due_item_card.dart';
 import 'home_providers.dart';
 
 /// Full list of checklist items / leaf tasks due today across the workspace.
@@ -223,98 +224,11 @@ class _DueTodayList extends StatelessWidget {
           );
         }
         final item = items[index - 1];
-        return _DueTodayRow(
+        return HomeDueItemCard(
           item: item,
           onTap: () => onOpenItem(item),
         );
       },
     );
-  }
-}
-
-class _DueTodayRow extends StatelessWidget {
-  const _DueTodayRow({required this.item, required this.onTap});
-
-  final HomeDueTodayItem item;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final priority = item.subtask?.priority ?? item.task.priority;
-    final color = _priorityColor(priority);
-    final subtaskTitle = item.title;
-    final parentTitle = item.parentTitle;
-    return SurfaceCard(
-      padding: const EdgeInsets.all(AppSpacing.sm),
-      onTap: onTap,
-      child: Row(
-        children: [
-          Container(
-            width: 4,
-            height: parentTitle == null ? 40 : 52,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  subtaskTitle,
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (parentTitle != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    parentTitle,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: AppColors.textMuted,
-                          fontWeight: FontWeight.w400,
-                        ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          StatusChip(
-            label: item.statusLabel,
-            color: switch (item.displayBucket) {
-              0 => AppColors.textMuted,
-              1 => AppColors.sky,
-              2 => AppColors.danger,
-              3 => AppColors.warning,
-              4 => AppColors.success,
-              _ => AppColors.sky,
-            },
-          ),
-          const SizedBox(width: 4),
-          const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
-        ],
-      ),
-    );
-  }
-}
-
-Color _priorityColor(String priority) {
-  switch (priority.toLowerCase()) {
-    case 'critical':
-    case 'urgent':
-    case 'high':
-      return AppColors.danger;
-    case 'low':
-      return AppColors.textMuted;
-    default:
-      return AppColors.sky;
   }
 }

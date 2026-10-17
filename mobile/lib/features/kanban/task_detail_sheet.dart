@@ -577,6 +577,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       status: item.status == 'DONE' ? 'TODO' : item.status,
       clearCompletionRecord: true,
       clearCompletedAt: true,
+      updatedAt: DateTime.now().toUtc().toIso8601String(),
     );
     setState(() => _subtasks = updated);
     await _run(() => ref.read(tasksRepositoryProvider).updateTask(
@@ -669,6 +670,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       status: 'DONE',
       completionRecord: record,
       completedAt: record.completedAt,
+      updatedAt: DateTime.now().toUtc().toIso8601String(),
     );
     setState(() => _subtasks = updated);
     await _run(() => ref.read(tasksRepositoryProvider).updateTask(
@@ -677,6 +679,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
         ));
     if (!mounted) return;
     // Preserve the checklist order the user had before completing.
+    final doneAt = DateTime.now().toUtc().toIso8601String();
     setState(() {
       _subtasks = _mergeSubtasksPreservingOrder(orderBefore.map((s) {
         if (s.id != rowId) return s;
@@ -685,6 +688,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
           status: 'DONE',
           completionRecord: record,
           completedAt: record.completedAt,
+          updatedAt: doneAt,
         );
       }).toList(), _subtasks);
     });
@@ -697,6 +701,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     if (title.isEmpty || title.length > subtaskTitleMaxLength) return;
 
     final previous = List<TaskSubtask>.from(_subtasks);
+    final nowIso = DateTime.now().toUtc().toIso8601String();
     final updated = [
       TaskSubtask(
         id: generateClientId(),
@@ -705,6 +710,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
         status: 'TODO',
         priority: 'MEDIUM',
         requireLocation: _task.requireLocation,
+        createdAt: nowIso,
+        updatedAt: nowIso,
       ),
       ...previous,
     ];
@@ -733,7 +740,11 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       if (!mounted) return;
       setState(() {
         _task = saved;
-        _subtasks = _mergeSubtasksPreservingOrder(updated, saved.subtasks);
+        _subtasks = _mergeSubtasksPreservingOrder(
+          updated,
+          saved.subtasks,
+          appendServerOnly: false,
+        );
       });
       widget.onUpdated();
     } on ApiException catch (e) {
@@ -754,6 +765,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
         .where((t) => t.isNotEmpty)
         .toSet();
     final additions = <TaskSubtask>[];
+    final nowIso = DateTime.now().toUtc().toIso8601String();
     for (final raw in titles) {
       final trimmed = clampSubtaskTitle(raw);
       final key = normalizeSuggestionTitle(trimmed);
@@ -767,6 +779,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
           status: 'TODO',
           priority: 'MEDIUM',
           requireLocation: _task.requireLocation,
+          createdAt: nowIso,
+          updatedAt: nowIso,
         ),
       );
     }
@@ -798,7 +812,11 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       if (!mounted) return;
       setState(() {
         _task = saved;
-        _subtasks = _mergeSubtasksPreservingOrder(updated, saved.subtasks);
+        _subtasks = _mergeSubtasksPreservingOrder(
+          updated,
+          saved.subtasks,
+          appendServerOnly: false,
+        );
       });
       widget.onUpdated();
     } on ApiException catch (e) {
@@ -849,9 +867,16 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       task: _task,
       subtask: existing,
     );
-    final toSave = canSetLocation
-        ? draft
-        : draft.copyWith(requireLocation: existing.requireLocation);
+    // Always bump updatedAt so the row rises within its color group even when
+    // an older API strips the field from the PATCH body.
+    final nowIso = DateTime.now().toUtc().toIso8601String();
+    final toSave = (canSetLocation
+            ? draft
+            : draft.copyWith(requireLocation: existing.requireLocation))
+        .copyWith(
+      updatedAt: nowIso,
+      createdAt: draft.createdAt ?? existing.createdAt ?? nowIso,
+    );
     final updated = List<TaskSubtask>.from(_subtasks);
     updated[index] = toSave;
     setState(() {
@@ -868,7 +893,11 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       setState(() {
         _task = saved;
         // Keep the checklist order the user sees; don't reshuffle from API payload.
-        _subtasks = _mergeSubtasksPreservingOrder(updated, saved.subtasks);
+        _subtasks = _mergeSubtasksPreservingOrder(
+          updated,
+          saved.subtasks,
+          appendServerOnly: false,
+        );
         _expandedSubtaskIndex = null;
       });
       _stabilizeChecklistScroll(rowId);
@@ -882,24 +911,37 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
   }
 
   /// Prefer local order; refresh fields from [server] by id.
+  ///
+  /// Server is the source of truth for membership: local-only ids are dropped
+  /// unless [keepLocalOnly] (in-flight optimistic rows). Otherwise a stale
+  /// board cache re-adds deleted checklist items on the next save.
+  /// When [appendServerOnly] is false, server-only ids are not appended
+  /// (after an intentional delete/move before the response is applied).
   List<TaskSubtask> _mergeSubtasksPreservingOrder(
     List<TaskSubtask> localOrder,
-    List<TaskSubtask> server,
-  ) {
+    List<TaskSubtask> server, {
+    bool appendServerOnly = true,
+    bool keepLocalOnly = false,
+  }) {
     final byId = {for (final s in server) s.id: s};
     final merged = <TaskSubtask>[];
     final seen = <String>{};
     for (final local in localOrder) {
       final fromServer = byId[local.id];
-      merged.add(
-        fromServer == null
-            ? local
-            : TaskSubtask.coalesce(local, fromServer),
-      );
+      if (fromServer == null) {
+        if (keepLocalOnly) {
+          merged.add(local);
+          seen.add(local.id);
+        }
+        continue;
+      }
+      merged.add(TaskSubtask.coalesce(local, fromServer));
       seen.add(local.id);
     }
-    for (final s in server) {
-      if (!seen.contains(s.id)) merged.add(s);
+    if (appendServerOnly) {
+      for (final s in server) {
+        if (!seen.contains(s.id)) merged.add(s);
+      }
     }
     return merged;
   }
@@ -994,8 +1036,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       if (!mounted) return;
       setState(() {
         _task = result.source;
-        _subtasks =
-            _mergeSubtasksPreservingOrder(remaining, result.source.subtasks);
+        _subtasks = List.of(result.source.subtasks);
       });
       _stabilizeChecklistScroll(anchorId);
       widget.onUpdated();
@@ -1022,6 +1063,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     if (!_canEditSubtasks() || _saving || _savingSubtaskIndex != null) return;
     if (index < 0 || index >= _subtasks.length) return;
     FocusManager.instance.primaryFocus?.unfocus();
+    final deletedId = _subtasks[index].id;
     final updated = List<TaskSubtask>.from(_subtasks)..removeAt(index);
     // Anchor to the row that lands at this index (or the last remaining item).
     final anchorId = updated.isEmpty
@@ -1035,14 +1077,24 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     });
     _stabilizeChecklistScroll(anchorId);
     try {
-      final saved = await ref.read(tasksRepositoryProvider).updateTask(
-            taskId: _task.id,
-            subtasks: updated,
-          );
+      Task saved;
+      try {
+        saved = await ref.read(tasksRepositoryProvider).deleteSubtask(
+              taskId: _task.id,
+              subtaskId: deletedId,
+            );
+      } on ApiException catch (e) {
+        // Older API without DELETE /subtasks/:id — fall back to full PATCH.
+        if (e.statusCode != 404) rethrow;
+        saved = await ref.read(tasksRepositoryProvider).updateTask(
+              taskId: _task.id,
+              subtasks: updated,
+            );
+      }
       if (!mounted) return;
       setState(() {
         _task = saved;
-        _subtasks = _mergeSubtasksPreservingOrder(updated, saved.subtasks);
+        _subtasks = List.of(saved.subtasks);
       });
       _stabilizeChecklistScroll(anchorId);
       widget.onUpdated();
@@ -1634,6 +1686,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                               child: SubtaskDetailPanel(
                                 subtask: item,
                                 members: subtaskAssigneePool,
+                                memberDirectory: _members,
                                 taskId: _task.id,
                                 organizationId: orgId,
                                 fallbackReporterId: _task.reporterId,

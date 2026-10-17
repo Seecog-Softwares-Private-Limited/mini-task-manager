@@ -11,6 +11,7 @@ import { UsersModule } from '../users/users.module';
 import { BillingModule } from '../billing/billing.module';
 import { PlansModule } from '../../plans/plans.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { ProjectsModule } from '../projects/projects.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     forwardRef(() => BillingModule),
     forwardRef(() => PlansModule),
     NotificationsModule,
+    forwardRef(() => ProjectsModule),
   ],
   controllers: [InvitationsController],
   providers: [InvitationsRepository, InvitationsService, EmailService],

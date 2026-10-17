@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
@@ -29,7 +28,7 @@ class PlanCheckoutService {
     String? userName,
     String? userEmail,
   }) async {
-    if (Platform.isIOS) {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
       try {
         return await AppleIapCheckoutService(repository: _repository).upgrade(
           plan: plan,
@@ -80,7 +79,7 @@ class PlanCheckoutService {
   }
 
   Future<String> restorePurchases() async {
-    if (!Platform.isIOS) {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) {
       throw PlanCheckoutException('Restore is only available on iOS.');
     }
     try {
