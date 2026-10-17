@@ -121,20 +121,47 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     _titleFocusNode.addListener(_onTitleFocusChange);
     _descriptionFocusNode.addListener(_onDescriptionFocusChange);
     _subtasks = List.of(widget.task.subtasks);
-    final focusId = widget.initialSubtaskId?.trim();
-    if (focusId != null && focusId.isNotEmpty) {
-      final index = _subtasks.indexWhere((s) => s.id == focusId);
-      if (index >= 0) _expandedSubtaskIndex = index;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _stabilizeChecklistScroll(focusId, alignment: 0.08);
-      });
-    }
+    _expandInitialSubtaskIfPresent();
     _loadMeta();
     _peerSyncTimer = Timer.periodic(
       const Duration(seconds: 12),
       (_) => _syncChecklistPeers(),
     );
+  }
+
+  String? get _initialSubtaskFocusId {
+    final id = widget.initialSubtaskId?.trim();
+    if (id == null || id.isEmpty) return null;
+    return id;
+  }
+
+  /// Expand the deep-linked subtask into the edit/detail panel and scroll to it.
+  void _expandInitialSubtaskIfPresent({bool reveal = true}) {
+    final focusId = _initialSubtaskFocusId;
+    if (focusId == null) return;
+    final index = _subtasks.indexWhere((s) => s.id == focusId);
+    if (index < 0) return;
+    if (_expandedSubtaskIndex != index) {
+      _expandedSubtaskIndex = index;
+    }
+    if (!reveal) return;
+    _revealSubtaskEditor(focusId);
+  }
+
+  void _revealSubtaskEditor(String focusId) {
+    // Sheet scroll + checklist keys settle across several frames after open /
+    // meta reload — retry so the edit panel is actually on screen.
+    for (final delayMs in const [0, 120, 350, 700]) {
+      Future<void>.delayed(Duration(milliseconds: delayMs), () {
+        if (!mounted) return;
+        final index = _subtasks.indexWhere((s) => s.id == focusId);
+        if (index < 0) return;
+        if (_expandedSubtaskIndex != index) {
+          setState(() => _expandedSubtaskIndex = index);
+        }
+        _stabilizeChecklistScroll(focusId, alignment: 0.02);
+      });
+    }
   }
 
   void _onTitleFocusChange() {
@@ -306,13 +333,13 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
         );
         widget.onUpdated();
       }
-      final focusId = widget.initialSubtaskId?.trim();
+      final focusId = _initialSubtaskFocusId;
       setState(() {
         _members = members;
         _task = task;
         // Keep local completion stamps if the server omitted them this round-trip.
         _subtasks = _mergeSubtasksPreservingOrder(_subtasks, task.subtasks);
-        if (focusId != null && focusId.isNotEmpty) {
+        if (focusId != null) {
           final index = _subtasks.indexWhere((s) => s.id == focusId);
           if (index >= 0) _expandedSubtaskIndex = index;
         }
@@ -321,11 +348,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
         _loadingMeta = false;
         _syncTextControllersFromTask();
       });
-      if (focusId != null && focusId.isNotEmpty) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) return;
-          _stabilizeChecklistScroll(focusId, alignment: 0.08);
-        });
+      if (focusId != null) {
+        _revealSubtaskEditor(focusId);
       }
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -550,9 +574,16 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     return canEditTaskSubtasks(org: org, userId: userId, task: _task);
   }
 
+  bool _canActOnSubtaskAt(int index) {
+    if (_canEditSubtasks()) return true;
+    if (index < 0 || index >= _subtasks.length) return false;
+    final userId = ref.read(sessionControllerProvider).user?.id;
+    return isUserAssignedToSubtask(subtask: _subtasks[index], userId: userId);
+  }
+
   Future<void> _toggleSubtask(int index, bool? value) async {
     if (value == null) return;
-    if (!_canEditSubtasks()) {
+    if (!_canActOnSubtaskAt(index)) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -598,7 +629,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     required String? subtaskPriority,
     bool itemRequireLocation = false,
   }) async {
-    if (!_canEditSubtasks()) {
+    final index = _subtasks.indexWhere((s) => s.id == subtaskId);
+    if (!_canActOnSubtaskAt(index)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -1291,6 +1323,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
         );
     final allowChecklistStructureEdit = canEditSubtasks && !isPastRecurringRun;
     final canCompleteSubtasks = canEditSubtasks;
+    final focusingSubtask = _initialSubtaskFocusId != null;
     final canDelete = canDeleteTask(
           org: org,
           userId: currentUserId,
@@ -1303,7 +1336,9 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
         checklistTotal == 0 ? 0 : ((checklistDone / checklistTotal) * 100).round();
     return DraggableScrollableSheet(
       expand: false,
-      initialChildSize: isRunChecklist ? 0.62 : 0.78,
+      initialChildSize: focusingSubtask
+          ? 0.92
+          : (isRunChecklist ? 0.62 : 0.78),
       minChildSize: 0.45,
       maxChildSize: 0.92,
       builder: (context, scrollController) {
@@ -1638,7 +1673,17 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                   final index = _subtasks.indexWhere((s) => s.id == item.id);
                   if (index < 0) return const SizedBox.shrink();
                   final expanded = _expandedSubtaskIndex == index;
-                  final canExpandSubtask = canEditSubtasks;
+                  final assignedToThisSubtask = isUserAssignedToSubtask(
+                    subtask: item,
+                    userId: currentUserId,
+                  );
+                  // Parent-task editors, this subtask's assignees, or a deep-link
+                  // focus (notification / due card) can open the edit panel.
+                  final canExpandSubtask = canEditSubtasks ||
+                      assignedToThisSubtask ||
+                      (_initialSubtaskFocusId == item.id);
+                  final canCompleteThisSubtask =
+                      canCompleteSubtasks || assignedToThisSubtask;
                   return Column(
                     key: ValueKey<String>('subtask-wrap-${item.id}'),
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1650,7 +1695,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                           members: subtaskAssigneePool,
                           expanded: expanded,
                           enabled: !_saving && _savingSubtaskIndex == null,
-                          canComplete: canCompleteSubtasks,
+                          canComplete: canCompleteThisSubtask,
                           canExpand: canExpandSubtask,
                           subtaskNumber: displaySubtasks.length - displayIndex,
                           showDoneAtChip: false,
@@ -1692,7 +1737,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                                 fallbackReporterId: _task.reporterId,
                                 fallbackCreatedAt: _task.createdAt,
                                 saving: _savingSubtaskIndex == index,
-                                canComplete: canCompleteSubtasks,
+                                canComplete: canCompleteThisSubtask,
                                 dailyRunMode: isRunChecklist,
                                 canEditRequireLocation: canToggleSubtaskRequireLocation(
                                   org: org,

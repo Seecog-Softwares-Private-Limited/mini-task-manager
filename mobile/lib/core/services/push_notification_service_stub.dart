@@ -11,6 +11,15 @@ class PushNotificationService {
   static final PushNotificationService instance = PushNotificationService._();
 
   OpenAlertsCallback? onOpenAlerts;
+
+  PushDeepLink? get pendingOpenLink => null;
+
+  void flushPendingOpen() {}
+
+  PushDeepLink? takePendingOpenLink() => null;
+
+  void requeueOpenLink(PushDeepLink link) {}
+
   void Function(String token)? onTokenRefresh;
   VoidCallback? onInitialized;
 

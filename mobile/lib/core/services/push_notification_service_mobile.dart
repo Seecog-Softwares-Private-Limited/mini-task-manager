@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -30,10 +29,65 @@ class PushNotificationService {
   bool _initialized = false;
   Completer<void>? _readyCompleter;
 
+  /// Queued until HomeShell successfully consumes the deep link.
+  PushDeepLink? _queuedOpenLink;
+  bool _queuedOpenAlertsOnly = false;
+
   void Function(String token)? onTokenRefresh;
   VoidCallback? onInitialized;
 
   String? get token => _token;
+
+  /// Peek at a pending task deep-link without clearing it.
+  PushDeepLink? get pendingOpenLink => _queuedOpenLink;
+
+  /// Deliver any launch / early taps that arrived before the UI callback existed.
+  void flushPendingOpen() {
+    final link = _queuedOpenLink;
+    final alertsOnly = _queuedOpenAlertsOnly;
+    // Keep [_queuedOpenLink] until [takePendingOpenLink] so a late HomeShell
+    // mount can still open the task after the tick listener was missed.
+    _queuedOpenAlertsOnly = false;
+    if (link != null) {
+      onOpenAlerts?.call(link);
+    } else if (alertsOnly) {
+      onOpenAlerts?.call();
+    }
+  }
+
+  /// HomeShell takes ownership of the pending deep link (clears the queue).
+  PushDeepLink? takePendingOpenLink() {
+    final link = _queuedOpenLink;
+    _queuedOpenLink = null;
+    return link;
+  }
+
+  /// Put a link back when open failed (e.g. API not ready yet).
+  void requeueOpenLink(PushDeepLink link) {
+    if (link.hasTask) {
+      _queuedOpenLink = link;
+    }
+  }
+
+  void _emitOpen([PushDeepLink? link]) {
+    debugPrint(
+      'FCM open tap: taskId=${link?.taskId} subtaskId=${link?.subtaskId} '
+      'projectId=${link?.projectId} hasTask=${link?.hasTask ?? false}',
+    );
+    if (link != null && link.hasTask) {
+      _queuedOpenLink = link;
+    } else if (link == null || !link.hasTask) {
+      // Only mark alerts-only when we don't already have a task link queued.
+      if (_queuedOpenLink == null) {
+        _queuedOpenAlertsOnly = true;
+      }
+    }
+
+    if (onOpenAlerts != null) {
+      onOpenAlerts!(link);
+      return;
+    }
+  }
 
   /// Completes when [initialize] finishes (success or failure).
   Future<void> get ready {
@@ -58,21 +112,21 @@ class PushNotificationService {
       await _setupLocalNotifications();
       await _requestPermission();
 
-      // Foreground banners are shown via flutter_local_notifications in
-      // [_showForegroundNotification] (Android never auto-displays FCM in
-      // foreground; iOS presentation options alone are unreliable). Keep badge.
+      // Background/killed: OS shows the FCM `notification` payload automatically.
+      // Foreground: mirror via flutter_local_notifications (see below).
       await _messaging!.setForegroundNotificationPresentationOptions(
         alert: false,
         badge: true,
         sound: false,
       );
 
-      // iOS requires an APNs token before FCM token is available on device.
+      // Capture cold-start tap ASAP — before token waits that can take seconds.
+      await _captureLaunchMessages();
+
       if (defaultTargetPlatform == TargetPlatform.iOS) {
         await _waitForApnsToken();
       }
 
-      // getToken() can hang indefinitely on iOS Simulator (no APNs).
       try {
         _token = await _messaging!.getToken().timeout(const Duration(seconds: 8));
         debugPrint('FCM TOKEN: $_token');
@@ -89,30 +143,51 @@ class PushNotificationService {
       FirebaseMessaging.onMessage.listen(_showForegroundNotification);
 
       FirebaseMessaging.onMessageOpenedApp.listen((message) {
-        onOpenAlerts?.call(_deepLinkFromRemote(message));
+        _emitOpen(_deepLinkFromRemote(message));
       });
-
-      try {
-        final initial = await _messaging!
-            .getInitialMessage()
-            .timeout(const Duration(seconds: 2));
-        if (initial != null) {
-          final link = _deepLinkFromRemote(initial);
-          Future.microtask(() => onOpenAlerts?.call(link));
-        }
-      } catch (e) {
-        debugPrint('FCM getInitialMessage skipped: $e');
-      }
     } finally {
       if (!(_readyCompleter?.isCompleted ?? true)) {
         _readyCompleter!.complete();
       }
-      // Let session re-register after cold-start race with restoreSession.
       try {
         onInitialized?.call();
       } catch (e) {
         debugPrint('Push onInitialized callback failed: $e');
       }
+      // UI may have wired [onOpenAlerts] while we were initializing.
+      flushPendingOpen();
+    }
+  }
+
+  Future<void> _captureLaunchMessages() async {
+    try {
+      final initial = await _messaging!
+          .getInitialMessage()
+          .timeout(const Duration(seconds: 2));
+      if (initial != null) {
+        debugPrint(
+          'FCM getInitialMessage data keys=${initial.data.keys.toList()}',
+        );
+        _emitOpen(_deepLinkFromRemote(initial));
+      } else {
+        debugPrint('FCM getInitialMessage: null');
+      }
+    } catch (e) {
+      debugPrint('FCM getInitialMessage skipped: $e');
+    }
+
+    // Cold start from a local (foreground-mirrored) notification tap.
+    try {
+      final launch = await _local!.getNotificationAppLaunchDetails();
+      final response = launch?.notificationResponse;
+      if (launch?.didNotificationLaunchApp == true && response != null) {
+        final link = _deepLinkFromLocalPayload(response.payload);
+        if (link != null) {
+          _emitOpen(link);
+        }
+      }
+    } catch (e) {
+      debugPrint('Local notification launch details skipped: $e');
     }
   }
 
@@ -178,7 +253,7 @@ class PushNotificationService {
     await _local!.initialize(
       settings: const InitializationSettings(android: androidInit, iOS: iosInit),
       onDidReceiveNotificationResponse: (response) {
-        onOpenAlerts?.call(_deepLinkFromLocalPayload(response.payload));
+        _emitOpen(_deepLinkFromLocalPayload(response.payload));
       },
     );
 
@@ -197,9 +272,6 @@ class PushNotificationService {
   }
 
   Future<void> _showForegroundNotification(RemoteMessage message) async {
-    // Background/killed: OS shows the FCM `notification` payload automatically.
-    // Foreground: Android never auto-shows; iOS only if presentation options work.
-    // Always mirror to a local notification so alerts are visible while the app is open.
     if (_local == null) return;
 
     final notification = message.notification;
@@ -223,8 +295,15 @@ class PushNotificationService {
     final id = message.messageId?.hashCode ??
         Object.hash(title, body, DateTime.now().millisecondsSinceEpoch);
 
+    // Persist the full FCM data map so taps keep taskId/subtaskId.
+    final payloadMap = <String, String>{
+      for (final entry in data.entries)
+        if (entry.value.toString().trim().isNotEmpty)
+          entry.key: entry.value.toString(),
+    };
     final link = _deepLinkFromRemote(message);
-    final payload = jsonEncode(link.toPayloadMap());
+    payloadMap.addAll(link.toPayloadMap());
+    final payload = jsonEncode(payloadMap);
 
     try {
       await _local!.show(
@@ -257,7 +336,6 @@ class PushNotificationService {
   }
 
   Future<String?> getToken() async {
-    // Wait for initialize() so restoreSession doesn't race past FCM setup.
     try {
       await ready.timeout(const Duration(seconds: 12));
     } catch (_) {

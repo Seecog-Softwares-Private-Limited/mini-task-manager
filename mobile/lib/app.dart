@@ -21,6 +21,12 @@ Future<void> bootstrap() async {
 
   final prefs = await SharedPreferences.getInstance();
 
+  // Start FCM immediately so cold-start notification taps keep taskId/subtaskId.
+  // Do not wait on the API probe first — that delay can drop getInitialMessage.
+  final firebaseInit = initializeFirebaseAndPush().timeout(
+    const Duration(seconds: 12),
+  );
+
   // Show UI immediately. Reachability + FCM can hang on iOS Simulator
   // (no APNs) or when the API is unreachable — never block first frame.
   runApp(
@@ -32,10 +38,19 @@ Future<void> bootstrap() async {
     ),
   );
 
-  unawaited(_postLaunchInit(prefs));
+  unawaited(_postLaunchInit(prefs, firebaseInit));
 }
 
-Future<void> _postLaunchInit(SharedPreferences prefs) async {
+Future<void> _postLaunchInit(
+  SharedPreferences prefs,
+  Future<void> firebaseInit,
+) async {
+  try {
+    await firebaseInit;
+  } catch (e, st) {
+    debugPrint('Firebase/FCM post-launch init failed: $e\n$st');
+  }
+
   try {
     await ApiReachabilityProbe.ensureReachable(prefs).timeout(
       const Duration(seconds: 6),
@@ -43,12 +58,6 @@ Future<void> _postLaunchInit(SharedPreferences prefs) async {
     );
   } catch (e, st) {
     debugPrint('API reachability probe failed: $e\n$st');
-  }
-
-  try {
-    await initializeFirebaseAndPush().timeout(const Duration(seconds: 12));
-  } catch (e, st) {
-    debugPrint('Firebase/FCM post-launch init failed: $e\n$st');
   }
 }
 
@@ -69,6 +78,8 @@ class _OpsPickAppState extends ConsumerState<OpsPickApp>
     PushNotificationService.instance.onOpenAlerts = ([link]) {
       requestOpenAlertsTab(ref, link);
     };
+    // Deliver cold-start taps that arrived before this callback was wired.
+    PushNotificationService.instance.flushPendingOpen();
   }
 
   @override

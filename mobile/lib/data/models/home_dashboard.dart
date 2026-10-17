@@ -225,17 +225,68 @@ class HomeDueTodayItem {
   }
 }
 
-int compareHomeDueItems(HomeDueTodayItem a, HomeDueTodayItem b) {
-  final bucketCmp = a.displayBucket.compareTo(b.displayBucket);
-  if (bucketCmp != 0) return bucketCmp;
+int _parseMillis(String? raw) {
+  final value = raw?.trim();
+  if (value == null || value.isEmpty) return 0;
+  return DateTime.tryParse(value)?.millisecondsSinceEpoch ?? 0;
+}
 
-  final aKey =
-      '${a._effectiveDueDate ?? ''}${a._effectiveDueTime ?? ''}'.trim();
-  final bKey =
-      '${b._effectiveDueDate ?? ''}${b._effectiveDueTime ?? ''}'.trim();
-  final dueCmp = (aKey.isEmpty ? '9999' : aKey)
-      .compareTo(bKey.isEmpty ? '9999' : bKey);
-  if (dueCmp != 0) return dueCmp;
+/// Client ids are often `{epochMicros}_{suffix}` — recency fallback.
+int _idRecencyMillis(String id) {
+  final head = id.split('_').first;
+  final n = int.tryParse(head);
+  if (n == null || n <= 0) return 0;
+  if (n > 100000000000000) return n ~/ 1000;
+  if (n > 100000000000) return n;
+  return 0;
+}
+
+/// Latest of created / updated (assignment bumps updatedAt when persisted).
+/// Subtask rows use subtask stamps only — parent task.updatedAt would float
+/// old checklist items whenever the parent is edited.
+int homeDueRecencyMillis(HomeDueTodayItem item) {
+  var best = 0;
+  void consider(int ms) {
+    if (ms > best) best = ms;
+  }
+
+  final sub = item.subtask;
+  if (sub != null) {
+    consider(_parseMillis(sub.updatedAt));
+    consider(_parseMillis(sub.createdAt));
+    consider(_parseMillis(sub.effectiveCompletedAt));
+    consider(_idRecencyMillis(sub.id));
+    if (best > 0) return best;
+    // No stamps: later array index ≈ newer append; fold in parent createdAt.
+    final idx = item.task.subtasks.indexWhere((s) => s.id == sub.id);
+    final taskCreated = _parseMillis(item.task.createdAt);
+    if (taskCreated > 0) return taskCreated + (idx < 0 ? 0 : idx + 1);
+    return idx < 0 ? 0 : idx + 1;
+  }
+  consider(_parseMillis(item.task.updatedAt));
+  consider(_parseMillis(item.task.createdAt));
+  consider(_idRecencyMillis(item.task.id));
+  return best;
+}
+
+int _checklistIndex(HomeDueTodayItem item) {
+  final sub = item.subtask;
+  if (sub == null) return -1;
+  return item.task.subtasks.indexWhere((s) => s.id == sub.id);
+}
+
+/// Newest → oldest by created/updated (for Home preview, View all, Planner).
+int compareHomeDueItems(HomeDueTodayItem a, HomeDueTodayItem b) {
+  final recencyCmp =
+      homeDueRecencyMillis(b).compareTo(homeDueRecencyMillis(a));
+  if (recencyCmp != 0) return recencyCmp;
+
+  // Same stamps / missing: later checklist row is usually newer (append).
+  if (a.task.id == b.task.id) {
+    final ai = _checklistIndex(a);
+    final bi = _checklistIndex(b);
+    if (ai >= 0 && bi >= 0 && ai != bi) return bi.compareTo(ai);
+  }
 
   return a.title.compareTo(b.title);
 }
@@ -257,13 +308,15 @@ class HomeDashboard {
   /// Checklist items (and leaf tasks) for Due Tasks — assigned to current user.
   final List<HomeDueTodayItem> dueTodayItems;
 
-  /// Board (non-planner) due rows.
+  /// Board (non-planner) due rows — newest created/updated first.
   List<HomeDueTodayItem> get dueTodayBoardItems =>
-      dueTodayItems.where((item) => !item.fromPlanner).toList();
+      dueTodayItems.where((item) => !item.fromPlanner).toList()
+        ..sort(compareHomeDueItems);
 
-  /// Planner / recurring due rows.
+  /// Planner / recurring due rows — newest created/updated first.
   List<HomeDueTodayItem> get dueTodayPlannerItems =>
-      dueTodayItems.where((item) => item.fromPlanner).toList();
+      dueTodayItems.where((item) => item.fromPlanner).toList()
+        ..sort(compareHomeDueItems);
 
   /// Legacy parent-task list (API / older callers). Prefer [dueTodayItems].
   final List<Task> dueTodayTasks;

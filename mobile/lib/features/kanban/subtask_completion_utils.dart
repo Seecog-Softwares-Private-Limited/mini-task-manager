@@ -122,6 +122,25 @@ bool isUserStoredAssigneeOnTask({
       .any((id) => normalizeUserId(id) == normalized);
 }
 
+List<String> storedSubtaskAssigneeIds(TaskSubtask subtask) {
+  if (subtask.assigneeIds.isNotEmpty) return List.of(subtask.assigneeIds);
+  if (subtask.assigneeId != null && subtask.assigneeId!.isNotEmpty) {
+    return [subtask.assigneeId!];
+  }
+  return const [];
+}
+
+/// True when [userId] is explicitly assigned to this checklist item.
+bool isUserAssignedToSubtask({
+  required TaskSubtask subtask,
+  required String? userId,
+}) {
+  if (userId == null || userId.isEmpty) return false;
+  final normalized = normalizeUserId(userId);
+  return storedSubtaskAssigneeIds(subtask)
+      .any((id) => normalizeUserId(id) == normalized);
+}
+
 bool isUserAssignedToTask({
   required Task task,
   required List<ProjectMember> members,
