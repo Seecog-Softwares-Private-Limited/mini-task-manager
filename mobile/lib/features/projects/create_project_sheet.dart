@@ -5,30 +5,56 @@ import '../../core/api/api_exception.dart';
 import '../../core/preferences/app_preferences.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../core/utils/html_plain_text.dart';
+import '../../data/models/project.dart';
 import '../../shared/widgets/app_widgets.dart';
+import '../kanban/kanban_providers.dart';
 import 'projects_providers.dart';
 
 class CreateProjectSheet extends ConsumerStatefulWidget {
   const CreateProjectSheet({
     super.key,
     required this.organizationId,
-    required this.onCreated,
+    this.existing,
+    this.onCreated,
+    this.onUpdated,
   });
 
   final String organizationId;
-  final ValueChanged<String> onCreated;
+  final Project? existing;
+  final ValueChanged<String>? onCreated;
+  final ValueChanged<Project>? onUpdated;
+
+  bool get isEditing => existing != null;
 
   @override
   ConsumerState<CreateProjectSheet> createState() => _CreateProjectSheetState();
 }
 
 class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
-  final _nameController = TextEditingController();
-  final _descriptionController = TextEditingController();
+  late final TextEditingController _nameController;
+  late final TextEditingController _descriptionController;
 
-  String _visibility = 'PRIVATE';
+  late String _visibility;
   bool _loading = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final existing = widget.existing;
+    _nameController = TextEditingController(text: existing?.name ?? '');
+    _descriptionController = TextEditingController(
+      text: stripHtmlToPlainText(existing?.description),
+    );
+    final rawVisibility = (existing?.visibility ?? 'PRIVATE').toUpperCase();
+    _visibility = rawVisibility == 'PUBLIC' ||
+            rawVisibility == 'TEAM' ||
+            rawVisibility == 'ORGANIZATION' ||
+            rawVisibility == 'WORKSPACE'
+        ? 'PUBLIC'
+        : 'PRIVATE';
+  }
 
   @override
   void dispose() {
@@ -50,13 +76,25 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
     });
 
     try {
-      final project = await ref.read(projectsRepositoryProvider).createProject(
-            organizationId: widget.organizationId,
-            name: name,
-            description: _descriptionController.text,
-            visibility: _visibility,
-          );
-      widget.onCreated(project.id);
+      final repository = ref.read(projectsRepositoryProvider);
+      if (widget.isEditing) {
+        final project = await repository.updateProject(
+          projectId: widget.existing!.id,
+          organizationId: widget.organizationId,
+          name: name,
+          description: _descriptionController.text,
+          visibility: _visibility,
+        );
+        widget.onUpdated?.call(project);
+      } else {
+        final project = await repository.createProject(
+          organizationId: widget.organizationId,
+          name: name,
+          description: _descriptionController.text,
+          visibility: _visibility,
+        );
+        widget.onCreated?.call(project.id);
+      }
       if (mounted) Navigator.of(context).pop();
     } on ApiException catch (e) {
       setState(() => _error = e.message);
@@ -69,6 +107,7 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surface = isDark ? const Color(0xFF1E293B) : AppColors.surface;
+    final editing = widget.isEditing;
 
     return Material(
       color: surface,
@@ -100,7 +139,7 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Create project',
+                      editing ? 'Edit project' : 'Create project',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.w700,
                           ),
@@ -122,7 +161,7 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
               const SizedBox(height: AppSpacing.xs),
               TextField(
                 controller: _nameController,
-                autofocus: true,
+                autofocus: !editing,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: const InputDecoration(hintText: 'Project name'),
               ),
@@ -160,7 +199,9 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
                       hint: 'Only invited members',
                       icon: Icons.lock_rounded,
                       selected: _visibility == 'PRIVATE',
-                      onTap: _loading ? null : () => setState(() => _visibility = 'PRIVATE'),
+                      onTap: _loading
+                          ? null
+                          : () => setState(() => _visibility = 'PRIVATE'),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.sm),
@@ -170,7 +211,9 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
                       hint: 'Visible to workspace',
                       icon: Icons.public_rounded,
                       selected: _visibility == 'PUBLIC',
-                      onTap: _loading ? null : () => setState(() => _visibility = 'PUBLIC'),
+                      onTap: _loading
+                          ? null
+                          : () => setState(() => _visibility = 'PUBLIC'),
                     ),
                   ),
                 ],
@@ -184,7 +227,7 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
               ],
               const SizedBox(height: AppSpacing.lg),
               PrimaryButton(
-                label: 'Create project',
+                label: editing ? 'Save changes' : 'Create project',
                 loading: _loading,
                 onPressed: _submit,
               ),
@@ -285,6 +328,34 @@ Future<void> showCreateProjectSheet({
           onCreated: (projectId) {
             ref.invalidate(projectsProvider);
             ref.read(lastProjectIdProvider.notifier).setProjectId(projectId);
+          },
+        ),
+      );
+    },
+  );
+}
+
+Future<void> showEditProjectSheet({
+  required BuildContext context,
+  required WidgetRef ref,
+  required String organizationId,
+  required Project project,
+}) async {
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) {
+      final height = MediaQuery.of(context).size.height * 0.78;
+      return SizedBox(
+        height: height,
+        child: CreateProjectSheet(
+          organizationId: organizationId,
+          existing: project,
+          onUpdated: (_) {
+            ref.invalidate(projectsProvider);
+            ref.invalidate(projectBoardProvider(project.id));
           },
         ),
       );

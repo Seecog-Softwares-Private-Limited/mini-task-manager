@@ -142,6 +142,26 @@ export class TasksRepository {
     await this.repo.delete(id);
   }
 
+  /**
+   * Non-recurring tasks whose checklist JSON mentions notifyMinutesBefore.
+   * Caller filters windows / completion in memory.
+   */
+  async findCandidatesForChecklistReminders(): Promise<TaskEntity[]> {
+    return this.repo
+      .createQueryBuilder('task')
+      .where('task.subtasks IS NOT NULL')
+      .andWhere('task.recurring_template_id IS NULL')
+      .andWhere(
+        `(task.recurrence_type IS NULL OR task.recurrence_type = '' OR task.recurrence_type = 'NONE')`,
+      )
+      .andWhere(`task.subtasks LIKE :needle`, {
+        needle: '%notifyMinutesBefore%',
+      })
+      .orderBy('task.updatedAt', 'DESC')
+      .take(2000)
+      .getMany();
+  }
+
   /** Find a task whose JSON subtasks array contains the given subtask id. */
   async findBySubtaskId(subtaskId: string, organizationId: string): Promise<TaskEntity | null> {
     const rows = await this.repo

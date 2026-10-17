@@ -210,7 +210,8 @@ class _MembersSheetState extends ConsumerState<MembersSheet>
         _inviteProjectIds.clear();
       });
       showAppMessage('Invitation sent to $email');
-      _tabController.animateTo(0);
+      // Pending Invitations is the second tab.
+      _tabController.animateTo(1);
       await _loadPending();
     } on ApiException catch (e) {
       if (mounted) setState(() => _error = e.message);
@@ -491,8 +492,8 @@ class _MembersSheetState extends ConsumerState<MembersSheet>
       unselectedLabelColor: AppColors.textMuted,
       indicatorColor: AppColors.primary,
       tabs: [
-        Tab(text: 'Pending Invitations (${_pending.length})'),
         Tab(text: 'Existing Members (${_members.length})'),
+        Tab(text: 'Pending Invitations (${_pending.length})'),
       ],
     );
 
@@ -675,8 +676,8 @@ class _MembersSheetState extends ConsumerState<MembersSheet>
           body: TabBarView(
             controller: _tabController,
             children: [
-              _buildPendingTab(),
               _buildMembersTab(),
+              _buildPendingTab(),
             ],
           ),
         ),

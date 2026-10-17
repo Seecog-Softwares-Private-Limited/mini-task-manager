@@ -50,6 +50,11 @@ export class TaskEntity extends BaseEntity {
     dueTime?: string;
     /** Minutes before dueTime to notify this item's assignees. */
     notifyMinutesBefore?: number | null;
+    /**
+     * Dedup key for the last notify-before window that was sent
+     * (`YYYY-MM-DDTHH:mm`). Cleared when due date/time/lead changes.
+     */
+    reminderSentFor?: string | null;
     status?: 'TODO' | 'IN_PROGRESS' | 'DONE';
     priority?: string;
     statusId?: string;

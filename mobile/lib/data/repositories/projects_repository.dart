@@ -51,6 +51,29 @@ class ProjectsRepository {
     }
   }
 
+  Future<Project> updateProject({
+    required String projectId,
+    required String organizationId,
+    String? name,
+    String? description,
+    String? visibility,
+  }) async {
+    try {
+      final response = await _api.dio.patch<Map<String, dynamic>>(
+        '/projects/$projectId',
+        data: {
+          if (name != null) 'name': name.trim(),
+          if (description != null) 'description': description.trim(),
+          if (visibility != null) 'visibility': visibility.toUpperCase(),
+        },
+        options: _api.withOrgHeader(organizationId),
+      );
+      return Project.fromJson(response.data!);
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
   Future<void> deleteProject({required String projectId}) async {
     try {
       await _api.dio.delete<void>('/projects/$projectId');

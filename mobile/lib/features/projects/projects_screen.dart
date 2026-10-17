@@ -124,6 +124,17 @@ class _PremiumProjectCard extends ConsumerStatefulWidget {
 class _PremiumProjectCardState extends ConsumerState<_PremiumProjectCard> {
   bool _deleting = false;
 
+  Future<void> _editProject(BuildContext context) async {
+    final orgId = widget.project.organizationId;
+    if (orgId.isEmpty) return;
+    await showEditProjectSheet(
+      context: context,
+      ref: ref,
+      organizationId: orgId,
+      project: widget.project,
+    );
+  }
+
   Future<void> _confirmDelete(BuildContext context) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -284,9 +295,23 @@ class _PremiumProjectCardState extends ConsumerState<_PremiumProjectCard> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     onSelected: (value) {
-                      if (value == 'delete') _confirmDelete(context);
+                      if (value == 'edit') {
+                        _editProject(context);
+                      } else if (value == 'delete') {
+                        _confirmDelete(context);
+                      }
                     },
                     itemBuilder: (_) => [
+                      const PopupMenuItem<String>(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_outlined, size: 18),
+                            SizedBox(width: 10),
+                            Text('Edit project'),
+                          ],
+                        ),
+                      ),
                       PopupMenuItem<String>(
                         value: 'delete',
                         child: Row(

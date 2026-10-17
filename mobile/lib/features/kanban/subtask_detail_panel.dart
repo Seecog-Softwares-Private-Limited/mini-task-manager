@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/api_exception.dart';
+import '../../core/platform/clipboard_image.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/workspace_logo.dart';
@@ -95,6 +98,8 @@ class SubtaskDetailPanel extends ConsumerStatefulWidget {
 class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
   late TextEditingController _titleController;
   late TextEditingController _descriptionController;
+  late FocusNode _descriptionFocus;
+  void Function()? _detachDescriptionPaste;
   late String _status;
   late String _priority;
   String? _dueDate;
@@ -117,6 +122,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     _titleController = TextEditingController(text: widget.subtask.title);
     _descriptionController =
         TextEditingController(text: widget.subtask.description ?? '');
+    _descriptionFocus = FocusNode();
     _status = _resolveSubtaskStatus(widget.subtask);
     _priority = (widget.subtask.priority ?? 'MEDIUM').toUpperCase();
     _dueDate = widget.subtask.dueDate;
@@ -128,6 +134,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     _notePreview = widget.subtask.note;
     if (!widget.templateMode) {
       _loadAttachments();
+      _attachDescriptionPasteListener();
     } else {
       _loadingAttachments = false;
     }
@@ -135,8 +142,37 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
 
   bool get _isDailyRun => widget.dailyRunMode && !widget.templateMode;
 
+  bool get _canPasteDescriptionImage =>
+      !widget.templateMode && !widget.saving && !_uploadingAttachment;
+
+  void _attachDescriptionPasteListener() {
+    _detachDescriptionPaste?.call();
+    _detachDescriptionPaste = null;
+    if (!ClipboardImagePaste.isSupported) return;
+    // Keep listener active while the panel is open. Only accept pastes when
+    // the description field is focused (matches web textarea behavior).
+    _detachDescriptionPaste = ClipboardImagePaste.attach(_onClipboardImagePasted);
+  }
+
+  void _onClipboardImagePasted(ClipboardImage image) {
+    if (!_canPasteDescriptionImage) return;
+    if (!_descriptionFocus.hasFocus) return;
+    unawaited(
+      _pickAndUpload(
+        () async => AttachmentPickerUtils.fromClipboardImage(image),
+      ).then((_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Screenshot attached')),
+        );
+      }),
+    );
+  }
+
   @override
   void dispose() {
+    _detachDescriptionPaste?.call();
+    _descriptionFocus.dispose();
     _titleController.dispose();
     _descriptionController.dispose();
     super.dispose();
@@ -837,12 +873,15 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
                 const SizedBox(height: AppSpacing.xs),
                 TextField(
                   controller: _descriptionController,
+                  focusNode: _descriptionFocus,
                   enabled: !widget.saving,
                   minLines: 2,
                   maxLines: 5,
                   scrollPadding: EdgeInsets.zero,
                   decoration: InputDecoration(
-                    hintText: 'Optional details (not the comment thread)',
+                    hintText: ClipboardImagePaste.isSupported
+                        ? 'Optional details — paste a screenshot to attach'
+                        : 'Optional details (not the comment thread)',
                     alignLabelWithHint: true,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),

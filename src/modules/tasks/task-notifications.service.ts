@@ -85,7 +85,8 @@ export class TaskNotificationsService {
     taskId: string;
     projectId: string;
     organizationId: string;
-    occurrenceId: string;
+    /** Present for recurring ritual runs; omitted for one-off checklist items. */
+    occurrenceId?: string;
     subtaskId?: string;
     /** Wall-clock due time HH:mm (Asia/Kolkata). */
     dueTime?: string;
@@ -123,7 +124,7 @@ export class TaskNotificationsService {
             taskId: params.taskId,
             projectId: params.projectId,
             organizationId: params.organizationId,
-            occurrenceId: params.occurrenceId,
+            ...(params.occurrenceId ? { occurrenceId: params.occurrenceId } : {}),
             ...(params.subtaskId ? { subtaskId: params.subtaskId } : {}),
             ...(dueTime ? { dueTime } : {}),
             ...(lead != null ? { notifyMinutesBefore: String(lead) } : {}),
