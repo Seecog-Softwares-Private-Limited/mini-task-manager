@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
@@ -10,7 +10,12 @@ import { ActivityLogsController } from './activity-logs.controller';
 import { BillingModule } from '../billing/billing.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ActivityLogEntity]), AuthModule, OrganizationsModule, BillingModule],
+  imports: [
+    TypeOrmModule.forFeature([ActivityLogEntity]),
+    forwardRef(() => AuthModule),
+    forwardRef(() => OrganizationsModule),
+    forwardRef(() => BillingModule),
+  ],
   controllers: [ActivityLogsController],
   providers: [ActivityLogsRepository, ActivityLogsService],
   exports: [ActivityLogsService, ActivityLogsRepository],
