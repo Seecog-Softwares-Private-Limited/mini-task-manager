@@ -9,9 +9,8 @@ import '../../shared/widgets/app_widgets.dart';
 const Color kHomeDueProjectColor = Color(0xFFE65100);
 
 /// Shared Due Tasks / Due from Planner card:
-/// Project : … (deep orange)
-/// Task : …
-/// Sub Task : … (when present)
+/// Board: Project / Task / Sub Task
+/// Planner: Project / Series / Item
 class HomeDueItemCard extends StatelessWidget {
   const HomeDueItemCard({
     super.key,
@@ -26,6 +25,9 @@ class HomeDueItemCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = _priorityColor(item.subtask?.priority ?? item.task.priority);
     final subLabel = item.subtaskLabel;
+    final planner = item.fromPlanner;
+    final midLabel = planner ? 'Series :' : 'Task :';
+    final itemLabel = planner ? 'Item :' : 'Sub Task :';
     final labelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
           color: AppColors.textMuted,
           fontWeight: FontWeight.w600,
@@ -84,8 +86,8 @@ class HomeDueItemCard extends StatelessWidget {
                   item.projectLabel,
                   valueColor: kHomeDueProjectColor,
                 ),
-                labeled('Task :', item.taskLabel),
-                if (subLabel != null) labeled('Sub Task :', subLabel),
+                labeled(midLabel, item.taskLabel),
+                if (subLabel != null) labeled(itemLabel, subLabel),
               ],
             ),
           ),

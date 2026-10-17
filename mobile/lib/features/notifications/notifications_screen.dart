@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/messaging/app_messenger.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../data/models/notification.dart';
@@ -63,12 +64,8 @@ class NotificationsScreen extends ConsumerWidget {
               final whenLabel = when != null
                   ? DateFormat('MMM d, h:mm a').format(when.toLocal())
                   : '';
-              final canOpenTask = item.taskId != null;
-
               return SurfaceCard(
-                onTap: canOpenTask || !item.isRead
-                    ? () => _onNotificationTap(context, ref, item)
-                    : null,
+                onTap: () => _onNotificationTap(context, ref, item),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -119,7 +116,18 @@ class NotificationsScreen extends ConsumerWidget {
     }
 
     final taskId = item.taskId;
-    if (taskId == null || !context.mounted) return;
+    if (taskId == null) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This alert is not linked to a task.'),
+        ),
+      );
+      return;
+    }
+    if (!context.mounted) return;
+
+    final navContext = rootNavigatorKey.currentContext ?? context;
 
     try {
       final task = await ref.read(tasksRepositoryProvider).fetchTask(taskId);
@@ -132,7 +140,8 @@ class NotificationsScreen extends ConsumerWidget {
       }
       if (!context.mounted) return;
       await showModalBottomSheet<void>(
-        context: context,
+        context: navContext,
+        useRootNavigator: true,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
         builder: (_) {

@@ -19,19 +19,20 @@ class AppNotification {
   /// Deep-link payload from API (`taskId`, `subtaskId`, `projectId`, `type`, …).
   final Map<String, String> data;
 
-  String? get taskId {
-    final value = data['taskId']?.trim();
-    return (value != null && value.isNotEmpty) ? value : null;
-  }
+  String? get taskId => _dataField(const ['taskId', 'task_id', 'task']);
 
-  String? get subtaskId {
-    final value = data['subtaskId']?.trim();
-    return (value != null && value.isNotEmpty) ? value : null;
-  }
+  String? get subtaskId =>
+      _dataField(const ['subtaskId', 'subtask_id', 'subtask']);
 
-  String? get projectId {
-    final value = data['projectId']?.trim();
-    return (value != null && value.isNotEmpty) ? value : null;
+  String? get projectId =>
+      _dataField(const ['projectId', 'project_id', 'project']);
+
+  String? _dataField(List<String> keys) {
+    for (final key in keys) {
+      final value = data[key]?.trim();
+      if (value != null && value.isNotEmpty) return value;
+    }
+    return null;
   }
 
   factory AppNotification.fromJson(Map<String, dynamic> json) {

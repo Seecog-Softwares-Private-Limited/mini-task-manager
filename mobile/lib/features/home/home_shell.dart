@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../workspaces/workspace_switcher_sheet.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/branding/opspick_logo.dart';
+import '../../core/messaging/app_messenger.dart';
 import '../../core/services/push_nav.dart';
+import '../../core/services/push_notification_service.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/workflow.dart';
 import '../auth/session_controller.dart';
@@ -39,6 +43,7 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
   int _index = 0;
   final Set<int> _mountedTabs = {0};
   bool _enableUnreadBadge = false;
+  bool _openingPushDeepLink = false;
 
   @override
   void initState() {
@@ -48,7 +53,35 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       setState(() => _enableUnreadBadge = true);
+      PushNotificationService.instance.flushPendingOpen();
+      // Cold start / late FCM: retry until the task deep-link is opened.
+      _schedulePushDeepLinkRetries();
     });
+  }
+
+  void _schedulePushDeepLinkRetries() {
+    for (final delayMs in const [0, 400, 1200, 2500, 4500]) {
+      Future<void>.delayed(Duration(milliseconds: delayMs), () {
+        if (!mounted) return;
+        _consumePendingPushDeepLink();
+      });
+    }
+  }
+
+  void _consumePendingPushDeepLink() {
+    if (_openingPushDeepLink || !mounted) return;
+
+    var link = ref.read(pendingPushDeepLinkProvider);
+    if (link == null || !link.hasTask) {
+      link = PushNotificationService.instance.takePendingOpenLink();
+      if (link != null && link.hasTask) {
+        ref.read(pendingPushDeepLinkProvider.notifier).state = link;
+      }
+    }
+    if (link == null || !link.hasTask) return;
+
+    ref.read(pendingPushDeepLinkProvider.notifier).state = null;
+    unawaited(_openPushDeepLink(link));
   }
 
   @override
@@ -158,8 +191,13 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
   Future<void> _openPushDeepLink(PushDeepLink link) async {
     final taskId = link.taskId?.trim();
     if (taskId == null || taskId.isEmpty || !mounted) return;
+    if (_openingPushDeepLink) return;
+    _openingPushDeepLink = true;
 
     try {
+      debugPrint(
+        'Opening push deep link taskId=$taskId subtaskId=${link.subtaskId}',
+      );
       final task = await ref.read(tasksRepositoryProvider).fetchTask(taskId);
       List<WorkflowStatus> statuses = const [];
       try {
@@ -169,8 +207,10 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
         statuses = const [];
       }
       if (!mounted) return;
+      final navContext = rootNavigatorKey.currentContext ?? context;
       await showModalBottomSheet<void>(
-        context: context,
+        context: navContext,
+        useRootNavigator: true,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
         builder: (_) {
@@ -191,24 +231,39 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
         },
       );
     } catch (error) {
+      // Keep the deep link so a later retry (or Alerts tap) can still open it.
+      PushNotificationService.instance.requeueOpenLink(link);
+      ref.read(pendingPushDeepLinkProvider.notifier).state = link;
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(userFacingError(error))),
       );
+    } finally {
+      _openingPushDeepLink = false;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Push tap / cold start → Alerts tab, then open task + subtask when present.
+    // Push tap → open linked task/subtask (Alerts tab only when there is no task).
     ref.listen<int>(openAlertsTabTickProvider, (_, __) {
+      final link = ref.read(pendingPushDeepLinkProvider) ??
+          PushNotificationService.instance.pendingOpenLink;
+      if (link != null && link.hasTask) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _consumePendingPushDeepLink();
+        });
+        return;
+      }
       _selectTab(kAlertsTabIndex);
-      final link = ref.read(pendingPushDeepLinkProvider);
-      if (link == null || !link.hasTask) return;
-      ref.read(pendingPushDeepLinkProvider.notifier).state = null;
+    });
+
+    ref.listen<PushDeepLink?>(pendingPushDeepLinkProvider, (prev, next) {
+      if (next == null || !next.hasTask) return;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
-        _openPushDeepLink(link);
+        _consumePendingPushDeepLink();
       });
     });
 

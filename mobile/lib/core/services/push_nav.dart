@@ -17,15 +17,18 @@ class PushDeepLink {
 
   factory PushDeepLink.fromMap(Map<String, dynamic>? raw) {
     if (raw == null || raw.isEmpty) return const PushDeepLink();
-    String? read(String key) {
-      final value = raw[key]?.toString().trim();
-      return (value != null && value.isNotEmpty) ? value : null;
+    String? read(List<String> keys) {
+      for (final key in keys) {
+        final value = raw[key]?.toString().trim();
+        if (value != null && value.isNotEmpty) return value;
+      }
+      return null;
     }
 
     return PushDeepLink(
-      taskId: read('taskId'),
-      subtaskId: read('subtaskId'),
-      projectId: read('projectId'),
+      taskId: read(const ['taskId', 'task_id', 'task']),
+      subtaskId: read(const ['subtaskId', 'subtask_id', 'subtask']),
+      projectId: read(const ['projectId', 'project_id', 'project']),
     );
   }
 
@@ -52,8 +55,10 @@ final pendingPushDeepLinkProvider = StateProvider<PushDeepLink?>((ref) => null);
 
 void requestOpenAlertsTab(WidgetRef ref, [PushDeepLink? link]) {
   if (link != null && link.hasTask) {
+    // Keep the latest task deep-link until HomeShell opens it.
     ref.read(pendingPushDeepLinkProvider.notifier).state = link;
   }
+  // Always bump so HomeShell can react (open task, or fall back to Alerts).
   ref.read(openAlertsTabTickProvider.notifier).state++;
 }
 
