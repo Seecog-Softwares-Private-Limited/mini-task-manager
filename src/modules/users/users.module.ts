@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserEntity } from './entities/user.entity';
 import { UsersRepository } from './repositories/users.repository';
@@ -11,7 +11,7 @@ import { AccountDeletionService } from './account-deletion.service';
 @Module({
   imports: [
     TypeOrmModule.forFeature([UserEntity]),
-    OrganizationsModule,
+    forwardRef(() => OrganizationsModule),
   ],
   controllers: [UserAvatarController, UsersController],
   providers: [UsersRepository, UsersService, AccountDeletionService],

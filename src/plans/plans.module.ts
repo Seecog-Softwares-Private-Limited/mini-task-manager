@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BillingModule } from '../modules/billing/billing.module';
 import { UserEntity } from '../modules/users/entities/user.entity';
@@ -25,7 +25,7 @@ import { AppleSubscriptionEntity } from './entities/apple-subscription.entity';
 
 @Module({
   imports: [
-    BillingModule,
+    forwardRef(() => BillingModule),
     TypeOrmModule.forFeature([
       UserEntity,
       OrganizationEntity,

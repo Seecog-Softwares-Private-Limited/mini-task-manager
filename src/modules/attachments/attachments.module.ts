@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { BillingModule } from '../billing/billing.module';
@@ -13,11 +13,11 @@ import { AttachmentsController } from './attachments.controller';
 @Module({
   imports: [
     TypeOrmModule.forFeature([AttachmentEntity]),
-    AuthModule,
-    BillingModule,
-    OrganizationsModule,
-    TasksModule,
-    PlansModule,
+    forwardRef(() => AuthModule),
+    forwardRef(() => BillingModule),
+    forwardRef(() => OrganizationsModule),
+    forwardRef(() => TasksModule),
+    forwardRef(() => PlansModule),
   ],
   controllers: [AttachmentsController],
   providers: [AttachmentsRepository, AttachmentsService],

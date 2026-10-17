@@ -13,8 +13,8 @@ import { WorkflowsController } from './workflows.controller';
 @Module({
   imports: [
     TypeOrmModule.forFeature([WorkflowEntity, WorkflowStatusEntity]),
-    AuthModule,
-    OrganizationsModule,
+    forwardRef(() => AuthModule),
+    forwardRef(() => OrganizationsModule),
     forwardRef(() => ProjectsModule),
   ],
   controllers: [WorkflowsController],

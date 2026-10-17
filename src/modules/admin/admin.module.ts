@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { UsersModule } from '../users/users.module';
@@ -28,11 +28,11 @@ import { FeedbacksModule } from '../feedbacks/feedbacks.module';
 
 @Module({
   imports: [
-    AuthModule,
+    forwardRef(() => AuthModule),
     UsersModule,
-    OrganizationsModule,
-    BillingModule,
-    PlansModule,
+    forwardRef(() => OrganizationsModule),
+    forwardRef(() => BillingModule),
+    forwardRef(() => PlansModule),
     FeedbacksModule,
     TypeOrmModule.forFeature([
       SuperAdminEntity,
