@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/api/api_exception.dart';
+import '../../core/platform/clipboard_image.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/client_id.dart';
@@ -554,7 +555,7 @@ class _SubtaskDraft {
   }
 }
 
-class _SubtaskEditorCard extends StatelessWidget {
+class _SubtaskEditorCard extends StatefulWidget {
   const _SubtaskEditorCard({
     required this.draft,
     required this.index,
@@ -570,7 +571,42 @@ class _SubtaskEditorCard extends StatelessWidget {
   final VoidCallback onChanged;
 
   @override
+  State<_SubtaskEditorCard> createState() => _SubtaskEditorCardState();
+}
+
+class _SubtaskEditorCardState extends State<_SubtaskEditorCard> {
+  late final FocusNode _descriptionFocus;
+  void Function()? _detachPaste;
+
+  @override
+  void initState() {
+    super.initState();
+    _descriptionFocus = FocusNode();
+    if (ClipboardImagePaste.isSupported) {
+      _detachPaste = ClipboardImagePaste.attach((image) {
+        if (widget.disabled || !_descriptionFocus.hasFocus) return;
+        widget.draft.attachments.add(
+          AttachmentPickerUtils.fromClipboardImage(image),
+        );
+        widget.onChanged();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Screenshot attached')),
+        );
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _detachPaste?.call();
+    _descriptionFocus.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final draft = widget.draft;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.sm),
       decoration: BoxDecoration(
@@ -583,42 +619,47 @@ class _SubtaskEditorCard extends StatelessWidget {
           Row(
             children: [
               Text(
-                'Subtask ${index + 1}',
+                'Subtask ${widget.index + 1}',
                 style: Theme.of(context).textTheme.labelLarge,
               ),
               const Spacer(),
               IconButton(
                 visualDensity: VisualDensity.compact,
-                onPressed: disabled ? null : onRemove,
+                onPressed: widget.disabled ? null : widget.onRemove,
                 icon: const Icon(Icons.delete_outline_rounded),
               ),
             ],
           ),
           TextField(
             controller: draft.titleController,
-            enabled: !disabled,
+            enabled: !widget.disabled,
             decoration: const InputDecoration(hintText: 'Subtask title'),
-            onChanged: (_) => onChanged(),
+            onChanged: (_) => widget.onChanged(),
           ),
           const SizedBox(height: AppSpacing.xs),
           TextField(
             controller: draft.descriptionController,
-            enabled: !disabled,
+            focusNode: _descriptionFocus,
+            enabled: !widget.disabled,
             minLines: 2,
             maxLines: 4,
-            decoration: const InputDecoration(hintText: 'Subtask description (optional)'),
-            onChanged: (_) => onChanged(),
+            decoration: InputDecoration(
+              hintText: ClipboardImagePaste.isSupported
+                  ? 'Description — paste screenshot to attach'
+                  : 'Subtask description (optional)',
+            ),
+            onChanged: (_) => widget.onChanged(),
           ),
           const SizedBox(height: AppSpacing.sm),
           AttachmentPickerSection(
             attachments: draft.attachments,
-            disabled: disabled,
+            disabled: widget.disabled,
             compact: true,
             onChanged: (items) {
               draft.attachments
                 ..clear()
                 ..addAll(items);
-              onChanged();
+              widget.onChanged();
             },
           ),
         ],

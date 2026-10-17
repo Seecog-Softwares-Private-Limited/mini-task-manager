@@ -2,12 +2,22 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/platform/clipboard_image.dart';
 import '../../core/utils/client_id.dart';
 import '../../data/models/pending_attachment.dart';
 import '../../shared/voice_dictation/voice_note_recorder_sheet.dart';
 import 'attachment_file_meta.dart';
 
 class AttachmentPickerUtils {
+  static PendingAttachment fromClipboardImage(ClipboardImage image) {
+    return PendingAttachment(
+      clientId: generateClientId(),
+      fileName: image.fileName,
+      bytes: image.bytes,
+      mimeType: image.mimeType,
+    );
+  }
+
   static Future<PendingAttachment?> pickFile() async {
     final result = await FilePicker.platform.pickFiles(withData: true);
     if (result == null || result.files.isEmpty) return null;

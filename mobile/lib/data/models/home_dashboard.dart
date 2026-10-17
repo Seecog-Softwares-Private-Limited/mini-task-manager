@@ -223,6 +223,42 @@ class HomeDueTodayItem {
         return 'Due';
     }
   }
+
+  /// Compact due line for Home cards, e.g. `Due Apr 3 · 2:30 PM` or `No due date`.
+  String get dueFooterLabel {
+    final date = parseCalendarDate(_effectiveDueDate);
+    final timeRaw = _effectiveDueTime?.trim();
+    final timeLabel = _formatDueTimeShort(timeRaw);
+
+    if (date == null && timeLabel == null) return 'No due date';
+
+    final months = const [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    final dateLabel =
+        date == null ? null : '${months[date.month - 1]} ${date.day}';
+
+    if (dateLabel != null && timeLabel != null) {
+      return 'Due $dateLabel · $timeLabel';
+    }
+    if (dateLabel != null) return 'Due $dateLabel';
+    return 'Due $timeLabel';
+  }
+}
+
+String? _formatDueTimeShort(String? raw) {
+  final value = raw?.trim();
+  if (value == null || value.isEmpty) return null;
+  final parts = value.split(':');
+  if (parts.length < 2) return value;
+  final hour = int.tryParse(parts[0]);
+  final minute = int.tryParse(parts[1]);
+  if (hour == null || minute == null) return value;
+  final h12 = hour % 12 == 0 ? 12 : hour % 12;
+  final suffix = hour >= 12 ? 'PM' : 'AM';
+  final mm = minute.toString().padLeft(2, '0');
+  return '$h12:$mm $suffix';
 }
 
 int _parseMillis(String? raw) {

@@ -10,7 +10,10 @@ const Color kHomeDueProjectColor = Color(0xFFE65100);
 
 /// Shared Due Tasks / Due from Planner card:
 /// Board: Project / Task / Sub Task
-/// Planner: Project / Series / Item
+/// Planner: Project / Series / Task
+///
+/// Compact layout: status is the left accent bar (no status chip),
+/// with due date/time at the bottom.
 class HomeDueItemCard extends StatelessWidget {
   const HomeDueItemCard({
     super.key,
@@ -23,26 +26,37 @@ class HomeDueItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _priorityColor(item.subtask?.priority ?? item.task.priority);
+    final statusColor = _statusColor(item.displayBucket);
     final subLabel = item.subtaskLabel;
     final planner = item.fromPlanner;
     final midLabel = planner ? 'Series :' : 'Task :';
-    final itemLabel = planner ? 'Item :' : 'Sub Task :';
+    final itemLabel = planner ? 'Task :' : 'Sub Task :';
     final labelStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
           color: AppColors.textMuted,
           fontWeight: FontWeight.w600,
+          fontSize: 11,
+          height: 1.15,
         );
     final valueStyle = Theme.of(context).textTheme.titleSmall?.copyWith(
           fontWeight: FontWeight.w700,
           color: AppColors.textPrimary,
-          height: 1.25,
+          fontSize: 13,
+          height: 1.2,
+        );
+    final dueStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: item.displayBucket == 2
+              ? AppColors.danger
+              : AppColors.textMuted,
+          fontWeight: FontWeight.w600,
+          fontSize: 11,
+          height: 1.1,
         );
 
     Widget labeled(String label, String value, {Color? valueColor}) {
       return Padding(
-        padding: const EdgeInsets.only(bottom: 4),
+        padding: const EdgeInsets.only(bottom: 2),
         child: RichText(
-          maxLines: 2,
+          maxLines: 1,
           overflow: TextOverflow.ellipsis,
           text: TextSpan(
             style: valueStyle,
@@ -62,17 +76,19 @@ class HomeDueItemCard extends StatelessWidget {
     }
 
     return SurfaceCard(
-      padding: const EdgeInsets.all(AppSpacing.sm),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: 8,
+      ),
       onTap: onTap,
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            width: 4,
-            height: subLabel == null ? 56 : 78,
-            margin: const EdgeInsets.only(top: 2),
+            width: 3.5,
+            height: subLabel == null ? 48 : 62,
             decoration: BoxDecoration(
-              color: color,
+              color: statusColor,
               borderRadius: BorderRadius.circular(4),
             ),
           ),
@@ -88,30 +104,21 @@ class HomeDueItemCard extends StatelessWidget {
                 ),
                 labeled(midLabel, item.taskLabel),
                 if (subLabel != null) labeled(itemLabel, subLabel),
+                const SizedBox(height: 2),
+                Text(
+                  item.dueFooterLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: dueStyle,
+                ),
               ],
             ),
           ),
-          const SizedBox(width: AppSpacing.xs),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              StatusChip(
-                label: item.statusLabel,
-                color: switch (item.displayBucket) {
-                  0 => AppColors.textMuted,
-                  1 => AppColors.sky,
-                  2 => AppColors.danger,
-                  3 => AppColors.warning,
-                  4 => AppColors.success,
-                  _ => AppColors.sky,
-                },
-              ),
-              const SizedBox(height: 6),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.textMuted,
-              ),
-            ],
+          const SizedBox(width: 4),
+          const Icon(
+            Icons.chevron_right_rounded,
+            size: 20,
+            color: AppColors.textMuted,
           ),
         ],
       ),
@@ -119,14 +126,19 @@ class HomeDueItemCard extends StatelessWidget {
   }
 }
 
-Color _priorityColor(String priority) {
-  switch (priority.toLowerCase()) {
-    case 'critical':
-    case 'urgent':
-    case 'high':
-      return AppColors.danger;
-    case 'low':
-      return AppColors.textMuted;
+/// Left bar color mirrors display status (not priority).
+Color _statusColor(int bucket) {
+  switch (bucket) {
+    case 0:
+      return AppColors.textMuted; // no date
+    case 1:
+      return AppColors.sky; // today / remaining
+    case 2:
+      return AppColors.danger; // overdue
+    case 3:
+      return AppColors.warning; // in progress
+    case 4:
+      return AppColors.success; // done
     default:
       return AppColors.sky;
   }

@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Inject, Injectable, Logger, NotFoundException, forwardRef } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
@@ -20,6 +20,15 @@ import { PatchTaskDto } from './dto/patch-task.dto';
 import { RecurringTasksService } from './recurring-tasks.service';
 import { OrgEventsService } from '../org-events/org-events.service';
 import { TaskNotificationsService } from './task-notifications.service';
+import {
+  assigneeIdsForItem,
+  coerceDueYmd,
+  isInRemindWindow,
+  isSubtaskDone,
+  normalizeNotifyMinutes,
+  parseHHmm,
+  reminderWindowKey,
+} from './due-reminder.util';
 import { PaginationQueryDto, PaginatedResult, paginate } from '../../common/pagination';
 import {
   formatUuid,
@@ -139,6 +148,8 @@ function patchDtoKeys(dto: PatchTaskDto): string[] {
 
 @Injectable()
 export class TasksService {
+  private readonly logger = new Logger(TasksService.name);
+
   constructor(
     private readonly tasksRepository: TasksRepository,
     private readonly taskCommentsRepository: TaskCommentsRepository,
@@ -978,6 +989,89 @@ export class TasksService {
     return { assigneeIds: ids, assigneeId: ids[0] };
   }
 
+  /**
+   * Notify-before for one-off (non-recurring) checklist items.
+   * Recurring runs are handled by RecurringTasksService.sendDueRitualReminders.
+   */
+  async sendDueChecklistItemReminders(now = new Date()): Promise<{ sent: number }> {
+    const nowMs = now.getTime();
+    const candidates = await this.tasksRepository.findCandidatesForChecklistReminders();
+    if (!candidates.length) return { sent: 0 };
+
+    let sent = 0;
+
+    for (const task of candidates) {
+      const subtasks = task.subtasks;
+      if (!subtasks?.length) continue;
+
+      let changed = false;
+      const nextSubtasks = subtasks.map((s) => ({ ...s }));
+
+      for (let i = 0; i < nextSubtasks.length; i++) {
+        const subtask = nextSubtasks[i];
+        if (isSubtaskDone(subtask)) continue;
+
+        const dueTime = parseHHmm(subtask.dueTime);
+        if (!dueTime) continue;
+
+        const notifyMinutesBefore = normalizeNotifyMinutes(
+          subtask.notifyMinutesBefore,
+          true,
+        );
+        if (notifyMinutesBefore == null) continue;
+
+        const dueYmd =
+          coerceDueYmd(subtask.dueDate) ?? coerceDueYmd(task.dueDate);
+        if (!dueYmd) continue;
+
+        if (!isInRemindWindow(dueYmd, dueTime, notifyMinutesBefore, nowMs)) {
+          continue;
+        }
+
+        const windowKey = reminderWindowKey(dueYmd, dueTime);
+        if (subtask.reminderSentFor === windowKey) continue;
+
+        let recipientIds = assigneeIdsForItem(subtask);
+        if (!recipientIds.length) {
+          recipientIds = assigneeIdsForItem(task);
+        }
+        if (!recipientIds.length) {
+          this.logger.warn(
+            `Checklist reminder skipped (no assignees): "${subtask.title}" @ ${dueYmd} ${dueTime}`,
+          );
+          continue;
+        }
+
+        const title =
+          (subtask.title || task.title || 'Checklist item').trim() ||
+          'Checklist item';
+        this.logger.log(
+          `Checklist reminder due: "${title}" → ${recipientIds.length} assignee(s) (notify ${notifyMinutesBefore}m before ${dueYmd} ${dueTime})`,
+        );
+        await this.taskNotifications.notifyRitualDue({
+          title,
+          recipientIds,
+          taskId: task.id,
+          projectId: task.projectId,
+          organizationId: task.organizationId,
+          subtaskId: subtask.id,
+          dueTime,
+          notifyMinutesBefore,
+        });
+
+        nextSubtasks[i] = { ...subtask, reminderSentFor: windowKey };
+        changed = true;
+        sent += 1;
+      }
+
+      if (changed) {
+        await this.tasksRepository.update(task.id, { subtasks: nextSubtasks });
+      }
+    }
+
+    return { sent };
+  }
+
   private normalizeSubtasks(
     subtasks?: Array<{
       id?: string;
@@ -989,6 +1083,7 @@ export class TasksService {
       dueDate?: string;
       dueTime?: string;
       notifyMinutesBefore?: number | null;
+      reminderSentFor?: string | null;
       priority?: string;
       status?: string;
       statusId?: string;
@@ -1011,6 +1106,10 @@ export class TasksService {
         status?: string;
         completed?: boolean;
         completionRecord?: Record<string, any>;
+        dueDate?: string;
+        dueTime?: string;
+        notifyMinutesBefore?: number | null;
+        reminderSentFor?: string | null;
       }> | null;
       currentUserId?: string;
     },
@@ -1024,6 +1123,7 @@ export class TasksService {
     dueDate?: string;
     dueTime?: string;
     notifyMinutesBefore?: number;
+    reminderSentFor?: string;
     status: 'TODO' | 'IN_PROGRESS' | 'DONE';
     priority?: string;
     statusId?: string;
@@ -1080,6 +1180,30 @@ export class TasksService {
           !Number.isNaN(Number(rawNotify))
             ? Math.max(0, Math.min(24 * 60, Number(rawNotify)))
             : undefined;
+
+        const priorDueDate = prior?.dueDate
+          ? String(prior.dueDate).slice(0, 10)
+          : undefined;
+        const priorDueTime =
+          typeof prior?.dueTime === 'string' ? prior.dueTime.trim().slice(0, 5) : undefined;
+        const priorNotify =
+          prior?.notifyMinutesBefore == null ||
+          Number.isNaN(Number(prior.notifyMinutesBefore))
+            ? undefined
+            : Number(prior.notifyMinutesBefore);
+        const scheduleChanged =
+          priorDueDate !== dueDate ||
+          priorDueTime !== dueTime ||
+          priorNotify !== notifyMinutesBefore;
+        const reminderSentFor = scheduleChanged
+          ? undefined
+          : typeof prior?.reminderSentFor === 'string' &&
+              prior.reminderSentFor.trim().length
+            ? prior.reminderSentFor.trim().slice(0, 32)
+            : typeof s.reminderSentFor === 'string' &&
+                s.reminderSentFor.trim().length
+              ? s.reminderSentFor.trim().slice(0, 32)
+              : undefined;
 
         // completionRecord: keep client value, else preserve existing while DONE,
         // else auto-stamp only when newly transitioning to DONE (never mass-stamp
@@ -1144,6 +1268,7 @@ export class TasksService {
           ...(dueDate ? { dueDate } : {}),
           ...(dueTime ? { dueTime } : {}),
           ...(notifyMinutesBefore != null ? { notifyMinutesBefore } : {}),
+          ...(reminderSentFor ? { reminderSentFor } : {}),
           ...(s.priority ? { priority: s.priority } : {}),
           ...(s.statusId ? { statusId: s.statusId } : {}),
           ...(completionRecord ? { completionRecord } : {}),

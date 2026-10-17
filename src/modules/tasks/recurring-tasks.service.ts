@@ -23,6 +23,12 @@ import {
   subtractDays,
   toYmd,
 } from './recurrence.util';
+import {
+  assigneeIdsForItem,
+  isInRemindWindow,
+  isSubtaskDone,
+  parseHHmm,
+} from './due-reminder.util';
 
 type TemplateSubtask = NonNullable<
   import('./entities/recurring-task-template.entity').RecurringTaskTemplateEntity['templateSubtasks']
@@ -1631,6 +1637,7 @@ export class RecurringTasksService {
           }));
 
       for (const subtask of subtasks) {
+        if (isSubtaskDone(subtask)) continue;
         const itemDueTime = parseHHmm(subtask.dueTime);
         if (!itemDueTime) continue;
         const key = `subtask:${subtask.id}`;
@@ -1651,7 +1658,10 @@ export class RecurringTasksService {
           continue;
         }
 
-        const recipientIds = assigneeIdsForItem(subtask);
+        let recipientIds = assigneeIdsForItem(subtask);
+        if (!recipientIds.length) {
+          recipientIds = seriesAssigneeIds(task, template);
+        }
         if (recipientIds.length) {
           const title = (subtask.title || task.title || 'Checklist item').trim() || 'Checklist item';
           this.logger.log(
@@ -1668,12 +1678,12 @@ export class RecurringTasksService {
             dueTime: itemDueTime,
             notifyMinutesBefore,
           });
+          await markSent(key);
         } else {
           this.logger.warn(
             `Checklist reminder skipped (no assignees): "${subtask.title}" @ ${itemDueYmd} ${itemDueTime}`,
           );
         }
-        await markSent(key);
       }
 
       if (keysChanged) {
@@ -1689,43 +1699,6 @@ export class RecurringTasksService {
 
     return { sent };
   }
-}
-
-function parseHHmm(raw?: string | null): string | null {
-  if (!raw) return null;
-  const t = String(raw).trim().slice(0, 5);
-  return /^([01]\d|2[0-3]):[0-5]\d$/.test(t) ? t : null;
-}
-
-function isInRemindWindow(
-  dueYmd: string,
-  dueTime: string,
-  notifyMinutesBefore: number,
-  nowMs: number,
-): boolean {
-  const dueAtMs = Date.parse(`${dueYmd}T${dueTime}:00+05:30`);
-  if (!Number.isFinite(dueAtMs)) return false;
-  const remindAtMs = dueAtMs - notifyMinutesBefore * 60_000;
-  // Fire from the remind moment until shortly after due.
-  // Previously this was a 60s window — any delayed cron tick permanently missed the push.
-  // Dedup is handled by occurrence.remindersSent keys, so a wider window is safe.
-  const graceAfterDueMs = 2 * 60_000;
-  return nowMs >= remindAtMs && nowMs < dueAtMs + graceAfterDueMs;
-}
-
-function assigneeIdsForItem(item: {
-  assigneeId?: string | null;
-  assigneeIds?: string[] | null;
-}): string[] {
-  const list =
-    item.assigneeIds?.length
-      ? item.assigneeIds
-      : item.assigneeId
-        ? [item.assigneeId]
-        : [];
-  return [
-    ...new Set(list.map((id) => String(id ?? '').trim()).filter(Boolean)),
-  ];
 }
 
 /** Ritual-level recipients: task assignees, else template series assignees. */
