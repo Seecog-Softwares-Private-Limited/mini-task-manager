@@ -171,7 +171,9 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
             embedded: widget.embedded,
             sectionIndex: widget.embedded ? null : _sectionIndex,
             onSectionChanged: widget.embedded ? null : _selectSection,
-            header: const _BoardTitleHeader(title: 'Board'),
+            header: widget.embedded
+                ? const _BoardTitleHeader()
+                : const _BoardTitleHeader(title: 'Board'),
             child: _standaloneSectionChild(
               tasksChild: EmptyState(
                 title: 'Board unavailable',
@@ -199,7 +201,7 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
               boardMetaLine: widget.embedded ? null : 'No workflow columns',
               header: widget.embedded
                   ? _BoardTitleHeader(
-                      title: allProjects ? 'All projects' : 'Board',
+                      title: allProjects ? 'All projects' : null,
                       subtitle: 'No workflow columns',
                     )
                   : ProjectSwitcher(
@@ -223,6 +225,11 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
 
           final totalTasks = board.tasks.length;
           final overdueCount = board.overdueCount;
+          // Embedded Tasks counters use full project board data (pre-filter),
+          // matching projectBoardProvider totals — not member/filter-narrowed lists.
+          final counterTasks = widget.embedded ? rawBoard.tasks.length : totalTasks;
+          final counterOverdue =
+              widget.embedded ? rawBoard.overdueCount : overdueCount;
           final boardBody = Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -269,6 +276,7 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
             ],
           );
 
+          // Standalone meta still uses columns; Tasks tab uses Expanded KPI row below.
           final metaLine =
               '$totalTasks tasks · ${board.statuses.length} columns';
 
@@ -278,9 +286,11 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
             onSectionChanged: widget.embedded ? null : _selectSection,
             boardMetaLine: widget.embedded ? null : metaLine,
             header: widget.embedded
-                ? _BoardTitleHeader(
-                    title: allProjects ? 'All projects' : 'Board',
-                    subtitle: metaLine,
+                ? _TasksEmbeddedCountersHeader(
+                    // Tasks tab: no "Board" title — keep "All projects" when applicable.
+                    title: allProjects ? 'All projects' : null,
+                    taskCount: counterTasks,
+                    overdueCount: counterOverdue,
                   )
                 : ProjectSwitcher(
                     selectedProjectId: widget.projectId,
@@ -289,27 +299,31 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
               ref.invalidate(projectBoardProvider(widget.projectId));
               await ref.read(projectBoardProvider(widget.projectId).future);
             },
-            headerStats: [
-              _HeaderStat(
-                icon: Icons.task_alt_rounded,
-                label: 'Total',
-                value: '$totalTasks',
-                color: AppColors.primary,
-              ),
-              _HeaderStat(
-                icon: Icons.warning_amber_rounded,
-                label: 'Overdue',
-                value: '$overdueCount',
-                color:
-                    overdueCount > 0 ? AppColors.danger : AppColors.textMuted,
-              ),
-              _HeaderStat(
-                icon: Icons.view_column_rounded,
-                label: 'Columns',
-                value: '${board.statuses.length}',
-                color: AppColors.violet,
-              ),
-            ],
+            // Tasks tab: drop Total / Overdue / Columns stats row.
+            headerStats: widget.embedded
+                ? null
+                : [
+                    _HeaderStat(
+                      icon: Icons.task_alt_rounded,
+                      label: 'Total',
+                      value: '$totalTasks',
+                      color: AppColors.primary,
+                    ),
+                    _HeaderStat(
+                      icon: Icons.warning_amber_rounded,
+                      label: 'Overdue',
+                      value: '$overdueCount',
+                      color: overdueCount > 0
+                          ? AppColors.danger
+                          : AppColors.textMuted,
+                    ),
+                    _HeaderStat(
+                      icon: Icons.view_column_rounded,
+                      label: 'Columns',
+                      value: '${board.statuses.length}',
+                      color: AppColors.violet,
+                    ),
+                  ],
             child: _standaloneSectionChild(tasksChild: boardBody),
           );
         },
@@ -506,9 +520,10 @@ class _BoardScaffold extends StatelessWidget {
         showTasksChrome && boardMetaLine != null;
     final showHeaderStats = headerStats != null && showTasksChrome;
 
+    // Embedded Tasks KPI row: tight vertical padding (≤ Recurring KPI sm).
     final headerPadding = embedded
         ? const EdgeInsets.fromLTRB(
-            AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.sm)
+            AppSpacing.md, AppSpacing.xs, AppSpacing.md, AppSpacing.xs)
         : const EdgeInsets.fromLTRB(
             AppSpacing.xs, AppSpacing.xs, AppSpacing.md, AppSpacing.md);
 
@@ -546,6 +561,9 @@ class _BoardScaffold extends StatelessWidget {
                   _CircleIconButton(
                     icon: Icons.refresh_rounded,
                     onPressed: () => onRefresh!(),
+                    // Keep Tasks KPI row short — don't force 44px chrome height.
+                    size: embedded ? 32 : 44,
+                    iconSize: embedded ? 18 : 22,
                   ),
               ],
             ),
@@ -573,10 +591,8 @@ class _BoardScaffold extends StatelessWidget {
               SizedBox(height: embedded ? AppSpacing.sm : AppSpacing.md),
               Row(
                 children: [
-                  for (var i = 0; i < headerStats!.length; i++) ...[
-                    if (i > 0) const SizedBox(width: AppSpacing.sm),
-                    Expanded(child: headerStats![i]),
-                  ],
+                  for (final stat in headerStats!)
+                    Expanded(child: stat),
                 ],
               ),
             ],
@@ -668,27 +684,29 @@ class _ProjectBoardSectionTabs extends StatelessWidget {
 }
 
 class _BoardTitleHeader extends StatelessWidget {
-  const _BoardTitleHeader({required this.title, this.subtitle});
+  const _BoardTitleHeader({this.title, this.subtitle});
 
-  final String title;
+  final String? title;
   final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
+    final hasTitle = title != null && title!.isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-        ),
+        if (hasTitle)
+          Text(
+            title!,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
         if (subtitle != null) ...[
-          const SizedBox(height: 2),
+          if (hasTitle) const SizedBox(height: 2),
           Text(
             subtitle!,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 13),
@@ -699,11 +717,82 @@ class _BoardTitleHeader extends StatelessWidget {
   }
 }
 
+/// Tasks-tab counters — same 3× Expanded + centered 13px muted row as Recurring KPIs.
+/// Slot order: left = tasks, center = empty (spacing), right = overdue.
+class _TasksEmbeddedCountersHeader extends StatelessWidget {
+  const _TasksEmbeddedCountersHeader({
+    this.title,
+    required this.taskCount,
+    required this.overdueCount,
+  });
+
+  final String? title;
+  final int taskCount;
+  final int overdueCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasTitle = title != null && title!.isNotEmpty;
+    final kpiStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+          fontSize: 13,
+          color: AppColors.textMuted,
+        );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (hasTitle) ...[
+          Text(
+            title!,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: 2),
+        ],
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Expanded(
+              child: Text(
+                '$taskCount tasks',
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: kpiStyle,
+              ),
+            ),
+            const Expanded(child: SizedBox.shrink()),
+            Expanded(
+              child: Text(
+                '$overdueCount overdue',
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: kpiStyle,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 class _CircleIconButton extends StatelessWidget {
-  const _CircleIconButton({required this.icon, required this.onPressed});
+  const _CircleIconButton({
+    required this.icon,
+    required this.onPressed,
+    this.size = 44,
+    this.iconSize = 22,
+  });
 
   final IconData icon;
   final VoidCallback onPressed;
+  final double size;
+  final double iconSize;
 
   @override
   Widget build(BuildContext context) {
@@ -718,9 +807,9 @@ class _CircleIconButton extends StatelessWidget {
         customBorder: const CircleBorder(),
         onTap: onPressed,
         child: SizedBox(
-          width: 44,
-          height: 44,
-          child: Icon(icon, size: 22),
+          width: size,
+          height: size,
+          child: Icon(icon, size: iconSize),
         ),
       ),
     );
@@ -742,53 +831,16 @@ class _HeaderStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.06)
-            : AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.08)
-              : AppColors.border.withValues(alpha: 0.8),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, size: 16, color: color),
+    // Compact plain text (same treatment as Recurring / Home KPI rows).
+    return Text(
+      '$value ${label.toLowerCase()}',
+      textAlign: TextAlign.center,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            fontSize: 13,
+            color: AppColors.textMuted,
           ),
-          const SizedBox(width: AppSpacing.xs),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  value,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: color,
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-                Text(
-                  label,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(fontSize: 11),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

@@ -147,30 +147,52 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen>
                         ),
             ),
           summaryAsync.maybeWhen(
-            data: (summary) => Padding(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              child: Row(
-                children: [
-                  _Kpi(
-                    label: 'Due week',
-                    value: '${summary.dueThisWeek}',
-                    color: AppColors.sky,
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  _Kpi(
-                    label: 'Overdue',
-                    value: '${summary.overdue}',
-                    color: AppColors.danger,
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  _Kpi(
-                    label: 'Paused',
-                    value: '${summary.paused}',
-                    color: AppColors.warning,
-                  ),
-                ],
-              ),
-            ),
+            data: (summary) {
+              final kpiStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontSize: 13,
+                    color: AppColors.textMuted,
+                  );
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                ),
+                // Three equal Expanded slots — group spans full width, each label centered.
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${summary.dueThisWeek} due week',
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: kpiStyle,
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        '${summary.overdue} overdue',
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: kpiStyle,
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        '${summary.paused} paused',
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: kpiStyle,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
             orElse: () => const SizedBox(height: AppSpacing.sm),
           ),
           TabBar(
@@ -207,32 +229,3 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen>
   }
 }
 
-class _Kpi extends StatelessWidget {
-  const _Kpi({required this.label, required this.value, required this.color});
-
-  final String label;
-  final String value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: SurfaceCard(
-        padding: const EdgeInsets.all(AppSpacing.sm),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: Theme.of(context).textTheme.labelMedium),
-            Text(
-              value,
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(color: color),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
