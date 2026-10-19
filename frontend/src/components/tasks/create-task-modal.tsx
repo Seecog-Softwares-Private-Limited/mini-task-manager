@@ -522,6 +522,7 @@ export function CreateTaskModal({
                           <AlertCircle className="h-3 w-3" /> {errors.title.message}
                         </p>
                       ) : null}
+                      {/* AI suggestions UI hidden for now.
                       <SubtaskSuggestionsPanel
                         variant="create"
                         request={{
@@ -565,6 +566,7 @@ export function CreateTaskModal({
                           }
                         }}
                       />
+                      */}
                     </div>
 
                     <Controller
@@ -834,6 +836,7 @@ export function CreateTaskModal({
                     <AlertCircle className="h-3 w-3" /> {errors.title.message}
                   </p>
                 ) : null}
+                {/* AI suggestions UI hidden for now.
                 <SubtaskSuggestionsPanel
                   variant="create"
                   request={{
@@ -875,6 +878,7 @@ export function CreateTaskModal({
                     }
                   }}
                 />
+                */}
               </div>
 
               <Controller

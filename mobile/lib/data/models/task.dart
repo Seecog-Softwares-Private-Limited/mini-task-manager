@@ -22,6 +22,8 @@ class TaskSubtask {
     this.reporterId,
     this.createdAt,
     this.updatedAt,
+    this.updatedBy,
+    this.assignedAt,
     this.completedAt,
     this.note,
     this.requireLocation = false,
@@ -45,6 +47,10 @@ class TaskSubtask {
   final String? createdAt;
   /// Bumped on status / meaningful edits so the item rises within its list bucket.
   final String? updatedAt;
+  /// User who last edited this checklist item.
+  final String? updatedBy;
+  /// When assignees on this item were last changed.
+  final String? assignedAt;
   /// ISO timestamp when marked done (lightweight; survives when full record is omitted).
   final String? completedAt;
   final String? note;
@@ -91,6 +97,8 @@ class TaskSubtask {
       reporterId: _nullableString(json['reporterId']),
       createdAt: _nullableString(json['createdAt']),
       updatedAt: _nullableString(json['updatedAt']),
+      updatedBy: _nullableString(json['updatedBy']),
+      assignedAt: _nullableString(json['assignedAt']),
       completedAt: completedAt,
       note: _nullableString(json['note']),
       requireLocation: json['requireLocation'] == true,
@@ -136,8 +144,25 @@ class TaskSubtask {
               ?.millisecondsSinceEpoch ??
           0;
       if (localMs >= serverMs) {
-        next = next.copyWith(updatedAt: localUpdated);
+        next = next.copyWith(
+          updatedAt: localUpdated,
+          updatedBy: local.updatedBy ?? next.updatedBy,
+        );
       }
+    }
+
+    final localUpdatedBy = local.updatedBy?.trim();
+    if ((next.updatedBy == null || next.updatedBy!.trim().isEmpty) &&
+        localUpdatedBy != null &&
+        localUpdatedBy.isNotEmpty) {
+      next = next.copyWith(updatedBy: localUpdatedBy);
+    }
+
+    final localAssignedAt = local.assignedAt?.trim();
+    if ((next.assignedAt == null || next.assignedAt!.trim().isEmpty) &&
+        localAssignedAt != null &&
+        localAssignedAt.isNotEmpty) {
+      next = next.copyWith(assignedAt: localAssignedAt);
     }
     return next;
   }
@@ -161,6 +186,8 @@ class TaskSubtask {
     String? reporterId,
     String? createdAt,
     String? updatedAt,
+    String? updatedBy,
+    String? assignedAt,
     String? completedAt,
     bool clearCompletedAt = false,
     String? note,
@@ -190,6 +217,8 @@ class TaskSubtask {
       reporterId: reporterId ?? this.reporterId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      updatedBy: updatedBy ?? this.updatedBy,
+      assignedAt: assignedAt ?? this.assignedAt,
       completedAt:
           clearCompletedAt ? null : (completedAt ?? this.completedAt),
       note: clearNote ? null : (note ?? this.note),
@@ -209,6 +238,8 @@ class Task {
     required this.loggedMinutes,
     required this.createdAt,
     required this.updatedAt,
+    this.updatedBy,
+    this.assigneesUpdatedAt,
     this.description,
     this.statusId,
     this.assigneeId,
@@ -235,6 +266,8 @@ class Task {
   final List<String> assigneeIds;
   final List<String> tags;
   final String reporterId;
+  final String? updatedBy;
+  final String? assigneesUpdatedAt;
   final String? dueDate;
   final String? dueTime;
   final String? completedAt;
@@ -262,6 +295,8 @@ class Task {
       assigneeIds: _parseStringList(json['assigneeIds']),
       tags: _parseTags(json['tags']),
       reporterId: _asString(json['reporterId']),
+      updatedBy: _nullableString(json['updatedBy']),
+      assigneesUpdatedAt: _nullableDateString(json['assigneesUpdatedAt']),
       dueDate: calendarDateString(json['dueDate']),
       dueTime: _nullableString(json['dueTime']),
       completedAt: _nullableDateString(json['completedAt']),
@@ -292,6 +327,9 @@ class Task {
     List<String>? tags,
     List<String>? assigneeIds,
     bool? requireLocation,
+    String? updatedBy,
+    String? assigneesUpdatedAt,
+    String? updatedAt,
   }) {
     return Task(
       id: id,
@@ -305,6 +343,8 @@ class Task {
       assigneeIds: assigneeIds ?? this.assigneeIds,
       tags: tags ?? this.tags,
       reporterId: reporterId,
+      updatedBy: updatedBy ?? this.updatedBy,
+      assigneesUpdatedAt: assigneesUpdatedAt ?? this.assigneesUpdatedAt,
       dueDate: clearDueDate ? null : (dueDate ?? this.dueDate),
       dueTime: clearDueDate || clearDueTime ? null : (dueTime ?? this.dueTime),
       completedAt: completedAt,
@@ -315,7 +355,7 @@ class Task {
       recurrenceSequence: recurrenceSequence,
       requireLocation: requireLocation ?? this.requireLocation,
       createdAt: createdAt,
-      updatedAt: updatedAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }

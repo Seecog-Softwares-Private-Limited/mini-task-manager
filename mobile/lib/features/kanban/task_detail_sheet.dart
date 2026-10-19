@@ -35,7 +35,8 @@ import 'attachment_picker_section.dart';
 import 'attachment_preview.dart';
 import 'assignee_picker_sheet.dart';
 import 'require_location_toggle.dart';
-import 'subtask_suggestions_panel.dart';
+// AI suggestions UI hidden for now — keep panel code for later.
+// import 'subtask_suggestions_panel.dart';
 
 /// How much of the task detail UI to show.
 enum TaskDetailMode {
@@ -102,6 +103,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
   ScrollController? _sheetScroll;
   String? _error;
   List<ProjectMember> _members = const [];
+  /// Org members (owner/admin/member) for audit role labels.
+  List<ProjectMember> _orgMembers = const [];
   List<_TaskAttachmentItem> _attachments = const [];
   List<TaskComment> _comments = const [];
   Timer? _peerSyncTimer;
@@ -319,10 +322,12 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
         tasksRepo.fetchTask(widget.task.id),
         _loadTaskAttachments(orgId, widget.task.id),
         tasksRepo.fetchComments(widget.task.id),
+        ref.read(organizationsRepositoryProvider).fetchOrgMembers(orgId),
       ]);
       if (!mounted) return;
       final members = results[0] as List<ProjectMember>;
       var task = results[1] as Task;
+      final orgMembers = results[4] as List<ProjectMember>;
       final activeAssigneeIds = _activeAssigneeIds(task, members);
       final storedAssigneeIds = _storedAssigneeIds(task);
       if (_assigneeListsDiffer(storedAssigneeIds, activeAssigneeIds)) {
@@ -335,6 +340,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       final focusId = _initialSubtaskFocusId;
       setState(() {
         _members = members;
+        _orgMembers = orgMembers;
         _task = task;
         // Keep local completion stamps if the server omitted them this round-trip.
         _subtasks = _mergeSubtasksPreservingOrder(_subtasks, task.subtasks);
@@ -789,78 +795,79 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     }
   }
 
-  Future<void> _acceptSuggestedSubtasks(List<String> titles) async {
-    if (_saving || _addingSubtask || _savingSubtaskIndex != null) return;
-    final taken = _subtasks
-        .map((s) => normalizeSuggestionTitle(s.title))
-        .where((t) => t.isNotEmpty)
-        .toSet();
-    final additions = <TaskSubtask>[];
-    final nowIso = DateTime.now().toUtc().toIso8601String();
-    for (final raw in titles) {
-      final trimmed = clampSubtaskTitle(raw);
-      final key = normalizeSuggestionTitle(trimmed);
-      if (trimmed.isEmpty || taken.contains(key)) continue;
-      taken.add(key);
-      additions.add(
-        TaskSubtask(
-          id: generateClientId(),
-          title: trimmed,
-          completed: false,
-          status: 'TODO',
-          priority: 'MEDIUM',
-          requireLocation: _task.requireLocation,
-          createdAt: nowIso,
-          updatedAt: nowIso,
-        ),
-      );
-    }
-    if (additions.isEmpty) return;
-
-    final previous = List<TaskSubtask>.from(_subtasks);
-    final updated = [...additions, ...previous];
-    setState(() {
-      _subtasks = updated;
-      _addingSubtask = true;
-      _error = null;
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final ctx = _checklistAddKey.currentContext;
-      if (ctx != null && mounted) {
-        Scrollable.ensureVisible(
-          ctx,
-          alignment: 0.1,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-    try {
-      final saved = await ref.read(tasksRepositoryProvider).updateTask(
-            taskId: _task.id,
-            subtasks: updated,
-          );
-      if (!mounted) return;
-      setState(() {
-        _task = saved;
-        _subtasks = _mergeSubtasksPreservingOrder(
-          updated,
-          saved.subtasks,
-          appendServerOnly: false,
-        );
-      });
-      widget.onUpdated();
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = e.message;
-        _subtasks = previous;
-      });
-      rethrow;
-    } finally {
-      if (mounted) setState(() => _addingSubtask = false);
-    }
-  }
+  // AI suggestions UI hidden for now.
+  // Future<void> _acceptSuggestedSubtasks(List<String> titles) async {
+  //   if (_saving || _addingSubtask || _savingSubtaskIndex != null) return;
+  //   final taken = _subtasks
+  //       .map((s) => normalizeSuggestionTitle(s.title))
+  //       .where((t) => t.isNotEmpty)
+  //       .toSet();
+  //   final additions = <TaskSubtask>[];
+  //   final nowIso = DateTime.now().toUtc().toIso8601String();
+  //   for (final raw in titles) {
+  //     final trimmed = clampSubtaskTitle(raw);
+  //     final key = normalizeSuggestionTitle(trimmed);
+  //     if (trimmed.isEmpty || taken.contains(key)) continue;
+  //     taken.add(key);
+  //     additions.add(
+  //       TaskSubtask(
+  //         id: generateClientId(),
+  //         title: trimmed,
+  //         completed: false,
+  //         status: 'TODO',
+  //         priority: 'MEDIUM',
+  //         requireLocation: _task.requireLocation,
+  //         createdAt: nowIso,
+  //         updatedAt: nowIso,
+  //       ),
+  //     );
+  //   }
+  //   if (additions.isEmpty) return;
+  //
+  //   final previous = List<TaskSubtask>.from(_subtasks);
+  //   final updated = [...additions, ...previous];
+  //   setState(() {
+  //     _subtasks = updated;
+  //     _addingSubtask = true;
+  //     _error = null;
+  //   });
+  //   WidgetsBinding.instance.addPostFrameCallback((_) {
+  //     final ctx = _checklistAddKey.currentContext;
+  //     if (ctx != null && mounted) {
+  //       Scrollable.ensureVisible(
+  //         ctx,
+  //         alignment: 0.1,
+  //         duration: const Duration(milliseconds: 200),
+  //         curve: Curves.easeOut,
+  //       );
+  //     }
+  //   });
+  //   try {
+  //     final saved = await ref.read(tasksRepositoryProvider).updateTask(
+  //           taskId: _task.id,
+  //           subtasks: updated,
+  //         );
+  //     if (!mounted) return;
+  //     setState(() {
+  //       _task = saved;
+  //       _subtasks = _mergeSubtasksPreservingOrder(
+  //         updated,
+  //         saved.subtasks,
+  //         appendServerOnly: false,
+  //       );
+  //     });
+  //     widget.onUpdated();
+  //   } on ApiException catch (e) {
+  //     if (!mounted) return;
+  //     setState(() {
+  //       _error = e.message;
+  //       _subtasks = previous;
+  //     });
+  //     rethrow;
+  //   } finally {
+  //     if (mounted) setState(() => _addingSubtask = false);
+  //   }
+  // }
 
   void _cancelSubtaskEdit(int index) {
     final id = _subtasks[index].id;
@@ -1603,26 +1610,27 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                       onSubmit: _appendSubtask,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.sm),
-                  if (orgId.isNotEmpty)
-                    SubtaskSuggestionsPanel(
-                      key: ValueKey<String>('ai-suggest-${_task.id}'),
-                      organizationId: orgId,
-                      taskId: _task.id,
-                      purposeInput: true,
-                      draftDescription: stripHtmlToPlainText(_task.description),
-                      existingTitles:
-                          _subtasks.map((s) => s.title).toList(),
-                      disabled: _saving ||
-                          _addingSubtask ||
-                          _savingSubtaskIndex != null,
-                      note: (_task.recurringTemplateId != null &&
-                              _task.recurringTemplateId!.trim().isNotEmpty)
-                          ? 'Added steps apply to this run only, not the recurring template.'
-                          : null,
-                      reportAcceptErrors: false,
-                      onAccept: _acceptSuggestedSubtasks,
-                    ),
+                  // AI suggestions UI hidden for now.
+                  // const SizedBox(height: AppSpacing.sm),
+                  // if (orgId.isNotEmpty)
+                  //   SubtaskSuggestionsPanel(
+                  //     key: ValueKey<String>('ai-suggest-${_task.id}'),
+                  //     organizationId: orgId,
+                  //     taskId: _task.id,
+                  //     purposeInput: true,
+                  //     draftDescription: stripHtmlToPlainText(_task.description),
+                  //     existingTitles:
+                  //         _subtasks.map((s) => s.title).toList(),
+                  //     disabled: _saving ||
+                  //         _addingSubtask ||
+                  //         _savingSubtaskIndex != null,
+                  //     note: (_task.recurringTemplateId != null &&
+                  //             _task.recurringTemplateId!.trim().isNotEmpty)
+                  //         ? 'Added steps apply to this run only, not the recurring template.'
+                  //         : null,
+                  //     reportAcceptErrors: false,
+                  //     onAccept: _acceptSuggestedSubtasks,
+                  //   ),
                   const SizedBox(height: AppSpacing.sm),
                 ],
                 if (_subtasks.isEmpty && allowChecklistStructureEdit)
@@ -1732,7 +1740,10 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                               child: SubtaskDetailPanel(
                                 subtask: item,
                                 members: subtaskAssigneePool,
-                                memberDirectory: _members,
+                                memberDirectory: [
+                                  ..._orgMembers,
+                                  ..._members,
+                                ],
                                 taskId: _task.id,
                                 organizationId: orgId,
                                 fallbackReporterId: _task.reporterId,
@@ -1907,6 +1918,7 @@ class _TaskMetaSection extends StatefulWidget {
 
 class _TaskMetaSectionState extends State<_TaskMetaSection> {
   final _tagController = TextEditingController();
+  bool _advanceOptionsExpanded = false;
 
   @override
   void dispose() {
@@ -2025,270 +2037,332 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
             'No description yet',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textMuted),
           ),
-        if (widget.attachments != null) ...[
-          const SizedBox(height: AppSpacing.lg),
-          widget.attachments!,
-        ],
-        const SizedBox(height: AppSpacing.md),
-        _AssignedBySection(member: assignedBy),
-        const SizedBox(height: AppSpacing.md),
-        _AssignedToSection(
-          assignedMembers: assignedTo,
-          allMembers: widget.members,
-          selectedAssigneeIds: _activeAssigneeIds(widget.task, widget.members),
-          currentUserId: widget.currentUserId,
-          saving: widget.saving,
-          enabled: widget.canEditDetails,
-          onAssigneesChanged: widget.onAssigneesChanged,
-        ),
         const SizedBox(height: AppSpacing.lg),
-        Text(
-          'OCCURRENCE',
-          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                letterSpacing: 1.6,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textMuted,
-              ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _FieldLabel(text: 'Due date & time'),
-        const SizedBox(height: AppSpacing.xs),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed:
-                    widget.saving || !widget.canEditDetails ? null : widget.onPickDueDate,
-                icon: Icon(
-                  Icons.calendar_today_rounded,
-                  size: 18,
-                  color: isOverdue ? AppColors.danger : AppColors.textMuted,
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: isOverdue ? AppColors.danger : null,
-                  side: BorderSide(
-                    color: isOverdue
-                        ? AppColors.danger.withValues(alpha: 0.45)
-                        : AppColors.border,
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => setState(() => _advanceOptionsExpanded = !_advanceOptionsExpanded),
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Advance Options',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                   ),
-                  backgroundColor:
-                      isOverdue ? AppColors.dangerSoft.withValues(alpha: 0.35) : null,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                  alignment: Alignment.centerLeft,
-                ),
-                label: Text(
-                  dueDate == null
-                      ? 'Date'
-                      : DateFormat('MMM d, yyyy').format(dueDate),
-                  overflow: TextOverflow.ellipsis,
-                ),
+                  AnimatedRotation(
+                    turns: _advanceOptionsExpanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 180),
+                    child: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: AppColors.textMuted.withValues(alpha: 0.85),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: AppSpacing.xs),
-            Expanded(
-              child: OutlinedButton(
-                onPressed: widget.saving ||
-                        !widget.canEditDetails ||
-                        dueDate == null
-                    ? null
-                    : widget.onPickDueTime,
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+          ),
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          alignment: Alignment.topCenter,
+          child: !_advanceOptionsExpanded
+              ? const SizedBox(width: double.infinity)
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.schedule_rounded, size: 18),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        (widget.task.dueTime == null ||
-                                widget.task.dueTime!.isEmpty)
-                            ? 'Time'
-                            : widget.task.dueTime!,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
+                    if (widget.attachments != null) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      widget.attachments!,
+                    ],
+                    const SizedBox(height: AppSpacing.md),
+                    _AssignedBySection(member: assignedBy),
+                    const SizedBox(height: AppSpacing.md),
+                    _AssignedToSection(
+                      assignedMembers: assignedTo,
+                      allMembers: widget.members,
+                      selectedAssigneeIds:
+                          _activeAssigneeIds(widget.task, widget.members),
+                      currentUserId: widget.currentUserId,
+                      saving: widget.saving,
+                      enabled: widget.canEditDetails,
+                      onAssigneesChanged: widget.onAssigneesChanged,
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    Text(
+                      'OCCURRENCE',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                            letterSpacing: 1.6,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textMuted,
+                          ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    _FieldLabel(text: 'Due date & time'),
+                    const SizedBox(height: AppSpacing.xs),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: widget.saving || !widget.canEditDetails
+                                ? null
+                                : widget.onPickDueDate,
+                            icon: Icon(
+                              Icons.calendar_today_rounded,
+                              size: 18,
+                              color:
+                                  isOverdue ? AppColors.danger : AppColors.textMuted,
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: isOverdue ? AppColors.danger : null,
+                              side: BorderSide(
+                                color: isOverdue
+                                    ? AppColors.danger.withValues(alpha: 0.45)
+                                    : AppColors.border,
+                              ),
+                              backgroundColor: isOverdue
+                                  ? AppColors.dangerSoft.withValues(alpha: 0.35)
+                                  : null,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                              alignment: Alignment.centerLeft,
+                            ),
+                            label: Text(
+                              dueDate == null
+                                  ? 'Date'
+                                  : DateFormat('MMM d, yyyy').format(dueDate),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.xs),
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: widget.saving ||
+                                    !widget.canEditDetails ||
+                                    dueDate == null
+                                ? null
+                                : widget.onPickDueTime,
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.schedule_rounded, size: 18),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    (widget.task.dueTime == null ||
+                                            widget.task.dueTime!.isEmpty)
+                                        ? 'Time'
+                                        : widget.task.dueTime!,
+                                    overflow: TextOverflow.ellipsis,
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (dueDate != null) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              [
+                                DateFormat('EEE, MMM d, yyyy').format(dueDate),
+                                if (widget.task.dueTime != null &&
+                                    widget.task.dueTime!.isNotEmpty)
+                                  widget.task.dueTime!,
+                              ].join(' · '),
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppColors.textMuted,
+                                  ),
+                            ),
+                          ),
+                          if (widget.task.dueTime != null &&
+                              widget.task.dueTime!.isNotEmpty)
+                            TextButton(
+                              onPressed: widget.saving || !widget.canEditDetails
+                                  ? null
+                                  : widget.onClearDueTime,
+                              child: const Text('Clear time'),
+                            ),
+                          TextButton(
+                            onPressed: widget.saving || !widget.canEditDetails
+                                ? null
+                                : widget.onClearDueDate,
+                            child: const Text('Clear'),
+                          ),
+                        ],
                       ),
+                      if (isOverdue) ...[
+                        const SizedBox(height: AppSpacing.xs),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.dangerSoft,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            'Overdue',
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: AppColors.danger,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ],
+                    const SizedBox(height: AppSpacing.md),
+                    _FieldLabel(text: 'Task status'),
+                    const SizedBox(height: AppSpacing.xs),
+                    _SidebarDropdown<String>(
+                      value: selectedStatus?.id,
+                      enabled: !widget.saving &&
+                          widget.statuses.isNotEmpty &&
+                          widget.canEditWorkflowFields,
+                      hint: 'Select status',
+                      items: widget.statuses
+                          .map(
+                            (status) => DropdownMenuItem(
+                              value: status.id,
+                              child: Row(
+                                children: [
+                                  _StatusDot(color: _parseStatusColor(status.color)),
+                                  const SizedBox(width: 10),
+                                  Expanded(child: Text(status.name)),
+                                ],
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      selectedChild: selectedStatus == null
+                          ? null
+                          : Row(
+                              children: [
+                                _StatusDot(
+                                  color: _parseStatusColor(selectedStatus.color),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(child: Text(selectedStatus.name)),
+                              ],
+                            ),
+                      onChanged: widget.onStatusChanged,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    _FieldLabel(text: 'Priority'),
+                    const SizedBox(height: AppSpacing.xs),
+                    _SidebarDropdown<String>(
+                      value: selectedPriority.$1,
+                      enabled: !widget.saving && widget.canEditWorkflowFields,
+                      hint: 'Select priority',
+                      items: _TaskMetaSection.priorities
+                          .map(
+                            (item) => DropdownMenuItem(
+                              value: item.$1,
+                              child: Row(
+                                children: [
+                                  _StatusDot(color: _priorityColor(item.$1)),
+                                  const SizedBox(width: 10),
+                                  Expanded(child: Text(item.$2)),
+                                ],
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      selectedChild: Row(
+                        children: [
+                          _StatusDot(color: _priorityColor(selectedPriority.$1)),
+                          const SizedBox(width: 10),
+                          Expanded(child: Text(selectedPriority.$2)),
+                        ],
+                      ),
+                      onChanged: widget.onPriorityChanged,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    RequireLocationToggle(
+                      value: widget.task.requireLocation,
+                      enabled:
+                          !widget.saving && widget.onRequireLocationChanged != null,
+                      title: 'Require location to complete',
+                      subtitle: widget.onRequireLocationChanged != null
+                          ? 'Ask for GPS when subtasks on this task are marked done'
+                          : 'Only the owner or task creator can change this',
+                      onChanged: widget.onRequireLocationChanged,
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    _FieldLabel(text: 'Tags'),
+                    const SizedBox(height: AppSpacing.xs),
+                    if (widget.task.tags.isNotEmpty) ...[
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: widget.task.tags
+                            .map(
+                              (tag) => InputChip(
+                                label: Text(tag),
+                                onDeleted: widget.saving || !widget.canEditDetails
+                                    ? null
+                                    : () => widget.onRemoveTag(tag),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                    ],
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _tagController,
+                            enabled: !widget.saving && widget.canEditDetails,
+                            decoration: InputDecoration(
+                              hintText: 'Add a tag',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
+                            ),
+                            onSubmitted: (value) {
+                              widget.onAddTag(value);
+                              _tagController.clear();
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
+                        IconButton.filled(
+                          onPressed: widget.saving || !widget.canEditDetails
+                              ? null
+                              : () {
+                                  widget.onAddTag(_tagController.text);
+                                  _tagController.clear();
+                                },
+                          icon: const Icon(Icons.add_rounded),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ),
-            ),
-          ],
-        ),
-        if (dueDate != null) ...[
-          const SizedBox(height: AppSpacing.xs),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  [
-                    DateFormat('EEE, MMM d, yyyy').format(dueDate),
-                    if (widget.task.dueTime != null &&
-                        widget.task.dueTime!.isNotEmpty)
-                      widget.task.dueTime!,
-                  ].join(' · '),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textMuted,
-                      ),
-                ),
-              ),
-              if (widget.task.dueTime != null && widget.task.dueTime!.isNotEmpty)
-                TextButton(
-                  onPressed:
-                      widget.saving || !widget.canEditDetails ? null : widget.onClearDueTime,
-                  child: const Text('Clear time'),
-                ),
-              TextButton(
-                onPressed:
-                    widget.saving || !widget.canEditDetails ? null : widget.onClearDueDate,
-                child: const Text('Clear'),
-              ),
-            ],
-          ),
-          if (isOverdue) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppColors.dangerSoft,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                'Overdue',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: AppColors.danger,
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-            ),
-          ],
-        ],
-        const SizedBox(height: AppSpacing.md),
-        _FieldLabel(text: 'Task status'),
-        const SizedBox(height: AppSpacing.xs),
-        _SidebarDropdown<String>(
-          value: selectedStatus?.id,
-          enabled: !widget.saving && widget.statuses.isNotEmpty && widget.canEditWorkflowFields,
-          hint: 'Select status',
-          items: widget.statuses
-              .map(
-                (status) => DropdownMenuItem(
-                  value: status.id,
-                  child: Row(
-                    children: [
-                      _StatusDot(color: _parseStatusColor(status.color)),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text(status.name)),
-                    ],
-                  ),
-                ),
-              )
-              .toList(),
-          selectedChild: selectedStatus == null
-              ? null
-              : Row(
-                  children: [
-                    _StatusDot(color: _parseStatusColor(selectedStatus.color)),
-                    const SizedBox(width: 10),
-                    Expanded(child: Text(selectedStatus.name)),
-                  ],
-                ),
-          onChanged: widget.onStatusChanged,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        _FieldLabel(text: 'Priority'),
-        const SizedBox(height: AppSpacing.xs),
-        _SidebarDropdown<String>(
-          value: selectedPriority.$1,
-          enabled: !widget.saving && widget.canEditWorkflowFields,
-          hint: 'Select priority',
-          items: _TaskMetaSection.priorities
-              .map(
-                (item) => DropdownMenuItem(
-                  value: item.$1,
-                  child: Row(
-                    children: [
-                      _StatusDot(color: _priorityColor(item.$1)),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text(item.$2)),
-                    ],
-                  ),
-                ),
-              )
-              .toList(),
-          selectedChild: Row(
-            children: [
-              _StatusDot(color: _priorityColor(selectedPriority.$1)),
-              const SizedBox(width: 10),
-              Expanded(child: Text(selectedPriority.$2)),
-            ],
-          ),
-          onChanged: widget.onPriorityChanged,
-        ),
-        const SizedBox(height: AppSpacing.md),
-        RequireLocationToggle(
-          value: widget.task.requireLocation,
-          enabled: !widget.saving && widget.onRequireLocationChanged != null,
-          title: 'Require location to complete',
-          subtitle: widget.onRequireLocationChanged != null
-              ? 'Ask for GPS when subtasks on this task are marked done'
-              : 'Only the owner or task creator can change this',
-          onChanged: widget.onRequireLocationChanged,
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        _FieldLabel(text: 'Tags'),
-        const SizedBox(height: AppSpacing.xs),
-        if (widget.task.tags.isNotEmpty) ...[
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: widget.task.tags
-                .map(
-                  (tag) => InputChip(
-                    label: Text(tag),
-                    onDeleted: widget.saving || !widget.canEditDetails
-                        ? null
-                        : () => widget.onRemoveTag(tag),
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: AppSpacing.sm),
-        ],
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _tagController,
-                enabled: !widget.saving && widget.canEditDetails,
-                decoration: InputDecoration(
-                  hintText: 'Add a tag',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 12,
-                  ),
-                ),
-                onSubmitted: (value) {
-                  widget.onAddTag(value);
-                  _tagController.clear();
-                },
-              ),
-            ),
-            const SizedBox(width: AppSpacing.sm),
-            IconButton.filled(
-              onPressed: widget.saving || !widget.canEditDetails
-                  ? null
-                  : () {
-                      widget.onAddTag(_tagController.text);
-                      _tagController.clear();
-                    },
-              icon: const Icon(Icons.add_rounded),
-            ),
-          ],
         ),
       ],
     );

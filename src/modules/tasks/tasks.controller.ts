@@ -8,6 +8,7 @@ import {
   Body,
   Param,
   Query,
+  Req,
   UseGuards,
   UseInterceptors,
   StreamableFile,
@@ -15,6 +16,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { SkipThrottle } from '@nestjs/throttler';
 import { createReadStream } from 'fs';
@@ -142,8 +144,16 @@ export class TasksController {
   async findByProject(
     @Param('projectId') projectId: string,
     @TenantId() tenantId: string,
+    @CurrentUserId() userId: string,
     @Query() query: PaginationQueryDto,
+    @Req() req: Request & { user?: { orgRole?: string } },
   ) {
+    await this.projectsService.assertUserCanAccessProject(
+      tenantId,
+      projectId,
+      userId,
+      req.user?.orgRole,
+    );
     return this.tasksService.findByProject(projectId, tenantId, query);
   }
 
@@ -524,6 +534,10 @@ export class TasksController {
           }
         : undefined,
       reporterId: formatUuid(t.reporterId as string | Buffer) ?? String(t.reporterId),
+      updatedBy: t.updatedBy
+        ? formatUuid(t.updatedBy as string | Buffer) ?? String(t.updatedBy)
+        : undefined,
+      assigneesUpdatedAt: t.assigneesUpdatedAt ?? undefined,
       parentTaskId: t.parentTaskId ? formatUuid(t.parentTaskId as string | Buffer) : undefined,
       storyPoints: t.storyPoints ?? undefined,
       dueDate: formatCalendarDate(t.dueDate),

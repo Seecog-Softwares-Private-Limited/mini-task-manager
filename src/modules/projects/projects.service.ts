@@ -1,4 +1,11 @@
-import { ConflictException, forwardRef, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  forwardRef,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 import * as fs from 'fs/promises';
@@ -14,6 +21,7 @@ import { UpdateProjectDto } from './dto/update-project.dto';
 import { TasksRepository } from '../tasks/repositories/tasks.repository';
 import { WorkflowsService } from '../workflows/workflows.service';
 import { ActivityLogsService } from '../activity-logs/activity-logs.service';
+import { OrganizationsService } from '../organizations/organizations.service';
 
 const DEMO_TASKS = [
   { title: 'Review project requirements', description: 'Go through the initial brief and clarify any questions.' },
@@ -30,6 +38,8 @@ export class ProjectsService {
     private readonly tasksRepository: TasksRepository,
     @Inject(forwardRef(() => WorkflowsService))
     private readonly workflowsService: WorkflowsService,
+    @Inject(forwardRef(() => OrganizationsService))
+    private readonly organizationsService: OrganizationsService,
     private readonly activityLogsService: ActivityLogsService,
     private readonly dataSource: DataSource,
     private readonly configService: ConfigService<Configuration>,
@@ -48,8 +58,8 @@ export class ProjectsService {
   }
 
   /**
-   * Owners/admins see every workspace project.
-   * Members only see projects they were explicitly added to.
+   * Owner sees every workspace project (to manage access).
+   * Admins and members only see projects they were explicitly granted.
    */
   async findVisibleForUser(
     organizationId: string,
@@ -58,13 +68,119 @@ export class ProjectsService {
   ): Promise<ProjectEntity[]> {
     const all = await this.projectsRepository.findByOrganization(organizationId);
     const role = (orgRole ?? '').toLowerCase();
-    if (role === 'owner' || role === 'admin') {
+    if (role === 'owner') {
       return all;
     }
     const allowedIds = new Set(
       await this.projectMembersRepository.findProjectIdsByUser(userId),
     );
     return all.filter((p) => allowedIds.has(p.id));
+  }
+
+  /** Whether the user may open this project (owner bypasses membership). */
+  async userCanAccessProject(
+    organizationId: string,
+    projectId: string,
+    userId: string,
+    orgRole?: string | null,
+  ): Promise<boolean> {
+    const project = await this.projectsRepository.findByIdAndOrganization(
+      projectId,
+      organizationId,
+    );
+    if (!project) return false;
+    const role = (orgRole ?? '').toLowerCase();
+    if (role === 'owner') return true;
+    const membership = await this.projectMembersRepository.findByProjectAndUser(
+      projectId,
+      userId,
+    );
+    return !!membership;
+  }
+
+  async assertUserCanAccessProject(
+    organizationId: string,
+    projectId: string,
+    userId: string,
+    orgRole?: string | null,
+  ): Promise<void> {
+    const ok = await this.userCanAccessProject(organizationId, projectId, userId, orgRole);
+    if (!ok) {
+      throw new ForbiddenException('You do not have access to this project');
+    }
+  }
+
+  /** Project IDs in this org that the user currently has access to. */
+  async getUserProjectIdsInOrganization(
+    organizationId: string,
+    userId: string,
+  ): Promise<string[]> {
+    const all = await this.projectsRepository.findByOrganization(organizationId);
+    const orgProjectIds = new Set(all.map((p) => p.id));
+    const userProjectIds = await this.projectMembersRepository.findProjectIdsByUser(userId);
+    return userProjectIds.filter((id) => orgProjectIds.has(id));
+  }
+
+  /**
+   * Owner-managed sync: set exactly which org projects a member can see.
+   * Adds CONTRIBUTOR for new grants; removes memberships for deselected projects.
+   */
+  async setUserProjectAccess(
+    organizationId: string,
+    targetUserId: string,
+    projectIds: string[],
+  ): Promise<{ projectIds: string[] }> {
+    const membership = await this.organizationsService.getMembership(
+      organizationId,
+      targetUserId,
+    );
+    if (!membership || membership.status?.toUpperCase() !== 'ACTIVE') {
+      throw new NotFoundException('Workspace member not found');
+    }
+
+    const orgProjects = await this.projectsRepository.findByOrganization(organizationId);
+    const orgProjectIds = new Set(orgProjects.map((p) => p.id));
+    const desired = [
+      ...new Set(
+        (projectIds ?? [])
+          .map((id) => String(id ?? '').trim())
+          .filter((id) => orgProjectIds.has(id)),
+      ),
+    ];
+    const desiredSet = new Set(desired);
+
+    const current = await this.getUserProjectIdsInOrganization(organizationId, targetUserId);
+    const currentSet = new Set(current);
+
+    for (const projectId of desired) {
+      if (currentSet.has(projectId)) continue;
+      const existing = await this.projectMembersRepository.findByProjectAndUser(
+        projectId,
+        targetUserId,
+      );
+      if (!existing) {
+        await this.projectMembersRepository.create({
+          projectId,
+          userId: targetUserId,
+          role: 'CONTRIBUTOR',
+        });
+      }
+    }
+
+    for (const projectId of current) {
+      if (desiredSet.has(projectId)) continue;
+      const row = await this.projectMembersRepository.findByProjectAndUser(
+        projectId,
+        targetUserId,
+      );
+      if (row) {
+        await this.projectMembersRepository.delete(row.id);
+      }
+    }
+
+    return {
+      projectIds: await this.getUserProjectIdsInOrganization(organizationId, targetUserId),
+    };
   }
 
   async countByOrganization(organizationId: string): Promise<number> {

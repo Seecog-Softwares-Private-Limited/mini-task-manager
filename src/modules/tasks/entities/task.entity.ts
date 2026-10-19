@@ -37,6 +37,10 @@ export class TaskEntity extends BaseEntity {
   @Column({ name: 'assignee_ids', type: 'simple-json', nullable: true })
   assigneeIds!: string[] | null;
 
+  /** When assignees were last changed (for audit UI). */
+  @Column({ name: 'assignees_updated_at', type: 'timestamp', nullable: true })
+  assigneesUpdatedAt!: Date | null;
+
   /** Checklist JSON — MEDIUMTEXT so large lists are not capped at 64KB. */
   @Column({ type: 'simple-json', nullable: true })
   subtasks!: Array<{
@@ -62,6 +66,10 @@ export class TaskEntity extends BaseEntity {
     reporterId?: string;
     createdAt?: string;
     updatedAt?: string;
+    /** User who last edited this checklist item. */
+    updatedBy?: string;
+    /** When assignees on this item were last changed. */
+    assignedAt?: string;
     note?: string;
     /** When true, completing this subtask requires GPS/geofence. */
     requireLocation?: boolean;
@@ -69,6 +77,16 @@ export class TaskEntity extends BaseEntity {
 
   @Column({ name: 'reporter_id', type: 'binary', length: 16, transformer: uuidBinaryTransformer })
   reporterId!: string;
+
+  /** User who last updated the task (audit UI). */
+  @Column({
+    name: 'updated_by',
+    type: 'binary',
+    length: 16,
+    transformer: uuidBinaryTransformer,
+    nullable: true,
+  })
+  updatedBy!: string | null;
 
   @Column({ name: 'parent_task_id', type: 'binary', length: 16, transformer: uuidBinaryTransformer, nullable: true })
   parentTaskId!: string | null;

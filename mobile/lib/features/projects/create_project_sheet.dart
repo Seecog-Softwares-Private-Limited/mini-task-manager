@@ -186,9 +186,12 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
 
     try {
       final repository = ref.read(projectsRepositoryProvider);
-      final iconChanged = _iconCleared ||
-          (_iconPreview != null &&
-              _iconPreview != widget.existing?.iconUrl);
+      // Explicit clear flag (create/edit sheet) + trimmed compare so whitespace-
+      // only diffs don't spuriously clear or re-upload icons.
+      final iconBefore = (widget.existing?.iconUrl ?? '').trim();
+      final iconAfter = (_iconPreview ?? '').trim();
+      final iconChanged =
+          _iconCleared || (iconBefore != iconAfter);
       if (widget.isEditing) {
         final project = await repository.updateProject(
           projectId: widget.existing!.id,
@@ -197,7 +200,9 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
           description: _descriptionController.text,
           visibility: _visibility,
           clearIcon: _iconCleared,
-          iconUrl: (!_iconCleared && iconChanged) ? _iconPreview : null,
+          iconUrl: (!_iconCleared && iconChanged && iconAfter.isNotEmpty)
+              ? iconAfter
+              : null,
         );
         widget.onUpdated?.call(project);
       } else {
@@ -206,7 +211,7 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
           name: name,
           description: _descriptionController.text,
           visibility: _visibility,
-          iconUrl: _iconPreview,
+          iconUrl: iconAfter.isEmpty ? null : iconAfter,
         );
         widget.onCreated?.call(project.id);
       }
@@ -345,6 +350,7 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
                 autofocus: !editing,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: const InputDecoration(hintText: 'Project name'),
+                onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: AppSpacing.md),
               Text(
@@ -629,7 +635,7 @@ Future<void> showCreateProjectSheet({
     useSafeArea: true,
     backgroundColor: Colors.transparent,
     builder: (_) {
-      final height = MediaQuery.of(context).size.height * 0.78;
+      final height = MediaQuery.of(context).size.height * 0.88;
       return SizedBox(
         height: height,
         child: CreateProjectSheet(
@@ -657,7 +663,7 @@ Future<void> showEditProjectSheet({
     useSafeArea: true,
     backgroundColor: Colors.transparent,
     builder: (_) {
-      final height = MediaQuery.of(context).size.height * 0.78;
+      final height = MediaQuery.of(context).size.height * 0.88;
       return SizedBox(
         height: height,
         child: CreateProjectSheet(
