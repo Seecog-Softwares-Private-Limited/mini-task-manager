@@ -175,9 +175,9 @@ class _WorkspaceSwitcherSheetState extends ConsumerState<WorkspaceSwitcherSheet>
                               StatusChip(label: org.myRole!, color: AppColors.sky),
                             if (_canManage(org))
                               IconButton(
-                                tooltip: 'Workspace settings',
+                                tooltip: 'Edit Workspace',
                                 onPressed: () => _openSettings(org),
-                                icon: const Icon(Icons.settings_outlined, size: 20),
+                                icon: const Icon(Icons.edit_outlined, size: 20),
                               ),
                             if (selected)
                               const Padding(

@@ -22,7 +22,7 @@ import '../recurring/recurring_actions.dart';
 import '../recurring/recurring_editor_sheet.dart';
 import '../recurring/recurring_providers.dart';
 import '../feedback/feedback_form_sheet.dart';
-import '../settings/settings_placeholder_screen.dart';
+import '../settings/settings_screen.dart';
 import 'home_tab.dart';
 import 'my_work_providers.dart';
 import 'my_work_screen.dart';
@@ -273,7 +273,7 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
             embedded: true,
           ),
         kAlertsTabIndex => const NotificationsScreen(),
-        _ => const SettingsPlaceholderScreen(),
+        _ => const SettingsScreen(),
       };
     });
 

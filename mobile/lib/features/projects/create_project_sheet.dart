@@ -6,9 +6,11 @@ import '../../core/preferences/app_preferences.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/html_plain_text.dart';
+import '../../core/utils/project_logo.dart';
 import '../../data/models/project.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../kanban/kanban_providers.dart';
+import '../kanban/project_switcher.dart';
 import 'projects_providers.dart';
 
 class CreateProjectSheet extends ConsumerStatefulWidget {
@@ -36,6 +38,9 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
   late final TextEditingController _descriptionController;
 
   late String _visibility;
+  String? _iconPreview;
+  bool _iconCleared = false;
+  bool _pickingLogo = false;
   bool _loading = false;
   String? _error;
 
@@ -47,6 +52,7 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
     _descriptionController = TextEditingController(
       text: stripHtmlToPlainText(existing?.description),
     );
+    _iconPreview = existing?.iconUrl;
     final rawVisibility = (existing?.visibility ?? 'PRIVATE').toUpperCase();
     _visibility = rawVisibility == 'PUBLIC' ||
             rawVisibility == 'TEAM' ||
@@ -54,6 +60,109 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
             rawVisibility == 'WORKSPACE'
         ? 'PUBLIC'
         : 'PRIVATE';
+  }
+
+  Future<void> _pickLogo() async {
+    if (_loading || _pickingLogo) return;
+    setState(() {
+      _pickingLogo = true;
+      _error = null;
+    });
+    try {
+      final dataUrl = await pickProjectLogoDataUrl();
+      if (!mounted) return;
+      setState(() {
+        _iconPreview = dataUrl;
+        _iconCleared = false;
+      });
+    } on ProjectLogoException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = e.message);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } finally {
+      if (mounted) setState(() => _pickingLogo = false);
+    }
+  }
+
+  void _clearLogo() {
+    setState(() {
+      _iconPreview = null;
+      _iconCleared = true;
+      _error = null;
+    });
+  }
+
+  void _inspectLogoPreview(BuildContext context, String logo) {
+    final provider = projectLogoImageProvider(logo);
+    if (provider == null) return;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          insetPadding: const EdgeInsets.all(AppSpacing.lg),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420, maxHeight: 480),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.md,
+                    AppSpacing.sm,
+                    AppSpacing.xs,
+                    0,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Logo preview',
+                          style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close',
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                ),
+                Flexible(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.md,
+                      AppSpacing.sm,
+                      AppSpacing.md,
+                      AppSpacing.md,
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: InteractiveViewer(
+                        minScale: 1,
+                        maxScale: 4,
+                        child: Image(
+                          image: provider,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => const Padding(
+                            padding: EdgeInsets.all(AppSpacing.lg),
+                            child: Text('Could not load logo preview'),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -77,6 +186,9 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
 
     try {
       final repository = ref.read(projectsRepositoryProvider);
+      final iconChanged = _iconCleared ||
+          (_iconPreview != null &&
+              _iconPreview != widget.existing?.iconUrl);
       if (widget.isEditing) {
         final project = await repository.updateProject(
           projectId: widget.existing!.id,
@@ -84,6 +196,8 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
           name: name,
           description: _descriptionController.text,
           visibility: _visibility,
+          clearIcon: _iconCleared,
+          iconUrl: (!_iconCleared && iconChanged) ? _iconPreview : null,
         );
         widget.onUpdated?.call(project);
       } else {
@@ -92,6 +206,7 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
           name: name,
           description: _descriptionController.text,
           visibility: _visibility,
+          iconUrl: _iconPreview,
         );
         widget.onCreated?.call(project.id);
       }
@@ -152,6 +267,72 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
                 ],
               ),
               const SizedBox(height: AppSpacing.sm),
+              Text(
+                'Logo',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  _ProjectLogoPreview(
+                    iconPreview: _iconPreview,
+                    projectName: _nameController.text,
+                    existing: widget.existing,
+                    loading: _pickingLogo || _loading,
+                    onInspect: (_iconPreview != null &&
+                            _iconPreview!.trim().isNotEmpty)
+                        ? () => _inspectLogoPreview(context, _iconPreview!)
+                        : null,
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextButton.icon(
+                          onPressed:
+                              _loading || _pickingLogo ? null : _pickLogo,
+                          icon: _pickingLogo
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.image_outlined, size: 18),
+                          label: Text(
+                            (_iconPreview == null || _iconPreview!.isEmpty)
+                                ? 'Upload logo'
+                                : 'Change logo',
+                          ),
+                        ),
+                        Text(
+                          'PNG or JPG, max 10 MB.',
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppColors.textMuted,
+                                  ),
+                        ),
+                        if (_iconPreview != null &&
+                            _iconPreview!.trim().isNotEmpty)
+                          TextButton(
+                            onPressed:
+                                _loading || _pickingLogo ? null : _clearLogo,
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.danger,
+                            ),
+                            child: const Text('Remove logo'),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
               Text(
                 'Name',
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
@@ -234,6 +415,134 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _ProjectLogoPreview extends StatelessWidget {
+  const _ProjectLogoPreview({
+    required this.iconPreview,
+    required this.projectName,
+    required this.existing,
+    required this.loading,
+    this.onInspect,
+  });
+
+  final String? iconPreview;
+  final String projectName;
+  final Project? existing;
+  final bool loading;
+  final VoidCallback? onInspect;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasLogo =
+        iconPreview != null && iconPreview!.trim().isNotEmpty;
+    final provider = projectLogoImageProvider(iconPreview);
+    // Prefer existing ProjectThumb when preview is the stored URL (handles
+    // network/data logos the same way as the rest of the app).
+    final useExistingThumb = hasLogo &&
+        existing != null &&
+        iconPreview == existing!.iconUrl &&
+        !(iconPreview!.startsWith('data:'));
+
+    final Widget thumb;
+    if (useExistingThumb) {
+      thumb = ProjectThumb(project: existing!, size: 64, radius: 14);
+    } else if (provider != null) {
+      thumb = ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Image(
+          image: provider,
+          width: 64,
+          height: 64,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => existing != null && hasLogo
+              ? ProjectThumb(project: existing!, size: 64, radius: 14)
+              : _LetterThumb(name: projectName),
+        ),
+      );
+    } else {
+      thumb = _LetterThumb(name: projectName);
+    }
+
+    return SizedBox(
+      width: 64,
+      height: 64,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          thumb,
+          if (loading)
+            const Positioned.fill(
+              child: ColoredBox(
+                color: Color(0x66000000),
+                child: Center(
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          if (hasLogo && onInspect != null && !loading)
+            Positioned(
+              right: -4,
+              bottom: -4,
+              child: Material(
+                color: Theme.of(context).colorScheme.surface,
+                shape: const CircleBorder(),
+                elevation: 1,
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: onInspect,
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(
+                      Icons.visibility_rounded,
+                      size: 16,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LetterThumb extends StatelessWidget {
+  const _LetterThumb({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = name.trim().isEmpty
+        ? '?'
+        : name.trim().characters.first.toUpperCase();
+    return Container(
+      width: 64,
+      height: 64,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.7)),
+      ),
+      child: Text(
+        initial,
+        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w700,
+            ),
       ),
     );
   }
@@ -327,6 +636,7 @@ Future<void> showCreateProjectSheet({
           organizationId: organizationId,
           onCreated: (projectId) {
             ref.invalidate(projectsProvider);
+            ref.invalidate(projectsForOrganizationProvider(organizationId));
             ref.read(lastProjectIdProvider.notifier).setProjectId(projectId);
           },
         ),
@@ -355,6 +665,7 @@ Future<void> showEditProjectSheet({
           existing: project,
           onUpdated: (_) {
             ref.invalidate(projectsProvider);
+            ref.invalidate(projectsForOrganizationProvider(organizationId));
             ref.invalidate(projectBoardProvider(project.id));
           },
         ),

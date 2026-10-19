@@ -48,3 +48,12 @@ final projectsProvider = FutureProvider.autoDispose<List<Project>>((ref) async {
     rethrow;
   }
 });
+
+/// Projects for any workspace (Settings manage flow) — uses that org's API header.
+final projectsForOrganizationProvider =
+    FutureProvider.autoDispose.family<List<Project>, String>((ref, orgId) async {
+  if (orgId.isEmpty) return const [];
+  return ref
+      .watch(projectsRepositoryProvider)
+      .fetchProjects(organizationId: orgId);
+});

@@ -280,8 +280,14 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
           final metaLine =
               '$totalTasks tasks · ${board.statuses.length} columns';
 
+          // Tasks tab: KPI row kept in code but hidden; refresh lives above
+          // the filter bar (below the shell profile AppBar) in MyWorkScreen.
+          final showEmbeddedHeader =
+              widget.embedded && (allProjects || _TasksEmbeddedCountersHeader.showKpiCounters);
+
           return _BoardScaffold(
             embedded: widget.embedded,
+            showHeader: !widget.embedded || showEmbeddedHeader,
             sectionIndex: widget.embedded ? null : _sectionIndex,
             onSectionChanged: widget.embedded ? null : _selectSection,
             boardMetaLine: widget.embedded ? null : metaLine,
@@ -295,10 +301,14 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
                 : ProjectSwitcher(
                     selectedProjectId: widget.projectId,
                   ),
-            onRefresh: () async {
-              ref.invalidate(projectBoardProvider(widget.projectId));
-              await ref.read(projectBoardProvider(widget.projectId).future);
-            },
+            // Embedded refresh moved to MyWorkScreen (between profile & filters).
+            onRefresh: widget.embedded
+                ? null
+                : () async {
+                    ref.invalidate(projectBoardProvider(widget.projectId));
+                    await ref
+                        .read(projectBoardProvider(widget.projectId).future);
+                  },
             // Tasks tab: drop Total / Overdue / Columns stats row.
             headerStats: widget.embedded
                 ? null
@@ -488,6 +498,7 @@ class _BoardScaffold extends StatelessWidget {
     this.headerStats,
     this.onRefresh,
     this.embedded = false,
+    this.showHeader = true,
     this.sectionIndex,
     this.onSectionChanged,
     this.boardMetaLine,
@@ -498,6 +509,9 @@ class _BoardScaffold extends StatelessWidget {
   final Widget child;
   final Future<void> Function()? onRefresh;
   final bool embedded;
+
+  /// When false, skips the top header chrome (used by Tasks tab when KPI is hidden).
+  final bool showHeader;
 
   /// Standalone only: selected Tasks / Recurring / Notes capsule.
   final int? sectionIndex;
@@ -604,10 +618,11 @@ class _BoardScaffold extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (embedded)
-          headerBlock
-        else
-          SafeArea(bottom: false, child: headerBlock),
+        if (showHeader)
+          if (embedded)
+            headerBlock
+          else
+            SafeArea(bottom: false, child: headerBlock),
         Expanded(child: child),
       ],
     );
@@ -726,6 +741,9 @@ class _TasksEmbeddedCountersHeader extends StatelessWidget {
     required this.overdueCount,
   });
 
+  /// Flip to true to restore the compact "N tasks / N overdue" KPI row.
+  static const bool showKpiCounters = false;
+
   final String? title;
   final int taskCount;
   final int overdueCount;
@@ -750,32 +768,34 @@ class _TasksEmbeddedCountersHeader extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
           ),
-          const SizedBox(height: 2),
+          if (showKpiCounters) const SizedBox(height: 2),
         ],
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Expanded(
-              child: Text(
-                '$taskCount tasks',
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: kpiStyle,
+        // KPI summary line — hidden for now; keep markup for easy restore.
+        if (showKpiCounters)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Expanded(
+                child: Text(
+                  '$taskCount tasks',
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: kpiStyle,
+                ),
               ),
-            ),
-            const Expanded(child: SizedBox.shrink()),
-            Expanded(
-              child: Text(
-                '$overdueCount overdue',
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: kpiStyle,
+              const Expanded(child: SizedBox.shrink()),
+              Expanded(
+                child: Text(
+                  '$overdueCount overdue',
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: kpiStyle,
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
       ],
     );
   }

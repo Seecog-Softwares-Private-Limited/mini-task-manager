@@ -33,6 +33,7 @@ class ProjectsRepository {
     required String name,
     String? description,
     String visibility = 'PRIVATE',
+    String? iconUrl,
   }) async {
     try {
       final response = await _api.dio.post<Map<String, dynamic>>(
@@ -42,6 +43,7 @@ class ProjectsRepository {
           if (description != null && description.trim().isNotEmpty)
             'description': description.trim(),
           'visibility': visibility.toUpperCase(),
+          if (iconUrl != null && iconUrl.trim().isNotEmpty) 'iconUrl': iconUrl,
         },
         options: _api.withOrgHeader(organizationId),
       );
@@ -57,6 +59,8 @@ class ProjectsRepository {
     String? name,
     String? description,
     String? visibility,
+    String? iconUrl,
+    bool clearIcon = false,
   }) async {
     try {
       final response = await _api.dio.patch<Map<String, dynamic>>(
@@ -65,6 +69,10 @@ class ProjectsRepository {
           if (name != null) 'name': name.trim(),
           if (description != null) 'description': description.trim(),
           if (visibility != null) 'visibility': visibility.toUpperCase(),
+          if (clearIcon)
+            'iconUrl': ''
+          else if (iconUrl != null)
+            'iconUrl': iconUrl,
         },
         options: _api.withOrgHeader(organizationId),
       );
