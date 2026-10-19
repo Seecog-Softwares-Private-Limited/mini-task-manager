@@ -1,0 +1,23 @@
+---
+description: After Flutter/mobile code changes, hot restart (or full restart) at localhost:8090 before reporting done
+alwaysApply: true
+---
+
+# Flutter restart after code changes
+
+After any code change that affects the Flutter mobile app (`mobile/`), do **not** report the task done until the running app at **http://localhost:8090** has picked up the change.
+
+## Required sequence
+
+1. Prefer a **hot restart** (`R` in the `flutter run` session) of the existing Chrome/`web-port=8090` process.
+2. If hot restart fails (DDS/WS 403, dead session, port conflict, stale assets), do a **full restart**:
+   - Stop every process whose command line matches `web-port=8090`
+   - Relaunch from `mobile/`:
+     `flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:3007 --web-port=8090`
+3. Confirm the app responds at **http://localhost:8090**, then report done with that URL.
+
+## Notes
+
+- Hot reload (`r`) is not enough when widgets, routes, or assets change; use hot restart (`R`) or full restart.
+- Do not touch the database as part of this restart workflow.
+- Keep Nest/Next (`npm run dev`) running separately; only restart Flutter unless the user asks otherwise.

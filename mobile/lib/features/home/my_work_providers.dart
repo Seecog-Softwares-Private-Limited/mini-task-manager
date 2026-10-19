@@ -103,6 +103,12 @@ class TasksBoardFilters {
 final tasksBoardFiltersProvider =
     StateProvider<TasksBoardFilters>((ref) => TasksBoardFilters.empty);
 
+/// Content tabs on the Tasks screen (below project/member filters).
+enum TasksContentTab { tasks, recurring, notes }
+
+final tasksContentTabProvider =
+    StateProvider<TasksContentTab>((ref) => TasksContentTab.tasks);
+
 /// Resolved project for the Tasks tab — mirrors Planner selection behavior.
 final tasksSelectedProjectIdProvider = Provider<String?>((ref) {
   final selected = ref.watch(tasksProjectIdProvider);

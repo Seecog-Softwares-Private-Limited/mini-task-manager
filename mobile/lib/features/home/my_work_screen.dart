@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/preferences/app_preferences.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../data/models/login_response.dart';
 import '../../data/models/project.dart';
-import '../../data/models/project_member.dart';
 import '../../shared/widgets/app_widgets.dart';
-import '../../shared/widgets/user_avatar.dart';
+import '../../shared/widgets/workspace_avatar.dart';
+import '../auth/session_controller.dart';
+import '../kanban/kanban_providers.dart';
 import '../kanban/project_board_screen.dart';
 import '../kanban/project_switcher.dart';
 import '../projects/projects_providers.dart';
+import '../recurring/recurring_providers.dart';
+import '../recurring/recurring_screen.dart';
 import 'my_work_providers.dart';
 
 class MyWorkScreen extends ConsumerWidget {
@@ -34,6 +37,7 @@ class MyWorkScreen extends ConsumerWidget {
         .where((p) => !p.isArchived)
         .toList();
     final selectedProjectId = ref.watch(tasksSelectedProjectIdProvider);
+    final contentTab = ref.watch(tasksContentTabProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final body = Column(
@@ -47,10 +51,15 @@ class MyWorkScreen extends ConsumerWidget {
             ref.read(tasksProjectIdProvider.notifier).state = projectId;
             if (!isAllProjectsSelection(projectId)) {
               ref.read(lastProjectIdProvider.notifier).setProjectId(projectId);
+              ref.read(recurringProjectIdProvider.notifier).state = projectId;
+              ref.invalidate(recurringSummaryProvider);
+              ref.invalidate(recurringTemplatesProvider);
+              ref.invalidate(recurringBoardTasksProvider);
             }
             ref.read(tasksMemberFilterProvider.notifier).state = null;
           },
         ),
+        const _TasksContentTabBar(),
         Expanded(
           child: ColoredBox(
             color: isDark ? const Color(0xFF0B1220) : const Color(0xFFF1F5F9),
@@ -63,11 +72,22 @@ class MyWorkScreen extends ConsumerWidget {
                   )
                 : selectedProjectId == null
                     ? const Center(child: CircularProgressIndicator())
-                    : ProjectBoardScreen(
-                        key: ValueKey('tasks-board-$selectedProjectId'),
-                        projectId: selectedProjectId,
-                        embedded: true,
-                      ),
+                    : switch (contentTab) {
+                        TasksContentTab.tasks => ProjectBoardScreen(
+                            key: ValueKey('tasks-board-$selectedProjectId'),
+                            projectId: selectedProjectId,
+                            embedded: true,
+                          ),
+                        TasksContentTab.recurring => const RecurringScreen(
+                            key: ValueKey('tasks-recurring'),
+                            hideProjectDropdown: true,
+                          ),
+                        TasksContentTab.notes => const EmptyState(
+                            icon: Icons.sticky_note_2_outlined,
+                            title: 'Notes',
+                            message: 'Coming soon.',
+                          ),
+                      },
           ),
         ),
       ],
@@ -78,6 +98,115 @@ class MyWorkScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Tasks')),
       body: body,
+    );
+  }
+}
+
+class _TasksContentTabBar extends ConsumerWidget {
+  const _TasksContentTabBar();
+
+  static const _tabs = <(TasksContentTab, String)>[
+    (TasksContentTab.tasks, 'Tasks'),
+    (TasksContentTab.recurring, 'Recurring'),
+    (TasksContentTab.notes, 'Notes'),
+  ];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(tasksContentTabProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final trackColor =
+        isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+
+    return Material(
+      color: Theme.of(context).colorScheme.surface,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          0,
+          AppSpacing.md,
+          AppSpacing.sm,
+        ),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: trackColor,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(3),
+            child: Row(
+              children: [
+                for (final (tab, label) in _tabs)
+                  Expanded(
+                    child: _TasksContentTabChip(
+                      label: label,
+                      selected: selected == tab,
+                      onTap: () {
+                        if (selected == tab) return;
+                        HapticFeedback.selectionClick();
+                        ref.read(tasksContentTabProvider.notifier).state = tab;
+                        if (tab == TasksContentTab.recurring) {
+                          final projectId =
+                              ref.read(tasksSelectedProjectIdProvider);
+                          if (projectId != null &&
+                              !isAllProjectsSelection(projectId)) {
+                            ref
+                                .read(recurringProjectIdProvider.notifier)
+                                .state = projectId;
+                          }
+                          ref.invalidate(recurringBoardTasksProvider);
+                          ref.invalidate(recurringSummaryProvider);
+                          ref.invalidate(recurringTemplatesProvider);
+                        } else if (selected == TasksContentTab.recurring) {
+                          ref.read(recurringFabHiddenProvider.notifier).state =
+                              false;
+                        }
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TasksContentTabChip extends StatelessWidget {
+  const _TasksContentTabChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppColors.primary : Colors.transparent,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: SizedBox(
+          height: 36,
+          child: Center(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: selected ? Colors.white : AppColors.textMuted,
+                  ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -94,6 +223,28 @@ class _TasksFilterBar extends ConsumerWidget {
   final String? selectedProjectId;
   final bool loading;
   final ValueChanged<String> onProjectSelected;
+
+  Future<void> _refresh(WidgetRef ref) async {
+    HapticFeedback.selectionClick();
+    final id = selectedProjectId;
+    if (id != null && id.isNotEmpty) {
+      ref.invalidate(projectBoardProvider(id));
+    }
+    ref.invalidate(projectsProvider);
+    final tab = ref.read(tasksContentTabProvider);
+    if (tab == TasksContentTab.recurring) {
+      ref.invalidate(recurringSummaryProvider);
+      ref.invalidate(recurringTemplatesProvider);
+      ref.invalidate(recurringBoardTasksProvider);
+    }
+    if (id != null && id.isNotEmpty) {
+      try {
+        await ref.read(projectBoardProvider(id).future);
+      } catch (_) {
+        // Board may be unavailable for the current selection; still refreshed providers.
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -112,10 +263,16 @@ class _TasksFilterBar extends ConsumerWidget {
                 projects.any((p) => p.id == selectedProjectId)
             ? selectedProjectId!
             : projects.first.id);
-    final memberId = ref.watch(tasksMemberFilterProvider);
     final boardFilters = ref.watch(tasksBoardFiltersProvider);
-    final membersAsync = ref.watch(projectMembersForTasksProvider(effectiveId));
-    final members = membersAsync.valueOrNull ?? const <ProjectMember>[];
+    final session = ref.watch(sessionControllerProvider);
+    final organizations = session.organizations;
+    final selectedOrgId = session.orgId;
+    final effectiveOrgId =
+        (selectedOrgId != null &&
+                selectedOrgId.isNotEmpty &&
+                organizations.any((o) => o.id == selectedOrgId))
+            ? selectedOrgId!
+            : (organizations.isNotEmpty ? organizations.first.id : '');
 
     const fieldHeight = 48.0;
     final labelStyle = Theme.of(context).textTheme.labelMedium?.copyWith(
@@ -135,19 +292,153 @@ class _TasksFilterBar extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Labels + compact refresh on one text-height row (no extra strip).
+            // Order: Select Workspace | Select Project | refresh.
             Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Expanded(child: Text('Project', style: labelStyle)),
+                Expanded(
+                    child: Text('Select Workspace', style: labelStyle)),
                 const SizedBox(width: AppSpacing.sm),
-                Expanded(child: Text('Members', style: labelStyle)),
+                Expanded(child: Text('Select Project', style: labelStyle)),
                 const SizedBox(width: AppSpacing.sm),
-                const SizedBox(width: fieldHeight),
+                SizedBox(
+                  width: fieldHeight,
+                  child: Align(
+                    alignment: Alignment.center,
+                    child: Tooltip(
+                      message: 'Refresh',
+                      child: InkWell(
+                        onTap: () => _refresh(ref),
+                        borderRadius: BorderRadius.circular(4),
+                        child: const Padding(
+                          padding: EdgeInsets.all(2),
+                          child: Icon(
+                            Icons.refresh_rounded,
+                            size: 16,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 6),
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                // Slot 1 (was Project → briefly Members → now Workspace).
+                Expanded(
+                  child: SizedBox(
+                    height: fieldHeight,
+                    child: organizations.isEmpty
+                        ? InputDecorator(
+                            decoration: const InputDecoration(
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                              border: OutlineInputBorder(),
+                            ),
+                            child: Text(
+                              'Select Workspace',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textMuted,
+                                  ),
+                            ),
+                          )
+                        : _CompactDropdown<String>(
+                            debugLabel: 'workspace',
+                            value: effectiveOrgId,
+                            items: [
+                              for (final org in organizations)
+                                DropdownMenuItem(
+                                  value: org.id,
+                                  child: Row(
+                                    children: [
+                                      WorkspaceAvatar(
+                                        logoUrl: org.logoUrl,
+                                        name: org.name,
+                                        size: 22,
+                                        borderRadius: 6,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          org.name,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                            selectedBuilder: (context) {
+                              final org = organizations.firstWhere(
+                                (o) => o.id == effectiveOrgId,
+                                orElse: () => organizations.first,
+                              );
+                              return Row(
+                                children: [
+                                  WorkspaceAvatar(
+                                    logoUrl: org.logoUrl,
+                                    name: org.name,
+                                    size: 22,
+                                    borderRadius: 6,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      org.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                              fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                            onChanged: (value) async {
+                              if (value == null || value.isEmpty) return;
+                              final current =
+                                  ref.read(sessionControllerProvider).orgId;
+                              if (value == current) return;
+                              await ref
+                                  .read(sessionControllerProvider.notifier)
+                                  .selectOrganization(value);
+                              ref.invalidate(projectsProvider);
+                              ref
+                                  .read(tasksProjectIdProvider.notifier)
+                                  .state = null;
+                              ref
+                                  .read(tasksMemberFilterProvider.notifier)
+                                  .state = null;
+                              ref
+                                  .read(recurringProjectIdProvider.notifier)
+                                  .state = null;
+                              ref.invalidate(recurringSummaryProvider);
+                              ref.invalidate(recurringTemplatesProvider);
+                              ref.invalidate(recurringBoardTasksProvider);
+                            },
+                          ),
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                // Slot 2 (was Members → now Project after the swap).
                 Expanded(
                   child: SizedBox(
                     height: fieldHeight,
@@ -164,7 +455,8 @@ class _TasksFilterBar extends ConsumerWidget {
                                 height: 22,
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(6),
-                                  color: AppColors.primary.withValues(alpha: 0.12),
+                                  color: AppColors.primary
+                                      .withValues(alpha: 0.12),
                                 ),
                                 alignment: Alignment.center,
                                 child: const Icon(
@@ -212,7 +504,8 @@ class _TasksFilterBar extends ConsumerWidget {
                                 height: 22,
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(6),
-                                  color: AppColors.primary.withValues(alpha: 0.12),
+                                  color: AppColors.primary
+                                      .withValues(alpha: 0.12),
                                 ),
                                 alignment: Alignment.center,
                                 child: const Icon(
@@ -262,104 +555,6 @@ class _TasksFilterBar extends ConsumerWidget {
                       onChanged: (value) {
                         if (value == null || value.isEmpty) return;
                         onProjectSelected(value);
-                      },
-                    ),
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: SizedBox(
-                    height: fieldHeight,
-                    child: _CompactDropdown<String>(
-                      debugLabel: 'members',
-                      value: memberId ?? '',
-                      items: [
-                        const DropdownMenuItem(
-                          value: '',
-                          child: Text('All members'),
-                        ),
-                        for (final member in members)
-                          DropdownMenuItem(
-                            value: member.userId,
-                            child: Row(
-                              children: [
-                                UserAvatar(
-                                  user: AuthUser(
-                                    id: member.userId,
-                                    email: member.user?.email ?? '',
-                                    fullName: member.user?.fullName ??
-                                        member.user?.email ??
-                                        'Member',
-                                    avatarUrl: member.user?.avatarUrl,
-                                  ),
-                                  size: 22,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    member.user?.fullName ??
-                                        member.user?.email ??
-                                        'Member',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                      ],
-                      selectedBuilder: (context) {
-                        if (memberId == null || memberId.isEmpty) {
-                          return Text(
-                            'All members',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(fontWeight: FontWeight.w600),
-                          );
-                        }
-                        ProjectMember? selected;
-                        for (final m in members) {
-                          if (m.userId == memberId) {
-                            selected = m;
-                            break;
-                          }
-                        }
-                        final name = selected?.user?.fullName ??
-                            selected?.user?.email ??
-                            'Member';
-                        return Row(
-                          children: [
-                            if (selected != null)
-                              UserAvatar(
-                                user: AuthUser(
-                                  id: selected.userId,
-                                  email: selected.user?.email ?? '',
-                                  fullName: name,
-                                  avatarUrl: selected.user?.avatarUrl,
-                                ),
-                                size: 22,
-                              ),
-                            if (selected != null) const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                      onChanged: (value) {
-                        ref.read(tasksMemberFilterProvider.notifier).state =
-                            (value == null || value.isEmpty) ? null : value;
                       },
                     ),
                   ),

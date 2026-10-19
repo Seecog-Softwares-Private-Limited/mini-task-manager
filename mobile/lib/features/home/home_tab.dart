@@ -11,7 +11,9 @@ import '../../shared/widgets/workspace_avatar.dart';
 import '../auth/session_controller.dart';
 import '../kanban/kanban_providers.dart';
 import '../kanban/task_detail_sheet.dart';
+import '../projects/create_project_sheet.dart';
 import '../projects/projects_providers.dart';
+import '../projects/projects_screen.dart';
 import '../recurring/recurring_providers.dart';
 import '../workspaces/workspace_switcher_sheet.dart';
 import 'home_due_item_card.dart';
@@ -102,7 +104,9 @@ class HomeTab extends ConsumerWidget {
             analyticsAsync: analyticsAsync,
             onTap: () {
               ref.read(recurringTabIndexProvider.notifier).state = 2;
-              onNavigateTab(3);
+              ref.read(tasksContentTabProvider.notifier).state =
+                  TasksContentTab.recurring;
+              onNavigateTab(1);
             },
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -124,7 +128,11 @@ class HomeTab extends ConsumerWidget {
                   icon: Icons.event_repeat_rounded,
                   label: 'Planner',
                   color: AppColors.violet,
-                  onTap: () => onNavigateTab(3),
+                  onTap: () {
+                    ref.read(tasksContentTabProvider.notifier).state =
+                        TasksContentTab.recurring;
+                    onNavigateTab(1);
+                  },
                 ),
               ),
             ],
@@ -137,7 +145,29 @@ class HomeTab extends ConsumerWidget {
                   icon: Icons.folder_open_rounded,
                   label: 'Projects',
                   color: AppColors.primary,
-                  onTap: () => onNavigateTab(2),
+                  onTap: () {
+                    final id = orgId;
+                    if (id == null || id.isEmpty) return;
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (ctx) => Scaffold(
+                          appBar: AppBar(
+                            title: const Text('Projects'),
+                          ),
+                          floatingActionButton: FloatingActionButton.extended(
+                            onPressed: () => showCreateProjectSheet(
+                              context: ctx,
+                              ref: ref,
+                              organizationId: id,
+                            ),
+                            icon: const Icon(Icons.add_rounded),
+                            label: const Text('Create project'),
+                          ),
+                          body: ProjectsScreen(orgId: id),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),

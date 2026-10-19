@@ -17,20 +17,21 @@ import '../kanban/task_detail_sheet.dart';
 import '../notifications/notifications_providers.dart';
 import '../notifications/notifications_screen.dart';
 import '../profile/header_account_menu.dart';
-import '../projects/create_project_sheet.dart';
 import '../projects/projects_providers.dart';
-import '../projects/projects_screen.dart';
 import '../recurring/recurring_actions.dart';
 import '../recurring/recurring_editor_sheet.dart';
 import '../recurring/recurring_providers.dart';
-import '../recurring/recurring_screen.dart';
 import '../feedback/feedback_form_sheet.dart';
+import '../settings/settings_screen.dart';
 import 'home_tab.dart';
 import 'my_work_providers.dart';
 import 'my_work_screen.dart';
 
-/// Alerts tab index inside the bottom navigation.
-const int kAlertsTabIndex = 4;
+/// Bottom-nav tab indices (Home / Tasks / Alerts / Settings).
+const int kHomeTabIndex = 0;
+const int kTasksTabIndex = 1;
+const int kAlertsTabIndex = 2;
+const int kSettingsTabIndex = 3;
 
 class HomeShell extends ConsumerStatefulWidget {
   const HomeShell({super.key});
@@ -101,17 +102,15 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
 
   void _selectTab(int value, {MyWorkFilter? tasksFilter}) {
     if (value != _index) HapticFeedback.selectionClick();
-    if (value == 1 && tasksFilter != null) {
+    if (value == kTasksTabIndex && tasksFilter != null) {
       ref.read(myWorkFilterProvider.notifier).state = tasksFilter;
     }
-    // Reset planner FAB visibility when leaving the Planner tab.
-    if (_index == 3 && value != 3) {
+    // Reset planner FAB visibility when leaving Tasks→Recurring.
+    final leavingTasksRecurring = _index == kTasksTabIndex &&
+        value != kTasksTabIndex &&
+        ref.read(tasksContentTabProvider) == TasksContentTab.recurring;
+    if (leavingTasksRecurring) {
       ref.read(recurringFabHiddenProvider.notifier).state = false;
-    }
-    // Entering Planner — refresh board so peer checklist updates are visible.
-    if (value == 3 && _index != 3) {
-      ref.invalidate(recurringBoardTasksProvider);
-      ref.invalidate(recurringSummaryProvider);
     }
     setState(() {
       _mountedTabs.add(value);
@@ -122,12 +121,6 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
   Future<void> _openWorkspaceSwitcher() async {
     await showWorkspaceSwitcherSheet(context: context, ref: ref);
     ref.invalidate(projectsProvider);
-  }
-
-  void _openCreateProject() {
-    final orgId = ref.read(sessionControllerProvider).orgId;
-    if (orgId == null || orgId.isEmpty) return;
-    showCreateProjectSheet(context: context, ref: ref, organizationId: orgId);
   }
 
   Future<void> _openCreatePlanner() async {
@@ -166,18 +159,8 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
     );
   }
 
-  Widget? _fabForTab({
-    required bool onProjectsTab,
-    required bool onPlannerTab,
-    required bool canCreateProject,
-  }) {
-    if (onProjectsTab && canCreateProject) {
-      return _GradientFab(
-        label: 'Create project',
-        onPressed: _openCreateProject,
-      );
-    }
-    if (onPlannerTab) {
+  Widget? _fabForTab({required bool onTasksRecurringTab}) {
+    if (onTasksRecurringTab) {
       final hideFab = ref.watch(recurringFabHiddenProvider);
       if (hideFab) return null;
       return _GradientFab(
@@ -272,27 +255,25 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
     );
     final unread = _enableUnreadBadge ? ref.watch(unreadNotificationsCountProvider) : 0;
     final unreadLabel = unread > 99 ? '99+' : '$unread';
-    final onProjectsTab = _index == 2;
-    final onPlannerTab = _index == 3;
-    final canCreateProject = onProjectsTab && orgId != null && orgId.isNotEmpty;
+    final onTasksRecurringTab = _index == kTasksTabIndex &&
+        ref.watch(tasksContentTabProvider) == TasksContentTab.recurring;
 
-    final pages = List<Widget>.generate(5, (index) {
+    final pages = List<Widget>.generate(4, (index) {
       if (!_mountedTabs.contains(index)) {
         return const SizedBox.shrink();
       }
       return switch (index) {
-        0 => HomeTab(
+        kHomeTabIndex => HomeTab(
             key: ValueKey('home-$orgId'),
             orgId: orgId,
             onNavigateTab: _selectTab,
           ),
-        1 => MyWorkScreen(
+        kTasksTabIndex => MyWorkScreen(
             key: ValueKey('tasks-$orgId'),
             embedded: true,
           ),
-        2 => ProjectsScreen(key: ValueKey('projects-$orgId'), orgId: orgId),
-        3 => const RecurringScreen(),
-        _ => const NotificationsScreen(),
+        kAlertsTabIndex => const NotificationsScreen(),
+        _ => const SettingsScreen(),
       };
     });
 
@@ -301,7 +282,7 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
         titleSpacing: 12,
         title: Row(
           children: [
-            if (_index == 0) ...[
+            if (_index == kHomeTabIndex) ...[
               const OpsPickLogo(size: 28, borderRadius: 8),
               const SizedBox(width: 10),
             ],
@@ -335,9 +316,7 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
       ),
       body: IndexedStack(index: _index, children: pages),
       floatingActionButton: _fabForTab(
-        onProjectsTab: onProjectsTab,
-        onPlannerTab: onPlannerTab,
-        canCreateProject: canCreateProject,
+        onTasksRecurringTab: onTasksRecurringTab,
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
@@ -353,16 +332,6 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
             selectedIcon: Icon(Icons.checklist_rtl_rounded),
             label: 'Tasks',
           ),
-          const NavigationDestination(
-            icon: Icon(Icons.folder_outlined),
-            selectedIcon: Icon(Icons.folder_rounded),
-            label: 'Projects',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.event_repeat_outlined),
-            selectedIcon: Icon(Icons.event_repeat_rounded),
-            label: 'Planner',
-          ),
           NavigationDestination(
             icon: Badge(
               isLabelVisible: unread > 0,
@@ -376,6 +345,11 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
             ),
             label: 'Alerts',
           ),
+          const NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings_rounded),
+            label: 'Settings',
+          ),
         ],
       ),
     );
@@ -383,11 +357,10 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
 
   String _titleForIndex(int index) {
     return switch (index) {
-      0 => 'Home',
-      1 => 'Tasks',
-      2 => 'Projects',
-      3 => 'Planner',
-      _ => 'Alerts',
+      kHomeTabIndex => 'Home',
+      kTasksTabIndex => 'Tasks',
+      kAlertsTabIndex => 'Alerts',
+      _ => 'Settings',
     };
   }
 }
