@@ -4,18 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import '../../core/api/api_client.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/platform/clipboard_image.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../core/utils/workspace_logo.dart';
 import '../../data/models/subtask_completion_record.dart';
 import '../../data/models/project_member.dart';
 import '../../data/models/task.dart';
 import '../../data/models/task_attachment.dart';
 import '../../shared/widgets/app_widgets.dart';
-import '../../shared/widgets/user_avatar.dart';
 import '../auth/session_controller.dart';
 import 'attachment_preview.dart';
 import 'attachment_picker_section.dart';
@@ -24,6 +21,7 @@ import 'assignee_picker_sheet.dart';
 
 import 'subtask_completion_sheet.dart';
 import 'subtask_completion_utils.dart';
+import 'assignment_audit_card.dart';
 import 'require_location_toggle.dart';
 import '../recurring/subtask_note_sheet.dart';
 
@@ -572,6 +570,19 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     }
 
     final completed = widget.templateMode ? false : _status == 'DONE';
+    final nowIso = DateTime.now().toUtc().toIso8601String();
+    final sessionUser = ref.read(sessionControllerProvider).user;
+    final prevAssignees = {
+      ...widget.subtask.assigneeIds.map((id) => id.trim()).where((id) => id.isNotEmpty),
+      if ((widget.subtask.assigneeId ?? '').trim().isNotEmpty)
+        widget.subtask.assigneeId!.trim(),
+    };
+    final nextAssignees = _assigneeIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    final assigneesChanged = prevAssignees.length != nextAssignees.length ||
+        !prevAssignees.containsAll(nextAssignees);
     widget.onSave(
       widget.subtask.copyWith(
         title: title,
@@ -595,7 +606,9 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
         clearCompletedAt: !completed,
         requireLocation: widget.templateMode ? false : _requireLocation,
         // Any save bumps updatedAt so the row rises within its color group.
-        updatedAt: DateTime.now().toUtc().toIso8601String(),
+        updatedAt: nowIso,
+        updatedBy: sessionUser?.id,
+        assignedAt: assigneesChanged ? nowIso : widget.subtask.assignedAt,
       ),
     );
   }
@@ -1530,238 +1543,36 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
                 widget.subtask.createdAt!.trim().isNotEmpty)
             ? widget.subtask.createdAt
             : widget.fallbackCreatedAt;
-    final hasDate = createdAtRaw != null && createdAtRaw.trim().isNotEmpty;
-
-    ProjectMember? memberFor(String? userId) {
-      if (userId == null || userId.trim().isEmpty) return null;
-      final normalized = _normalizeUserId(userId);
-      final directories = <ProjectMember>[
-        ...widget.members,
-        ...?widget.memberDirectory,
-      ];
-      for (final member in directories) {
-        if (_normalizeUserId(member.userId) == normalized) return member;
+    final directory = <ProjectMember>[
+      ...?widget.memberDirectory,
+      ...widget.members,
+    ];
+    // Prefer org-role entries (from memberDirectory) when both exist.
+    final byUser = <String, ProjectMember>{};
+    for (final m in directory) {
+      final key = _normalizeUserId(m.userId);
+      if (key.isEmpty) continue;
+      final existing = byUser[key];
+      if (existing == null) {
+        byUser[key] = m;
+        continue;
       }
-      return null;
-    }
-
-    String displayNameFor(String? userId) {
-      if (userId == null || userId.trim().isEmpty) return 'Unknown';
-      final match = memberFor(userId);
-      final memberUser = match?.user;
-      if (memberUser != null) {
-        return memberUser.fullName.trim().isNotEmpty
-            ? memberUser.fullName
-            : memberUser.email;
+      final existingRole = existing.role.toLowerCase();
+      final nextRole = m.role.toLowerCase();
+      final orgRoles = {'owner', 'admin', 'member'};
+      if (!orgRoles.contains(existingRole) && orgRoles.contains(nextRole)) {
+        byUser[key] = m;
       }
-      final currentUser = ref.read(sessionControllerProvider).user;
-      if (currentUser != null &&
-          _normalizeUserId(currentUser.id) == _normalizeUserId(userId)) {
-        return currentUser.fullName.trim().isNotEmpty
-            ? currentUser.fullName
-            : currentUser.email;
-      }
-      return 'Unknown';
     }
 
-    String? avatarFor(String? userId) {
-      final match = memberFor(userId);
-      if (match?.user?.avatarUrl != null) return match!.user!.avatarUrl;
-      final currentUser = ref.read(sessionControllerProvider).user;
-      if (currentUser != null &&
-          userId != null &&
-          _normalizeUserId(currentUser.id) == _normalizeUserId(userId)) {
-        return currentUser.avatarUrl;
-      }
-      return null;
-    }
-
-    final assigneeIds = _assigneeIds
-        .map((id) => id.trim())
-        .where((id) => id.isNotEmpty)
-        .toList();
-    final hasReporter = reporterId != null && reporterId.trim().isNotEmpty;
-    if (!hasReporter && assigneeIds.isEmpty && !hasDate) {
-      return const SizedBox.shrink();
-    }
-
-    final raisedByName = hasReporter ? displayNameFor(reporterId) : 'Unknown';
-    final assignedToLabel = assigneeIds.isEmpty
-        ? 'Unassigned'
-        : assigneeIds.length == 1
-            ? displayNameFor(assigneeIds.first)
-            : '${displayNameFor(assigneeIds.first)} +${assigneeIds.length - 1}';
-
-    String dateLabel = 'Unavailable';
-    if (hasDate) {
-      final parsed = DateTime.tryParse(createdAtRaw);
-      dateLabel = parsed == null
-          ? createdAtRaw
-          : DateFormat('MMM d, yyyy · h:mm a').format(parsed.toLocal());
-    }
-
-    final avatarUserId = hasReporter
-        ? reporterId
-        : (assigneeIds.isNotEmpty ? assigneeIds.first : null);
-    final apiBaseUrl = ref.watch(appConfigProvider).apiBaseUrl;
-    final imageUrl = resolveUserAvatarUrl(apiBaseUrl, avatarFor(avatarUserId));
-
-    TextStyle labelStyle() => Theme.of(context).textTheme.labelSmall!.copyWith(
-          color: AppColors.textMuted,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0.2,
-        );
-    TextStyle valueStyle() => Theme.of(context).textTheme.titleSmall!.copyWith(
-          fontWeight: FontWeight.w700,
-          height: 1.2,
-        );
-
-    Widget labeledRow(String label, String value) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 6),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 96,
-              child: Text(label, style: labelStyle()),
-            ),
-            Expanded(
-              child: Text(
-                value,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: valueStyle(),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.primary.withValues(alpha: 0.10),
-            AppColors.violet.withValues(alpha: 0.08),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: _ReporterAvatar(
-              name: raisedByName,
-              imageUrl: imageUrl,
-              size: 40,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                labeledRow('Raised By :', raisedByName),
-                labeledRow('Assigned To :', assignedToLabel),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 96,
-                      child: Text('Date Time :', style: labelStyle()),
-                    ),
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.schedule_rounded,
-                            size: 14,
-                            color: AppColors.textMuted.withValues(alpha: 0.95),
-                          ),
-                          const SizedBox(width: 5),
-                          Expanded(
-                            child: Text(
-                              dateLabel,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: AppColors.textMuted,
-                                    fontWeight: FontWeight.w600,
-                                    height: 1.2,
-                                  ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ReporterAvatar extends StatelessWidget {
-  const _ReporterAvatar({
-    required this.name,
-    required this.imageUrl,
-    required this.size,
-  });
-
-  final String name;
-  final String imageUrl;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    if (imageUrl.isNotEmpty) {
-      return ClipOval(
-        child: Image.network(
-          imageUrl,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _initials(),
-        ),
-      );
-    }
-    return _initials();
-  }
-
-  Widget _initials() {
-    return Container(
-      width: size,
-      height: size,
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          colors: [AppColors.primary, AppColors.violet],
-        ),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        workspaceInitials(name),
-        style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w700,
-          fontSize: size * 0.36,
-        ),
-      ),
+    return AssignmentAuditCard(
+      members: byUser.values.toList(),
+      raisedByUserId: reporterId,
+      raisedAt: createdAtRaw,
+      updatedByUserId: widget.subtask.updatedBy,
+      updatedAt: widget.subtask.updatedAt ?? createdAtRaw,
+      assigneeIds: _assigneeIds,
+      assignedAt: widget.subtask.assignedAt,
     );
   }
 }

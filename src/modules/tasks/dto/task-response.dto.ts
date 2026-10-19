@@ -30,6 +30,10 @@ export class TaskResponseDto {
   assigneeIds?: string[];
   assignee?: TaskAssigneeResponseDto;
   reporterId!: string;
+  /** User who last updated the task. */
+  updatedBy?: string;
+  /** When assignees were last changed. */
+  assigneesUpdatedAt?: Date | null;
   parentTaskId?: string;
   storyPoints?: number;
   dueDate?: string;

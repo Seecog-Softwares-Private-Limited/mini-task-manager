@@ -24,7 +24,7 @@ import { ProjectInviteMemberModal } from "@/components/projects/project-invite-m
 import { ProjectInvitationList } from "@/components/projects/project-invitation-list";
 import { useProjectMembers, useAddProjectMember, PROJECT_ROLE_OPTIONS } from "@/hooks/use-project-members";
 import { useCreateProjectInvitation } from "@/hooks/use-project-invitations";
-import { useAuth } from "@/hooks/use-auth";
+import { useOrgRole } from "@/hooks/use-org-role";
 import { useToast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -66,7 +66,7 @@ export function ProjectMembers({
 }: ProjectMembersProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { isOwner } = useOrgRole();
   const [addUserId, setAddUserId] = React.useState<string>("");
   const [addRole, setAddRole] = React.useState<ProjectMemberRole>("CONTRIBUTOR");
   const [removeMember, setRemoveMember] = React.useState<ProjectMember | null>(null);
@@ -99,9 +99,9 @@ export function ProjectMembers({
   const canAdd = Boolean(addUserId && !addPending && !isDuplicate);
   const noOneToAdd = !orgMembersLoading && availableToAdd.length === 0;
 
-  const currentMember = projectMembers.find((m) => m.userId === user?.id);
-  const canInvite =
-    projectMembers.length === 0 || currentMember?.role?.toUpperCase() === "ADMIN";
+  // Workspace owner controls project membership / visibility for everyone.
+  const canInvite = isOwner;
+  const canManageMembers = isOwner;
 
   const handleAdd = () => {
     if (!canAdd || !addUserId) return;
@@ -207,7 +207,8 @@ export function ProjectMembers({
             </div>
           </div>
 
-          {/* Secondary: Add Existing Member (collapsible) */}
+          {/* Secondary: Add Existing Member (owner only) */}
+          {canManageMembers ? (
           <div className="flex flex-col gap-2 w-full sm:w-auto">
             <div className="flex flex-wrap items-center gap-2">
               <Button
@@ -337,6 +338,7 @@ export function ProjectMembers({
               </div>
             )}
           </div>
+          ) : null}
         </CardHeader>
         <CardContent>
           {membersLoading ? (
@@ -385,7 +387,7 @@ export function ProjectMembers({
                     onValueChange={(role) =>
                       updateRoleMutation.mutate({ memberId: member.id, role })
                     }
-                    disabled={updateRoleMutation.isPending}
+                    disabled={!canManageMembers || updateRoleMutation.isPending}
                   >
                     <SelectTrigger className="w-[130px]" aria-label={`Role for ${member.user?.email}`}>
                       <SelectValue />
@@ -398,6 +400,7 @@ export function ProjectMembers({
                       ))}
                     </SelectContent>
                   </Select>
+                  {canManageMembers ? (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Actions">
@@ -413,6 +416,7 @@ export function ProjectMembers({
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
+                  ) : null}
                 </li>
               ))}
             </ul>

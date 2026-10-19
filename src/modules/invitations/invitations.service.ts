@@ -86,10 +86,26 @@ export class InvitationsService {
     if (!normalizedRole) {
       throw new BadRequestException('Role is required');
     }
-    const normalizedProjectIds = await this.normalizeInviteProjectIds(
+    let normalizedProjectIds = await this.normalizeInviteProjectIds(
       organizationId,
       projectIds,
     );
+    // Only the owner may grant any workspace project. Admins may only grant
+    // projects they themselves can access.
+    const inviterMembership = await this.orgsService.getMembership(
+      organizationId,
+      invitedByUserId,
+    );
+    const inviterRole = (inviterMembership?.role ?? '').toLowerCase();
+    if (inviterRole !== 'owner' && normalizedProjectIds.length > 0) {
+      const allowed = new Set(
+        await this.projectsService.getUserProjectIdsInOrganization(
+          organizationId,
+          invitedByUserId,
+        ),
+      );
+      normalizedProjectIds = normalizedProjectIds.filter((id) => allowed.has(id));
+    }
 
     const token = generateToken();
     const invitation = await this.invitationsRepo.create({

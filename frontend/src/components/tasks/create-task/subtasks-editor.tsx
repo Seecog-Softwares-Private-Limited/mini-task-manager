@@ -99,7 +99,7 @@ export function SubtasksEditor({
   hideQuickAdd,
   taskTitle = "",
   taskDescription = "",
-  hideAiSuggestions = false,
+  hideAiSuggestions = true,
 }: SubtasksEditorProps) {
   const { orgId } = useTenant();
   const { toast } = useToast();
@@ -627,6 +627,7 @@ export function SubtasksEditor({
         </ul>
       ) : null}
 
+      {/* AI suggestions UI hidden for now.
       {!hideAiSuggestions ? (
       <SubtaskSuggestionsPanel
         request={{
@@ -665,6 +666,7 @@ export function SubtasksEditor({
         }}
       />
       ) : null}
+      */}
 
       <ConfirmDialog
         open={removeTarget !== null}

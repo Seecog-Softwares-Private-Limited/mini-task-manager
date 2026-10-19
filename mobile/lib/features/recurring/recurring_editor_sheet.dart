@@ -16,7 +16,8 @@ import '../kanban/new_subtask_composer.dart';
 import '../kanban/subtask_compact_row.dart';
 import '../kanban/subtask_detail_panel.dart';
 import '../kanban/subtask_sort.dart';
-import '../kanban/subtask_suggestions_panel.dart';
+// AI suggestions UI hidden for now — keep panel code for later.
+// import '../kanban/subtask_suggestions_panel.dart';
 import '../projects/projects_providers.dart';
 import 'recurring_actions.dart';
 import 'recurring_providers.dart';
@@ -283,33 +284,34 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
     });
   }
 
-  void _acceptSuggestedChecklist(List<String> titles) {
-    final taken = _checklist
-        .map((s) => normalizeSuggestionTitle(s.title))
-        .where((t) => t.isNotEmpty)
-        .toSet();
-    final additions = <TaskSubtask>[];
-    for (final raw in titles) {
-      final trimmed = clampSubtaskTitle(raw);
-      final key = normalizeSuggestionTitle(trimmed);
-      if (trimmed.isEmpty || taken.contains(key)) continue;
-      taken.add(key);
-      additions.add(
-        TaskSubtask(
-          id: generateClientId(),
-          title: trimmed,
-          completed: false,
-          status: 'TODO',
-          priority: 'MEDIUM',
-        ),
-      );
-    }
-    if (additions.isEmpty) return;
-    setState(() {
-      _checklist.insertAll(0, additions);
-      _expandedSubtaskIndex = 0;
-    });
-  }
+  // AI suggestions UI hidden for now.
+  // void _acceptSuggestedChecklist(List<String> titles) {
+  //   final taken = _checklist
+  //       .map((s) => normalizeSuggestionTitle(s.title))
+  //       .where((t) => t.isNotEmpty)
+  //       .toSet();
+  //   final additions = <TaskSubtask>[];
+  //   for (final raw in titles) {
+  //     final trimmed = clampSubtaskTitle(raw);
+  //     final key = normalizeSuggestionTitle(trimmed);
+  //     if (trimmed.isEmpty || taken.contains(key)) continue;
+  //     taken.add(key);
+  //     additions.add(
+  //       TaskSubtask(
+  //         id: generateClientId(),
+  //         title: trimmed,
+  //         completed: false,
+  //         status: 'TODO',
+  //         priority: 'MEDIUM',
+  //       ),
+  //     );
+  //   }
+  //   if (additions.isEmpty) return;
+  //   setState(() {
+  //     _checklist.insertAll(0, additions);
+  //     _expandedSubtaskIndex = 0;
+  //   });
+  // }
 
   void _toggleChecklistExpanded(int index) {
     setState(() {
@@ -794,22 +796,23 @@ class _RecurringEditorSheetState extends ConsumerState<RecurringEditorSheet> {
                 enabled: !_loading,
                 onSubmit: _appendChecklistItem,
               ),
-              const SizedBox(height: AppSpacing.sm),
-              SubtaskSuggestionsPanel(
-                organizationId: widget.organizationId,
-                variant: SubtaskSuggestionsVariant.create,
-                draftTitle: _titleController.text,
-                draftDescription: _descriptionController.text,
-                existingTitles: _checklist.map((s) => s.title).toList(),
-                disabled:
-                    _loading || _titleController.text.trim().isEmpty,
-                disabledReason: _titleController.text.trim().isEmpty
-                    ? 'Add a series title before asking for suggestions.'
-                    : null,
-                note:
-                    'Added steps are copied into every run when you save. They are not saved before that.',
-                onAccept: (titles) async => _acceptSuggestedChecklist(titles),
-              ),
+              // AI suggestions UI hidden for now.
+              // const SizedBox(height: AppSpacing.sm),
+              // SubtaskSuggestionsPanel(
+              //   organizationId: widget.organizationId,
+              //   variant: SubtaskSuggestionsVariant.create,
+              //   draftTitle: _titleController.text,
+              //   draftDescription: _descriptionController.text,
+              //   existingTitles: _checklist.map((s) => s.title).toList(),
+              //   disabled:
+              //       _loading || _titleController.text.trim().isEmpty,
+              //   disabledReason: _titleController.text.trim().isEmpty
+              //       ? 'Add a series title before asking for suggestions.'
+              //       : null,
+              //   note:
+              //       'Added steps are copied into every run when you save. They are not saved before that.',
+              //   onAccept: (titles) async => _acceptSuggestedChecklist(titles),
+              // ),
               const SizedBox(height: AppSpacing.sm),
               if (_checklist.isEmpty)
                 Container(

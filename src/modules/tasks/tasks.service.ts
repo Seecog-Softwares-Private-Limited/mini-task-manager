@@ -666,9 +666,23 @@ export class TasksService {
       const ids = Array.from(new Set(dto.assigneeIds.filter((id) => !!String(id).trim())));
       patch.assigneeIds = ids.length ? ids : null;
       patch.assigneeId = ids[0] ?? null;
+      const prevKey = [...(task.assigneeIds ?? []), ...(task.assigneeId ? [task.assigneeId] : [])]
+        .map((id) => String(id).trim())
+        .filter(Boolean)
+        .sort()
+        .join(',');
+      const nextKey = ids.map((id) => String(id).trim()).filter(Boolean).sort().join(',');
+      if (prevKey !== nextKey) {
+        patch.assigneesUpdatedAt = new Date();
+      }
     } else if (dto.assigneeId !== undefined) {
       patch.assigneeId = dto.assigneeId ?? null;
       patch.assigneeIds = patch.assigneeId ? [patch.assigneeId] : null;
+      const prev = task.assigneeId ? String(task.assigneeId) : '';
+      const next = patch.assigneeId ? String(patch.assigneeId) : '';
+      if (prev !== next) {
+        patch.assigneesUpdatedAt = new Date();
+      }
     }
     if (dto.dueDate !== undefined) {
       if (dto.dueDate === null || dto.dueDate === '') {
@@ -734,6 +748,9 @@ export class TasksService {
       }
     }
     if (Object.keys(patch).length > 0) {
+      if (userId) {
+        patch.updatedBy = userId;
+      }
       await this.tasksRepository.update(taskId, patch);
       const action = dto.statusId !== undefined ? 'move' : 'update';
       this.activityLogsService
@@ -1091,6 +1108,8 @@ export class TasksService {
       reporterId?: string;
       createdAt?: string;
       updatedAt?: string;
+      updatedBy?: string;
+      assignedAt?: string;
       /** Top-level done stamp (mobile); mirrored into/from completionRecord. */
       completedAt?: string;
       note?: string;
@@ -1102,6 +1121,10 @@ export class TasksService {
         reporterId?: string;
         createdAt?: string;
         updatedAt?: string;
+        updatedBy?: string;
+        assignedAt?: string;
+        assigneeId?: string;
+        assigneeIds?: string[];
         completedAt?: string;
         status?: string;
         completed?: boolean;
@@ -1131,6 +1154,8 @@ export class TasksService {
     reporterId?: string;
     createdAt?: string;
     updatedAt?: string;
+    updatedBy?: string;
+    assignedAt?: string;
     completedAt?: string;
     note?: string;
     requireLocation?: boolean;
@@ -1163,10 +1188,45 @@ export class TasksService {
             ? s.updatedAt.trim().slice(0, 40)
             : undefined;
         // Rise to top of the color group on create, status change, or client edit.
-        const updatedAt =
-          isNew || statusChanged || clientUpdatedAt
-            ? clientUpdatedAt ?? nowIso
-            : prior?.updatedAt ?? createdAt;
+        const bumpedUpdate = isNew || statusChanged || !!clientUpdatedAt;
+        const updatedAt = bumpedUpdate
+          ? clientUpdatedAt ?? nowIso
+          : prior?.updatedAt ?? createdAt;
+        const updatedBy = bumpedUpdate
+          ? context?.currentUserId ??
+            (typeof s.updatedBy === 'string' && s.updatedBy.trim()
+              ? s.updatedBy.trim()
+              : undefined) ??
+            prior?.updatedBy
+          : prior?.updatedBy ??
+            (typeof s.updatedBy === 'string' && s.updatedBy.trim()
+              ? s.updatedBy.trim()
+              : undefined);
+
+        const priorAssigneeKey = [
+          ...(prior?.assigneeIds ?? []),
+          ...(prior?.assigneeId ? [prior.assigneeId] : []),
+        ]
+          .map((id) => String(id).trim())
+          .filter(Boolean)
+          .sort()
+          .join(',');
+        const nextAssigneeKey = [
+          ...(assignees.assigneeIds ?? []),
+          ...(assignees.assigneeId ? [assignees.assigneeId] : []),
+        ]
+          .map((id) => String(id).trim())
+          .filter(Boolean)
+          .sort()
+          .join(',');
+        const assigneesChanged = isNew || priorAssigneeKey !== nextAssigneeKey;
+        const assignedAt = assigneesChanged
+          ? nowIso
+          : prior?.assignedAt ??
+            (typeof s.assignedAt === 'string' && s.assignedAt.trim()
+              ? s.assignedAt.trim().slice(0, 40)
+              : undefined);
+
         const dueDate = s.dueDate ? String(s.dueDate).slice(0, 10) : undefined;
         const dueTimeRaw = typeof s.dueTime === 'string' ? s.dueTime.trim() : '';
         // Keep HH:mm even when dueDate is absent (checklist items may set time only).
@@ -1275,6 +1335,8 @@ export class TasksService {
           ...(reporterId ? { reporterId } : {}),
           createdAt,
           updatedAt,
+          ...(updatedBy ? { updatedBy } : {}),
+          ...(assignedAt ? { assignedAt } : {}),
           ...(completedAt ? { completedAt } : {}),
           ...(typeof s.note === 'string' && s.note.trim().length
             ? { note: s.note.trim().slice(0, 2000) }

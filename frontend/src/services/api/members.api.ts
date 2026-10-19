@@ -93,3 +93,23 @@ export async function updateProjectMemberRole(
   );
   return data;
 }
+
+/** Owner: which projects a workspace user can access. */
+export async function fetchUserProjectAccess(userId: string): Promise<string[]> {
+  const { data } = await apiClient.get<{ projectIds: string[] }>(
+    `/projects/users/${userId}/access`
+  );
+  return data.projectIds ?? [];
+}
+
+/** Owner: replace a user's project access (visibility updates immediately). */
+export async function setUserProjectAccess(
+  userId: string,
+  projectIds: string[]
+): Promise<string[]> {
+  const { data } = await apiClient.put<{ projectIds: string[] }>(
+    `/projects/users/${userId}/access`,
+    { projectIds }
+  );
+  return data.projectIds ?? [];
+}

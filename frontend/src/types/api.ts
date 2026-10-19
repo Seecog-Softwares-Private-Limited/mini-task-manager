@@ -103,6 +103,10 @@ export interface Task {
   completedAt?: string | null;
   /** When true, completing subtasks on this task requires GPS/geofence. */
   requireLocation?: boolean;
+  /** User who last updated the task. */
+  updatedBy?: string;
+  /** When assignees were last changed. */
+  assigneesUpdatedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -242,6 +246,10 @@ export interface TaskSubtask {
   createdAt?: string;
   /** Bumped on status / meaningful edits so the item rises within its list bucket. */
   updatedAt?: string;
+  /** User who last edited this checklist item. */
+  updatedBy?: string | null;
+  /** When assignees on this item were last changed. */
+  assignedAt?: string | null;
   /** Lightweight done stamp (also mirrored in completionRecord). */
   completedAt?: string | null;
   note?: string;
