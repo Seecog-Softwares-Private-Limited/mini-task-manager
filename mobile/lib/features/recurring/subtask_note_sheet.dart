@@ -289,19 +289,20 @@ class _SubtaskNotesThreadSheetState
 
     setState(() => _picking = true);
     try {
-      PendingAttachment? file;
+      List<PendingAttachment> files = const [];
       switch (choice) {
         case 'camera':
-          file = await AttachmentPickerUtils.capturePhoto();
+          files = await AttachmentPickerUtils.capturePhotos();
         case 'gallery':
-          file = await AttachmentPickerUtils.pickFromGallery();
+          files = await AttachmentPickerUtils.pickFromGallery();
         case 'file':
-          file = await AttachmentPickerUtils.pickFile();
+          files = await AttachmentPickerUtils.pickFiles();
         case 'voice':
-          file = await showVoiceNoteRecorderSheet(context);
+          final note = await showVoiceNoteRecorderSheet(context);
+          files = note == null ? const [] : [note];
       }
-      if (file == null || !mounted) return;
-      setState(() => _pending = [..._pending, file!]);
+      if (files.isEmpty || !mounted) return;
+      setState(() => _pending = [..._pending, ...files]);
     } finally {
       if (mounted) setState(() => _picking = false);
     }

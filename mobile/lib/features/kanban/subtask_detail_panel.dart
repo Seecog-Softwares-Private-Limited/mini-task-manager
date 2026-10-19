@@ -10,7 +10,6 @@ import '../../core/platform/clipboard_image.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/workspace_logo.dart';
-import '../../data/models/pending_attachment.dart';
 import '../../data/models/subtask_completion_record.dart';
 import '../../data/models/project_member.dart';
 import '../../data/models/task.dart';
@@ -23,6 +22,7 @@ import 'attachment_picker_section.dart';
 import 'kanban_providers.dart';
 import 'assignee_picker_sheet.dart';
 
+import 'subtask_completion_sheet.dart';
 import 'subtask_completion_utils.dart';
 import 'require_location_toggle.dart';
 import '../recurring/subtask_note_sheet.dart';
@@ -61,6 +61,8 @@ class SubtaskDetailPanel extends ConsumerStatefulWidget {
     this.onNoteChanged,
     this.fallbackReporterId,
     this.fallbackCreatedAt,
+    /// Parent task due date (`yyyy-MM-dd`). Subtask due cannot exceed this.
+    this.parentDueDate,
     /// Broader directory for Raised By name/avatar (defaults to [members]).
     this.memberDirectory,
     this.canEditRequireLocation = false,
@@ -76,6 +78,8 @@ class SubtaskDetailPanel extends ConsumerStatefulWidget {
   final String organizationId;
   final String? fallbackReporterId;
   final String? fallbackCreatedAt;
+  /// Calendar day of the parent task due date; bounds subtask date picking.
+  final String? parentDueDate;
   final List<ProjectMember>? memberDirectory;
   final bool saving;
   final bool canComplete;
@@ -159,7 +163,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     if (!_descriptionFocus.hasFocus) return;
     unawaited(
       _pickAndUpload(
-        () async => AttachmentPickerUtils.fromClipboardImage(image),
+        () async => [AttachmentPickerUtils.fromClipboardImage(image)],
       ).then((_) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -258,20 +262,23 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     }
   }
 
-  Future<void> _pickAndUpload(Future<PendingAttachment?> Function() pick) async {
+  Future<void> _pickAndUpload(AttachmentPick pick) async {
     final picked = await pick();
-    if (picked == null) return;
+    if (picked.isEmpty) return;
     setState(() {
       _uploadingAttachment = true;
       _attachmentError = null;
     });
     try {
-      await ref.read(attachmentsRepositoryProvider).uploadSubtaskAttachment(
-            subtaskId: widget.subtask.id,
-            taskId: widget.taskId,
-            organizationId: widget.organizationId,
-            file: picked,
-          );
+      final repo = ref.read(attachmentsRepositoryProvider);
+      for (final file in picked) {
+        await repo.uploadSubtaskAttachment(
+          subtaskId: widget.subtask.id,
+          taskId: widget.taskId,
+          organizationId: widget.organizationId,
+          file: file,
+        );
+      }
       await _loadAttachments();
     } on ApiException catch (e) {
       if (!mounted) return;
@@ -304,13 +311,46 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     }
   }
 
+  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  /// Selectable range: today … parent task due (inclusive).
+  ({DateTime first, DateTime last})? _subtaskDueBounds() {
+    final parent = _parseDueDate(widget.parentDueDate);
+    if (parent == null) return null;
+    final today = _dateOnly(DateTime.now());
+    final parentDay = _dateOnly(parent);
+    if (parentDay.isBefore(today)) {
+      // Task already past due — only that day remains selectable.
+      return (first: parentDay, last: parentDay);
+    }
+    return (first: today, last: parentDay);
+  }
+
   Future<void> _pickDueDate() async {
+    final bounds = _subtaskDueBounds();
+    if (bounds == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Set a due date on the task before scheduling checklist items.',
+          ),
+        ),
+      );
+      return;
+    }
+
     final current = _parseDueDate(_dueDate);
+    var initial = current != null ? _dateOnly(current) : bounds.first;
+    if (initial.isBefore(bounds.first)) initial = bounds.first;
+    if (initial.isAfter(bounds.last)) initial = bounds.last;
+
     final picked = await showDatePicker(
       context: context,
-      initialDate: current ?? DateTime.now(),
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
+      initialDate: initial,
+      firstDate: bounds.first,
+      lastDate: bounds.last,
+      helpText: 'Select due date',
     );
     if (picked == null) return;
     setState(() => _dueDate = DateFormat('yyyy-MM-dd').format(picked));
@@ -484,6 +524,37 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     if (title.isEmpty || title.length > subtaskTitleMaxLength) return;
     if (!_dueDateTimeValid) return;
 
+    if (!widget.templateMode && _dueDate != null) {
+      final subDay = _parseDueDate(_dueDate);
+      final bounds = _subtaskDueBounds();
+      if (subDay != null && bounds != null) {
+        final day = _dateOnly(subDay);
+        if (day.isBefore(bounds.first) || day.isAfter(bounds.last)) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Checklist due date must be between '
+                '${DateFormat('MMM d').format(bounds.first)} and '
+                '${DateFormat('MMM d, yyyy').format(bounds.last)}.',
+              ),
+            ),
+          );
+          return;
+        }
+      } else if (subDay != null && bounds == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Set a due date on the task before scheduling checklist items.',
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
     final movingToDone = _status == 'DONE' && !isSubtaskDone(widget.subtask);
     var record = _completionRecord ?? widget.subtask.completionRecord;
     if (movingToDone && record == null) {
@@ -524,6 +595,95 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
         clearCompletedAt: !completed,
         requireLocation: widget.templateMode ? false : _requireLocation,
         // Any save bumps updatedAt so the row rises within its color group.
+        updatedAt: DateTime.now().toUtc().toIso8601String(),
+      ),
+    );
+  }
+
+  bool get _canEditCompletion {
+    if (widget.templateMode || widget.saving) return false;
+    if (_completionRecord == null) return false;
+    if (widget.canComplete) return true;
+    final user = ref.read(sessionControllerProvider).user;
+    if (user == null) return false;
+    return _normalizeUserId(user.id) ==
+        _normalizeUserId(_completionRecord!.employeeId);
+  }
+
+  Future<void> _editCompletion() async {
+    if (!_canEditCompletion) return;
+    final user = ref.read(sessionControllerProvider).user;
+    final existing = _completionRecord;
+    if (user == null || existing == null) return;
+
+    final title = _titleController.text.trim().isEmpty
+        ? widget.subtask.title
+        : _titleController.text.trim();
+    FocusManager.instance.primaryFocus?.unfocus();
+    final result = await showSubtaskCompletionSheet(
+      context: context,
+      subtaskTitle: title,
+      projectId: '',
+      employee: user,
+      requireVideo: false,
+      requireLocation: false,
+      existingRecord: existing,
+      organizationId: widget.organizationId,
+      existingAttachments: _attachments,
+    );
+    if (result == null || !mounted) return;
+
+    try {
+      for (final file in result.attachments) {
+        await ref.read(attachmentsRepositoryProvider).uploadSubtaskAttachment(
+              subtaskId: widget.subtask.id,
+              taskId: widget.taskId,
+              organizationId: widget.organizationId,
+              file: file,
+            );
+      }
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+      return;
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not upload attachments: $e')),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _completionRecord = result.record;
+      _status = 'DONE';
+    });
+    await _loadAttachments();
+    if (!mounted) return;
+    widget.onSave(
+      widget.subtask.copyWith(
+        title: title,
+        description: _descriptionController.text.trim().isEmpty
+            ? null
+            : _descriptionController.text,
+        status: 'DONE',
+        completed: true,
+        priority: _priority,
+        dueDate: widget.templateMode ? null : _dueDate,
+        dueTime: _dueTime,
+        notifyMinutesBefore: _notifyMinutesBefore,
+        clearDueDate: widget.templateMode || _dueDate == null,
+        clearDueTime: _dueTime == null,
+        clearNotifyMinutesBefore:
+            _dueTime == null || _notifyMinutesBefore == null,
+        assigneeIds: _assigneeIds,
+        assigneeId: _assigneeIds.isNotEmpty ? _assigneeIds.first : null,
+        completionRecord: result.record,
+        completedAt: result.record.completedAt,
+        requireLocation: widget.templateMode ? false : _requireLocation,
         updatedAt: DateTime.now().toUtc().toIso8601String(),
       ),
     );
@@ -763,7 +923,12 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
         ),
         if (_completionRecord != null) ...[
           const SizedBox(height: AppSpacing.md),
-          _CompletionRecordCard(record: _completionRecord!),
+          _CompletionRecordCard(
+            record: _completionRecord!,
+            onEdit: _canEditCompletion ? _editCompletion : null,
+            organizationId: widget.organizationId,
+            attachments: _attachments,
+          ),
         ],
         if (!widget.canComplete && !isDone) ...[
           const SizedBox(height: AppSpacing.sm),
@@ -807,6 +972,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     }
 
     final dueDate = _parseDueDate(_dueDate);
+    final dueBounds = _subtaskDueBounds();
     final priority = _findPriority(_priority);
     final assigneeCount = _assigneeIds.length;
     final hasCommentPreview =
@@ -1235,6 +1401,16 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
                     ],
                   ),
                 ],
+                if (!widget.templateMode && dueBounds != null) ...[
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    'Due date must be on or before the task due '
+                    '(${DateFormat('MMM d, yyyy').format(dueBounds.last)}).',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textMuted,
+                        ),
+                  ),
+                ],
                 if (!widget.templateMode && !widget.canComplete) ...[
                   const SizedBox(height: AppSpacing.xs),
                   Text(
@@ -1266,7 +1442,12 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
           ],
           if (!widget.templateMode && _completionRecord != null) ...[
             const SizedBox(height: AppSpacing.md),
-            _CompletionRecordCard(record: _completionRecord!),
+            _CompletionRecordCard(
+              record: _completionRecord!,
+              onEdit: _canEditCompletion ? _editCompletion : null,
+              organizationId: widget.organizationId,
+              attachments: _attachments,
+            ),
           ],
           if (!widget.templateMode) ...[
             const SizedBox(height: AppSpacing.md),
@@ -1709,9 +1890,62 @@ Color _priorityColor(String priority) {
 }
 
 class _CompletionRecordCard extends StatelessWidget {
-  const _CompletionRecordCard({required this.record});
+  const _CompletionRecordCard({
+    required this.record,
+    this.onEdit,
+    this.organizationId = '',
+    this.attachments = const [],
+  });
 
   final SubtaskCompletionRecord record;
+  final VoidCallback? onEdit;
+  final String organizationId;
+  final List<TaskAttachment> attachments;
+
+  List<AttachmentGridEntry> get _proofEntries {
+    final names = <String>[
+      ...record.beforePhotoFileNames,
+      ...record.afterPhotoFileNames,
+      if (record.voiceNoteFileName != null) record.voiceNoteFileName!,
+      if (record.videoFileName != null) record.videoFileName!,
+    ];
+    final entries = <AttachmentGridEntry>[];
+    final usedIds = <String>{};
+    var index = 1;
+    for (final name in names) {
+      final match = _matchProofAttachment(name, usedIds);
+      if (match == null) continue;
+      usedIds.add(match.id);
+      entries.add(
+        AttachmentGridEntry(
+          attachment: match,
+          index: index++,
+        ),
+      );
+    }
+    return entries;
+  }
+
+  TaskAttachment? _matchProofAttachment(String name, Set<String> usedIds) {
+    final target = name.trim().toLowerCase();
+    if (target.isEmpty) return null;
+
+    TaskAttachment? fuzzy;
+    for (final attachment in attachments) {
+      if (usedIds.contains(attachment.id)) continue;
+      final fileName = attachment.fileName.trim().toLowerCase();
+      final stored = attachment.storedFileName?.trim().toLowerCase() ?? '';
+      if (fileName == target || stored == target) return attachment;
+      if (fuzzy == null &&
+          (fileName.endsWith(target) ||
+              target.endsWith(fileName) ||
+              (stored.isNotEmpty &&
+                  (stored.endsWith(target) || target.endsWith(stored))))) {
+        fuzzy = attachment;
+      }
+    }
+    return fuzzy;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1719,6 +1953,7 @@ class _CompletionRecordCard extends StatelessWidget {
     final timestamp = completedAt == null
         ? record.completedAt
         : DateFormat('MMM d, yyyy · h:mm a').format(completedAt.toLocal());
+    final proofEntries = _proofEntries;
 
     return Container(
       width: double.infinity,
@@ -1731,11 +1966,27 @@ class _CompletionRecordCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Completion record',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Completion record',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                 ),
+              ),
+              if (onEdit != null)
+                TextButton.icon(
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  label: const Text('Edit'),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: AppSpacing.sm),
           _row('Completed', timestamp),
@@ -1748,13 +1999,33 @@ class _CompletionRecordCard extends StatelessWidget {
             'Geofence',
             record.geofenceValid ? 'Validated on site' : 'Outside site',
           ),
-          if (record.notes != null && record.notes!.isNotEmpty) _row('Notes', record.notes!),
-          if (record.beforePhotoFileNames.isNotEmpty)
-            _row('Before photos', '${record.beforePhotoFileNames.length} attached'),
-          if (record.afterPhotoFileNames.isNotEmpty)
-            _row('After photos', '${record.afterPhotoFileNames.length} attached'),
-          if (record.voiceNoteFileName != null) _row('Voice note', record.voiceNoteFileName!),
-          if (record.videoFileName != null) _row('Video', record.videoFileName!),
+          if (record.notes != null && record.notes!.isNotEmpty)
+            _row('Notes', record.notes!)
+          else if (onEdit != null)
+            _row('Notes', 'None'),
+          if (proofEntries.isEmpty) ...[
+            if (record.beforePhotoFileNames.isNotEmpty)
+              _row(
+                'Before photos',
+                '${record.beforePhotoFileNames.length} attached',
+              ),
+            if (record.afterPhotoFileNames.isNotEmpty)
+              _row(
+                'After photos',
+                '${record.afterPhotoFileNames.length} attached',
+              ),
+            if (record.voiceNoteFileName != null)
+              _row('Voice note', record.voiceNoteFileName!),
+            if (record.videoFileName != null)
+              _row('Video', record.videoFileName!),
+          ] else ...[
+            const SizedBox(height: AppSpacing.sm),
+            AttachmentGrid(
+              organizationId: organizationId,
+              enabled: true,
+              items: proofEntries,
+            ),
+          ],
         ],
       ),
     );

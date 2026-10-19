@@ -368,6 +368,41 @@ class SessionController extends Notifier<SessionState> {
     return org;
   }
 
+  /// Permanently delete a workspace (owner only). Switches or prompts for another.
+  Future<void> deleteWorkspace(String orgId) async {
+    await _organizationsRepository.deleteOrganization(orgId);
+    final organizations = await _organizationsRepository.fetchOrganizations();
+    final wasCurrent = state.orgId == orgId;
+
+    if (!wasCurrent) {
+      state = state.copyWith(organizations: organizations);
+      return;
+    }
+
+    if (organizations.isEmpty) {
+      await _authStorage.writeOrgId(null);
+      state = SessionState(
+        status: SessionStatus.needsWorkspace,
+        user: state.user,
+        organizations: const [],
+      );
+      return;
+    }
+
+    if (organizations.length == 1) {
+      await selectOrganization(organizations.first.id);
+      state = state.copyWith(organizations: organizations);
+      return;
+    }
+
+    await _authStorage.writeOrgId(null);
+    state = SessionState(
+      status: SessionStatus.needsWorkspace,
+      user: state.user,
+      organizations: organizations,
+    );
+  }
+
   Future<void> logout() async {
     await unregisterDeviceToken();
     await _authRepository.logout();

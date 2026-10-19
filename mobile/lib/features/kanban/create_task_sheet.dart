@@ -301,7 +301,15 @@ class _CreateTaskSheetState extends ConsumerState<CreateTaskSheet> {
                 TextField(
                   controller: _titleController,
                   autofocus: true,
-                  decoration: const InputDecoration(hintText: 'What needs to be done?'),
+                  // Grow with content so long titles wrap (same as subtask title).
+                  minLines: 1,
+                  maxLines: 6,
+                  keyboardType: TextInputType.multiline,
+                  textInputAction: TextInputAction.newline,
+                  decoration: const InputDecoration(
+                    hintText: 'What needs to be done?',
+                    alignLabelWithHint: true,
+                  ),
                   onChanged: (_) => setState(() {}),
                 ),
                 const SizedBox(height: AppSpacing.sm),
@@ -633,7 +641,14 @@ class _SubtaskEditorCardState extends State<_SubtaskEditorCard> {
           TextField(
             controller: draft.titleController,
             enabled: !widget.disabled,
-            decoration: const InputDecoration(hintText: 'Subtask title'),
+            minLines: 1,
+            maxLines: 6,
+            keyboardType: TextInputType.multiline,
+            textInputAction: TextInputAction.newline,
+            decoration: const InputDecoration(
+              hintText: 'Subtask title',
+              alignLabelWithHint: true,
+            ),
             onChanged: (_) => widget.onChanged(),
           ),
           const SizedBox(height: AppSpacing.xs),
