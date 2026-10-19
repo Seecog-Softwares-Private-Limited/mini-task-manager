@@ -6,8 +6,10 @@ import '../../core/preferences/app_preferences.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/html_plain_text.dart';
+import '../../core/utils/workspace_logo.dart';
 import '../../data/models/project.dart';
 import '../../shared/widgets/app_widgets.dart';
+import '../../shared/widgets/project_icon.dart';
 import '../kanban/kanban_providers.dart';
 import 'projects_providers.dart';
 
@@ -36,6 +38,7 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
   late final TextEditingController _descriptionController;
 
   late String _visibility;
+  String? _iconPreview;
   bool _loading = false;
   String? _error;
 
@@ -47,6 +50,7 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
     _descriptionController = TextEditingController(
       text: stripHtmlToPlainText(existing?.description),
     );
+    _iconPreview = existing?.iconUrl;
     final rawVisibility = (existing?.visibility ?? 'PRIVATE').toUpperCase();
     _visibility = rawVisibility == 'PUBLIC' ||
             rawVisibility == 'TEAM' ||
@@ -77,6 +81,9 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
 
     try {
       final repository = ref.read(projectsRepositoryProvider);
+      final iconBefore = (widget.existing?.iconUrl ?? '').trim();
+      final iconAfter = (_iconPreview ?? '').trim();
+      final iconChanged = iconBefore != iconAfter;
       if (widget.isEditing) {
         final project = await repository.updateProject(
           projectId: widget.existing!.id,
@@ -84,6 +91,8 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
           name: name,
           description: _descriptionController.text,
           visibility: _visibility,
+          iconUrl: iconChanged && iconAfter.isNotEmpty ? iconAfter : null,
+          clearIcon: iconChanged && iconAfter.isEmpty && iconBefore.isNotEmpty,
         );
         widget.onUpdated?.call(project);
       } else {
@@ -92,6 +101,7 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
           name: name,
           description: _descriptionController.text,
           visibility: _visibility,
+          iconUrl: iconAfter.isEmpty ? null : iconAfter,
         );
         widget.onCreated?.call(project.id);
       }
@@ -100,6 +110,19 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
       setState(() => _error = e.message);
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _pickIcon() async {
+    try {
+      final dataUrl = await pickWorkspaceLogoDataUrl();
+      if (!mounted) return;
+      setState(() => _iconPreview = dataUrl);
+    } on WorkspaceLogoException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
     }
   }
 
@@ -153,6 +176,59 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
+                'PROJECT ICON',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: AppColors.textMuted,
+                      letterSpacing: 0.8,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ProjectIcon(
+                    name: _nameController.text.trim().isEmpty
+                        ? 'Project'
+                        : _nameController.text.trim(),
+                    iconUrl: _iconPreview,
+                    size: 64,
+                    borderRadius: 14,
+                  ),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextButton.icon(
+                          onPressed: _loading ? null : _pickIcon,
+                          icon: const Icon(Icons.image_outlined, size: 18),
+                          label: Text(
+                            _iconPreview == null || _iconPreview!.isEmpty
+                                ? 'Upload image'
+                                : 'Change image',
+                          ),
+                        ),
+                        Text(
+                          'PNG, JPG up to 100KB. Optional.',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppColors.textMuted,
+                              ),
+                        ),
+                        if (_iconPreview != null && _iconPreview!.isNotEmpty)
+                          TextButton(
+                            onPressed: _loading
+                                ? null
+                                : () => setState(() => _iconPreview = null),
+                            child: const Text('Remove image'),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(
                 'Name',
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       fontWeight: FontWeight.w600,
@@ -164,6 +240,7 @@ class _CreateProjectSheetState extends ConsumerState<CreateProjectSheet> {
                 autofocus: !editing,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: const InputDecoration(hintText: 'Project name'),
+                onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: AppSpacing.md),
               Text(
@@ -320,7 +397,7 @@ Future<void> showCreateProjectSheet({
     useSafeArea: true,
     backgroundColor: Colors.transparent,
     builder: (_) {
-      final height = MediaQuery.of(context).size.height * 0.78;
+      final height = MediaQuery.of(context).size.height * 0.88;
       return SizedBox(
         height: height,
         child: CreateProjectSheet(
@@ -347,7 +424,7 @@ Future<void> showEditProjectSheet({
     useSafeArea: true,
     backgroundColor: Colors.transparent,
     builder: (_) {
-      final height = MediaQuery.of(context).size.height * 0.78;
+      final height = MediaQuery.of(context).size.height * 0.88;
       return SizedBox(
         height: height,
         child: CreateProjectSheet(

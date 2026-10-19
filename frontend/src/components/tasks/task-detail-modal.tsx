@@ -1551,6 +1551,7 @@ export function TaskDetailModal({
                           Add
                         </Button>
                       </div>
+                      {/* AI suggestions UI hidden for now.
                       {canEditSubtasks && taskId ? (
                         <SubtaskSuggestionsPanel
                           key={taskId}
@@ -1568,6 +1569,7 @@ export function TaskDetailModal({
                           reportAcceptErrors={false}
                         />
                       ) : null}
+                      */}
                       {checklist.map((item, idx) => {
                         const expanded = expandedSubtaskId === item.id;
                         return (

@@ -9,6 +9,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/utils/html_plain_text.dart';
 import '../../shared/widgets/app_widgets.dart';
+import '../../shared/widgets/project_icon.dart';
 import '../../data/models/project.dart';
 import 'create_project_sheet.dart';
 import 'projects_providers.dart';
@@ -188,9 +189,6 @@ class _PremiumProjectCardState extends ConsumerState<_PremiumProjectCard> {
     final isDark = widget.isDark;
     final description = stripHtmlToPlainText(project.description);
     final visibility = _visibilityMeta(project.visibility);
-    final initial = project.name.trim().isEmpty
-        ? '?'
-        : project.name.characters.first.toUpperCase();
 
     return Material(
       color: Colors.transparent,
@@ -218,35 +216,11 @@ class _PremiumProjectCardState extends ConsumerState<_PremiumProjectCard> {
             padding: const EdgeInsets.all(AppSpacing.md),
             child: Row(
               children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        AppColors.primary.withValues(alpha: 0.85),
-                        AppColors.violet.withValues(alpha: 0.9),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.25),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    initial,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
+                ProjectIcon(
+                  name: project.name,
+                  iconUrl: project.iconUrl,
+                  size: 48,
+                  borderRadius: 14,
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(

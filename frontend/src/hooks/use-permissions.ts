@@ -18,6 +18,8 @@ export function usePermissions() {
   const canManageApiKeys = isOwner;
   const canManageWebhooks = isOwner || isAdmin;
   const canInviteMembers = isOwner || isAdmin;
+  /** Only the workspace owner assigns which projects each user can see. */
+  const canManageProjectAccess = isOwner;
   const canCreateProjects = true; // owner, admin, member
   const canCreateTasks = true; // owner, admin, member
   const canExportData = true; // owner, admin, member
@@ -30,6 +32,7 @@ export function usePermissions() {
     canManageApiKeys,
     canManageWebhooks,
     canInviteMembers,
+    canManageProjectAccess,
     canCreateProjects,
     canCreateTasks,
     canExportData,
@@ -47,6 +50,7 @@ export function usePermissions() {
     canManageApiKeys,
     canManageWebhooks,
     canInviteMembers,
+    canManageProjectAccess,
     canCreateProjects,
     canCreateTasks,
     canExportData,

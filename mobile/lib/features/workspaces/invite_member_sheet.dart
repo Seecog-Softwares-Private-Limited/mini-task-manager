@@ -64,8 +64,8 @@ class _MembersSheetState extends ConsumerState<MembersSheet>
   }
 
   bool get _canManageProjectAccess {
-    final role = (widget.myRole ?? '').toLowerCase();
-    return role == 'owner' || role == 'admin';
+    // Only the workspace owner controls which projects each user can see.
+    return (widget.myRole ?? '').toLowerCase() == 'owner';
   }
 
   @override
@@ -395,24 +395,17 @@ class _MembersSheetState extends ConsumerState<MembersSheet>
       return;
     }
 
-    // Map projectId → project membership row id.
-    final membershipByProject = <String, String>{};
     setState(() {
       _busyMemberId = member.id;
       _error = null;
     });
+    late final Set<String> currentAccess;
     try {
-      for (final project in projects) {
-        final rows = await projectsRepo.fetchProjectMembers(
-          projectId: project.id,
-          organizationId: workspaceId,
-        );
-        for (final row in rows) {
-          if (row.userId != member.userId) continue;
-          membershipByProject[project.id] = row.id;
-          break;
-        }
-      }
+      final ids = await projectsRepo.fetchUserProjectAccess(
+        organizationId: workspaceId,
+        userId: member.userId,
+      );
+      currentAccess = ids.toSet();
     } on ApiException catch (e) {
       if (mounted) {
         setState(() {
@@ -437,36 +430,24 @@ class _MembersSheetState extends ConsumerState<MembersSheet>
     final saved = await showProjectAccessPicker(
       context: context,
       projects: projects,
-      initiallySelected: membershipByProject.keys,
+      initiallySelected: currentAccess,
       title: 'Update project access',
     );
     if (saved == null || !mounted) return;
-
-    final toAdd = saved.difference(membershipByProject.keys.toSet());
-    final toRemove = membershipByProject.keys.toSet().difference(saved);
-    if (toAdd.isEmpty && toRemove.isEmpty) return;
+    if (saved.length == currentAccess.length && saved.containsAll(currentAccess)) {
+      return;
+    }
 
     setState(() {
       _busyMemberId = member.id;
       _error = null;
     });
     try {
-      for (final projectId in toAdd) {
-        await projectsRepo.addProjectMember(
-          projectId: projectId,
-          organizationId: workspaceId,
-          userId: member.userId,
-        );
-      }
-      for (final projectId in toRemove) {
-        final rowId = membershipByProject[projectId];
-        if (rowId == null) continue;
-        await projectsRepo.removeProjectMember(
-          projectId: projectId,
-          organizationId: workspaceId,
-          memberId: rowId,
-        );
-      }
+      await projectsRepo.setUserProjectAccess(
+        organizationId: workspaceId,
+        userId: member.userId,
+        projectIds: saved,
+      );
       if (!mounted) return;
       showAppMessage('Project access updated');
     } on ApiException catch (e) {

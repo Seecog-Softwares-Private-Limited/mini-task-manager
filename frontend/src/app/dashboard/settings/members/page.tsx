@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { InviteMemberModal } from "@/components/members/invite-member-modal";
+import { ProjectAccessDialog } from "@/components/members/project-access-dialog";
 import { InvitationList } from "@/components/members/invitation-list";
 import { useCreateInvitation, useOrgInvitations, useResendInvitation, useCancelInvitation } from "@/hooks/use-invitations";
 import { useToast } from "@/components/ui/use-toast";
@@ -36,6 +37,7 @@ import type { OrgMember } from "@/types/api";
 import {
   ArrowLeft,
   Building2,
+  FolderKanban,
   Mail,
   Search,
   UserPlus,
@@ -61,13 +63,18 @@ const ROLE_OPTIONS = [
 
 export default function SettingsMembersPage() {
   const { orgId } = useTenant();
-  const { canInviteMembers, isLoading: permsLoading } = usePermissions();
+  const {
+    canInviteMembers,
+    canManageProjectAccess,
+    isLoading: permsLoading,
+  } = usePermissions();
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [search, setSearch] = React.useState("");
   const [inviteOpen, setInviteOpen] = React.useState(false);
   const [removeMember, setRemoveMember] = React.useState<OrgMember | null>(null);
   const [transferTo, setTransferTo] = React.useState<OrgMember | null>(null);
+  const [projectAccessMember, setProjectAccessMember] = React.useState<OrgMember | null>(null);
 
   const { data: org, isLoading: orgLoading } = useQuery({
     queryKey: ["organization", orgId ?? ""],
@@ -349,7 +356,7 @@ export default function SettingsMembersPage() {
                         </>
                       );
                     })()}
-                    {!isOwner(member) && (
+                    {(canManageProjectAccess || !isOwner(member)) && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
@@ -362,12 +369,21 @@ export default function SettingsMembersPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => setRemoveMember(member)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" /> Remove
-                          </DropdownMenuItem>
+                          {canManageProjectAccess && !isOwner(member) && (
+                            <DropdownMenuItem
+                              onClick={() => setProjectAccessMember(member)}
+                            >
+                              <FolderKanban className="mr-2 h-4 w-4" /> Project access
+                            </DropdownMenuItem>
+                          )}
+                          {!isOwner(member) && (
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => setRemoveMember(member)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" /> Remove
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     )}
@@ -438,6 +454,17 @@ export default function SettingsMembersPage() {
         }}
         isSubmitting={invitePending}
         error={inviteError ? parseApiError(inviteError) : null}
+      />
+
+      <ProjectAccessDialog
+        open={!!projectAccessMember}
+        onOpenChange={(open) => !open && setProjectAccessMember(null)}
+        userId={projectAccessMember?.userId ?? ""}
+        memberLabel={
+          projectAccessMember?.user?.fullName ??
+          projectAccessMember?.user?.email ??
+          "this member"
+        }
       />
 
       <ConfirmDialog

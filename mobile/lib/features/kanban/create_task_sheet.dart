@@ -14,7 +14,8 @@ import '../../shared/widgets/app_widgets.dart';
 import 'attachment_picker_section.dart';
 import 'kanban_providers.dart';
 import 'require_location_toggle.dart';
-import 'subtask_suggestions_panel.dart';
+// AI suggestions UI hidden for now — keep import/panel code for later.
+// import 'subtask_suggestions_panel.dart';
 
 class CreateTaskSheet extends ConsumerStatefulWidget {
   const CreateTaskSheet({
@@ -104,26 +105,27 @@ class _CreateTaskSheetState extends ConsumerState<CreateTaskSheet> {
     });
   }
 
-  void _acceptSuggestedSubtasks(List<String> titles) {
-    final taken = _subtasks
-        .map((d) => normalizeSuggestionTitle(d.titleController.text))
-        .where((t) => t.isNotEmpty)
-        .toSet();
-    final additions = <_SubtaskDraft>[];
-    for (final raw in titles) {
-      final trimmed = clampSubtaskTitle(raw);
-      final key = normalizeSuggestionTitle(trimmed);
-      if (trimmed.isEmpty || taken.contains(key)) continue;
-      taken.add(key);
-      final draft = _SubtaskDraft(clientId: generateClientId());
-      draft.titleController.text = trimmed;
-      additions.add(draft);
-    }
-    if (additions.isEmpty) return;
-    setState(() {
-      _subtasks.insertAll(0, additions);
-    });
-  }
+  // AI suggestions UI hidden for now.
+  // void _acceptSuggestedSubtasks(List<String> titles) {
+  //   final taken = _subtasks
+  //       .map((d) => normalizeSuggestionTitle(d.titleController.text))
+  //       .where((t) => t.isNotEmpty)
+  //       .toSet();
+  //   final additions = <_SubtaskDraft>[];
+  //   for (final raw in titles) {
+  //     final trimmed = clampSubtaskTitle(raw);
+  //     final key = normalizeSuggestionTitle(trimmed);
+  //     if (trimmed.isEmpty || taken.contains(key)) continue;
+  //     taken.add(key);
+  //     final draft = _SubtaskDraft(clientId: generateClientId());
+  //     draft.titleController.text = trimmed;
+  //     additions.add(draft);
+  //   }
+  //   if (additions.isEmpty) return;
+  //   setState(() {
+  //     _subtasks.insertAll(0, additions);
+  //   });
+  // }
 
   Future<void> _pickDueDate() async {
     final picked = await showDatePicker(
@@ -312,24 +314,25 @@ class _CreateTaskSheetState extends ConsumerState<CreateTaskSheet> {
                   ),
                   onChanged: (_) => setState(() {}),
                 ),
-                const SizedBox(height: AppSpacing.sm),
-                SubtaskSuggestionsPanel(
-                  organizationId: widget.organizationId,
-                  variant: SubtaskSuggestionsVariant.create,
-                  draftTitle: _titleController.text,
-                  draftDescription: _descriptionController.text,
-                  existingTitles: _subtasks
-                      .map((d) => d.titleController.text)
-                      .toList(),
-                  disabled: _loading ||
-                      _titleController.text.trim().isEmpty,
-                  disabledReason: _titleController.text.trim().isEmpty
-                      ? 'Describe what you need to get done before asking for suggestions.'
-                      : null,
-                  note:
-                      'Added steps are included when you create this task. They are not saved before that.',
-                  onAccept: (titles) async => _acceptSuggestedSubtasks(titles),
-                ),
+                // AI suggestions UI hidden for now.
+                // const SizedBox(height: AppSpacing.sm),
+                // SubtaskSuggestionsPanel(
+                //   organizationId: widget.organizationId,
+                //   variant: SubtaskSuggestionsVariant.create,
+                //   draftTitle: _titleController.text,
+                //   draftDescription: _descriptionController.text,
+                //   existingTitles: _subtasks
+                //       .map((d) => d.titleController.text)
+                //       .toList(),
+                //   disabled: _loading ||
+                //       _titleController.text.trim().isEmpty,
+                //   disabledReason: _titleController.text.trim().isEmpty
+                //       ? 'Describe what you need to get done before asking for suggestions.'
+                //       : null,
+                //   note:
+                //       'Added steps are included when you create this task. They are not saved before that.',
+                //   onAccept: (titles) async => _acceptSuggestedSubtasks(titles),
+                // ),
                 const SizedBox(height: AppSpacing.md),
                 _SectionLabel('Description'),
                 TextField(

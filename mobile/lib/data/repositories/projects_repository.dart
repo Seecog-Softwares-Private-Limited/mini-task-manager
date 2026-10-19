@@ -32,6 +32,7 @@ class ProjectsRepository {
     required String organizationId,
     required String name,
     String? description,
+    String? iconUrl,
     String visibility = 'PRIVATE',
   }) async {
     try {
@@ -41,6 +42,7 @@ class ProjectsRepository {
           'name': name.trim(),
           if (description != null && description.trim().isNotEmpty)
             'description': description.trim(),
+          if (iconUrl != null && iconUrl.trim().isNotEmpty) 'iconUrl': iconUrl,
           'visibility': visibility.toUpperCase(),
         },
         options: _api.withOrgHeader(organizationId),
@@ -57,6 +59,8 @@ class ProjectsRepository {
     String? name,
     String? description,
     String? visibility,
+    String? iconUrl,
+    bool clearIcon = false,
   }) async {
     try {
       final response = await _api.dio.patch<Map<String, dynamic>>(
@@ -65,6 +69,10 @@ class ProjectsRepository {
           if (name != null) 'name': name.trim(),
           if (description != null) 'description': description.trim(),
           if (visibility != null) 'visibility': visibility.toUpperCase(),
+          if (clearIcon)
+            'iconUrl': ''
+          else if (iconUrl != null)
+            'iconUrl': iconUrl,
         },
         options: _api.withOrgHeader(organizationId),
       );
@@ -132,6 +140,44 @@ class ProjectsRepository {
         '/projects/$projectId/members/$memberId',
         options: _api.withOrgHeader(organizationId),
       );
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  /// Owner: which projects a workspace user can currently access.
+  Future<List<String>> fetchUserProjectAccess({
+    required String organizationId,
+    required String userId,
+  }) async {
+    try {
+      final response = await _api.dio.get<Map<String, dynamic>>(
+        '/projects/users/$userId/access',
+        options: _api.withOrgHeader(organizationId),
+      );
+      final raw = response.data?['projectIds'];
+      if (raw is! List) return const [];
+      return raw.map((e) => e.toString()).where((id) => id.isNotEmpty).toList();
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  /// Owner: replace a user's project access (visibility updates immediately).
+  Future<List<String>> setUserProjectAccess({
+    required String organizationId,
+    required String userId,
+    required Iterable<String> projectIds,
+  }) async {
+    try {
+      final response = await _api.dio.put<Map<String, dynamic>>(
+        '/projects/users/$userId/access',
+        data: {'projectIds': projectIds.toList()},
+        options: _api.withOrgHeader(organizationId),
+      );
+      final raw = response.data?['projectIds'];
+      if (raw is! List) return const [];
+      return raw.map((e) => e.toString()).where((id) => id.isNotEmpty).toList();
     } on DioException catch (error) {
       throw ApiException.fromDio(error);
     }

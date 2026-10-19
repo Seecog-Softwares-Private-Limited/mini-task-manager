@@ -31,6 +31,7 @@ import { SUBTASK_TITLE_MAX_LENGTH, clampSubtaskTitle } from "@/lib/subtask-limit
 import { cn } from "@/lib/utils";
 import { getSubtaskAssigneeIds, subtaskAssigneesEqual, withSubtaskAssignees } from "@/lib/subtask-assignees";
 import { MessageSquare, StickyNote } from "lucide-react";
+import { AssignmentAuditCard } from "@/components/tasks/assignment-audit-card";
 
 type MemberHint = { id: string; name: string; email?: string; avatarUrl?: string };
 
@@ -78,8 +79,11 @@ export type SubtaskDraft = Pick<
   | "priority"
   | "requireLocation"
   | "completionRecord"
+  | "reporterId"
   | "createdAt"
   | "updatedAt"
+  | "updatedBy"
+  | "assignedAt"
   | "completedAt"
 >;
 
@@ -283,6 +287,10 @@ export function SubtaskDetailPanel({
   const dailySummary = `${formatDailyStatusLabel(status)} · ${formatDailyDueSummary(draft.dueDate, draft.dueTime)} · ${assigneeSummary}`;
 
   const commitDraft = (next: SubtaskDraft = draft) => {
+    const nowIso = new Date().toISOString();
+    const prevKey = getSubtaskAssigneeIds(initialDraft).slice().sort().join(",");
+    const nextKey = getSubtaskAssigneeIds(next).slice().sort().join(",");
+    const assigneesChanged = prevKey !== nextKey;
     onSave({
       ...next,
       title: clampSubtaskTitle(next.title.trim() || initialDraft.title),
@@ -291,7 +299,9 @@ export function SubtaskDetailPanel({
       priority: resolveSubtaskPriority(next.priority),
       requireLocation: next.requireLocation === true,
       // Any save bumps updatedAt so the row rises within its color group.
-      updatedAt: new Date().toISOString(),
+      updatedAt: nowIso,
+      updatedBy: user?.id ?? next.updatedBy,
+      assignedAt: assigneesChanged ? nowIso : next.assignedAt ?? initialDraft.assignedAt,
     });
   };
 
@@ -562,6 +572,21 @@ export function SubtaskDetailPanel({
           </span>
         </span>
       </label>
+
+      <AssignmentAuditCard
+        members={(prefetchedOrgMembers ?? []).map((m) => ({
+          userId: m.userId,
+          name: m.user?.fullName ?? m.user?.email ?? "Unknown",
+          role: m.role,
+          avatarUrl: m.user?.avatarUrl,
+        }))}
+        raisedByUserId={draft.reporterId}
+        raisedAt={draft.createdAt}
+        updatedByUserId={draft.updatedBy}
+        updatedAt={draft.updatedAt ?? draft.createdAt}
+        assigneeIds={getSubtaskAssigneeIds(draft)}
+        assignedAt={draft.assignedAt}
+      />
 
       <div className="flex items-center justify-end gap-2 border-t border-border/40 pt-3">
         {readOnly ? (

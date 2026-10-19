@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, Logger } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Put,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+  Logger,
+} from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import { ProjectsService } from './projects.service';
 import { WorkflowsService } from '../workflows/workflows.service';
@@ -18,6 +29,7 @@ import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { AddProjectMemberDto } from './dto/add-project-member.dto';
 import { UpdateProjectMemberRoleDto } from './dto/update-project-member-role.dto';
+import { SetUserProjectAccessDto } from './dto/set-user-project-access.dto';
 import { ProjectResponseDto } from './dto/project-response.dto';
 
 @Controller('projects')
@@ -86,13 +98,54 @@ export class ProjectsController {
 
   // ── Project Members (must come before :id catch-all) ──
 
+  /** Owner: list which projects a workspace user can access. */
+  @UseGuards(RolesGuard)
+  @Roles('owner')
+  @Get('users/:userId/access')
+  async getUserProjectAccess(
+    @Param('userId') userId: string,
+    @TenantId() tenantId?: string,
+  ) {
+    const projectIds = await this.projectsService.getUserProjectIdsInOrganization(
+      tenantId!,
+      userId,
+    );
+    return { projectIds };
+  }
+
+  /** Owner: replace a user's project access (visibility updates immediately). */
+  @UseGuards(RolesGuard)
+  @Roles('owner')
+  @Put('users/:userId/access')
+  async setUserProjectAccess(
+    @Param('userId') userId: string,
+    @Body() dto: SetUserProjectAccessDto,
+    @TenantId() tenantId?: string,
+  ) {
+    return this.projectsService.setUserProjectAccess(tenantId!, userId, dto.projectIds ?? []);
+  }
+
   @Get(':id/members')
-  async getMembers(@Param('id') projectId: string) {
-    // Only people with explicit project access — not every workspace member.
+  async getMembers(
+    @Param('id') projectId: string,
+    @TenantId() tenantId?: string,
+    @CurrentUserId() userId?: string,
+  ) {
+    const membership = userId
+      ? await this.organizationsService.getMembership(tenantId!, userId)
+      : null;
+    await this.projectsService.assertUserCanAccessProject(
+      tenantId!,
+      projectId,
+      userId!,
+      membership?.role,
+    );
     const members = await this.projectsService.getProjectMembers(projectId);
     return members.map((m) => this.toMemberResponse(m));
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('owner')
   @Post(':id/members')
   async addMember(
     @Param('id') projectId: string,
@@ -113,6 +166,8 @@ export class ProjectsController {
     return this.toMemberResponse(member);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('owner')
   @Patch(':id/members/:memberId')
   async updateMemberRole(
     @Param('memberId') memberId: string,
@@ -122,6 +177,8 @@ export class ProjectsController {
     return this.toMemberResponse(member);
   }
 
+  @UseGuards(RolesGuard)
+  @Roles('owner')
   @Delete(':id/members/:memberId')
   async removeMember(@Param('memberId') memberId: string) {
     await this.projectsService.removeProjectMember(memberId);
@@ -141,7 +198,17 @@ export class ProjectsController {
   async findOne(
     @Param('id') id: string,
     @TenantId() tenantId?: string,
+    @CurrentUserId() userId?: string,
   ): Promise<ProjectResponseDto | null> {
+    const membership = userId
+      ? await this.organizationsService.getMembership(tenantId!, userId)
+      : null;
+    await this.projectsService.assertUserCanAccessProject(
+      tenantId!,
+      id,
+      userId!,
+      membership?.role,
+    );
     const project = await this.projectsService.findByIdInOrganization(id, tenantId!);
     if (!project) return null;
     return this.toResponse(project);
@@ -154,6 +221,15 @@ export class ProjectsController {
     @TenantId() tenantId?: string,
     @CurrentUserId() userId?: string,
   ): Promise<ProjectResponseDto> {
+    const membership = userId
+      ? await this.organizationsService.getMembership(tenantId!, userId)
+      : null;
+    await this.projectsService.assertUserCanAccessProject(
+      tenantId!,
+      id,
+      userId!,
+      membership?.role,
+    );
     const project = await this.projectsService.update(id, tenantId!, dto, userId);
     return this.toResponse(project);
   }
