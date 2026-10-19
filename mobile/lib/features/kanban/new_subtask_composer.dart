@@ -55,9 +55,15 @@ class _NewSubtaskComposerState extends State<NewSubtaskComposer> {
                 controller: _controller,
                 enabled: widget.enabled,
                 maxLength: subtaskTitleMaxLength,
+                // Grow with content so long titles wrap (same as task/subtask title).
+                minLines: 1,
+                maxLines: 6,
+                keyboardType: TextInputType.multiline,
+                textInputAction: TextInputAction.newline,
                 decoration: InputDecoration(
                   hintText: widget.hintText,
                   counterText: '',
+                  alignLabelWithHint: true,
                   prefixIcon: Icon(
                     Icons.add_rounded,
                     color: AppColors.textMuted.withValues(alpha: 0.7),
@@ -70,7 +76,6 @@ class _NewSubtaskComposerState extends State<NewSubtaskComposer> {
                     vertical: 14,
                   ),
                 ),
-                onSubmitted: (_) => _submit(),
               ),
             ),
             const SizedBox(width: AppSpacing.sm),

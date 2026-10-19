@@ -179,4 +179,16 @@ class OrganizationsRepository {
       throw ApiException.fromDio(error);
     }
   }
+
+  /// Permanently delete a workspace. Owner only (enforced by API).
+  Future<void> deleteOrganization(String orgId) async {
+    try {
+      await _api.dio.delete<void>(
+        '/organizations/$orgId',
+        options: _api.withOrgHeader(orgId),
+      );
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
 }

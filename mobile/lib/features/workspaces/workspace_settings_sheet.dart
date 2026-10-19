@@ -126,6 +126,54 @@ class _WorkspaceSettingsSheetState extends ConsumerState<WorkspaceSettingsSheet>
     }
   }
 
+  Future<void> _confirmDeleteWorkspace() async {
+    final org = _org;
+    if (org == null || !_isOwner || _saving) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete workspace?'),
+        content: Text(
+          'Permanently delete "${org.name}"? All projects, tasks, members, '
+          'and data will be removed. This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
+            child: const Text('Delete permanently'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await ref.read(sessionControllerProvider.notifier).deleteWorkspace(org.id);
+      ref.invalidate(projectsProvider);
+      if (!mounted) return;
+      showAppMessage('Workspace deleted');
+      Navigator.of(context).pop(true);
+    } on ApiException catch (error) {
+      if (mounted) setState(() => _error = error.message);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Could not delete workspace. Please try again.');
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -244,6 +292,37 @@ class _WorkspaceSettingsSheetState extends ConsumerState<WorkspaceSettingsSheet>
                               Navigator.of(context).pop();
                               openPlansBillingScreen();
                             },
+                          ),
+                        ],
+                        if (_isOwner) ...[
+                          const SizedBox(height: AppSpacing.lg),
+                          Text(
+                            'DANGER ZONE',
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: AppColors.danger,
+                                  letterSpacing: 0.8,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            'Deleting this workspace permanently removes all projects, tasks, members, and data.',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppColors.textMuted,
+                                ),
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          OutlinedButton.icon(
+                            onPressed: _saving ? null : _confirmDeleteWorkspace,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.danger,
+                              side: BorderSide(
+                                color: AppColors.danger.withValues(alpha: 0.55),
+                              ),
+                              minimumSize: const Size.fromHeight(48),
+                            ),
+                            icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                            label: const Text('Delete workspace'),
                           ),
                         ],
                       ],

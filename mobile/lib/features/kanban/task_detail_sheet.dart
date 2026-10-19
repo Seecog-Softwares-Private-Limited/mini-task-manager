@@ -11,7 +11,6 @@ import '../../core/theme/app_colors.dart';
 import '../../core/utils/client_id.dart';
 import '../../core/utils/html_plain_text.dart';
 import '../../core/theme/app_spacing.dart';
-import '../../data/models/pending_attachment.dart';
 import '../../data/models/subtask_completion_record.dart';
 import '../../data/models/project_member.dart';
 import '../../data/models/task.dart';
@@ -1373,8 +1372,13 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                     focusNode: _titleFocusNode,
                     autofocus: true,
                     style: Theme.of(context).textTheme.headlineSmall,
+                    minLines: 1,
+                    maxLines: 6,
+                    keyboardType: TextInputType.multiline,
+                    textInputAction: TextInputAction.newline,
                     decoration: InputDecoration(
                       hintText: 'Task title',
+                      alignLabelWithHint: true,
                       filled: true,
                       fillColor: Theme.of(context)
                           .colorScheme
@@ -1393,9 +1397,6 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                         ),
                       ),
                     ),
-                    textInputAction: TextInputAction.done,
-                    onSubmitted: (_) => _commitTitleEdit(),
-                    onEditingComplete: _commitTitleEdit,
                   )
                 else if (canEditTitleAndDescription)
                   Material(
@@ -1736,6 +1737,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                                 organizationId: orgId,
                                 fallbackReporterId: _task.reporterId,
                                 fallbackCreatedAt: _task.createdAt,
+                                parentDueDate: _task.dueDate,
                                 saving: _savingSubtaskIndex == index,
                                 canComplete: canCompleteThisSubtask,
                                 dailyRunMode: isRunChecklist,
@@ -2804,9 +2806,9 @@ class _AttachmentsSectionState extends ConsumerState<_AttachmentsSection> {
   bool _uploading = false;
   String? _uploadError;
 
-  Future<void> _pickAndUpload(Future<PendingAttachment?> Function() pick) async {
+  Future<void> _pickAndUpload(AttachmentPick pick) async {
     final picked = await pick();
-    if (picked == null) return;
+    if (picked.isEmpty) return;
 
     setState(() {
       _uploading = true;
@@ -2814,11 +2816,14 @@ class _AttachmentsSectionState extends ConsumerState<_AttachmentsSection> {
     });
 
     try {
-      await ref.read(attachmentsRepositoryProvider).uploadTaskAttachment(
-            taskId: widget.taskId,
-            organizationId: widget.organizationId,
-            file: picked,
-          );
+      final repo = ref.read(attachmentsRepositoryProvider);
+      for (final file in picked) {
+        await repo.uploadTaskAttachment(
+          taskId: widget.taskId,
+          organizationId: widget.organizationId,
+          file: file,
+        );
+      }
       final merged = await _reloadAttachments();
       if (!mounted) return;
       widget.onAttachmentsChanged(merged);

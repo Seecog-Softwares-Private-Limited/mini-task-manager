@@ -127,17 +127,20 @@ class AttachmentGrid extends ConsumerWidget {
         Wrap(
           spacing: AppSpacing.sm,
           runSpacing: AppSpacing.sm,
-          children: items.map((entry) {
-            return AttachmentGridTile(
-              key: ValueKey(entry.attachment.id),
-              attachment: entry.attachment,
-              organizationId: organizationId,
-              source: entry.source,
-              index: entry.index,
-              enabled: enabled,
-              onDelete: entry.onDelete,
-            );
-          }).toList(),
+          children: [
+            for (var i = 0; i < items.length; i++)
+              AttachmentGridTile(
+                // Include slot index so the same attachment id can appear
+                // once without colliding if callers ever pass duplicates.
+                key: ValueKey('${items[i].attachment.id}#$i'),
+                attachment: items[i].attachment,
+                organizationId: organizationId,
+                source: items[i].source,
+                index: items[i].index,
+                enabled: enabled,
+                onDelete: items[i].onDelete,
+              ),
+          ],
         ),
       ],
     );
