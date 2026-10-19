@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/preferences/app_preferences.dart';
@@ -12,6 +13,8 @@ import '../../shared/widgets/user_avatar.dart';
 import '../kanban/project_board_screen.dart';
 import '../kanban/project_switcher.dart';
 import '../projects/projects_providers.dart';
+import '../recurring/recurring_providers.dart';
+import '../recurring/recurring_screen.dart';
 import 'my_work_providers.dart';
 
 class MyWorkScreen extends ConsumerWidget {
@@ -34,6 +37,7 @@ class MyWorkScreen extends ConsumerWidget {
         .where((p) => !p.isArchived)
         .toList();
     final selectedProjectId = ref.watch(tasksSelectedProjectIdProvider);
+    final contentTab = ref.watch(tasksContentTabProvider);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     final body = Column(
@@ -47,10 +51,15 @@ class MyWorkScreen extends ConsumerWidget {
             ref.read(tasksProjectIdProvider.notifier).state = projectId;
             if (!isAllProjectsSelection(projectId)) {
               ref.read(lastProjectIdProvider.notifier).setProjectId(projectId);
+              ref.read(recurringProjectIdProvider.notifier).state = projectId;
+              ref.invalidate(recurringSummaryProvider);
+              ref.invalidate(recurringTemplatesProvider);
+              ref.invalidate(recurringBoardTasksProvider);
             }
             ref.read(tasksMemberFilterProvider.notifier).state = null;
           },
         ),
+        const _TasksContentTabBar(),
         Expanded(
           child: ColoredBox(
             color: isDark ? const Color(0xFF0B1220) : const Color(0xFFF1F5F9),
@@ -63,11 +72,22 @@ class MyWorkScreen extends ConsumerWidget {
                   )
                 : selectedProjectId == null
                     ? const Center(child: CircularProgressIndicator())
-                    : ProjectBoardScreen(
-                        key: ValueKey('tasks-board-$selectedProjectId'),
-                        projectId: selectedProjectId,
-                        embedded: true,
-                      ),
+                    : switch (contentTab) {
+                        TasksContentTab.tasks => ProjectBoardScreen(
+                            key: ValueKey('tasks-board-$selectedProjectId'),
+                            projectId: selectedProjectId,
+                            embedded: true,
+                          ),
+                        TasksContentTab.recurring => const RecurringScreen(
+                            key: ValueKey('tasks-recurring'),
+                            hideProjectDropdown: true,
+                          ),
+                        TasksContentTab.notes => const EmptyState(
+                            icon: Icons.sticky_note_2_outlined,
+                            title: 'Notes',
+                            message: 'Coming soon.',
+                          ),
+                      },
           ),
         ),
       ],
@@ -78,6 +98,115 @@ class MyWorkScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Tasks')),
       body: body,
+    );
+  }
+}
+
+class _TasksContentTabBar extends ConsumerWidget {
+  const _TasksContentTabBar();
+
+  static const _tabs = <(TasksContentTab, String)>[
+    (TasksContentTab.tasks, 'Tasks'),
+    (TasksContentTab.recurring, 'Recurring'),
+    (TasksContentTab.notes, 'Notes'),
+  ];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(tasksContentTabProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final trackColor =
+        isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+
+    return Material(
+      color: Theme.of(context).colorScheme.surface,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          0,
+          AppSpacing.md,
+          AppSpacing.sm,
+        ),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: trackColor,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(3),
+            child: Row(
+              children: [
+                for (final (tab, label) in _tabs)
+                  Expanded(
+                    child: _TasksContentTabChip(
+                      label: label,
+                      selected: selected == tab,
+                      onTap: () {
+                        if (selected == tab) return;
+                        HapticFeedback.selectionClick();
+                        ref.read(tasksContentTabProvider.notifier).state = tab;
+                        if (tab == TasksContentTab.recurring) {
+                          final projectId =
+                              ref.read(tasksSelectedProjectIdProvider);
+                          if (projectId != null &&
+                              !isAllProjectsSelection(projectId)) {
+                            ref
+                                .read(recurringProjectIdProvider.notifier)
+                                .state = projectId;
+                          }
+                          ref.invalidate(recurringBoardTasksProvider);
+                          ref.invalidate(recurringSummaryProvider);
+                          ref.invalidate(recurringTemplatesProvider);
+                        } else if (selected == TasksContentTab.recurring) {
+                          ref.read(recurringFabHiddenProvider.notifier).state =
+                              false;
+                        }
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TasksContentTabChip extends StatelessWidget {
+  const _TasksContentTabChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppColors.primary : Colors.transparent,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: SizedBox(
+          height: 36,
+          child: Center(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: selected ? Colors.white : AppColors.textMuted,
+                  ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

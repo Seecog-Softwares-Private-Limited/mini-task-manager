@@ -13,7 +13,13 @@ import 'recurring_providers.dart';
 import 'recurring_series_tab.dart';
 
 class RecurringScreen extends ConsumerStatefulWidget {
-  const RecurringScreen({super.key});
+  const RecurringScreen({
+    super.key,
+    this.hideProjectDropdown = false,
+  });
+
+  /// When true, skips the in-screen project picker (parent already provides one).
+  final bool hideProjectDropdown;
 
   @override
   ConsumerState<RecurringScreen> createState() => _RecurringScreenState();
@@ -108,36 +114,38 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen>
       },
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.sm,
-              AppSpacing.md,
-              0,
+          if (!widget.hideProjectDropdown)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.sm,
+                AppSpacing.md,
+                0,
+              ),
+              child: projectsLoading
+                  ? const LinearProgressIndicator()
+                  : selectedProjectId == null
+                      ? const LinearProgressIndicator()
+                      : DropdownButtonFormField<String>(
+                          initialValue: selectedProjectId,
+                          decoration:
+                              const InputDecoration(labelText: 'Project'),
+                          items: [
+                            for (final project in projects)
+                              DropdownMenuItem(
+                                value: project.id,
+                                child: Text(project.name),
+                              ),
+                          ],
+                          onChanged: (value) {
+                            ref.read(recurringProjectIdProvider.notifier).state =
+                                value;
+                            ref.invalidate(recurringSummaryProvider);
+                            ref.invalidate(recurringTemplatesProvider);
+                            ref.invalidate(recurringBoardTasksProvider);
+                          },
+                        ),
             ),
-            child: projectsLoading
-                ? const LinearProgressIndicator()
-                : selectedProjectId == null
-                    ? const LinearProgressIndicator()
-                    : DropdownButtonFormField<String>(
-                        initialValue: selectedProjectId,
-                        decoration: const InputDecoration(labelText: 'Project'),
-                        items: [
-                          for (final project in projects)
-                            DropdownMenuItem(
-                              value: project.id,
-                              child: Text(project.name),
-                            ),
-                        ],
-                        onChanged: (value) {
-                          ref.read(recurringProjectIdProvider.notifier).state =
-                              value;
-                          ref.invalidate(recurringSummaryProvider);
-                          ref.invalidate(recurringTemplatesProvider);
-                          ref.invalidate(recurringBoardTasksProvider);
-                        },
-                      ),
-          ),
           summaryAsync.maybeWhen(
             data: (summary) => Padding(
               padding: const EdgeInsets.all(AppSpacing.md),

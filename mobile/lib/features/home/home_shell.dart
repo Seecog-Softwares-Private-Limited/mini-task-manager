@@ -29,6 +29,7 @@ import 'home_tab.dart';
 import 'my_work_providers.dart';
 import 'my_work_screen.dart';
 
+
 /// Alerts tab index inside the bottom navigation.
 const int kAlertsTabIndex = 4;
 
@@ -104,8 +105,12 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
     if (value == 1 && tasksFilter != null) {
       ref.read(myWorkFilterProvider.notifier).state = tasksFilter;
     }
-    // Reset planner FAB visibility when leaving the Planner tab.
-    if (_index == 3 && value != 3) {
+    // Reset planner FAB visibility when leaving Planner / Tasks→Recurring.
+    final leavingPlannerSurface = (_index == 3 && value != 3) ||
+        (_index == 1 &&
+            value != 1 &&
+            ref.read(tasksContentTabProvider) == TasksContentTab.recurring);
+    if (leavingPlannerSurface) {
       ref.read(recurringFabHiddenProvider.notifier).state = false;
     }
     // Entering Planner — refresh board so peer checklist updates are visible.
@@ -169,6 +174,7 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
   Widget? _fabForTab({
     required bool onProjectsTab,
     required bool onPlannerTab,
+    required bool onTasksRecurringTab,
     required bool canCreateProject,
   }) {
     if (onProjectsTab && canCreateProject) {
@@ -177,7 +183,7 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
         onPressed: _openCreateProject,
       );
     }
-    if (onPlannerTab) {
+    if (onPlannerTab || onTasksRecurringTab) {
       final hideFab = ref.watch(recurringFabHiddenProvider);
       if (hideFab) return null;
       return _GradientFab(
@@ -274,6 +280,8 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
     final unreadLabel = unread > 99 ? '99+' : '$unread';
     final onProjectsTab = _index == 2;
     final onPlannerTab = _index == 3;
+    final onTasksRecurringTab = _index == 1 &&
+        ref.watch(tasksContentTabProvider) == TasksContentTab.recurring;
     final canCreateProject = onProjectsTab && orgId != null && orgId.isNotEmpty;
 
     final pages = List<Widget>.generate(5, (index) {
@@ -337,6 +345,7 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
       floatingActionButton: _fabForTab(
         onProjectsTab: onProjectsTab,
         onPlannerTab: onPlannerTab,
+        onTasksRecurringTab: onTasksRecurringTab,
         canCreateProject: canCreateProject,
       ),
       bottomNavigationBar: NavigationBar(
