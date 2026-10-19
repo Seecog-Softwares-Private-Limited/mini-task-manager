@@ -8,6 +8,8 @@ import '../../data/models/pending_attachment.dart';
 import '../../shared/voice_dictation/voice_note_recorder_sheet.dart';
 import 'attachment_file_meta.dart';
 
+typedef AttachmentPick = Future<List<PendingAttachment>> Function();
+
 class AttachmentPickerUtils {
   static PendingAttachment fromClipboardImage(ClipboardImage image) {
     return PendingAttachment(
@@ -18,49 +20,103 @@ class AttachmentPickerUtils {
     );
   }
 
-  static Future<PendingAttachment?> pickFile() async {
-    final result = await FilePicker.platform.pickFiles(withData: true);
-    if (result == null || result.files.isEmpty) return null;
-
-    final file = result.files.first;
-    if (file.name.isEmpty) return null;
-
-    // On web, accessing file.path throws UnsupportedError.
-    // Safely attempt to read it; fall back to null (bytes will be used).
-    String? filePath;
-    try {
-      filePath = file.path;
-    } catch (_) {
-      filePath = null;
-    }
-
-    return PendingAttachment(
-      clientId: generateClientId(),
-      fileName: file.name,
-      path: filePath,
-      bytes: file.bytes,
-      mimeType: file.extension,
+  /// Multi-file picker (documents, images, etc.).
+  static Future<List<PendingAttachment>> pickFiles() async {
+    final result = await FilePicker.platform.pickFiles(
+      withData: true,
+      allowMultiple: true,
     );
+    if (result == null || result.files.isEmpty) return const [];
+
+    final out = <PendingAttachment>[];
+    for (final file in result.files) {
+      if (file.name.isEmpty) continue;
+      // On web, accessing file.path throws UnsupportedError.
+      String? filePath;
+      try {
+        filePath = file.path;
+      } catch (_) {
+        filePath = null;
+      }
+      out.add(
+        PendingAttachment(
+          clientId: generateClientId(),
+          fileName: file.name,
+          path: filePath,
+          bytes: file.bytes,
+          mimeType: file.extension,
+        ),
+      );
+    }
+    return out;
   }
 
-  static Future<PendingAttachment?> capturePhoto() async {
+  /// Single-file convenience (first selected file).
+  static Future<PendingAttachment?> pickFile() async {
+    final files = await pickFiles();
+    return files.isEmpty ? null : files.first;
+  }
+
+  /// Camera capture — always a single photo.
+  static Future<List<PendingAttachment>> capturePhotos() async {
     final picker = ImagePicker();
     final photo = await picker.pickImage(
       source: ImageSource.camera,
       imageQuality: 85,
     );
-    if (photo == null) return null;
-    return _fromXFile(photo);
+    if (photo == null) return const [];
+    return [await _fromXFile(photo)];
   }
 
-  static Future<PendingAttachment?> pickFromGallery() async {
+  static Future<PendingAttachment?> capturePhoto() async {
+    final photos = await capturePhotos();
+    return photos.isEmpty ? null : photos.first;
+  }
+
+  /// Gallery / file multi-image select.
+  static Future<List<PendingAttachment>> pickFromGallery() async {
     final picker = ImagePicker();
-    final photo = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
+    final photos = await picker.pickMultiImage(imageQuality: 85);
+    if (photos.isEmpty) return const [];
+    final out = <PendingAttachment>[];
+    for (final photo in photos) {
+      out.add(await _fromXFile(photo));
+    }
+    return out;
+  }
+
+  /// Proof images for Before/After — multi gallery, with file-picker fallback.
+  static Future<List<PendingAttachment>> pickProofImages() async {
+    final fromGallery = await pickFromGallery();
+    if (fromGallery.isNotEmpty) return fromGallery;
+
+    final result = await FilePicker.platform.pickFiles(
+      withData: true,
+      allowMultiple: true,
+      type: FileType.image,
     );
-    if (photo == null) return null;
-    return _fromXFile(photo);
+    if (result == null || result.files.isEmpty) return const [];
+
+    final out = <PendingAttachment>[];
+    for (final file in result.files) {
+      if (file.name.isEmpty) continue;
+      String? filePath;
+      try {
+        filePath = file.path;
+      } catch (_) {
+        filePath = null;
+      }
+      out.add(
+        PendingAttachment(
+          clientId: generateClientId(),
+          fileName: file.name,
+          path: filePath,
+          bytes: file.bytes,
+          mimeType: file.extension ?? 'image/jpeg',
+        ),
+      );
+    }
+    return out;
   }
 
   static Future<PendingAttachment?> captureVideo({
@@ -112,11 +168,11 @@ class AttachmentUploadActions extends StatelessWidget {
 
   final bool disabled;
   final bool uploading;
-  final Future<void> Function(Future<PendingAttachment?> Function() pick) onPickAndUpload;
+  final Future<void> Function(AttachmentPick pick) onPickAndUpload;
   final bool showGallery;
   final bool compact;
 
-  Future<void> _handle(Future<PendingAttachment?> Function() pick) async {
+  Future<void> _handle(AttachmentPick pick) async {
     if (disabled || uploading) return;
     await onPickAndUpload(pick);
   }
@@ -128,14 +184,14 @@ class AttachmentUploadActions extends StatelessWidget {
       label: 'Camera',
       onTap: uploading || disabled
           ? null
-          : () => _handle(AttachmentPickerUtils.capturePhoto),
+          : () => _handle(AttachmentPickerUtils.capturePhotos),
     );
     final file = _ActionChip(
       icon: Icons.attach_file_rounded,
       label: 'File',
       onTap: uploading || disabled
           ? null
-          : () => _handle(AttachmentPickerUtils.pickFile),
+          : () => _handle(AttachmentPickerUtils.pickFiles),
     );
     final gallery = _ActionChip(
       icon: Icons.photo_library_rounded,
@@ -149,7 +205,10 @@ class AttachmentUploadActions extends StatelessWidget {
       label: 'Voice',
       onTap: uploading || disabled
           ? null
-          : () => _handle(() => showVoiceNoteRecorderSheet(context)),
+          : () => _handle(() async {
+                final note = await showVoiceNoteRecorderSheet(context);
+                return note == null ? const [] : [note];
+              }),
     );
 
     final showGalleryChip = showGallery && !compact;
@@ -204,11 +263,11 @@ class AttachmentPickerSection extends StatelessWidget {
   final bool disabled;
   final bool compact;
 
-  Future<void> _addAttachment(Future<PendingAttachment?> Function() pick) async {
+  Future<void> _addAttachments(AttachmentPick pick) async {
     if (disabled) return;
     final picked = await pick();
-    if (picked == null) return;
-    onChanged([...attachments, picked]);
+    if (picked.isEmpty) return;
+    onChanged([...attachments, ...picked]);
   }
 
   void _remove(String clientId) {
@@ -228,7 +287,7 @@ class AttachmentPickerSection extends StatelessWidget {
                 label: 'Camera',
                 onTap: disabled
                     ? null
-                    : () => _addAttachment(AttachmentPickerUtils.capturePhoto),
+                    : () => _addAttachments(AttachmentPickerUtils.capturePhotos),
               ),
             ),
             const SizedBox(width: 8),
@@ -238,7 +297,7 @@ class AttachmentPickerSection extends StatelessWidget {
                 label: 'File',
                 onTap: disabled
                     ? null
-                    : () => _addAttachment(AttachmentPickerUtils.pickFile),
+                    : () => _addAttachments(AttachmentPickerUtils.pickFiles),
               ),
             ),
           ],
@@ -253,7 +312,7 @@ class AttachmentPickerSection extends StatelessWidget {
                   label: 'Gallery',
                   onTap: disabled
                       ? null
-                      : () => _addAttachment(
+                      : () => _addAttachments(
                             AttachmentPickerUtils.pickFromGallery,
                           ),
                 ),
@@ -266,9 +325,11 @@ class AttachmentPickerSection extends StatelessWidget {
                 label: 'Voice',
                 onTap: disabled
                     ? null
-                    : () => _addAttachment(
-                          () => showVoiceNoteRecorderSheet(context),
-                        ),
+                    : () => _addAttachments(() async {
+                          final note =
+                              await showVoiceNoteRecorderSheet(context);
+                          return note == null ? const [] : [note];
+                        }),
               ),
             ),
             if (compact) const Expanded(child: SizedBox.shrink()),

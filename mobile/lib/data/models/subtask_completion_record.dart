@@ -84,6 +84,41 @@ class SubtaskCompletionRecord {
     );
   }
 
+  SubtaskCompletionRecord copyWith({
+    String? notes,
+    bool clearNotes = false,
+    List<String>? beforePhotoFileNames,
+    List<String>? afterPhotoFileNames,
+    String? voiceNoteFileName,
+    bool clearVoiceNoteFileName = false,
+    String? videoFileName,
+    bool clearVideoFileName = false,
+  }) {
+    return SubtaskCompletionRecord(
+      completedAt: completedAt,
+      employeeId: employeeId,
+      employeeName: employeeName,
+      employeeEmail: employeeEmail,
+      latitude: latitude,
+      longitude: longitude,
+      accuracyMeters: accuracyMeters,
+      geofenceValid: geofenceValid,
+      geofenceDistanceMeters: geofenceDistanceMeters,
+      geofenceRadiusMeters: geofenceRadiusMeters,
+      geofenceSiteId: geofenceSiteId,
+      deviceInfo: deviceInfo,
+      notes: clearNotes ? null : (notes ?? this.notes),
+      beforePhotoFileNames: beforePhotoFileNames ?? this.beforePhotoFileNames,
+      afterPhotoFileNames: afterPhotoFileNames ?? this.afterPhotoFileNames,
+      voiceNoteFileName: clearVoiceNoteFileName
+          ? null
+          : (voiceNoteFileName ?? this.voiceNoteFileName),
+      videoFileName: clearVideoFileName
+          ? null
+          : (videoFileName ?? this.videoFileName),
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'completedAt': completedAt,
