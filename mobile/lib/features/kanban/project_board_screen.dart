@@ -15,10 +15,19 @@ import '../../data/models/workflow.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../auth/session_controller.dart';
 import '../home/my_work_providers.dart';
+import '../recurring/recurring_actions.dart';
+import '../recurring/recurring_editor_sheet.dart';
+import '../recurring/recurring_providers.dart';
+import '../recurring/recurring_screen.dart';
 import 'create_task_sheet.dart';
 import 'kanban_providers.dart';
 import 'project_switcher.dart';
 import 'task_detail_sheet.dart';
+
+/// Standalone Projects board section capsules (Tasks / Recurring / Notes).
+const int _kProjectBoardSectionTasks = 0;
+const int _kProjectBoardSectionRecurring = 1;
+const int _kProjectBoardSectionNotes = 2;
 
 class ProjectBoardScreen extends ConsumerStatefulWidget {
   const ProjectBoardScreen({
@@ -39,6 +48,9 @@ class ProjectBoardScreen extends ConsumerStatefulWidget {
 class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
   late final PageController _pageController;
   int _selectedColumn = 0;
+
+  /// Standalone board only: which capsule is selected under ProjectSwitcher.
+  int _sectionIndex = _kProjectBoardSectionTasks;
 
   @override
   void initState() {
@@ -63,6 +75,81 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
     );
   }
 
+  void _selectSection(int index) {
+    if (index == _sectionIndex) return;
+    HapticFeedback.selectionClick();
+    if (index == _kProjectBoardSectionRecurring) {
+      if (!isAllProjectsSelection(widget.projectId)) {
+        ref.read(recurringProjectIdProvider.notifier).state = widget.projectId;
+      }
+      ref.invalidate(recurringBoardTasksProvider);
+      ref.invalidate(recurringSummaryProvider);
+      ref.invalidate(recurringTemplatesProvider);
+    } else if (_sectionIndex == _kProjectBoardSectionRecurring) {
+      ref.read(recurringFabHiddenProvider.notifier).state = false;
+    }
+    setState(() => _sectionIndex = index);
+  }
+
+  bool get _showRecurringSection =>
+      !widget.embedded && _sectionIndex == _kProjectBoardSectionRecurring;
+
+  bool get _showNotesSection =>
+      !widget.embedded && _sectionIndex == _kProjectBoardSectionNotes;
+
+  bool get _showTasksSection =>
+      widget.embedded || _sectionIndex == _kProjectBoardSectionTasks;
+
+  static const _notesPlaceholder = EmptyState(
+    icon: Icons.sticky_note_2_outlined,
+    title: 'Notes',
+    message: 'Coming soon.',
+  );
+
+  /// Standalone section swap: Tasks → board, Recurring → planner, Notes → placeholder.
+  Widget _standaloneSectionChild({required Widget tasksChild}) {
+    if (widget.embedded) return tasksChild;
+    switch (_sectionIndex) {
+      case _kProjectBoardSectionRecurring:
+        return const RecurringScreen(hideProjectDropdown: true);
+      case _kProjectBoardSectionNotes:
+        return _notesPlaceholder;
+      case _kProjectBoardSectionTasks:
+      default:
+        return tasksChild;
+    }
+  }
+
+  Future<void> _openCreatePlanner() async {
+    final orgId = ref.read(sessionControllerProvider).orgId;
+    if (orgId == null || orgId.isEmpty) return;
+
+    if (!canManageRecurring(ref)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Only workspace owners and admins can create planners.'),
+        ),
+      );
+      return;
+    }
+
+    final projectId = isAllProjectsSelection(widget.projectId)
+        ? ref.read(recurringSelectedProjectIdProvider)
+        : widget.projectId;
+    if (projectId == null || projectId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select a project first.')),
+      );
+      return;
+    }
+
+    await showRecurringEditorSheet(
+      context: context,
+      organizationId: orgId,
+      projectId: projectId,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final boardAsync = ref.watch(projectBoardProvider(widget.projectId));
@@ -70,6 +157,7 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
     final orgId = session.orgId;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final allProjects = isAllProjectsSelection(widget.projectId);
+    final hidePlannerFab = ref.watch(recurringFabHiddenProvider);
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0B1220) : const Color(0xFFF1F5F9),
@@ -81,11 +169,15 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
               : 'Unable to load board.';
           return _BoardScaffold(
             embedded: widget.embedded,
+            sectionIndex: widget.embedded ? null : _sectionIndex,
+            onSectionChanged: widget.embedded ? null : _selectSection,
             header: const _BoardTitleHeader(title: 'Board'),
-            child: EmptyState(
-              title: 'Board unavailable',
-              message: message,
-              icon: Icons.view_kanban_outlined,
+            child: _standaloneSectionChild(
+              tasksChild: EmptyState(
+                title: 'Board unavailable',
+                message: message,
+                icon: Icons.view_kanban_outlined,
+              ),
             ),
           );
         },
@@ -102,6 +194,9 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
           if (board.statuses.isEmpty) {
             return _BoardScaffold(
               embedded: widget.embedded,
+              sectionIndex: widget.embedded ? null : _sectionIndex,
+              onSectionChanged: widget.embedded ? null : _selectSection,
+              boardMetaLine: widget.embedded ? null : 'No workflow columns',
               header: widget.embedded
                   ? _BoardTitleHeader(
                       title: allProjects ? 'All projects' : 'Board',
@@ -109,12 +204,13 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
                     )
                   : ProjectSwitcher(
                       selectedProjectId: widget.projectId,
-                      subtitle: 'No workflow columns',
                     ),
-              child: const EmptyState(
-                title: 'No workflow columns',
-                message: 'Create a workflow in the web app first.',
-                icon: Icons.view_column_outlined,
+              child: _standaloneSectionChild(
+                tasksChild: const EmptyState(
+                  title: 'No workflow columns',
+                  message: 'Create a workflow in the web app first.',
+                  icon: Icons.view_column_outlined,
+                ),
               ),
             );
           }
@@ -173,19 +269,21 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
             ],
           );
 
+          final metaLine =
+              '$totalTasks tasks · ${board.statuses.length} columns';
+
           return _BoardScaffold(
             embedded: widget.embedded,
+            sectionIndex: widget.embedded ? null : _sectionIndex,
+            onSectionChanged: widget.embedded ? null : _selectSection,
+            boardMetaLine: widget.embedded ? null : metaLine,
             header: widget.embedded
                 ? _BoardTitleHeader(
                     title: allProjects ? 'All projects' : 'Board',
-                    subtitle:
-                        '$totalTasks tasks · ${board.statuses.length} columns',
+                    subtitle: metaLine,
                   )
                 : ProjectSwitcher(
                     selectedProjectId: widget.projectId,
-                    taskCount: totalTasks,
-                    subtitle:
-                        '$totalTasks tasks · ${board.statuses.length} columns',
                   ),
             onRefresh: () async {
               ref.invalidate(projectBoardProvider(widget.projectId));
@@ -212,20 +310,30 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
                 color: AppColors.violet,
               ),
             ],
-            child: boardBody,
+            child: _standaloneSectionChild(tasksChild: boardBody),
           );
         },
       ),
-      floatingActionButton: allProjects
+      floatingActionButton: allProjects || _showNotesSection
           ? null
-          : boardAsync.maybeWhen(
-              data: (board) => orgId == null || board.statuses.isEmpty
+          : _showRecurringSection
+              ? (hidePlannerFab
                   ? null
-                  : _CreateTaskFab(
-                      onPressed: () => _openCreateTask(context, ref, board, orgId),
+                  : _BoardActionFab(
+                      label: 'Add planner',
+                      onPressed: _openCreatePlanner,
+                    ))
+              : !_showTasksSection
+                  ? null
+                  : boardAsync.maybeWhen(
+                      data: (board) => orgId == null || board.statuses.isEmpty
+                          ? null
+                          : _CreateTaskFab(
+                              onPressed: () =>
+                                  _openCreateTask(context, ref, board, orgId),
+                            ),
+                      orElse: () => null,
                     ),
-              orElse: () => null,
-            ),
     );
   }
 
@@ -366,6 +474,9 @@ class _BoardScaffold extends StatelessWidget {
     this.headerStats,
     this.onRefresh,
     this.embedded = false,
+    this.sectionIndex,
+    this.onSectionChanged,
+    this.boardMetaLine,
   });
 
   final Widget header;
@@ -374,12 +485,26 @@ class _BoardScaffold extends StatelessWidget {
   final Future<void> Function()? onRefresh;
   final bool embedded;
 
+  /// Standalone only: selected Tasks / Recurring / Notes capsule.
+  final int? sectionIndex;
+  final ValueChanged<int>? onSectionChanged;
+
+  /// Standalone only: "N tasks · M columns" shown under capsules when Tasks.
+  final String? boardMetaLine;
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final topGradient = isDark
         ? [const Color(0xFF1E293B), const Color(0xFF0B1220)]
         : [const Color(0xFFFFFFFF), const Color(0xFFF1F5F9)];
+    final selectedSection = sectionIndex ?? _kProjectBoardSectionTasks;
+    final showTasksChrome = !embedded
+        ? selectedSection == _kProjectBoardSectionTasks
+        : true;
+    final showMetaLine =
+        showTasksChrome && boardMetaLine != null;
+    final showHeaderStats = headerStats != null && showTasksChrome;
 
     final headerPadding = embedded
         ? const EdgeInsets.fromLTRB(
@@ -424,7 +549,27 @@ class _BoardScaffold extends StatelessWidget {
                   ),
               ],
             ),
-            if (headerStats != null) ...[
+            // Standalone Projects board only: section capsules.
+            if (!embedded &&
+                sectionIndex != null &&
+                onSectionChanged != null) ...[
+              const SizedBox(height: AppSpacing.md),
+              _ProjectBoardSectionTabs(
+                selectedIndex: sectionIndex!,
+                onChanged: onSectionChanged!,
+              ),
+              if (showMetaLine) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  boardMetaLine!,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontSize: 13,
+                        color: AppColors.textMuted,
+                      ),
+                ),
+              ],
+            ],
+            if (showHeaderStats) ...[
               SizedBox(height: embedded ? AppSpacing.sm : AppSpacing.md),
               Row(
                 children: [
@@ -449,6 +594,75 @@ class _BoardScaffold extends StatelessWidget {
           SafeArea(bottom: false, child: headerBlock),
         Expanded(child: child),
       ],
+    );
+  }
+}
+
+/// Section pills on the standalone Projects board (matches Tasks tab styling).
+///
+/// Tasks → board body; Recurring → [RecurringScreen]; Notes → coming-soon.
+class _ProjectBoardSectionTabs extends StatelessWidget {
+  const _ProjectBoardSectionTabs({
+    required this.selectedIndex,
+    required this.onChanged,
+  });
+
+  static const _labels = ['Tasks', 'Recurring', 'Notes'];
+
+  final int selectedIndex;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final trackColor =
+        isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: trackColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(3),
+        child: Row(
+          children: [
+            for (var i = 0; i < _labels.length; i++)
+              Expanded(
+                child: Material(
+                  color: selectedIndex == i
+                      ? AppColors.primary
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                  child: InkWell(
+                    onTap: () {
+                      if (selectedIndex == i) return;
+                      onChanged(i);
+                    },
+                    borderRadius: BorderRadius.circular(10),
+                    child: SizedBox(
+                      height: 36,
+                      child: Center(
+                        child: Text(
+                          _labels[i],
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.labelMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: selectedIndex == i
+                                        ? Colors.white
+                                        : AppColors.textMuted,
+                                  ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -963,6 +1177,21 @@ class _CreateTaskFab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return _BoardActionFab(label: 'New task', onPressed: onPressed);
+  }
+}
+
+class _BoardActionFab extends StatelessWidget {
+  const _BoardActionFab({
+    required this.label,
+    required this.onPressed,
+  });
+
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
@@ -984,7 +1213,7 @@ class _CreateTaskFab extends StatelessWidget {
         foregroundColor: Colors.white,
         onPressed: onPressed,
         icon: const Icon(Icons.add_rounded),
-        label: const Text('New task'),
+        label: Text(label),
       ),
     );
   }
