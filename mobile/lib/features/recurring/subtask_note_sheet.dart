@@ -21,10 +21,22 @@ class SubtaskNoteSheetResult {
   const SubtaskNoteSheetResult({
     required this.hasNotes,
     this.latestNotePreview,
+    this.commentCount = 0,
   });
 
   final bool hasNotes;
   final String? latestNotePreview;
+  /// Plain total of all comments on the subtask (all authors + nested replies).
+  final int commentCount;
+}
+
+/// Counts every comment in the tree (roots and replies). Not unread-aware.
+int countSubtaskComments(List<SubtaskComment> roots) {
+  var n = 0;
+  for (final r in roots) {
+    n += 1 + r.descendantCount;
+  }
+  return n;
 }
 
 Future<SubtaskNoteSheetResult?> showSubtaskNoteSheet({
@@ -245,6 +257,7 @@ class _SubtaskNotesThreadSheetState
       SubtaskNoteSheetResult(
         hasNotes: hasNotes,
         latestNotePreview: latest?.isEmpty == true ? null : latest,
+        commentCount: countSubtaskComments(_roots),
       ),
     );
   }
