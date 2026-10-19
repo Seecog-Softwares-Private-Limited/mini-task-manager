@@ -115,6 +115,9 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
   SubtaskCompletionRecord? _completionRecord;
   late bool _requireLocation;
   String? _notePreview;
+  /// Plain total of all comments on this subtask (everyone’s, including replies).
+  /// Not an unread/new indicator — just the count.
+  int _commentCount = 0;
   /// Daily-run: expand Camera/Gallery/File/Voice only after "Attach proof".
   bool _proofPickerOpen = false;
 
@@ -136,6 +139,7 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     _notePreview = widget.subtask.note;
     if (!widget.templateMode) {
       _loadAttachments();
+      _loadCommentCount();
       _attachDescriptionPasteListener();
     } else {
       _loadingAttachments = false;
@@ -186,9 +190,11 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     if (oldWidget.subtask.id != widget.subtask.id) {
       _completionRecord = widget.subtask.completionRecord;
       _notePreview = widget.subtask.note;
+      _commentCount = 0;
       _proofPickerOpen = false;
       if (!widget.templateMode) {
         _loadAttachments();
+        _loadCommentCount();
       } else {
         _attachments = const [];
         _attachmentError = null;
@@ -702,6 +708,25 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     );
   }
 
+  Future<void> _loadCommentCount() async {
+    if (widget.templateMode) return;
+    final id = widget.subtask.id.trim();
+    if (id.isEmpty) {
+      if (mounted) setState(() => _commentCount = 0);
+      return;
+    }
+    try {
+      final roots = await ref.read(tasksRepositoryProvider).fetchSubtaskComments(
+            taskId: widget.taskId,
+            subtaskId: id,
+          );
+      if (!mounted) return;
+      setState(() => _commentCount = countSubtaskComments(roots));
+    } catch (_) {
+      // Keep last known count; bubble still shows (may be 0).
+    }
+  }
+
   Future<void> _openComments() async {
     if (widget.templateMode || widget.saving) return;
     final id = widget.subtask.id.trim();
@@ -733,7 +758,10 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
     final next = result.hasNotes
         ? (preview != null && preview.isNotEmpty ? preview : 'Comments')
         : null;
-    setState(() => _notePreview = next);
+    setState(() {
+      _notePreview = next;
+      _commentCount = result.commentCount;
+    });
     widget.onNoteChanged?.call(next);
   }
 
@@ -1102,14 +1130,23 @@ class _SubtaskDetailPanelState extends ConsumerState<SubtaskDetailPanel> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                hasCommentPreview
-                                    ? 'Open comments'
-                                    : 'Add comments',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleSmall
-                                    ?.copyWith(fontWeight: FontWeight.w700),
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      hasCommentPreview
+                                          ? 'Open comments'
+                                          : 'Add comments',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleSmall
+                                          ?.copyWith(
+                                              fontWeight: FontWeight.w700),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _CommentCountBubble(count: _commentCount),
+                                ],
                               ),
                               const SizedBox(height: 2),
                               Text(
@@ -1856,6 +1893,35 @@ class _CompletionRecordCard extends StatelessWidget {
             TextSpan(text: value),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Neutral count pill — always shown (including 0); no unread styling.
+class _CommentCountBubble extends StatelessWidget {
+  const _CommentCountBubble({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = count > 99 ? '99+' : '$count';
+    return Container(
+      constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.border.withValues(alpha: 0.65),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: AppColors.textMuted,
+              height: 1.1,
+            ),
       ),
     );
   }

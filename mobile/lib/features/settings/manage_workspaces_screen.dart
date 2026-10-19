@@ -162,8 +162,6 @@ class _WorkspaceManageCard extends ConsumerWidget {
     return role == 'owner' || role == 'admin';
   }
 
-  bool get _isOwner => organization.myRole?.toLowerCase() == 'owner';
-
   Future<void> _editWorkspace(BuildContext context, WidgetRef ref) async {
     final updated = await showWorkspaceSettingsSheet(
       context: context,
@@ -171,49 +169,6 @@ class _WorkspaceManageCard extends ConsumerWidget {
       organizationId: organization.id,
     );
     if (updated == true) await onChanged();
-  }
-
-  Future<void> _deleteWorkspace(BuildContext context, WidgetRef ref) async {
-    if (!_isOwner) {
-      showAppMessage('Only the workspace owner can delete it.', isError: true);
-      return;
-    }
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete workspace?'),
-        content: Text(
-          'Permanently delete "${organization.name}"? All projects, tasks, '
-          'members, and data will be removed. This cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.danger),
-            child: const Text('Delete permanently'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-
-    try {
-      await ref
-          .read(sessionControllerProvider.notifier)
-          .deleteWorkspace(organization.id);
-      ref.invalidate(projectsProvider);
-      ref.invalidate(projectsForOrganizationProvider(organization.id));
-      showAppMessage('Workspace deleted');
-      await onChanged();
-    } on ApiException catch (e) {
-      showAppMessage(e.message, isError: true);
-    } catch (_) {
-      showAppMessage('Could not delete workspace.', isError: true);
-    }
   }
 
   @override
@@ -278,37 +233,13 @@ class _WorkspaceManageCard extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    PopupMenuButton<_WorkspaceAction>(
-                      tooltip: 'Workspace actions',
-                      onSelected: (action) {
-                        switch (action) {
-                          case _WorkspaceAction.edit:
-                            _editWorkspace(context, ref);
-                          case _WorkspaceAction.delete:
-                            _deleteWorkspace(context, ref);
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        PopupMenuItem(
-                          value: _WorkspaceAction.edit,
-                          enabled: _canManage,
-                          child: const Text('Edit workspace'),
-                        ),
-                        PopupMenuItem(
-                          value: _WorkspaceAction.delete,
-                          enabled: _isOwner,
-                          child: Text(
-                            'Delete workspace',
-                            style: TextStyle(
-                              color: _isOwner
-                                  ? AppColors.danger
-                                  : AppColors.textMuted,
-                            ),
-                          ),
-                        ),
-                      ],
-                      icon: const Icon(Icons.more_vert_rounded),
-                    ),
+                    if (_canManage)
+                      IconButton(
+                        tooltip: 'Edit Workspace',
+                        onPressed: () => _editWorkspace(context, ref),
+                        icon: const Icon(Icons.edit_outlined, size: 20),
+                        visualDensity: VisualDensity.compact,
+                      ),
                     Icon(
                       expanded
                           ? Icons.expand_less_rounded
@@ -333,8 +264,6 @@ class _WorkspaceManageCard extends ConsumerWidget {
     );
   }
 }
-
-enum _WorkspaceAction { edit, delete }
 
 class _WorkspaceProjectsPanel extends ConsumerWidget {
   const _WorkspaceProjectsPanel({required this.organization});
