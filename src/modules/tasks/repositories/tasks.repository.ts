@@ -162,6 +162,31 @@ export class TasksRepository {
       .getMany();
   }
 
+  /**
+   * Exact (case-insensitive) title match within an organization, optionally
+   * narrowed to one project. Used by the "add subtasks by title" AI endpoint.
+   */
+  async findByTitleInOrganization(
+    title: string,
+    organizationId: string,
+    projectId?: string,
+  ): Promise<TaskEntity[]> {
+    const qb = this.repo
+      .createQueryBuilder('task')
+      .where('task.organization_id = :organizationId', {
+        organizationId: uuidBinaryTransformer.to(organizationId),
+      })
+      .andWhere('LOWER(task.title) = LOWER(:title)', { title })
+      .orderBy('task.updatedAt', 'DESC')
+      .take(10);
+    if (projectId) {
+      qb.andWhere('task.project_id = :projectId', {
+        projectId: uuidBinaryTransformer.to(projectId),
+      });
+    }
+    return qb.getMany();
+  }
+
   /** Find a task whose JSON subtasks array contains the given subtask id. */
   async findBySubtaskId(subtaskId: string, organizationId: string): Promise<TaskEntity | null> {
     const rows = await this.repo

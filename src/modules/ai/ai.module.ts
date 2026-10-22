@@ -6,6 +6,7 @@ import { OrganizationsModule } from '../organizations/organizations.module';
 import { TasksModule } from '../tasks/tasks.module';
 import { AiController } from './ai.controller';
 import { SubtaskSuggestionsService } from './subtask-suggestions.service';
+import { AddSubtasksByTitleService } from './add-subtasks-by-title.service';
 import {
   AI_COMPLETION_PROVIDER,
   AiCompletionProvider,
@@ -39,6 +40,7 @@ import { GroqCompletionProvider } from './providers/groq-completion.provider';
       inject: [ConfigService, GroqCompletionProvider],
     },
     SubtaskSuggestionsService,
+    AddSubtasksByTitleService,
   ],
 })
 export class AiModule {}
