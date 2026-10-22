@@ -1,0 +1,3479 @@
+{
+ "id": "ba8e8e70-8235-405d-8f06-5b8134cc8c0f",
+ "projectId": "90598de7-39f9-494a-b04f-ea926afa9fb8",
+ "organizationId": "08f8b6f5-3b9e-40cf-abe5-57d3ea71e509",
+ "title": "Create/Update Tasks+Recurring Tasks.",
+ "description": "<p>All Add/update + Recurring tasks bugs/improvements/new task should be in this section</p>",
+ "statusId": "7696dc7c-9b6f-47e5-ba8d-79a349eee805",
+ "priority": "MEDIUM",
+ "assigneeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+ "assigneeIds": [
+  "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+  "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+  "f0065592-c6a4-4d36-a877-a171b1748e2d"
+ ],
+ "assignee": {
+  "id": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+  "fullName": "Pankaj Kumar Agarwal",
+  "email": "pankajkumaragarwal40@gmail.com",
+  "avatarUrl": "/api/v1/users/avatar/0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c"
+ },
+ "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+ "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+ "dueDate": "2026-11-05",
+ "loggedMinutes": 0,
+ "subtasks": [
+  {
+   "id": "1792647351570953_ad28aa",
+   "title": "New wrapper for restaurant operations",
+   "completed": false,
+   "status": "TODO",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-10-22T05:35:51.570922Z",
+   "updatedAt": "2026-10-22T05:35:51.570922Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "assignedAt": "2026-10-22T05:35:52.985Z"
+  },
+  {
+   "id": "f1e9dd1e-3373-49ef-a443-e02b5d2286a4",
+   "title": "Make reel for instagram and youtube",
+   "completed": false,
+   "status": "TODO",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-21T10:37:25.538Z",
+   "updatedAt": "2026-10-21T10:37:25.538Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "assignedAt": "2026-10-21T10:37:25.538Z"
+  },
+  {
+   "id": "cbdc51d7-866d-4b9f-ad8a-af270fab38a4",
+   "title": "Create linkedin account",
+   "completed": false,
+   "status": "TODO",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-21T09:34:48.356Z",
+   "updatedAt": "2026-10-21T09:34:48.356Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "assignedAt": "2026-10-21T09:34:48.356Z"
+  },
+  {
+   "id": "e446eef1-517e-41ac-92cc-ae3ed62bb121",
+   "title": "Create facebook page",
+   "completed": false,
+   "status": "TODO",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-21T09:34:10.381Z",
+   "updatedAt": "2026-10-21T09:34:10.381Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "assignedAt": "2026-10-21T09:34:10.381Z"
+  },
+  {
+   "id": "2e8da5d5-d8f6-4f68-9e48-4a77612497aa",
+   "title": "Create instagram page",
+   "completed": false,
+   "status": "TODO",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-21T09:34:02.335Z",
+   "updatedAt": "2026-10-21T09:34:02.335Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "assignedAt": "2026-10-21T09:34:02.335Z"
+  },
+  {
+   "id": "1784705438797247_bfc65d",
+   "title": "Based on feedback create a weekly report for member including multiple parameters",
+   "completed": false,
+   "status": "TODO",
+   "description": "How much run member covers\nTask completion rate and feedback status\nthis will help in appriasial and also payouts",
+   "assigneeIds": [
+    "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-22T07:30:39.160Z",
+   "updatedAt": "2026-07-22T07:30:39.160Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1783688716863009_40d2c1",
+   "title": "Add a video for task manager",
+   "completed": false,
+   "status": "TODO",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1792414785250000_e5cad6",
+   "title": "Settings icon will be disabled for admin and members only owner can access it",
+   "completed": false,
+   "status": "IN_PROGRESS",
+   "assigneeIds": [
+    "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "dueDate": "2026-10-19",
+   "dueTime": "20:00",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-10-19T12:59:45.249Z",
+   "updatedAt": "2026-10-19T13:00:26.116Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1792405310817742_9f3733",
+   "title": "Projects updated for any admin/member by the owner is not reflecting on admin/member project list",
+   "completed": false,
+   "status": "IN_PROGRESS",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-10-19",
+   "dueTime": "20:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-19T10:21:50.817735Z",
+   "updatedAt": "2026-10-19T12:13:55.384Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1792375601775377_2f7898",
+   "title": "Pin tasks to home page shortcut for easy access",
+   "completed": false,
+   "status": "TODO",
+   "description": "Task can only be pinned and not the sub-task",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-10-19",
+   "dueTime": "16:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-19T02:06:41.774155Z",
+   "updatedAt": "2026-10-19T10:23:25.603361Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1792379852920510_dd3eeb",
+   "title": "Handle different restrictions with roles",
+   "completed": false,
+   "status": "TODO",
+   "description": "1)Owner : There can be multiple owners\npankajkumaragarwal40@gmail.com\na)How to add multiple owner \nb)can create workspace\nc)Can create project\nd)Can add admin and members to workspace (member button is visible to owner only)\n\n2)Admin\na)Can create tasks\nb) Can update all fields of task and subtask\n3)\nMember\na)Can not create task",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-10-19",
+   "dueTime": "16:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-19T03:17:32.920497Z",
+   "updatedAt": "2026-10-19T03:28:25.143338Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1792342035516210_6087ba",
+   "title": "Even we have deleted the few items in checklist in series planner it is reoccurring again",
+   "completed": false,
+   "status": "TODO",
+   "dueDate": "2026-10-19",
+   "dueTime": "15:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-18T16:47:15.516201Z",
+   "updatedAt": "2026-10-18T16:48:29.148676Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1792341179427787_bcdf69",
+   "title": "There should be notes option project specific. Beed plan",
+   "completed": false,
+   "status": "TODO",
+   "assigneeIds": [
+    "f0065592-c6a4-4d36-a877-a171b1748e2d"
+   ],
+   "assigneeId": "f0065592-c6a4-4d36-a877-a171b1748e2d",
+   "dueDate": "2026-10-19",
+   "dueTime": "17:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-18T16:32:59.427776Z",
+   "updatedAt": "2026-10-18T16:33:43.465912Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1792341059923731_8a1215",
+   "title": "can we set task or subtask as alarm, snooze etc",
+   "completed": false,
+   "status": "TODO",
+   "assigneeIds": [
+    "f0065592-c6a4-4d36-a877-a171b1748e2d"
+   ],
+   "assigneeId": "f0065592-c6a4-4d36-a877-a171b1748e2d",
+   "dueDate": "2026-10-19",
+   "dueTime": "16:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-18T16:30:59.923725Z",
+   "updatedAt": "2026-10-18T16:31:28.043522Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1792339146943197_76edfd",
+   "title": "Tasks should be dragged so that we can reorder the tasks",
+   "completed": false,
+   "status": "TODO",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "f0065592-c6a4-4d36-a877-a171b1748e2d"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-10-19",
+   "dueTime": "14:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-18T15:59:06.942825Z",
+   "updatedAt": "2026-10-18T15:59:23.794190Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1792337402711818_102fde",
+   "title": "Instead of typing there should be option for audio to typescript and then through ai correct the sentence",
+   "completed": false,
+   "status": "TODO",
+   "description": "it is hectic to type all ideas",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "f0065592-c6a4-4d36-a877-a171b1748e2d"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-10-19",
+   "dueTime": "14:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-18T15:30:02.711804Z",
+   "updatedAt": "2026-10-18T15:30:42.361892Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1792336874164854_8eeef6",
+   "title": "Genearate a very detailed pdf for screenshots",
+   "completed": false,
+   "status": "TODO",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "f0065592-c6a4-4d36-a877-a171b1748e2d"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-10-19",
+   "dueTime": "14:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-18T15:21:14.164846Z",
+   "updatedAt": "2026-10-18T15:21:42.297129Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1792334823770324_305df5",
+   "title": "There is no option to change workspace when clicked on projects",
+   "completed": false,
+   "status": "TODO",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-10-19",
+   "dueTime": "12:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-18T14:47:03.770276Z",
+   "updatedAt": "2026-10-18T14:48:18.298655Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1792334095826479_ac5d69",
+   "title": "There should be 3 options 1)Raised By 2)Updated by 3)Assigned To",
+   "completed": false,
+   "status": "TODO",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-10-19",
+   "dueTime": "12:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-18T14:34:55.826467Z",
+   "updatedAt": "2026-10-18T14:35:36.943453Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "571e295e-28b6-4018-b845-6a05e441e16f",
+   "title": "iOS App : Release the iOS app",
+   "completed": false,
+   "status": "TODO",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-10-19",
+   "dueTime": "12:00",
+   "priority": "CRITICAL",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-03T05:57:22.174Z",
+   "updatedAt": "2026-10-18T14:33:24.505508Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1792219282156311_7e2a5d",
+   "title": "in home page or tab due task top last 20 subtask/task should come",
+   "completed": false,
+   "status": "IN_PROGRESS",
+   "description": "deep orange color project name at top \n\nProject : xyzhxhx\nTask : jdbdhdb\nSub Task : hshdhd\n\n———\nProject : hush\nTask : jshshdb",
+   "assigneeIds": [
+    "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c"
+   ],
+   "assigneeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "dueDate": "2026-10-17",
+   "dueTime": "18:00",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-10-17T06:41:23.591Z",
+   "updatedAt": "2026-10-17T13:24:30.296Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1792224759529530_c5327a",
+   "title": "The task list item is visible when content is big but when checked in sub task form the title of sub task is not completely visible",
+   "completed": false,
+   "status": "TODO",
+   "description": "the height of text field that is showing the sub task title should toggle acc to content of subtask",
+   "assigneeIds": [
+    "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "dueDate": "2026-10-17",
+   "dueTime": "17:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-17T08:12:56.342Z",
+   "updatedAt": "2026-10-17T08:12:56.342Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1792222929928193_bbd9",
+   "title": "For workspace setting page few changes",
+   "completed": false,
+   "status": "TODO",
+   "description": "The button “Invite Members” should change to “Members”. \nonce clicked on members the next page should have below changes: \n1)instead of pending invitations \nwe should have 2 tabs “Pending Invitations” and “Existing Members”\n2) In existing members we can do below actions : \na)Remove Member \nconfirmation box\nb)Change role\npopup with role dropdown with existing role pre selected \nc)Update project list \npopup with project dropdown with existing projects pre selected",
+   "assigneeIds": [
+    "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "dueDate": "2026-10-17",
+   "dueTime": "17:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-17T07:42:32.493Z",
+   "updatedAt": "2026-10-17T07:42:32.493Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1792222278903752_af5e35",
+   "title": "post demo of vinik at 4 pm Sumit will make apk and make it live by 10pm",
+   "completed": false,
+   "status": "IN_PROGRESS",
+   "assigneeIds": [
+    "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+    "f0065592-c6a4-4d36-a877-a171b1748e2d"
+   ],
+   "assigneeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "dueDate": "2026-10-17",
+   "dueTime": "22:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-17T07:42:32.493Z",
+   "updatedAt": "2026-10-17T07:42:32.493Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1792219971183805_6e5fff",
+   "title": "the hash numbering for sub task is coming diff for diff mobiles.",
+   "completed": false,
+   "status": "IN_PROGRESS",
+   "description": "for each subtask should start from 1 for each new task. as we can not disturb the main I’d of sub task table so there should be new field in JSON body\nsubtask_id \nwe should run the query to update at least one task only that is not imp\n\nthen finally we will apply on out main task",
+   "assigneeIds": [
+    "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "dueDate": "2026-10-17",
+   "dueTime": "14:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-17T06:52:53.980Z",
+   "updatedAt": "2026-10-17T06:52:53.980Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1792218667344121_1a8484",
+   "title": "only selected user for specific task if ritual should get notification , email, on dashboard home page planner",
+   "completed": false,
+   "status": "TODO",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-10-17",
+   "dueTime": "15:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-17T06:31:07.787Z",
+   "updatedAt": "2026-10-17T06:31:07.787Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1792217180776983_8c9493",
+   "title": "when a user click on notification the specific task or the sub-task should open",
+   "completed": false,
+   "status": "IN_PROGRESS",
+   "assigneeIds": [
+    "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "dueDate": "2026-10-17",
+   "dueTime": "18:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-17T06:06:21.157Z",
+   "updatedAt": "2026-10-17T06:06:21.157Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1784704861942025_a500ca",
+   "title": "Feedback should be sent to the assignee as notification, on email and on app",
+   "completed": false,
+   "status": "IN_PROGRESS",
+   "assigneeIds": [
+    "b5fb10b6-5321-46ed-8f42-11b9a7ddc4e0"
+   ],
+   "assigneeId": "b5fb10b6-5321-46ed-8f42-11b9a7ddc4e0",
+   "dueDate": "2026-07-28",
+   "dueTime": "15:00",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-22T07:21:02.204Z",
+   "updatedAt": "2026-07-22T07:21:02.204Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1784183789719882_2323fc",
+   "title": "Planner should be editable",
+   "completed": false,
+   "status": "TODO",
+   "description": "planner should be editable. the edit button should be left if delete button",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-20",
+   "dueTime": "15:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-07-16T06:36:30.285Z",
+   "updatedAt": "2026-07-16T06:36:30.285Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "2ae24ae5-16d1-493c-8331-22d035f7ff97",
+   "title": "Add a premium for each subtask",
+   "completed": false,
+   "status": "TODO",
+   "assigneeIds": [
+    "b5fb10b6-5321-46ed-8f42-11b9a7ddc4e0"
+   ],
+   "assigneeId": "b5fb10b6-5321-46ed-8f42-11b9a7ddc4e0",
+   "dueDate": "2026-07-21",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1783889783204050_7a5f24",
+   "title": "there should be some notification system which can be used as reminder for task or recurring task",
+   "completed": false,
+   "status": "TODO",
+   "description": "it can also be used for product update notifications",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-13",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "db546b6f-1e80-42e3-a94f-dbb04735de16",
+   "title": "iOS App : Review of iOS App",
+   "completed": false,
+   "status": "IN_PROGRESS",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-03T05:57:15.926Z",
+   "updatedAt": "2026-08-03T05:57:15.926Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1792413401252000_331dfe",
+   "title": "in subtask comment add bubble with number for the new comment counter",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "f0065592-c6a4-4d36-a877-a171b1748e2d"
+   ],
+   "assigneeId": "f0065592-c6a4-4d36-a877-a171b1748e2d",
+   "dueDate": "2026-10-19",
+   "dueTime": "20:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-10-19T13:58:02.659Z",
+    "employeeId": "f0065592-c6a4-4d36-a877-a171b1748e2d",
+    "employeeName": "sumit kumar",
+    "employeeEmail": "sumitkumar302100@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "1.0.0",
+     "buildNumber": "27",
+     "packageName": "mini_task_manager",
+     "platform": "windows",
+     "browserName": "chrome",
+     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
+     "vendor": "Google Inc."
+    },
+    "afterPhotoFileNames": [
+     "after-Photo 2026-10-19 19.28.35.jpg"
+    ]
+   },
+   "reporterId": "f0065592-c6a4-4d36-a877-a171b1748e2d",
+   "createdAt": "2026-10-19T12:36:41.251Z",
+   "updatedAt": "2026-10-19T13:58:37.731Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-10-19T13:58:02.659Z"
+  },
+  {
+   "id": "1792404031454112_409e6b",
+   "title": "On bottom settings menu there should be configurations options",
+   "completed": true,
+   "status": "DONE",
+   "description": "Menu\n1)Manage workspace and projects\n-once clicked we can see list of workspaces (crud)\n-once clicked on any workspace then we can see list of projects (crud)\n\n2)Configure task status with color",
+   "assigneeIds": [
+    "f0065592-c6a4-4d36-a877-a171b1748e2d"
+   ],
+   "assigneeId": "f0065592-c6a4-4d36-a877-a171b1748e2d",
+   "dueDate": "2026-10-19",
+   "dueTime": "18:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-10-19T13:57:41.023Z",
+    "employeeId": "f0065592-c6a4-4d36-a877-a171b1748e2d",
+    "employeeName": "sumit kumar",
+    "employeeEmail": "sumitkumar302100@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "1.0.0",
+     "buildNumber": "27",
+     "packageName": "mini_task_manager",
+     "platform": "windows",
+     "browserName": "chrome",
+     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
+     "vendor": "Google Inc."
+    },
+    "afterPhotoFileNames": [
+     "after-Photo 2026-10-19 19.27.48.jpg"
+    ]
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-19T10:00:31.454107Z",
+   "updatedAt": "2026-10-19T13:58:16.251Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-10-19T13:57:41.023Z"
+  },
+  {
+   "id": "1792404402918690_a4d843",
+   "title": "The subtask details section should contain updated information",
+   "completed": true,
+   "status": "DONE",
+   "description": "Raised By : Pankaj kumar Agarwal     (owner) - 19th Oct 2026 , 2 pm\n—————-\nLast Updated  : Vinik (admin) -  20th October 2026, 4 pm\n—————\nAssigned To : Sumit",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-10-19",
+   "dueTime": "18:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-10-19T12:03:52.871Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "employeeEmail": "vinikdhariwal13@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "1.0.0",
+     "buildNumber": "27",
+     "packageName": "mini_task_manager",
+     "platform": "macOS",
+     "browserName": "chrome",
+     "userAgent": "Mozilla/5.0 (Linux; Android 16; Pixel 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Mobile Safari/537.36",
+     "vendor": "Google Inc."
+    },
+    "notes": "Done",
+    "afterPhotoFileNames": [
+     "after-Photo 2026-10-19 17.33.59.jpg"
+    ]
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-19T10:06:42.918680Z",
+   "updatedAt": "2026-10-19T12:11:57.341Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-10-19T12:03:52.871Z"
+  },
+  {
+   "id": "1792335212611194_3c5100",
+   "title": "The section from 1)Task attachments to 2)above checklist should be expendable and collepsable. The label under which all will be there is “Advance Options”",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-10-19",
+   "dueTime": "18:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-10-19T11:31:41.848Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "employeeEmail": "vinikdhariwal13@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "1.0.0",
+     "buildNumber": "27",
+     "packageName": "mini_task_manager",
+     "platform": "macOS",
+     "browserName": "chrome",
+     "userAgent": "Mozilla/5.0 (Linux; Android 16; Pixel 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Mobile Safari/537.36",
+     "vendor": "Google Inc."
+    },
+    "notes": "Items Stay under a collapsable menu untill clicked on arrow",
+    "afterPhotoFileNames": [
+     "after-Photo 2026-10-19 17.01.47.jpg"
+    ]
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-18T14:53:32.611169Z",
+   "updatedAt": "2026-10-19T11:32:11.809Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-10-19T11:31:41.848Z"
+  },
+  {
+   "id": "1792336786118504_9e220b",
+   "title": "Hide ai suggestion box from everywhere",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-10-19",
+   "dueTime": "18:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-10-19T11:27:34.156Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "employeeEmail": "vinikdhariwal13@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "1.0.0",
+     "buildNumber": "27",
+     "packageName": "mini_task_manager",
+     "platform": "macOS",
+     "browserName": "chrome",
+     "userAgent": "Mozilla/5.0 (Linux; Android 16; Pixel 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Mobile Safari/537.36",
+     "vendor": "Google Inc."
+    },
+    "afterPhotoFileNames": [
+     "after-Photo 2026-10-19 16.57.40.jpg"
+    ]
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-18T15:19:46.118486Z",
+   "updatedAt": "2026-10-19T11:27:43.289Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-10-19T11:27:34.156Z"
+  },
+  {
+   "id": "1792333918168468_32a24a",
+   "title": "There is no option to upload image for project edit and creation",
+   "completed": true,
+   "status": "DONE",
+   "description": "the logo upload should come in add , edit and can also be visible on list",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-10-19",
+   "dueTime": "18:00",
+   "priority": "HIGH",
+   "completionRecord": {
+    "completedAt": "2026-10-19T11:15:23.196Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "employeeEmail": "vinikdhariwal13@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "1.0.0",
+     "buildNumber": "27",
+     "packageName": "mini_task_manager",
+     "platform": "macOS",
+     "browserName": "chrome",
+     "userAgent": "Mozilla/5.0 (Linux; Android 16; Pixel 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Mobile Safari/537.36",
+     "vendor": "Google Inc."
+    },
+    "notes": "Complete",
+    "afterPhotoFileNames": [
+     "after-Photo 2026-10-19 16.45.30.jpg"
+    ]
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-18T14:31:58.168461Z",
+   "updatedAt": "2026-10-19T11:15:36.133Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-10-19T11:15:23.196Z"
+  },
+  {
+   "id": "1792403793620205_a07815",
+   "title": "On the “Tasks” tab there should be 2 filters",
+   "completed": true,
+   "status": "DONE",
+   "description": "1)Select Workspace\n2)Select Project",
+   "assigneeIds": [
+    "f0065592-c6a4-4d36-a877-a171b1748e2d"
+   ],
+   "assigneeId": "f0065592-c6a4-4d36-a877-a171b1748e2d",
+   "dueDate": "2026-10-19",
+   "dueTime": "18:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-10-19T11:10:24.416Z",
+    "employeeId": "f0065592-c6a4-4d36-a877-a171b1748e2d",
+    "employeeName": "sumit kumar",
+    "employeeEmail": "sumitkumar302100@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "1.0.0",
+     "buildNumber": "27",
+     "packageName": "mini_task_manager",
+     "platform": "windows",
+     "browserName": "chrome",
+     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
+     "vendor": "Google Inc."
+    },
+    "afterPhotoFileNames": [
+     "after-Photo 2026-10-19 16.40.30.jpg"
+    ]
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-19T09:56:33.620183Z",
+   "updatedAt": "2026-10-19T11:10:32.371Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-10-19T11:10:24.416Z"
+  },
+  {
+   "id": "1792375666126974_f5dae2",
+   "title": "Under project on single page there should be 3 tabs",
+   "completed": true,
+   "status": "DONE",
+   "description": "1)\n3 bottom menu :\nHome , Tasks , alerts, setting\n\n2)Setting\nManage Workspace & Projects\nadd , edit , delete\n\nTasks\nRecurring Tasks\nNotes",
+   "assigneeIds": [
+    "f0065592-c6a4-4d36-a877-a171b1748e2d"
+   ],
+   "assigneeId": "f0065592-c6a4-4d36-a877-a171b1748e2d",
+   "dueDate": "2026-10-19",
+   "dueTime": "18:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-10-19T10:35:37.038Z",
+    "employeeId": "f0065592-c6a4-4d36-a877-a171b1748e2d",
+    "employeeName": "sumit kumar",
+    "employeeEmail": "sumitkumar302100@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "1.0.0",
+     "buildNumber": "27",
+     "packageName": "mini_task_manager",
+     "platform": "windows",
+     "browserName": "chrome",
+     "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36",
+     "vendor": "Google Inc."
+    },
+    "notes": "done",
+    "afterPhotoFileNames": [
+     "after-Photo 2026-10-19 16.05.46.jpg"
+    ]
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-19T02:07:46.126966Z",
+   "updatedAt": "2026-10-19T10:36:18.285Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-10-19T10:35:37.038Z"
+  },
+  {
+   "id": "1792402059609064_2a813d",
+   "title": "In sub task new title text field when more words are added the vertical expansion happen",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-10-19",
+   "dueTime": "15:20",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-10-19T09:30:08.540Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "employeeEmail": "vinikdhariwal13@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "1.0.0",
+     "buildNumber": "27",
+     "packageName": "mini_task_manager",
+     "platform": "macOS",
+     "browserName": "chrome",
+     "userAgent": "Mozilla/5.0 (Linux; Android 16; Pixel 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Mobile Safari/537.36",
+     "vendor": "Google Inc."
+    },
+    "notes": "Complete",
+    "beforePhotoFileNames": [
+     "before-Photo 2026-10-19 15.00.23.jpg"
+    ]
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-19T09:27:39.608038Z",
+   "updatedAt": "2026-10-19T09:30:30.224Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-10-19T09:30:08.540Z"
+  },
+  {
+   "id": "1792337068406070_5bcf32",
+   "title": "There is no option to delete the workspace with alert box confirmation",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-10-19",
+   "dueTime": "14:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-10-19T08:04:40.348Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "employeeEmail": "vinikdhariwal13@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "1.0.0",
+     "buildNumber": "27",
+     "packageName": "mini_task_manager",
+     "platform": "macOS",
+     "browserName": "chrome",
+     "userAgent": "Mozilla/5.0 (Linux; Android 16; Pixel 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Mobile Safari/537.36",
+     "vendor": "Google Inc."
+    },
+    "notes": "Workspace can now be deleted by owner only",
+    "afterPhotoFileNames": [
+     "after-Photo 2026-10-19 13.34.52.jpg"
+    ]
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-18T15:24:28.406062Z",
+   "updatedAt": "2026-10-19T08:05:23.502Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-10-19T08:04:40.348Z"
+  },
+  {
+   "id": "1792391204022623_967abf",
+   "title": "The date/time for subtask can not exceed task date/time",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-10-19",
+   "dueTime": "14:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-10-19T07:59:21.641Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "employeeEmail": "vinikdhariwal13@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "1.0.0",
+     "buildNumber": "27",
+     "packageName": "mini_task_manager",
+     "platform": "macOS",
+     "browserName": "chrome",
+     "userAgent": "Mozilla/5.0 (Linux; Android 16; Pixel 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Mobile Safari/537.36",
+     "vendor": "Google Inc."
+    },
+    "notes": "Before all the dates were unblocked now only date range of today till due date of task is allowed to select other dates stay blocked",
+    "beforePhotoFileNames": [
+     "before-Photo 2026-10-19 13.29.34.jpg"
+    ],
+    "afterPhotoFileNames": [
+     "after-Photo 2026-10-19 13.29.29.jpg"
+    ]
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-19T06:26:44.021390Z",
+   "updatedAt": "2026-10-19T08:00:32.181Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-10-19T07:59:21.641Z"
+  },
+  {
+   "id": "1792337288324854_318959",
+   "title": "There is no way to edit the task/subtask completion notes",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-10-19",
+   "dueTime": "14:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-10-19T07:44:21.222Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "employeeEmail": "vinikdhariwal13@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "1.0.0",
+     "buildNumber": "27",
+     "packageName": "mini_task_manager",
+     "platform": "macOS",
+     "browserName": "chrome",
+     "userAgent": "Mozilla/5.0 (Linux; Android 16; Pixel 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Mobile Safari/537.36",
+     "vendor": "Google Inc."
+    },
+    "notes": "Complete",
+    "afterPhotoFileNames": [
+     "after-Photo 2026-10-19 13.14.27.jpg",
+     "after-Photo 2026-10-19 13.14.27.jpg"
+    ]
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-18T15:28:08.324576Z",
+   "updatedAt": "2026-10-19T07:44:36.079Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-10-19T07:44:21.222Z"
+  },
+  {
+   "id": "1792339227900549_827526",
+   "title": "After clicking on new task text field it should expand vertically so to accommodate more words",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-10-19",
+   "dueTime": "14:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-10-19T07:29:57.866Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "employeeEmail": "vinikdhariwal13@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "1.0.0",
+     "buildNumber": "27",
+     "packageName": "mini_task_manager",
+     "platform": "macOS",
+     "browserName": "chrome",
+     "userAgent": "Mozilla/5.0 (Linux; Android 16; Pixel 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Mobile Safari/537.36",
+     "vendor": "Google Inc."
+    },
+    "notes": "Completed",
+    "afterPhotoFileNames": [
+     "after-Photo 2026-10-19 13.00.10.jpg"
+    ]
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-18T16:00:27.900542Z",
+   "updatedAt": "2026-10-19T07:36:03.868Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-10-19T07:29:57.866Z"
+  },
+  {
+   "id": "1792077182475267_8031e6",
+   "title": "There is no way to edit project name and icon and description",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "dueDate": "2026-10-17",
+   "dueTime": "18:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-10-17T13:27:30.692Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "employeeEmail": "vinikdhariwal13@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "1.0.0",
+     "buildNumber": "27",
+     "packageName": "mini_task_manager",
+     "platform": "macOS",
+     "browserName": "chrome",
+     "userAgent": "Mozilla/5.0 (Linux; Android 16; Pixel 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Mobile Safari/537.36",
+     "vendor": "Google Inc."
+    }
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-15T15:13:02.797Z",
+   "updatedAt": "2026-10-17T13:27:32.312Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-10-17T13:27:30.692Z"
+  },
+  {
+   "id": "1792216557677881_9ede1a",
+   "title": "for subtask there should be one more column for updatedAt so that most recently ipdated task will come on top categorised by to do tasks , etc",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "dueDate": "2026-10-17",
+   "dueTime": "15:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-10-17T13:23:29.098Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "employeeEmail": "vinikdhariwal13@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "1.0.0",
+     "buildNumber": "27",
+     "packageName": "mini_task_manager",
+     "platform": "macOS",
+     "browserName": "chrome",
+     "userAgent": "Mozilla/5.0 (Linux; Android 16; Pixel 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Mobile Safari/537.36",
+     "vendor": "Google Inc."
+    }
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-17T05:55:58.094Z",
+   "updatedAt": "2026-10-17T13:23:30.428Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-10-17T13:23:29.098Z"
+  },
+  {
+   "id": "1792235621606353_4e9347",
+   "title": "For member list should be at first and then “Pending Invitations” after that",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "dueDate": "2026-10-17",
+   "dueTime": "19:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-10-17T13:22:35.053Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "employeeEmail": "vinikdhariwal13@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "1.0.0",
+     "buildNumber": "27",
+     "packageName": "mini_task_manager",
+     "platform": "macOS",
+     "browserName": "chrome",
+     "userAgent": "Mozilla/5.0 (Linux; Android 16; Pixel 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Mobile Safari/537.36",
+     "vendor": "Google Inc."
+    }
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-17T11:13:41.606346Z",
+   "updatedAt": "2026-10-17T13:22:37.149Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-10-17T13:22:35.053Z"
+  },
+  {
+   "id": "1792224263694820_92b436",
+   "title": "for the sub task details form , only assignee name is coming and not who assigned by",
+   "completed": true,
+   "status": "DONE",
+   "description": "Assignee : \nAssigned By : \nDate Time",
+   "assigneeIds": [
+    "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "dueDate": "2026-10-17",
+   "dueTime": "15:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-10-17T11:18:05.487557Z",
+    "employeeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+    "employeeName": "Pankaj Kumar Agarwal",
+    "employeeEmail": "pankajkumaragarwal40@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "1.0.0",
+     "buildNumber": "28",
+     "packageName": "com.seecog.minitaskmanager.miniTaskManager",
+     "platform": "iOS",
+     "deviceId": "39B3AE35-FAF3-4E72-B371-E38F3B341402",
+     "model": "iPhone",
+     "systemName": "iOS",
+     "osVersion": "27.0.1"
+    }
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-17T08:04:24.109Z",
+   "updatedAt": "2026-10-17T08:04:24.109Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-10-17T11:18:05.487557Z"
+  },
+  {
+   "id": "1792218743493313_47504",
+   "title": "why one task deleted is again coming to subtask list",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "dueDate": "2026-10-17",
+   "dueTime": "09:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-10-17T11:19:12.142465Z",
+    "employeeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+    "employeeName": "Pankaj Kumar Agarwal",
+    "employeeEmail": "pankajkumaragarwal40@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "1.0.0",
+     "buildNumber": "28",
+     "packageName": "com.seecog.minitaskmanager.miniTaskManager",
+     "platform": "iOS",
+     "deviceId": "39B3AE35-FAF3-4E72-B371-E38F3B341402",
+     "model": "iPhone",
+     "systemName": "iOS",
+     "osVersion": "27.0.1"
+    }
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-17T06:32:23.922Z",
+   "updatedAt": "2026-10-17T06:32:23.922Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-10-17T11:19:12.142465Z"
+  },
+  {
+   "id": "1792217013695166_9f2a9c",
+   "title": "User should get notification even if the app is opened",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "dueDate": "2026-10-17",
+   "dueTime": "15:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-10-17T11:21:27.015123Z",
+    "employeeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+    "employeeName": "Pankaj Kumar Agarwal",
+    "employeeEmail": "pankajkumaragarwal40@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "1.0.0",
+     "buildNumber": "28",
+     "packageName": "com.seecog.minitaskmanager.miniTaskManager",
+     "platform": "iOS",
+     "deviceId": "39B3AE35-FAF3-4E72-B371-E38F3B341402",
+     "model": "iPhone",
+     "systemName": "iOS",
+     "osVersion": "27.0.1"
+    }
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-17T06:03:34.217Z",
+   "updatedAt": "2026-10-17T06:03:34.217Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-10-17T11:21:27.015123Z"
+  },
+  {
+   "id": "1792215627212362_8975bc",
+   "title": "when inviting the user for any workspace there should be one more field to select multiple projects",
+   "completed": true,
+   "status": "DONE",
+   "description": "current we have 2 fields. \nemail and role. \nso all the 3 fields should be compulsory\nonce the invited user opens the workspace he should see only the projects we selected during invite",
+   "assigneeIds": [
+    "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "dueDate": "2026-10-17",
+   "dueTime": "12:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-10-17T11:22:08.380041Z",
+    "employeeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+    "employeeName": "Pankaj Kumar Agarwal",
+    "employeeEmail": "pankajkumaragarwal40@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "1.0.0",
+     "buildNumber": "28",
+     "packageName": "com.seecog.minitaskmanager.miniTaskManager",
+     "platform": "iOS",
+     "deviceId": "39B3AE35-FAF3-4E72-B371-E38F3B341402",
+     "model": "iPhone",
+     "systemName": "iOS",
+     "osVersion": "27.0.1"
+    }
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-17T05:40:27.612Z",
+   "updatedAt": "2026-10-17T05:40:27.612Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-10-17T11:22:08.380041Z"
+  },
+  {
+   "id": "1792072675703921_301053",
+   "title": "in home page there should be 2 tabs 1) Due Tasks 2)Due Rituals",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-10-17T06:07:26.066057Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "employeeEmail": "vinikdhariwal13@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "2.0.16",
+     "buildNumber": "17",
+     "packageName": "com.seecog.minitaskmanager.mini_task_manager",
+     "platform": "android",
+     "deviceId": "BP2A.250605.015",
+     "model": "CPH2717",
+     "manufacturer": "OnePlus",
+     "osVersion": "16",
+     "sdkInt": 36
+    }
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-15T13:57:55.997Z",
+   "updatedAt": "2026-10-15T13:57:55.997Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-10-17T06:07:26.066057Z"
+  },
+  {
+   "id": "1792041817305473_f08589",
+   "title": "the members selected for tasks should only come for member dropdown in sub task",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "dueDate": "2026-10-15",
+   "dueTime": "12:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-10-15T06:21:55.735Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-15T05:23:37.764Z",
+   "updatedAt": "2026-10-15T05:23:37.764Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-10-15T06:21:55.735Z"
+  },
+  {
+   "id": "1792041730063181_e9a4c4",
+   "title": "critical tasks should group and move to top + In progress tasks should come in list after critical tasks + All the done tasks should come to bottom",
+   "completed": true,
+   "status": "DONE",
+   "description": "1)sub task for which the date and time not assigned should come to top\n2)tasks whose time is remaining to be completed\n3)Tasks whose time got ended\n4)Completed tasks",
+   "assigneeIds": [
+    "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "dueDate": "2026-10-15",
+   "dueTime": "12:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-10-17T11:24:01.353Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "employeeEmail": "vinikdhariwal13@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "1.0.0",
+     "buildNumber": "27",
+     "packageName": "mini_task_manager",
+     "platform": "macOS",
+     "browserName": "chrome",
+     "userAgent": "Mozilla/5.0 (Linux; Android 16; Pixel 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Mobile Safari/537.36",
+     "vendor": "Google Inc."
+    }
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-10-15T05:22:10.412Z",
+   "updatedAt": "2026-10-15T05:22:10.412Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-10-17T11:24:01.353Z"
+  },
+  {
+   "id": "1791966650951122_d7570",
+   "title": "People added in main task should come in subtask not all",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "f0065592-c6a4-4d36-a877-a171b1748e2d"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-10-14",
+   "dueTime": "18:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-10-15T17:14:53.694Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "employeeEmail": "vinikdhariwal13@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "1.0.0",
+     "buildNumber": "26",
+     "packageName": "mini_task_manager",
+     "platform": "macOS",
+     "browserName": "chrome",
+     "userAgent": "Mozilla/5.0 (Linux; Android 16; Pixel 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/154.0.0.0 Mobile Safari/537.36",
+     "vendor": "Google Inc."
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-10-14T08:30:52.296Z",
+   "updatedAt": "2026-10-14T08:30:52.296Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-10-15T17:14:53.694Z"
+  },
+  {
+   "id": "f8269ac3-0faf-45b0-aa8b-db99747a10a1",
+   "title": "Instead of “Description” , we have to put task “title”",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-08-19",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-19T14:04:42.469Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-19T13:02:44.266Z",
+   "updatedAt": "2026-08-19T13:02:44.266Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-19T14:04:42.469Z"
+  },
+  {
+   "id": "5f96a956-fb47-4f18-a930-e8a70c8cb30a",
+   "title": "Make due date and time compulsory for subtask",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-08-19",
+   "dueTime": "19:30",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-19T14:02:50.723Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-19T12:57:35.150Z",
+   "updatedAt": "2026-08-19T12:57:35.150Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-19T14:02:50.723Z"
+  },
+  {
+   "id": "71f670f8-5300-46a1-99ed-5a0b4821d5bc",
+   "title": "Add \"Due Date\" in red color below subtask title",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-08-19",
+   "dueTime": "19:30",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-19T14:00:32.737Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-19T12:51:20.819Z",
+   "updatedAt": "2026-08-19T12:51:20.819Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-19T14:00:32.737Z"
+  },
+  {
+   "id": "cae943fb-61c3-4efd-99d5-7f4b520f25a6",
+   "title": "Remove time from subtask that got completed",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-08-19",
+   "dueTime": "19:30",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-19T13:54:07.259Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-19T12:49:06.131Z",
+   "updatedAt": "2026-08-19T12:49:06.131Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-19T13:54:07.259Z"
+  },
+  {
+   "id": "b0fce430-7dc9-489c-915e-8f72c2ec73e9",
+   "title": "Add a small subtask number to below checkbox of subtask i.e. #12",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-08-19",
+   "dueTime": "19:30",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-19T13:53:18.875Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-19T12:44:37.859Z",
+   "updatedAt": "2026-08-19T12:44:37.859Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-19T13:53:18.875Z"
+  },
+  {
+   "id": "acfbb099-130c-42ea-8612-961b2d41f5ed",
+   "title": "Add a refresh button on right side of checklist to refresh the content",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-08-19",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-19T13:48:52.432Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-19T12:42:36.441Z",
+   "updatedAt": "2026-08-19T12:42:36.441Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-19T13:48:52.432Z"
+  },
+  {
+   "id": "e478ff7c-9b3b-47f8-8a9f-b481fb1701f3",
+   "title": "Release Testflight",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-08-19",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-19T15:15:41.932Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-19T12:40:13.081Z",
+   "updatedAt": "2026-08-19T12:40:13.081Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-19T15:15:41.932Z"
+  },
+  {
+   "id": "eb34d0d2-9e77-41da-b3b7-55c353c37d6a",
+   "title": "Mobile : Add data deletion and account deletion option",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-08-19",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-19T15:15:43.374Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-19T12:36:34.603Z",
+   "updatedAt": "2026-08-19T12:36:34.603Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-19T15:15:43.374Z"
+  },
+  {
+   "id": "48dbb3eb-42e9-44f0-a3ac-d096c8d132dd",
+   "title": "Mobile : Redirect Razorpay payments to website",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-08-19",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-19T15:15:44.740Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-19T12:35:55.114Z",
+   "updatedAt": "2026-08-19T12:35:55.114Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-19T15:15:44.740Z"
+  },
+  {
+   "id": "0a9b1c29-0277-46c3-b9b5-a391cae67d07",
+   "title": "Cannot Forget Password from mobile it takes to web",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-19T14:02:11.916Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-12T06:25:18.901Z",
+   "updatedAt": "2026-08-12T06:25:18.901Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-19T14:02:11.916Z"
+  },
+  {
+   "id": "c1ff2bf9-6b18-44fc-bdff-af448464d5c9",
+   "title": "No member-invite UI in mobile",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-19T14:02:09.585Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-12T06:14:15.993Z",
+   "updatedAt": "2026-08-12T06:14:15.993Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-19T14:02:09.585Z"
+  },
+  {
+   "id": "2972fb5f-b40b-4be8-9bb0-f9cfbe2c8796",
+   "title": "Home Momentum opens Planner Calendar, not Insights",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-19T14:02:08.361Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-12T06:11:33.402Z",
+   "updatedAt": "2026-08-12T06:11:33.402Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-19T14:02:08.361Z"
+  },
+  {
+   "id": "e8ad4df1-bd73-4ccb-8c50-401286a03f0b",
+   "title": "Alerts tap does not open the related task and subtask",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-19T14:02:06.102Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-12T06:08:10.511Z",
+   "updatedAt": "2026-08-12T06:08:10.511Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-19T14:02:06.102Z"
+  },
+  {
+   "id": "2e3cfc16-6d4c-4a82-8e52-a49f5f638373",
+   "title": "Unpaused SES",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-19T14:02:05.002Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-12T05:50:47.663Z",
+   "updatedAt": "2026-08-12T05:50:47.663Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-19T14:02:05.002Z"
+  },
+  {
+   "id": "85077ce6-04f0-44d8-8f70-897fb6b4cc0d",
+   "title": "Remove server settings from login page",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-19T14:02:03.761Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-12T05:46:28.585Z",
+   "updatedAt": "2026-08-12T05:46:28.585Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-19T14:02:03.761Z"
+  },
+  {
+   "id": "1ba20fa9-215f-4caf-87ec-6fc4db4cf68b",
+   "title": "AWS SES not working (forget password)",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-19T14:02:02.544Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-12T05:24:21.715Z",
+   "updatedAt": "2026-08-12T05:24:21.715Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-19T14:02:02.544Z"
+  },
+  {
+   "id": "0d385e95-f075-49b0-bcca-e0fc88a3d5d2",
+   "title": "Improve Error Handling",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-08-10",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-19T14:01:52.452Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-10T11:00:27.982Z",
+   "updatedAt": "2026-08-10T11:00:27.982Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-19T14:01:52.452Z"
+  },
+  {
+   "id": "899b9fe4-166c-4d17-bfaa-afeba57bf98d",
+   "title": "Home Screen should show due tasks for today",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-08-10",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-19T14:01:51.403Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-10T10:46:46.003Z",
+   "updatedAt": "2026-08-10T10:46:46.003Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-19T14:01:51.403Z"
+  },
+  {
+   "id": "cc184616-3f3e-45de-8aed-0a6d6601614b",
+   "title": "on opening app it goes to login screen first then automatically logs in",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-08-10",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-19T14:01:48.801Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-10T09:13:52.522Z",
+   "updatedAt": "2026-08-10T09:13:52.522Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-19T14:01:48.801Z"
+  },
+  {
+   "id": "1785906881596250_8fe45e",
+   "title": "ask the review for planner checklist form from chatgpt and get all the suggestions in description we want to give premium feel to customer etc",
+   "completed": true,
+   "status": "DONE",
+   "description": "send all checklist form images to pankaj sir",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-08-05",
+   "dueTime": "01:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-05T06:33:10.570Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-05T05:14:42.615Z",
+   "updatedAt": "2026-08-05T05:14:42.615Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-05T06:33:10.570Z"
+  },
+  {
+   "id": "1785906646867037_b7a33a",
+   "title": "there should be option to select how much before we need to send the notification",
+   "completed": true,
+   "status": "DONE",
+   "description": "in the form of dropdown",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-05T12:36:27.491Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-05T05:10:47.976Z",
+   "updatedAt": "2026-08-05T05:10:47.976Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-05T12:36:27.491Z"
+  },
+  {
+   "id": "1785906514342046_72f6b9",
+   "title": "Planner : Send notifications for rituals for the members who are there in that checklist",
+   "completed": true,
+   "status": "DONE",
+   "description": "only task title should be sent as notification\n+vibration",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-05T12:36:26.259Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-05T05:08:35.411Z",
+   "updatedAt": "2026-08-05T05:08:35.411Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-05T12:36:26.259Z"
+  },
+  {
+   "id": "1785906151406100_ba66ce",
+   "title": "Add the comment and notes functionality on website",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-05T07:25:57.320Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-05T05:02:32.403Z",
+   "updatedAt": "2026-08-05T05:02:32.403Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-05T07:25:57.320Z"
+  },
+  {
+   "id": "deaad481-7f9c-44fb-8876-2ca1aa7c6229",
+   "title": "there is a database error when adding the subtask right now",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-05T07:26:04.490Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "f0065592-c6a4-4d36-a877-a171b1748e2d",
+   "createdAt": "2026-08-04T05:39:48.579Z",
+   "updatedAt": "2026-08-04T05:39:48.579Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-05T07:26:04.490Z"
+  },
+  {
+   "id": "e4989ed9-6160-4bf6-9002-734a17de6202",
+   "title": "The button in the planner for add new planner should minimize when scrolling",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-05T10:29:20.875Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "f0065592-c6a4-4d36-a877-a171b1748e2d",
+   "createdAt": "2026-08-04T05:38:32.555Z",
+   "updatedAt": "2026-08-04T05:38:32.555Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-05T10:29:20.875Z"
+  },
+  {
+   "id": "fd65c461-47c8-4000-a599-f7edc153a280",
+   "title": "Android App : Daily Do 12 members testing till live",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "f0065592-c6a4-4d36-a877-a171b1748e2d"
+   ],
+   "assigneeId": "f0065592-c6a4-4d36-a877-a171b1748e2d",
+   "dueDate": "2026-08-03",
+   "dueTime": "16:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-18T05:06:09.537415Z",
+    "employeeId": "f0065592-c6a4-4d36-a877-a171b1748e2d",
+    "employeeName": "sumit kumar",
+    "employeeEmail": "sumitkumar302100@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "2.0.1",
+     "buildNumber": "15",
+     "packageName": "com.seecog.minitaskmanager.mini_task_manager",
+     "platform": "android",
+     "deviceId": "AP3A.240905.015.A2",
+     "model": "Infinix X6871",
+     "manufacturer": "INFINIX",
+     "osVersion": "15",
+     "sdkInt": 35
+    },
+    "notes": "today is the 14th day of the testing of opspick"
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-03T06:07:35.030Z",
+   "updatedAt": "2026-08-03T06:07:35.030Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-18T05:06:09.537415Z"
+  },
+  {
+   "id": "298320af-53b2-4ca4-9e89-96555c90bf19",
+   "title": "Android App : Upload AAB file to Google Play Console inside closed testing",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "f0065592-c6a4-4d36-a877-a171b1748e2d"
+   ],
+   "assigneeId": "f0065592-c6a4-4d36-a877-a171b1748e2d",
+   "dueDate": "2026-08-03",
+   "dueTime": "14:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-03T09:07:08.557217Z",
+    "employeeId": "f0065592-c6a4-4d36-a877-a171b1748e2d",
+    "employeeName": "sumit kumar",
+    "employeeEmail": "sumitkumar302100@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "1.0.0",
+     "buildNumber": "13",
+     "packageName": "com.seecog.minitaskmanager.mini_task_manager",
+     "platform": "android",
+     "deviceId": "AP3A.240905.015.A2",
+     "model": "Infinix X6871",
+     "manufacturer": "INFINIX",
+     "osVersion": "15",
+     "sdkInt": 35
+    },
+    "notes": "it's sent for review",
+    "beforePhotoFileNames": [
+     "before-Photo 2026-08-03 14.37.45.jpg"
+    ]
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-03T06:05:03.960Z",
+   "updatedAt": "2026-08-03T06:05:03.960Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-03T09:07:08.557217Z"
+  },
+  {
+   "id": "51a02078-cbdf-4edb-825b-029cdb7d40b9",
+   "title": "Android App : Create AAB file",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "f0065592-c6a4-4d36-a877-a171b1748e2d"
+   ],
+   "assigneeId": "f0065592-c6a4-4d36-a877-a171b1748e2d",
+   "dueDate": "2026-08-03",
+   "dueTime": "14:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-03T09:06:50.086069Z",
+    "employeeId": "f0065592-c6a4-4d36-a877-a171b1748e2d",
+    "employeeName": "sumit kumar",
+    "employeeEmail": "sumitkumar302100@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "1.0.0",
+     "buildNumber": "13",
+     "packageName": "com.seecog.minitaskmanager.mini_task_manager",
+     "platform": "android",
+     "deviceId": "AP3A.240905.015.A2",
+     "model": "Infinix X6871",
+     "manufacturer": "INFINIX",
+     "osVersion": "15",
+     "sdkInt": 35
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-03T06:01:04.059Z",
+   "updatedAt": "2026-08-03T06:01:04.059Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-03T09:06:50.086069Z"
+  },
+  {
+   "id": "b6e5eb4d-a8c9-4986-92f2-8030a51f873c",
+   "title": "iOS App : Send iOS App for review",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-08-03T05:57:23.289Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-08-03T05:57:08.484Z",
+   "updatedAt": "2026-08-03T05:57:08.484Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-08-03T05:57:23.289Z"
+  },
+  {
+   "id": "1785164322035771_8b06f2",
+   "title": "for edit planner there is no option to add new checklist",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-28",
+   "dueTime": "13:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-07-28T12:16:30.745943Z",
+    "employeeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+    "employeeName": "Pankaj Kumar Agarwal",
+    "employeeEmail": "pankajkumaragarwal40@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "2.0.1",
+     "buildNumber": "15",
+     "packageName": "com.seecog.minitaskmanager.miniTaskManager",
+     "platform": "iOS",
+     "deviceId": "C1724126-A1FC-47E7-AC50-BEF9F24357AA",
+     "model": "iPhone",
+     "systemName": "iOS",
+     "osVersion": "26.5.2"
+    }
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-07-27T14:58:42.327Z",
+   "updatedAt": "2026-07-27T14:58:42.327Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-07-28T12:16:30.745943Z"
+  },
+  {
+   "id": "1785163044759629_5e2a43",
+   "title": "comment/reply section for subtask",
+   "completed": true,
+   "status": "DONE",
+   "description": "There should be comment and reply section for task and substask",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-28",
+   "dueTime": "14:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-07-28T12:16:36.794588Z",
+    "employeeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+    "employeeName": "Pankaj Kumar Agarwal",
+    "employeeEmail": "pankajkumaragarwal40@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "2.0.1",
+     "buildNumber": "15",
+     "packageName": "com.seecog.minitaskmanager.miniTaskManager",
+     "platform": "iOS",
+     "deviceId": "C1724126-A1FC-47E7-AC50-BEF9F24357AA",
+     "model": "iPhone",
+     "systemName": "iOS",
+     "osVersion": "26.5.2"
+    }
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-07-27T14:37:25.039Z",
+   "updatedAt": "2026-07-27T14:37:25.039Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-07-28T12:16:36.794588Z"
+  },
+  {
+   "id": "1785162605715486_2fedcc",
+   "title": "mobile : the subtask created date + time + assignee should be in new row and clearly visible",
+   "completed": true,
+   "status": "DONE",
+   "description": "in 2nd last row it contain “name of assignee with pic & date & time”\nin last row there should be save & delete & reset",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-28",
+   "dueTime": "12:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-07-27T14:30:06.046Z",
+   "updatedAt": "2026-07-27T14:30:06.046Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1785162363441477_f15562",
+   "title": "There should option to move a subtask under another task",
+   "completed": true,
+   "status": "DONE",
+   "description": "the movement of subtask under any task should happen inside same project and not across multiple projects",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-28",
+   "dueTime": "12:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-07-27T14:26:03.754Z",
+   "updatedAt": "2026-07-27T14:26:03.754Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "c472646f-f1c4-4bd8-93f5-bc419d42a3eb",
+   "title": "add https protocol for the \"OpsPick\" website",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "b5fb10b6-5321-46ed-8f42-11b9a7ddc4e0"
+   ],
+   "assigneeId": "b5fb10b6-5321-46ed-8f42-11b9a7ddc4e0",
+   "dueDate": "2026-07-23",
+   "dueTime": "13:00",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-23T05:54:20.560Z",
+   "updatedAt": "2026-07-23T05:54:20.560Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1784703263879482_b5da5",
+   "title": "there should be the option to edit tasks directly from edit button in planner",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-22T06:54:24.198Z",
+   "updatedAt": "2026-07-22T06:54:24.198Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "ca01a8ed-b8d0-42a9-ab82-61968ebefdac",
+   "title": "Recurring task description text area should look good",
+   "completed": true,
+   "status": "DONE",
+   "description": "Descriptionn should be text box \non web application there should be file upload and audio record\non mobile app there should be file upload, audio record, camera",
+   "assigneeIds": [
+    "b5fb10b6-5321-46ed-8f42-11b9a7ddc4e0"
+   ],
+   "assigneeId": "b5fb10b6-5321-46ed-8f42-11b9a7ddc4e0",
+   "priority": "MEDIUM",
+   "reporterId": "b5fb10b6-5321-46ed-8f42-11b9a7ddc4e0",
+   "createdAt": "2026-07-22T06:43:29.600Z",
+   "updatedAt": "2026-07-22T06:43:29.600Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "250b71d3-5039-45b0-8c70-1d07a3bd0f3d",
+   "title": "Enhance UI of login page + Signup page + Forget Password and OTP Page",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "b5fb10b6-5321-46ed-8f42-11b9a7ddc4e0"
+   ],
+   "assigneeId": "b5fb10b6-5321-46ed-8f42-11b9a7ddc4e0",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-10-17T07:24:28.273992Z",
+    "employeeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+    "employeeName": "Pankaj Kumar Agarwal",
+    "employeeEmail": "pankajkumaragarwal40@gmail.com",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": true,
+    "deviceInfo": {
+     "appVersion": "1.0.0",
+     "buildNumber": "27",
+     "packageName": "com.seecog.minitaskmanager.miniTaskManager",
+     "platform": "iOS",
+     "deviceId": "39B3AE35-FAF3-4E72-B371-E38F3B341402",
+     "model": "iPhone",
+     "systemName": "iOS",
+     "osVersion": "27.0.1"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-22T06:20:41.904Z",
+   "updatedAt": "2026-07-22T06:20:41.904Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-10-17T07:24:28.273992Z"
+  },
+  {
+   "id": "c5525b9b-c4ce-42b1-9ef6-8514d6222a71",
+   "title": "feedback given by application user should be visible on super admin dashboard",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "b5fb10b6-5321-46ed-8f42-11b9a7ddc4e0"
+   ],
+   "assigneeId": "b5fb10b6-5321-46ed-8f42-11b9a7ddc4e0",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-22T06:07:12.378Z",
+   "updatedAt": "2026-07-22T06:07:12.378Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "8dd92206-a7ba-409a-a92f-69cf57123c00",
+   "title": "For planner assigned members are visible on web but not on mobile",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-22T06:04:49.352Z",
+   "updatedAt": "2026-07-22T06:04:49.352Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1784658530700208_30ff1d",
+   "title": "Configure plan and pricing on app",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-22",
+   "dueTime": "15:00",
+   "priority": "CRITICAL",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-07-21T18:28:50.887Z",
+   "updatedAt": "2026-07-21T18:28:50.887Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1784658365789562_c4683b",
+   "title": "change icon of app",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-22",
+   "dueTime": "14:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-07-21T18:26:05.990Z",
+   "updatedAt": "2026-07-21T18:26:05.990Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1784658231244985_d6ac4a",
+   "title": "app name “opspick” + live deploy",
+   "completed": true,
+   "status": "DONE",
+   "description": "both on ios and android",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-22",
+   "dueTime": "13:00",
+   "priority": "CRITICAL",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-07-21T18:23:51.398Z",
+   "updatedAt": "2026-07-21T18:23:51.398Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1784658110492159_538973",
+   "title": "configure email in ses",
+   "completed": true,
+   "status": "DONE",
+   "description": "support@opspick.com",
+   "assigneeIds": [
+    "b5fb10b6-5321-46ed-8f42-11b9a7ddc4e0"
+   ],
+   "assigneeId": "b5fb10b6-5321-46ed-8f42-11b9a7ddc4e0",
+   "dueDate": "2026-07-22",
+   "dueTime": "12:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-07-30T05:57:43.467Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-07-21T18:21:50.659Z",
+   "updatedAt": "2026-07-21T18:21:50.659Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-07-30T05:57:43.467Z"
+  },
+  {
+   "id": "2a62a53a-1eac-4d26-bff6-bf55c8525e1d",
+   "title": "create email on godaddy",
+   "completed": true,
+   "status": "DONE",
+   "description": "hello@opspick.com",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-22",
+   "dueTime": "00:00",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-07-30T05:57:41.551Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-07-21T18:11:03.829Z",
+   "updatedAt": "2026-07-21T18:11:03.829Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-07-30T05:57:41.551Z"
+  },
+  {
+   "id": "1784552339814819_6040e5",
+   "title": "add open workspace in quick links",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-20",
+   "dueTime": "19:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-07-20T12:59:00.068Z",
+   "updatedAt": "2026-07-20T12:59:00.068Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1784524732485848_5d52b8",
+   "title": "for subtask in right side the assignee icons not coming",
+   "completed": true,
+   "status": "DONE",
+   "description": "only the circle with short form of name is coming",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-20",
+   "dueTime": "13:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-07-20T05:18:52.668Z",
+   "updatedAt": "2026-07-20T05:18:52.668Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "51b04ffc-58f5-4e4a-97bc-4ec062cceacc",
+   "title": "url slug should be internally handled and should be hidden from user interface",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-18T13:30:44.710Z",
+   "updatedAt": "2026-07-18T13:30:44.710Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "7e0590ae-4446-4ddc-9db0-9b3880852457",
+   "title": "there should be a default logo for my workspace",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-18T13:29:16.665Z",
+   "updatedAt": "2026-07-18T13:29:16.665Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "2df42e6d-bcc7-43f4-bc17-e7f93339dc42",
+   "title": "Mobile : For planner and series are coming in infinite loading on first time user",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-18T13:27:59.312Z",
+   "updatedAt": "2026-07-18T13:27:59.312Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1784352287148073_238e8b",
+   "title": "There should be a list to filter all sub tasks assigned to a person",
+   "completed": true,
+   "status": "DONE",
+   "description": "there should be 2 drop downs . one for filter project + another to filter members",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-18",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-07-18T05:24:47.337Z",
+   "updatedAt": "2026-07-18T05:24:47.337Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1784351937605498_2f5c3",
+   "title": "Mobile : can’t mark subtask as done in iPhone 16 pro max",
+   "completed": true,
+   "status": "DONE",
+   "description": "when any subtask is maked as done + a popup opens + we put the description + but can’t save as the mobile keyboard bottom sheet is still opened and save button is below the bottom sheet in background\n\nNote : when we click outside the text area the keyboard bottom sheet should collapse",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-18",
+   "dueTime": "13:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-07-18T05:18:57.764Z",
+   "updatedAt": "2026-07-18T05:18:57.764Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1784351667438602_5c9585",
+   "title": "Mobile : audio recording for task status change",
+   "completed": true,
+   "status": "DONE",
+   "description": "when a task completed or marked as done + when clicked in audio + a popup with recording happening status + done + audio should be attached once done + when clicked again a popup should open and play\n\nNote : open ChatGPT + attach existing status change popup + put above task context + make a plan + make cursor prompt",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-18",
+   "dueTime": "15:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-07-18T05:14:27.586Z",
+   "updatedAt": "2026-07-18T05:14:27.586Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1784216016069358_8fba60",
+   "title": "mobile : There should be feedback form",
+   "completed": true,
+   "status": "DONE",
+   "description": "There should be a feedback form means a text area + file upload + clipboard",
+   "assigneeIds": [
+    "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "dueDate": "2026-07-18",
+   "dueTime": "15:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-07-16T15:33:36.322Z",
+   "updatedAt": "2026-07-16T15:33:36.322Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1784184123932000_910789",
+   "title": "testing ap notifications",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c"
+   ],
+   "assigneeId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-16T06:42:05.106Z",
+   "updatedAt": "2026-07-16T06:42:05.106Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1784183901232214_f62dcc",
+   "title": "right arrow should be removed",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-16",
+   "dueTime": "14:00",
+   "priority": "MEDIUM",
+   "reporterId": "0dad08e6-bc95-41e3-aec9-2b74c7c7ca5c",
+   "createdAt": "2026-07-16T06:38:22.053Z",
+   "updatedAt": "2026-07-16T06:38:22.053Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1784019383810000_97d416",
+   "title": "Add App notifications in mobile",
+   "completed": true,
+   "status": "DONE",
+   "description": "Add the functionality for push notifications in andriod and ios",
+   "assigneeIds": [
+    "b5fb10b6-5321-46ed-8f42-11b9a7ddc4e0"
+   ],
+   "assigneeId": "b5fb10b6-5321-46ed-8f42-11b9a7ddc4e0",
+   "dueDate": "2026-07-14",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "b8dde427-1b8a-443c-b4e4-298ad7c33710",
+   "title": "Add Person who has assigned the task",
+   "completed": true,
+   "status": "DONE",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "09eb404a-8fa5-42d1-9f75-457b6219e7d8",
+   "title": "Add Priority while creating subtasks",
+   "completed": true,
+   "status": "DONE",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "2dd92667-52c5-4cb4-8989-1b9ba7f06405",
+   "title": "Add sub task textfield to the top and below \"Checklist\" level + Sub Tasks should be in descending order with latest sub task at the top",
+   "completed": true,
+   "status": "DONE",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "bb9f7ed1-7564-4166-ad14-4493699592bd",
+   "title": "Add subtask field should be on top",
+   "completed": true,
+   "status": "DONE",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "98daff4a-2f76-4655-be87-6a2481a857a7",
+   "title": "assign domain to ip address",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "b5fb10b6-5321-46ed-8f42-11b9a7ddc4e0"
+   ],
+   "assigneeId": "b5fb10b6-5321-46ed-8f42-11b9a7ddc4e0",
+   "completionRecord": {
+    "completedAt": "2026-07-30T05:57:57.380Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-07-30T05:57:57.380Z"
+  },
+  {
+   "id": "a386a77f-4914-42b2-a826-a1352536d2f0",
+   "title": "Can not be able to assign the task to members directly from row item + Can not be able change the task status from row bar",
+   "completed": true,
+   "status": "DONE",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "6be920a1-9070-4622-809d-bf4671127f47",
+   "title": "Cannot assign a subtask to more than 1 person",
+   "completed": true,
+   "status": "DONE",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "d1a211f7-9a09-431e-a892-d592bd0d58ca",
+   "title": "Check for revenue cat (A subscription enabling software)",
+   "completed": true,
+   "status": "DONE",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "8d6477f1-2f7b-4b32-b8e2-1446feadc0eb",
+   "title": "Create/Update task should come from rightside /drawer",
+   "completed": true,
+   "status": "DONE",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "363da5e8-5603-4204-95d8-53f23472c1ef",
+   "title": "Dark Mode is showing opposite in selected workspace",
+   "completed": true,
+   "status": "DONE",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1783887640582301_a1e4a6",
+   "title": "for home , planner the footer icon section coming but not for “Open Tasks”",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-13",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1783658994441676_7b0f3d",
+   "title": "for planner when clicked on date the checklist should come",
+   "completed": true,
+   "status": "DONE",
+   "description": "for planner when clicked on date the checklist should come so that we can track the recurring task status",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-10",
+   "priority": "MEDIUM",
+   "completionRecord": {
+    "completedAt": "2026-07-30T05:58:09.440Z",
+    "employeeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "employeeName": "Vinik Dhariwal",
+    "latitude": 0,
+    "longitude": 0,
+    "geofenceValid": false,
+    "deviceInfo": {
+     "source": "web"
+    }
+   },
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "completedAt": "2026-07-30T05:58:09.440Z"
+  },
+  {
+   "id": "b6af14b1-eb8a-4316-a267-cdab200edb01",
+   "title": "For sub task when docx/doc file is uploaded the file is not visible when clicked on view icon",
+   "completed": true,
+   "status": "DONE",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1783886921313191_1fe8a3",
+   "title": "in edit series the checklist is not coming",
+   "completed": true,
+   "status": "DONE",
+   "description": "how the checklist come in create time . it should come for edit series",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-13",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1bfa8bf1-5dff-4666-a960-fc605ec5097b",
+   "title": "Make signup page also on right side",
+   "completed": true,
+   "status": "DONE",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1783889608920635_8dcedd",
+   "title": "Mobile : add a timer for sub task",
+   "completed": true,
+   "status": "DONE",
+   "description": "make a timer for sub task",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-13",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "c0573f80-946b-4bf4-a03e-40f5335df11d",
+   "title": "Mobile : Add the camera captured images in tiles format. once clicked then open",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1783887171765698_9a0218",
+   "title": "Mobile : in profile for password and security same ui is coming",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-13",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1783889349011457_c665cd",
+   "title": "Mobile : there should be option to upload image in profile section",
+   "completed": true,
+   "status": "DONE",
+   "description": "there should be zoom in , zoom out , crop option",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-13",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "c7eef072-58b8-4a0f-948b-9d50311c289c",
+   "title": "Mobile : When we kill and reopen app again the previously selected workspace should come",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-04",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "aed0ad6e-c86a-43eb-a974-a0ac9ed284e9",
+   "title": "Mobile: No option to create a recurring task in mobiel",
+   "completed": true,
+   "status": "DONE",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "16c2b017-cf8d-4723-b46c-171f74c914a0",
+   "title": "mutiple person can be assigned to a subtask",
+   "completed": true,
+   "status": "DONE",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "ded398f1-12f1-4faa-8be9-20bc4f27ec1f",
+   "title": "no task is coming in recurring task section",
+   "completed": true,
+   "status": "DONE",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1783889907777334_e3033a",
+   "title": "not able to delete the main task image attachment",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-13",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "56c77806-001a-451d-aead-8f6e6c7c3628",
+   "title": "On mobile app if anyone has created a subtask then the reporter, date and time of subtask created",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-10",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "5b1a090f-1c83-4d79-abc8-4f1efc4ac6df",
+   "title": "purchase a doman",
+   "completed": true,
+   "status": "DONE",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "939ac0e6-f6cc-4be4-b7ad-9dbe9e5d239c",
+   "title": "Recent created/completed task Should come on top",
+   "completed": true,
+   "status": "DONE",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1783658711849989_fa0f8",
+   "title": "recurring task is also coming for main task list",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-10",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "382f7ad6-2ed8-43c0-87af-6f41ce1d53b4",
+   "title": "run and fix flutter application",
+   "completed": true,
+   "status": "DONE",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "496bdd27-e3f6-480d-ab26-78a8085bd41e",
+   "title": "Select project from dropdown and the check status (In task dashboard)",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-04",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "0629023b-9418-41a4-af0f-57b6049742f7",
+   "title": "Send email when a task is assigned to anybody",
+   "completed": true,
+   "status": "DONE",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "ad12990b-1288-4164-add1-5c333c55f067",
+   "title": "sub task assignie is not chaning from row",
+   "completed": true,
+   "status": "DONE",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "826df9ea-ada2-4736-9684-ea6ce49f39ab",
+   "title": "Task on edit task should have \"select all\" option on right hand side",
+   "completed": true,
+   "status": "DONE",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1783918794838844_c690d8",
+   "title": "the box colour of sub tasks should follow colour border",
+   "completed": true,
+   "status": "DONE",
+   "description": "for done green light green \nfor to do light red\nfor in progress light green\ntasks with deadline od date and time passed should be in dark red color",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-13",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1783510046084895_6bfe18",
+   "title": "the email is not editable in profile section",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-08",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1783510137400034_46c5c1",
+   "title": "There is no option to delete pic or attached file in task and sub task in mobile application",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "f0065592-c6a4-4d36-a877-a171b1748e2d"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-08",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1783503471685029_6bf802",
+   "title": "There is no option to delete the main task in mobile app",
+   "completed": true,
+   "status": "DONE",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1783688990884783_84c92",
+   "title": "There should be option for adding sub task of any task to another task",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-11",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "57ccbccf-0723-46d9-8e81-1ac035dd71b1",
+   "title": "Until all the sub tasks got completed we cant mark main task as completed",
+   "completed": true,
+   "status": "DONE",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "bb79a9cb-1d91-47f4-aa5c-1d34c56934a9",
+   "title": "Update css of forgot password also same as login and signup page",
+   "completed": true,
+   "status": "DONE",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "b6d0c8c7-7203-4baf-ae4d-d492b5d7329a",
+   "title": "We should have both \"Assigned By\" and \"Assigned To\"",
+   "completed": true,
+   "status": "DONE",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "7b342984-6f1c-4712-bb72-31e027d903da",
+   "title": "Web : Add calander icon while creating task in same row",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-04",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "08d71a86-7b08-42f0-9527-d3f9ad3ef95e",
+   "title": "Web/Mobile : A owner/admin can be able to edit the task and add sub task (In edit mode)",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "b5fb10b6-5321-46ed-8f42-11b9a7ddc4e0"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1783503649092675_df0036",
+   "title": "when I am clicking on any row of sub task immediately it ask fir completion status. ideally it should not ask on clicking on row instead when we click on checkbox it should ask for same",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+    "cece7327-6b08-4a60-8a87-94a9c29ac32a"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-08",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "1783503153587473_94bb04",
+   "title": "when I open the sub task in edit mode but no option for delete",
+   "completed": true,
+   "status": "DONE",
+   "assigneeIds": [
+    "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+   ],
+   "assigneeId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "dueDate": "2026-07-08",
+   "priority": "MEDIUM",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  },
+  {
+   "id": "ff0abf4d-ae6e-4413-ba79-d033c2715a68",
+   "title": "when the workspace changed the company logo also takes the wokspace image",
+   "completed": true,
+   "status": "DONE",
+   "reporterId": "ed4b1037-17ad-460b-93a4-ca9678d86eba",
+   "createdAt": "2026-07-14T14:55:27.937Z",
+   "updatedAt": "2026-07-14T14:55:27.937Z",
+   "updatedBy": "ed4b1037-17ad-460b-93a4-ca9678d86eba"
+  }
+ ],
+ "createdAt": "2026-06-11T04:54:43.000Z",
+ "updatedAt": "2026-10-22T05:35:53.000Z"
+}
