@@ -78,9 +78,10 @@ class PlansRepository {
 
   Future<({String plan, String? planExpiresAt})> verifyPayment({
     required String plan,
-    required String razorpayOrderId,
     required String razorpayPaymentId,
     required String razorpaySignature,
+    String? razorpayOrderId,
+    String? razorpaySubscriptionId,
     String? couponCode,
   }) async {
     try {
@@ -88,9 +89,12 @@ class PlansRepository {
         '/plans/verify-payment',
         data: {
           'plan': plan,
-          'razorpay_order_id': razorpayOrderId,
           'razorpay_payment_id': razorpayPaymentId,
           'razorpay_signature': razorpaySignature,
+          if (razorpayOrderId != null && razorpayOrderId.isNotEmpty)
+            'razorpay_order_id': razorpayOrderId,
+          if (razorpaySubscriptionId != null && razorpaySubscriptionId.isNotEmpty)
+            'razorpay_subscription_id': razorpaySubscriptionId,
           if (couponCode != null && couponCode.trim().isNotEmpty)
             'couponCode': couponCode.trim(),
         },

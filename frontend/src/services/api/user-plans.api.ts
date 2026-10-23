@@ -101,6 +101,7 @@ export async function validatePlanCoupon(
 
 export interface UserPlanRazorpayOrder {
   orderId: string;
+  subscriptionId?: string;
   amount: number;
   currency: string;
   keyId: string;
@@ -132,9 +133,10 @@ export async function createUserPlanOrder(
 
 export async function verifyUserPlanPayment(params: {
   plan: UserPlanSlug;
-  razorpay_order_id: string;
   razorpay_payment_id: string;
   razorpay_signature: string;
+  razorpay_order_id?: string;
+  razorpay_subscription_id?: string;
   couponCode?: string;
 }): Promise<{ plan: UserPlanSlug; planExpiresAt: string }> {
   const { data } = await apiClient.post("/plans/verify-payment", params);

@@ -48,7 +48,7 @@ class PlanCheckoutService {
     }
 
     final rz = order.razorpay;
-    if (rz == null || rz.orderId.isEmpty || rz.keyId.isEmpty) {
+    if (rz == null || rz.keyId.isEmpty || (!rz.isSubscription && rz.orderId.isEmpty)) {
       throw PlanCheckoutException(
         'Payment could not be started. Please try again.',
       );
@@ -71,6 +71,7 @@ class PlanCheckoutService {
     final verified = await _repository.verifyPayment(
       plan: plan,
       razorpayOrderId: payment.orderId,
+      razorpaySubscriptionId: payment.subscriptionId,
       razorpayPaymentId: payment.paymentId,
       razorpaySignature: payment.signature,
       couponCode: couponCode,
@@ -89,15 +90,16 @@ class PlanCheckoutService {
     }
   }
 
-  Future<({String orderId, String paymentId, String signature})> _openRazorpay({
+  Future<({String orderId, String subscriptionId, String paymentId, String signature})>
+      _openRazorpay({
     required UserPlanRazorpayOrder order,
     required String plan,
     String? userName,
     String? userEmail,
   }) async {
     final razorpay = Razorpay();
-    final completer =
-        Completer<({String orderId, String paymentId, String signature})>();
+    final completer = Completer<
+        ({String orderId, String subscriptionId, String paymentId, String signature})>();
 
     void clearHandlers() {
       razorpay.clear();
@@ -105,8 +107,12 @@ class PlanCheckoutService {
 
     razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, (PaymentSuccessResponse res) {
       if (completer.isCompleted) return;
+      final data = res.data ?? const <dynamic, dynamic>{};
+      final subId = data['razorpay_subscription_id']?.toString() ??
+          order.subscriptionId;
       completer.complete((
         orderId: res.orderId ?? order.orderId,
+        subscriptionId: subId,
         paymentId: res.paymentId ?? '',
         signature: res.signature ?? '',
       ));
@@ -130,13 +136,12 @@ class PlanCheckoutService {
     });
 
     final planLabel = order.planName ?? UserPlans.displayName(plan);
-    razorpay.open({
+    final options = <String, dynamic>{
       'key': order.keyId,
-      'amount': order.amount,
-      'currency': order.currency,
       'name': 'OpsPick',
-      'description': '$planLabel plan — monthly',
-      'order_id': order.orderId,
+      'description': order.isSubscription
+          ? '$planLabel monthly subscription'
+          : '$planLabel plan — monthly',
       'prefill': {
         if (userName != null && userName.trim().isNotEmpty) 'name': userName.trim(),
         if (userEmail != null && userEmail.trim().isNotEmpty)
@@ -145,7 +150,15 @@ class PlanCheckoutService {
       'theme': {
         'color': plan == UserPlans.gold ? '#F59E0B' : '#8B5CF6',
       },
-    });
+    };
+    if (order.isSubscription) {
+      options['subscription_id'] = order.subscriptionId;
+    } else {
+      options['amount'] = order.amount;
+      options['currency'] = order.currency;
+      options['order_id'] = order.orderId;
+    }
+    razorpay.open(options);
 
     try {
       return await completer.future.timeout(

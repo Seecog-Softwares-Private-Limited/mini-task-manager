@@ -37,6 +37,7 @@ typedef _VerifiedPurchase = ({
   String transactionId,
   String? signedTransaction,
   String productId,
+  PurchaseDetails? purchase,
 });
 
 /// StoreKit checkout + restore for iOS (Guideline 3.1.1).
@@ -84,6 +85,10 @@ class AppleIapCheckoutService {
       signedTransaction: purchase.signedTransaction,
       productId: purchase.productId,
     );
+    final details = purchase.purchase;
+    if (details != null && details.pendingCompletePurchase) {
+      await _iap.completePurchase(details);
+    }
     return verified.plan;
   }
 
@@ -103,6 +108,10 @@ class AppleIapCheckoutService {
         signedTransaction: purchase.signedTransaction,
         productId: purchase.productId,
       );
+      final details = purchase.purchase;
+      if (details != null && details.pendingCompletePurchase) {
+        await _iap.completePurchase(details);
+      }
       bestPlan = verified.plan;
     }
     return bestPlan ?? UserPlans.free;
@@ -141,9 +150,6 @@ class AppleIapCheckoutService {
             }
           case PurchaseStatus.purchased:
           case PurchaseStatus.restored:
-            if (purchase.pendingCompletePurchase) {
-              await _iap.completePurchase(purchase);
-            }
             final txId = purchase.purchaseID?.trim() ?? '';
             if (txId.isEmpty) continue;
             if (!completer.isCompleted) {
@@ -152,6 +158,7 @@ class AppleIapCheckoutService {
                 signedTransaction:
                     _signedPayload(purchase.verificationData.serverVerificationData),
                 productId: purchase.productID,
+                purchase: purchase,
               ));
             }
         }
@@ -188,9 +195,6 @@ class AppleIapCheckoutService {
             purchase.status != PurchaseStatus.purchased) {
           continue;
         }
-        if (purchase.pendingCompletePurchase) {
-          await _iap.completePurchase(purchase);
-        }
         final txId = purchase.purchaseID?.trim() ?? '';
         if (txId.isEmpty || seen.contains(txId)) continue;
         seen.add(txId);
@@ -199,6 +203,7 @@ class AppleIapCheckoutService {
           signedTransaction:
               _signedPayload(purchase.verificationData.serverVerificationData),
           productId: purchase.productID,
+          purchase: purchase,
         ));
       }
       if (!done.isCompleted) done.complete();

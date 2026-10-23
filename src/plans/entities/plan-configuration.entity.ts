@@ -25,5 +25,9 @@ export class PlanConfigurationEntity extends BaseEntity {
 
   @Column({ name: 'price_monthly_inr', type: 'int', unsigned: true, default: 0 })
   priceMonthlyInr!: number;
+
+  /** Cached Razorpay recurring plan id for this OpsPick plan (monthly). */
+  @Column({ name: 'razorpay_plan_id', type: 'varchar', length: 64, nullable: true })
+  razorpayPlanId!: string | null;
 }
 

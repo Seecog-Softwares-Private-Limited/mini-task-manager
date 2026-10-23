@@ -180,7 +180,7 @@ export default function UserPlansPage() {
       }
 
       const rz = orderResponse.razorpay;
-      if (!rz?.orderId || !rz.keyId) {
+      if (!rz?.keyId || (!rz.subscriptionId && !rz.orderId)) {
         throw new Error("Payment could not be started. Please try again.");
       }
 
@@ -194,21 +194,23 @@ export default function UserPlansPage() {
 
       const options: Record<string, unknown> = {
         key: rz.keyId,
-        amount: rz.amount,
-        currency: rz.currency,
         name: "OpsPick",
-        description: `${planLabel} plan — monthly`,
-        order_id: rz.orderId,
+        description: rz.subscriptionId
+          ? `${planLabel} monthly subscription`
+          : `${planLabel} plan — monthly`,
         redirect: false,
         handler: async (response: {
-          razorpay_order_id: string;
+          razorpay_order_id?: string;
+          razorpay_subscription_id?: string;
           razorpay_payment_id: string;
           razorpay_signature: string;
         }) => {
           try {
             const result = await verifyUserPlanPayment({
               plan: target,
-              razorpay_order_id: response.razorpay_order_id,
+              razorpay_order_id: response.razorpay_order_id || rz.orderId,
+              razorpay_subscription_id:
+                response.razorpay_subscription_id || rz.subscriptionId,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
               couponCode,
@@ -242,6 +244,13 @@ export default function UserPlansPage() {
           color: target === "gold" ? "#f59e0b" : "#8b5cf6",
         },
       };
+      if (rz.subscriptionId) {
+        options.subscription_id = rz.subscriptionId;
+      } else {
+        options.amount = rz.amount;
+        options.currency = rz.currency;
+        options.order_id = rz.orderId;
+      }
 
       const rzp = new window.Razorpay(options);
       rzp.on("payment.failed", () => {

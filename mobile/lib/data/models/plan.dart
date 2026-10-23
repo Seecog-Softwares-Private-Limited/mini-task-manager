@@ -301,19 +301,24 @@ class UserPlanRazorpayOrder extends Equatable {
     required this.currency,
     required this.keyId,
     required this.amountInr,
+    this.subscriptionId = '',
     this.planName,
   });
 
   final String orderId;
+  final String subscriptionId;
   final int amount;
   final String currency;
   final String keyId;
   final num amountInr;
   final String? planName;
 
+  bool get isSubscription => subscriptionId.isNotEmpty;
+
   factory UserPlanRazorpayOrder.fromJson(Map<String, dynamic> json) {
     return UserPlanRazorpayOrder(
       orderId: json['orderId'] as String? ?? '',
+      subscriptionId: json['subscriptionId'] as String? ?? '',
       amount: (json['amount'] as num?)?.toInt() ?? 0,
       currency: json['currency'] as String? ?? 'INR',
       keyId: json['keyId'] as String? ?? '',
@@ -324,7 +329,7 @@ class UserPlanRazorpayOrder extends Equatable {
 
   @override
   List<Object?> get props =>
-      [orderId, amount, currency, keyId, amountInr, planName];
+      [orderId, subscriptionId, amount, currency, keyId, amountInr, planName];
 }
 
 class CreatePlanOrderResult extends Equatable {

@@ -23,8 +23,13 @@ export class PlanConfigurationsRepository {
     planName: UserPlanSlug,
     data: Pick<
       PlanConfigurationEntity,
-      'maxUsers' | 'maxStorage' | 'maxWorkspaces' | 'allowCoupon' | 'priceMonthlyInr'
-    >,
+      | 'maxUsers'
+      | 'maxStorage'
+      | 'maxWorkspaces'
+      | 'allowCoupon'
+      | 'priceMonthlyInr'
+    > &
+      Partial<Pick<PlanConfigurationEntity, 'razorpayPlanId'>>,
   ): Promise<PlanConfigurationEntity> {
     const existing = await this.findByPlanName(planName);
     if (existing) {

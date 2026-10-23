@@ -1,14 +1,10 @@
 import 'package:flutter/foundation.dart';
 
-/// Temporary gate for App Review while Apple IAP products are not submitted.
+/// iOS Plans UI + Apple IAP checkout.
 ///
-/// - Android/web: plans UI stays available (Razorpay).
-/// - iOS: hide Plans / Upgrade entry points so this binary does not offer
-///   paid digital subscriptions for purchase.
-///
-/// Set [kIosPlansPurchaseEnabled] to `true` in a later update after
-/// `opspick.silver.monthly` / `opspick.gold.monthly` are live in App Store Connect.
-const bool kIosPlansPurchaseEnabled = false;
+/// - iOS app: Apple In-App Purchase (`opspick.silver.monthly` / `opspick.gold.monthly`).
+/// - Android app + website: Razorpay (unchanged).
+const bool kIosPlansPurchaseEnabled = true;
 
 /// Whether the in-app Plans & Pricing screen / Upgrade CTAs should be shown.
 bool get isPlansBillingUiEnabled {

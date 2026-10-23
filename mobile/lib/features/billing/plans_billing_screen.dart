@@ -311,6 +311,16 @@ class _PlansBillingScreenState extends ConsumerState<PlansBillingScreen> {
                 ),
               ),
             ),
+            if (!_isIos) ...[
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                'Silver and Gold are auto-renewable monthly subscriptions billed '
+                'through Razorpay. Your plan renews each month until you cancel.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textMuted,
+                    ),
+              ),
+            ],
             if (_isIos) ...[
               const SizedBox(height: AppSpacing.md),
               Text(

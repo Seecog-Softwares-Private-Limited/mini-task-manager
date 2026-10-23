@@ -37,6 +37,34 @@ SEED_INVITED_EMAIL=invitee@example.com
 
 The backend, migrations, seed scripts, frontend (`next.config.mjs` + `npm run dev` in `frontend/`), Cypress, and Docker Compose (`env_file: .env` for the API) use **only** repo-root **`.env`**. Optional SMTP, OAuth, Razorpay, and test vars belong there too.
 
+Billing split: **iOS app = Apple IAP**, **website + Android = Razorpay**.
+
+Razorpay (website + Android):
+
+```env
+RAZORPAY_KEY_ID=rzp_test_xxxx
+RAZORPAY_KEY_SECRET=xxxx
+RAZORPAY_WEBHOOK_SECRET=xxxx
+# Optional: reuse plans created in the Razorpay dashboard (Subscriptions → Plans)
+# RAZORPAY_PLAN_SILVER=plan_xxxx
+# RAZORPAY_PLAN_GOLD=plan_xxxx
+```
+
+Webhook URL: `POST /api/v1/billing/webhook` with events `subscription.authenticated`, `subscription.activated`, `subscription.charged`, `subscription.cancelled`, `subscription.completed`, `subscription.halted`, `payment.captured`.
+
+Apple IAP (iOS app — `.p8` key from App Store Connect → Users and Access → Integrations → In-App Purchase):
+
+```env
+APPLE_IAP_BUNDLE_ID=com.seecog.minitaskmanager.miniTaskManager
+APPLE_IAP_ISSUER_ID=<asc-issuer-id>
+APPLE_IAP_KEY_ID=<key-id>
+APPLE_IAP_PRIVATE_KEY_PATH=config/AuthKey_IAP.p8
+APPLE_IAP_ENVIRONMENT=Sandbox
+APPLE_IAP_FALLBACK_SANDBOX=true
+```
+
+ASN V2 URL: `POST /api/v1/plans/apple/notifications`. Products: `opspick.silver.monthly`, `opspick.gold.monthly`.
+
 ### 3) Run migrations
 
 ```bash

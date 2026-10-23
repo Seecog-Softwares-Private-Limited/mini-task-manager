@@ -5,6 +5,13 @@ import * as crypto from 'crypto';
 const Razorpay = require('razorpay') as new (options: { key_id: string; key_secret: string }) => {
   orders: { create: (params: unknown) => Promise<unknown> };
   payments: { fetch: (id: string) => Promise<unknown>; refund: (id: string, params?: unknown) => Promise<unknown> };
+  customers: { create: (params: unknown) => Promise<unknown> };
+  plans: { create: (params: unknown) => Promise<unknown>; fetch: (id: string) => Promise<unknown> };
+  subscriptions: {
+    create: (params: unknown) => Promise<unknown>;
+    fetch: (id: string) => Promise<unknown>;
+    cancel: (id: string, params?: unknown) => Promise<unknown>;
+  };
 };
 
 /** Normalize Razorpay / HTTP errors from the Node SDK into a readable message + optional statusCode. */
@@ -100,7 +107,7 @@ export class RazorpayService {
   }
 
   /**
-   * Verify payment signature from Razorpay callback
+   * Verify payment signature from Razorpay callback (one-time order).
    */
   verifyPaymentSignature(params: {
     orderId: string;
@@ -114,6 +121,127 @@ export class RazorpayService {
       .digest('hex');
 
     return expectedSignature === params.signature;
+  }
+
+  /**
+   * Verify checkout signature for a Razorpay Subscription
+   * (`subscription_id|payment_id`).
+   */
+  verifySubscriptionSignature(params: {
+    subscriptionId: string;
+    paymentId: string;
+    signature: string;
+  }): boolean {
+    const body = params.subscriptionId + '|' + params.paymentId;
+    const expectedSignature = crypto
+      .createHmac('sha256', this.keySecret)
+      .update(body)
+      .digest('hex');
+    return expectedSignature === params.signature;
+  }
+
+  async createCustomer(params: {
+    name: string;
+    email: string;
+    contact?: string;
+    notes?: Record<string, string>;
+  }): Promise<{ id: string }> {
+    try {
+      const customer = (await this.razorpay.customers.create({
+        name: params.name,
+        email: params.email,
+        contact: params.contact || undefined,
+        notes: params.notes || {},
+        fail_existing: 0,
+      })) as { id: string };
+      return customer;
+    } catch (error) {
+      const { message, statusCode } = parseRazorpayFailure(error);
+      this.logger.error(`Failed to create Razorpay customer: ${message}`);
+      const wrapped = new Error(message) as Error & { statusCode?: number };
+      wrapped.statusCode = statusCode;
+      throw wrapped;
+    }
+  }
+
+  async createPlan(params: {
+    name: string;
+    amountPaise: number;
+    currency?: string;
+    period?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    interval?: number;
+    description?: string;
+  }): Promise<{ id: string }> {
+    try {
+      const plan = (await this.razorpay.plans.create({
+        period: params.period ?? 'monthly',
+        interval: params.interval ?? 1,
+        item: {
+          name: params.name,
+          amount: params.amountPaise,
+          currency: params.currency ?? 'INR',
+          description: params.description ?? params.name,
+        },
+      })) as { id: string };
+      this.logger.log(`Razorpay plan created: ${plan.id} (${params.name})`);
+      return plan;
+    } catch (error) {
+      const { message, statusCode } = parseRazorpayFailure(error);
+      this.logger.error(`Failed to create Razorpay plan: ${message}`);
+      const wrapped = new Error(message) as Error & { statusCode?: number };
+      wrapped.statusCode = statusCode;
+      throw wrapped;
+    }
+  }
+
+  async fetchPlan(planId: string): Promise<{ id: string; item?: { amount?: number } }> {
+    const plan = (await this.razorpay.plans.fetch(planId)) as {
+      id: string;
+      item?: { amount?: number };
+    };
+    return plan;
+  }
+
+  async createSubscription(params: {
+    planId: string;
+    customerId?: string;
+    totalCount?: number;
+    notes?: Record<string, string>;
+  }): Promise<{ id: string; status: string }> {
+    try {
+      const subscription = (await this.razorpay.subscriptions.create({
+        plan_id: params.planId,
+        customer_id: params.customerId || undefined,
+        total_count: params.totalCount ?? 120,
+        quantity: 1,
+        customer_notify: 0,
+        notes: params.notes || {},
+      })) as { id: string; status: string };
+      this.logger.log(`Razorpay subscription created: ${subscription.id}`);
+      return subscription;
+    } catch (error) {
+      const { message, statusCode } = parseRazorpayFailure(error);
+      this.logger.error(`Failed to create Razorpay subscription: ${message}`);
+      const wrapped = new Error(message) as Error & { statusCode?: number };
+      wrapped.statusCode = statusCode;
+      throw wrapped;
+    }
+  }
+
+  async fetchSubscription(subscriptionId: string): Promise<Record<string, unknown>> {
+    return (await this.razorpay.subscriptions.fetch(subscriptionId)) as Record<string, unknown>;
+  }
+
+  async cancelSubscription(subscriptionId: string, cancelAtCycleEnd = false): Promise<void> {
+    try {
+      await this.razorpay.subscriptions.cancel(subscriptionId, {
+        cancel_at_cycle_end: cancelAtCycleEnd ? 1 : 0,
+      });
+      this.logger.log(`Razorpay subscription cancelled: ${subscriptionId}`);
+    } catch (error) {
+      const { message } = parseRazorpayFailure(error);
+      this.logger.warn(`Failed to cancel Razorpay subscription ${subscriptionId}: ${message}`);
+    }
   }
 
   /**

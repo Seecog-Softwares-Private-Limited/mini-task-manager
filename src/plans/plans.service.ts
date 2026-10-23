@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { v4 as uuidv4 } from 'uuid';
 import {
   PLANS,
@@ -29,6 +29,10 @@ import {
   AppleSubscriptionEntity,
   type AppleSubscriptionStatus,
 } from './entities/apple-subscription.entity';
+import {
+  RazorpaySubscriptionEntity,
+  type RazorpaySubscriptionStatus,
+} from './entities/razorpay-subscription.entity';
 
 @Injectable()
 export class PlansService {
@@ -39,6 +43,8 @@ export class PlansService {
     private readonly userRepo: Repository<UserEntity>,
     @InjectRepository(AppleSubscriptionEntity)
     private readonly appleSubRepo: Repository<AppleSubscriptionEntity>,
+    @InjectRepository(RazorpaySubscriptionEntity)
+    private readonly razorpaySubRepo: Repository<RazorpaySubscriptionEntity>,
     private readonly planLimitService: PlanLimitService,
     private readonly planConfigurationsService: PlanConfigurationsService,
     private readonly paymentService: PaymentService,
@@ -179,6 +185,82 @@ export class PlansService {
       };
     }
 
+    const useSubscription = amount === originalAmount;
+    if (useSubscription) {
+      const pending = await this.razorpaySubRepo.find({
+        where: {
+          userId,
+          planSlug: targetPlan,
+          status: In(['created', 'authenticated']),
+        },
+        order: { createdAt: 'DESC' },
+      });
+      for (const row of pending) {
+        try {
+          const remote = await this.paymentService.fetchSubscription(
+            row.razorpaySubscriptionId,
+          );
+          const status = this.normalizeRazorpayStatus(String(remote.status ?? ''));
+          row.status = status;
+          await this.razorpaySubRepo.save(row);
+          if (status === 'created' || status === 'authenticated') {
+            return {
+              requiresPayment: true,
+              razorpay: {
+                orderId: '',
+                subscriptionId: row.razorpaySubscriptionId,
+                amount: Math.max(100, Math.round(amount * 100)),
+                currency: 'INR',
+                keyId: this.paymentService.getKeyId(),
+                amountInr: amount,
+                planName,
+              },
+              originalAmountInr: originalAmount,
+              finalAmountInr: amount,
+              couponApplied: !!normalizedCoupon,
+            };
+          }
+        } catch {
+          row.status = 'cancelled';
+          await this.razorpaySubRepo.save(row);
+        }
+      }
+
+      const user = await this.userRepo.findOne({ where: { id: userId } });
+      const sub = await this.paymentService.createUserPlanSubscription({
+        userId,
+        plan: targetPlan,
+        amountInr: amount,
+        name: user?.fullName || 'OpsPick user',
+        email: user?.email || '',
+        contact: user?.phone,
+        couponCode: normalizedCoupon,
+      });
+      await this.upsertRazorpaySubscription({
+        userId,
+        plan: targetPlan,
+        subscriptionId: sub.subscriptionId,
+        customerId: sub.customerId,
+        razorpayPlanId: sub.razorpayPlanId,
+        status: 'created',
+      });
+      return {
+        requiresPayment: true,
+        razorpay: {
+          orderId: '',
+          subscriptionId: sub.subscriptionId,
+          amount: sub.amount,
+          currency: sub.currency,
+          keyId: sub.keyId,
+          amountInr: sub.amountInr,
+          planName,
+        },
+        originalAmountInr: originalAmount,
+        finalAmountInr: amount,
+        couponApplied: !!normalizedCoupon,
+      };
+    }
+
     const razorpay = await this.paymentService.createUserPlanOrder({
       userId,
       plan: targetPlan,
@@ -190,6 +272,7 @@ export class PlansService {
       requiresPayment: true,
       razorpay: {
         ...razorpay,
+        subscriptionId: '',
         planName,
       },
       originalAmountInr: originalAmount,
@@ -198,7 +281,7 @@ export class PlansService {
     };
   }
 
-  /** Verify Razorpay payment and activate user plan. */
+  /** Verify Razorpay payment (subscription or one-time order) and activate. */
   async verifyPayment(userId: string, dto: VerifyUserPlanPaymentDto) {
     await this.assertCanUpgrade(userId, dto.plan);
     const { originalAmount, amount, normalizedCoupon } = await this.resolveUpgradePricing(
@@ -207,11 +290,23 @@ export class PlansService {
       dto.couponCode,
     );
 
-    const valid = this.paymentService.verifyUserPlanPayment({
-      orderId: dto.razorpay_order_id,
-      paymentId: dto.razorpay_payment_id,
-      signature: dto.razorpay_signature,
-    });
+    const subscriptionId = dto.razorpay_subscription_id?.trim() || '';
+    const orderId = dto.razorpay_order_id?.trim() || '';
+    if (!subscriptionId && !orderId) {
+      throw new BadRequestException('Missing Razorpay order or subscription id');
+    }
+
+    const valid = subscriptionId
+      ? this.paymentService.verifyUserPlanSubscription({
+          subscriptionId,
+          paymentId: dto.razorpay_payment_id,
+          signature: dto.razorpay_signature,
+        })
+      : this.paymentService.verifyUserPlanPayment({
+          orderId,
+          paymentId: dto.razorpay_payment_id,
+          signature: dto.razorpay_signature,
+        });
     if (!valid) {
       throw new BadRequestException('Payment verification failed — invalid signature');
     }
@@ -226,15 +321,82 @@ export class PlansService {
       );
     }
 
-    await this.activatePlan(userId, dto.plan, { source: 'razorpay' });
+    let expiresAt = this.paymentService.getPlanExpiryFromNow();
+    if (subscriptionId) {
+      expiresAt = await this.activateRazorpaySubscriptionFromPayment({
+        userId,
+        plan: dto.plan,
+        subscriptionId,
+        paymentId: dto.razorpay_payment_id,
+      });
+    } else {
+      await this.activatePlan(userId, dto.plan, { source: 'razorpay', expiresAt });
+    }
+
     this.logger.log(
-      `User ${userId} upgraded to ${dto.plan} (order=${dto.razorpay_order_id})`,
+      `User ${userId} upgraded to ${dto.plan} ` +
+        `(${subscriptionId ? `sub=${subscriptionId}` : `order=${orderId}`})`,
     );
     return {
       requiresPayment: false,
       plan: dto.plan,
-      planExpiresAt: this.paymentService.getPlanExpiryFromNow().toISOString(),
+      planExpiresAt: expiresAt.toISOString(),
     };
+  }
+
+  /** Razorpay Subscriptions webhooks (charged / cancelled / halted). */
+  async handleRazorpaySubscriptionWebhook(body: Record<string, unknown>): Promise<void> {
+    const event = String(body.event ?? '');
+    if (!event.startsWith('subscription.') && event !== 'payment.captured') {
+      return;
+    }
+
+    const payload = (body.payload as Record<string, unknown>) ?? {};
+    const subscription = (payload.subscription as { entity?: Record<string, unknown> })?.entity;
+    const payment = (payload.payment as { entity?: Record<string, unknown> })?.entity;
+    const subscriptionId = String(
+      subscription?.id ??
+        (payment?.subscription_id as string | undefined) ??
+        '',
+    );
+    if (!subscriptionId) return;
+
+    const row = await this.razorpaySubRepo.findOne({
+      where: { razorpaySubscriptionId: subscriptionId },
+    });
+    if (!row) {
+      this.logger.warn(`Razorpay subscription webhook for unknown id=${subscriptionId} event=${event}`);
+      return;
+    }
+
+    const statusRaw = String(subscription?.status ?? row.status);
+    const status = this.normalizeRazorpayStatus(statusRaw);
+    const currentEnd = Number(subscription?.current_end ?? 0);
+    const expiresAt =
+      currentEnd > 0 ? new Date(currentEnd * 1000) : row.expiresAt ?? this.paymentService.getPlanExpiryFromNow();
+    const paymentId = payment?.id ? String(payment.id) : row.latestPaymentId;
+
+    row.status = status;
+    row.expiresAt = expiresAt;
+    row.latestPaymentId = paymentId;
+    if (!row.purchasedAt && (event === 'subscription.charged' || event === 'subscription.activated')) {
+      row.purchasedAt = new Date();
+    }
+    await this.razorpaySubRepo.save(row);
+
+    const live =
+      status === 'active' || status === 'authenticated' || status === 'pending';
+    if (live) {
+      await this.activatePlan(row.userId, normalizePlanSlug(row.planSlug), {
+        source: 'razorpay',
+        expiresAt,
+      });
+    } else {
+      await this.recomputeEffectivePlan(row.userId);
+    }
+    this.logger.log(
+      `Razorpay subscription ${subscriptionId} event=${event} status=${status} user=${row.userId}`,
+    );
   }
 
   /** Verify Apple IAP / restore and activate (or keep higher) plan. */
@@ -370,6 +532,114 @@ export class PlansService {
     return { ok: true };
   }
 
+  private normalizeRazorpayStatus(value: string): RazorpaySubscriptionStatus {
+    const allowed: RazorpaySubscriptionStatus[] = [
+      'created',
+      'authenticated',
+      'active',
+      'pending',
+      'halted',
+      'cancelled',
+      'completed',
+      'expired',
+    ];
+    const lower = (value || '').toLowerCase() as RazorpaySubscriptionStatus;
+    return allowed.includes(lower) ? lower : 'created';
+  }
+
+  private async upsertRazorpaySubscription(params: {
+    userId: string;
+    plan: UserPlanSlug;
+    subscriptionId: string;
+    customerId?: string | null;
+    razorpayPlanId: string;
+    status: RazorpaySubscriptionStatus;
+    paymentId?: string | null;
+    expiresAt?: Date | null;
+  }) {
+    let row = await this.razorpaySubRepo.findOne({
+      where: { razorpaySubscriptionId: params.subscriptionId },
+    });
+    if (row && row.userId !== params.userId) {
+      throw new BadRequestException(
+        'This Razorpay subscription is already linked to another OpsPick account',
+      );
+    }
+    if (!row) {
+      row = this.razorpaySubRepo.create({
+        id: uuidv4(),
+        userId: params.userId,
+        razorpaySubscriptionId: params.subscriptionId,
+      });
+    }
+    row.userId = params.userId;
+    row.planSlug = params.plan;
+    row.razorpayPlanId = params.razorpayPlanId;
+    row.razorpayCustomerId = params.customerId ?? row.razorpayCustomerId;
+    row.status = params.status;
+    if (params.paymentId) row.latestPaymentId = params.paymentId;
+    if (params.expiresAt !== undefined) row.expiresAt = params.expiresAt;
+    await this.razorpaySubRepo.save(row);
+    return row;
+  }
+
+  private async activateRazorpaySubscriptionFromPayment(params: {
+    userId: string;
+    plan: UserPlanSlug;
+    subscriptionId: string;
+    paymentId: string;
+  }): Promise<Date> {
+    let expiresAt = this.paymentService.getPlanExpiryFromNow();
+    let razorpayPlanId = '';
+    let customerId: string | null = null;
+    let status: RazorpaySubscriptionStatus = 'active';
+    try {
+      const remote = await this.paymentService.fetchSubscription(params.subscriptionId);
+      const currentEnd = Number(remote.current_end ?? 0);
+      if (currentEnd > 0) expiresAt = new Date(currentEnd * 1000);
+      razorpayPlanId = String(remote.plan_id ?? '');
+      customerId = remote.customer_id ? String(remote.customer_id) : null;
+      status = this.normalizeRazorpayStatus(String(remote.status ?? 'active'));
+    } catch (err) {
+      this.logger.warn(
+        `Could not fetch Razorpay subscription ${params.subscriptionId}: ${err}`,
+      );
+    }
+
+    const existing = await this.razorpaySubRepo.findOne({
+      where: { razorpaySubscriptionId: params.subscriptionId },
+    });
+    await this.upsertRazorpaySubscription({
+      userId: params.userId,
+      plan: params.plan,
+      subscriptionId: params.subscriptionId,
+      customerId,
+      razorpayPlanId: razorpayPlanId || existing?.razorpayPlanId || 'unknown',
+      status,
+      paymentId: params.paymentId,
+      expiresAt,
+    });
+
+    const previous = await this.razorpaySubRepo.find({
+      where: {
+        userId: params.userId,
+        status: In(['created', 'authenticated', 'active', 'pending']),
+      },
+    });
+    for (const row of previous) {
+      if (row.razorpaySubscriptionId === params.subscriptionId) continue;
+      row.status = 'cancelled';
+      await this.razorpaySubRepo.save(row);
+      await this.paymentService.cancelSubscription(row.razorpaySubscriptionId, false);
+    }
+
+    await this.activatePlan(params.userId, params.plan, {
+      source: 'razorpay',
+      expiresAt,
+    });
+    return expiresAt;
+  }
+
   private async upsertAppleSubscription(
     userId: string,
     verified: {
@@ -437,6 +707,19 @@ export class PlansService {
         plan,
         expiresAt: row.expiresAt,
         source: 'apple',
+      });
+    }
+
+    const rzRows = await this.razorpaySubRepo.find({ where: { userId } });
+    for (const row of rzRows) {
+      if (!['active', 'authenticated', 'pending'].includes(row.status)) continue;
+      if (row.expiresAt && row.expiresAt.getTime() <= now) continue;
+      const plan = normalizePlanSlug(row.planSlug);
+      if (plan === 'free') continue;
+      candidates.push({
+        plan,
+        expiresAt: row.expiresAt,
+        source: 'razorpay',
       });
     }
 

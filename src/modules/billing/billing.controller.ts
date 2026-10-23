@@ -1,4 +1,6 @@
-import { Controller, Get, Post, Body, UseGuards, Req, RawBodyRequest, Headers, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Req, RawBodyRequest, Headers, HttpCode, Logger } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
+import { PlansService } from '../../plans/plans.service';
 import { SkipThrottle } from '@nestjs/throttler';
 import { Public } from '../../common/decorators/public.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -26,7 +28,12 @@ function toUsageBucket(current: number, limit: number | null): UsageBucketDto {
 @SkipThrottle({ auth: true })
 @UseGuards(JwtAuthGuard)
 export class BillingController {
-  constructor(private readonly billingService: BillingService) {}
+  private readonly logger = new Logger(BillingController.name);
+
+  constructor(
+    private readonly billingService: BillingService,
+    private readonly moduleRef: ModuleRef,
+  ) {}
 
   // ── GET /billing/plans (public — needed for landing/pricing before login) ──
   @Public()
@@ -312,6 +319,14 @@ export class BillingController {
       req.rawBody?.toString('utf8') ??
       (typeof body === 'string' ? body : JSON.stringify(body));
     await this.billingService.handleRazorpayWebhook(rawBody, signature, body);
+    try {
+      const plansService = this.moduleRef.get(PlansService, { strict: false });
+      await plansService.handleRazorpaySubscriptionWebhook(body);
+    } catch (err) {
+      this.logger.warn(
+        `User-plan Razorpay webhook failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
     return { status: 'ok' };
   }
 }
