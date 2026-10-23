@@ -189,6 +189,7 @@ export class RecurringTasksController {
       projectId,
       organizationId,
       title: t.title,
+      type: t.type ?? 'TASK',
       description: t.description ?? undefined,
       statusId: statusId ?? undefined,
       priority: t.priority,

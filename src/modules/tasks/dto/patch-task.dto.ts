@@ -182,6 +182,10 @@ export class PatchTaskDto {
   title?: string;
 
   @IsOptional()
+  @IsIn(['STORY', 'BUG', 'TASK', 'SUBTASK'])
+  type?: string;
+
+  @IsOptional()
   @IsString()
   description?: string;
 

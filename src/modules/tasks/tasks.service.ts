@@ -108,6 +108,7 @@ function sanitizeFileName(name: string): string {
 const ASSIGNEE_PATCH_FIELDS = new Set([
   'statusId',
   'priority',
+  'type',
   'subtasks',
   'title',
   'description',
@@ -568,6 +569,7 @@ export class TasksService {
       organizationId,
       reporterId,
       title: dto.title,
+      type: dto.type ?? 'TASK',
       description: dto.description ?? null,
       statusId,
       priority: dto.priority ?? 'MEDIUM',
@@ -655,6 +657,9 @@ export class TasksService {
       if (trimmedTitle.length > 0) {
         patch.title = trimmedTitle;
       }
+    }
+    if (dto.type !== undefined) {
+      patch.type = dto.type;
     }
     if (dto.description !== undefined) {
       const trimmedDescription = dto.description.trim();
@@ -907,7 +912,7 @@ export class TasksService {
     const disallowed = keys.filter((k) => !ASSIGNEE_PATCH_FIELDS.has(k));
     if (disallowed.length > 0) {
       throw new ForbiddenException(
-        'Assignees can only update task title, description, status, priority, and subtasks',
+        'Assignees can only update task title, description, status, priority, type, and subtasks',
       );
     }
   }

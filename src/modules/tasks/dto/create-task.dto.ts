@@ -124,6 +124,10 @@ export class CreateTaskDto {
   title!: string;
 
   @IsOptional()
+  @IsIn(['STORY', 'BUG', 'TASK', 'SUBTASK'])
+  type?: string;
+
+  @IsOptional()
   @IsString()
   description?: string;
 

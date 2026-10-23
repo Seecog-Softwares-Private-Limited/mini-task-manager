@@ -75,11 +75,14 @@ export interface Project {
   updatedAt?: string;
 }
 
+export type TaskType = "STORY" | "BUG" | "TASK" | "SUBTASK";
+
 export interface Task {
   id: string;
   projectId: string;
   organizationId: string;
   title: string;
+  type: TaskType;
   description?: string;
   statusId?: string;
   priority: string;

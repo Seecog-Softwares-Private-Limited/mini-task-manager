@@ -1,6 +1,6 @@
 import { apiClient } from "@/services/api/client";
 import { normalizeTaskId } from "@/lib/task-id";
-import type { Task } from "@/types/api";
+import type { Task, TaskType } from "@/types/api";
 import type { PaginatedResult } from "@/types/api";
 import { resolveSubtaskStatus } from "@/lib/subtask-status";
 import type { TaskSubtask } from "@/types/api";
@@ -13,6 +13,7 @@ export interface CreateTaskPayload {
   projectId: string;
   organizationId: string;
   title: string;
+  type?: TaskType;
   description?: string;
   statusId?: string;
   priority?: string;
@@ -147,6 +148,7 @@ export async function fetchTasksByProject(
  */
 export interface UpdateTaskPayload {
   title?: string;
+  type?: TaskType;
   description?: string;
   statusId?: string | null;
   sprintId?: string | null;
