@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>OpsPick for Dev — Sprint Reports</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; background: #e8ecf4; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 40px; }
+  .chrome { width: 1280px; border-radius: 16px; overflow: hidden; background: #fcfcfc; border: 1px solid #e2e8f0; box-shadow: 0 24px 64px -16px rgba(15,23,42,.18), 0 0 0 1px rgba(99,102,241,.06); }
+  .bar { height: 40px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; padding: 0 14px; gap: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; } .dot.r{background:#f87171} .dot.y{background:#fbbf24} .dot.g{background:#34d399}
+  .url { flex: 1; margin-left: 8px; height: 26px; border-radius: 8px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; font-size: 11px; display: flex; align-items: center; padding: 0 12px; }
+  .app { display: flex; height: 760px; }
+  .sidebar { width: 240px; border-right: 1px solid #e2e8f0; background: #fff; padding: 16px 12px; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 16px; }
+  .logo { width: 32px; height: 32px; border-radius: 10px; background: #fff; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; }
+  .brand span { font-size: 15px; font-weight: 600; color: #020617; }
+  .proj-switch { display: flex; align-items: center; gap: 8px; padding: 8px; margin: 0 0 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
+  .proj-switch .sq { width: 24px; height: 24px; border-radius: 7px; background: linear-gradient(135deg,#6366f1,#c026d3); flex-shrink: 0; }
+  .proj-switch strong { display: block; font-size: 12px; font-weight: 600; color: #0f172a; }
+  .proj-switch small { font-size: 10px; color: #94a3b8; }
+  .section { font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #94a3b8; padding: 12px 10px 6px; }
+  .nav { position: relative; display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 500; color: #64748b; margin-bottom: 2px; }
+  .nav.active { background: rgba(139,92,246,.11); color: #5b21b6; font-weight: 600; }
+  .nav.active::before { content:""; position:absolute; left:0; top:6px; bottom:6px; width:3px; border-radius:0 4px 4px 0; background:#8b5cf6; }
+  .nav svg { width: 18px; height: 18px; opacity: .75; flex-shrink: 0; }
+  .nav.active svg { color: #7c3aed; opacity: 1; }
+  .main { flex: 1; padding: 24px; overflow-y: auto; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+  .header h1 { font-size: 22px; font-weight: 600; letter-spacing: -.03em; color: #020617; }
+  .header p { font-size: 13px; color: #64748b; margin-top: 4px; }
+  .seg { display: inline-flex; border: 1px solid #e2e8f0; border-radius: 999px; padding: 3px; background: #fff; }
+  .seg span { padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; color: #64748b; }
+  .seg span.on { background: linear-gradient(135deg,#6366f1,#c026d3); color: #fff; box-shadow: 0 2px 8px rgba(99,102,241,.25); }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }
+  .kpi { border: 1px solid #e2e8f0; background: #f8fafc; border-radius: 12px; padding: 14px; }
+  .kpi label { font-size: 11px; color: #64748b; font-weight: 500; }
+  .kpi strong { display: block; margin-top: 4px; font-size: 20px; font-weight: 600; color: #020617; letter-spacing: -.02em; }
+  .kpi em { font-style: normal; font-size: 11px; font-weight: 600; color: #16a34a; }
+  .kpi em.warn { color: #d97706; }
+  .grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 14px; }
+  .card { border: 1px solid #e2e8f0; background: #fff; border-radius: 12px; padding: 18px; box-shadow: 0 1px 2px rgba(15,23,42,.04), 0 4px 16px -4px rgba(15,23,42,.06); }
+  .card h2 { font-size: 14px; font-weight: 600; color: #0f172a; margin-bottom: 4px; }
+  .card .sub { font-size: 12px; color: #64748b; margin-bottom: 16px; }
+  .chart { height: 200px; border-radius: 10px; background: linear-gradient(180deg, rgba(99,102,241,.06), transparent 60%), repeating-linear-gradient(0deg, transparent, transparent 38px, #f1f5f9 39px); position: relative; overflow: hidden; }
+  .line { position: absolute; inset: 20px 14px 24px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 160' preserveAspectRatio='none'%3E%3Cpath d='M0 20 L50 38 L100 55 L150 68 L200 92 L250 108 L300 128 L350 142 L400 150' fill='none' stroke='%23cbd5e1' stroke-width='2' stroke-dasharray='5 5'/%3E%3Cpath d='M0 20 C60 40 90 60 140 72 C190 84 230 86 260 110 C300 138 340 150 400 160' fill='none' stroke='%236366f1' stroke-width='3' stroke-linecap='round'/%3E%3Cpath d='M0 20 C60 40 90 60 140 72 C190 84 230 86 260 110 C300 138 340 150 400 160 L400 160 L0 160 Z' fill='url(%23g)' opacity='.2'/%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='0' y2='1'%3E%3Cstop stop-color='%236366f1'/%3E%3Cstop offset='1' stop-color='%236366f1' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3C/svg%3E") center/100% 100% no-repeat; }
+  .legend2 { display: flex; gap: 16px; margin-top: 10px; font-size: 11px; color: #64748b; }
+  .legend2 span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend2 i { width: 14px; height: 2px; display: inline-block; }
+  .bars { display: flex; align-items: stretch; gap: 10px; height: 160px; padding-top: 20px; }
+  .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .bar-track { flex: 1; width: 100%; display: flex; align-items: flex-end; }
+  .bar-track i { display: block; width: 100%; border-radius: 8px 8px 4px 4px; background: linear-gradient(180deg, #6366f1, #c026d3); opacity: .85; }
+  .bar-col span { font-size: 10px; color: #94a3b8; font-weight: 500; flex-shrink: 0; }
+  .list { display: flex; flex-direction: column; gap: 10px; }
+  .row { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-radius: 10px; border: 1px solid #e2e8f0; background: #f8fafc; }
+  .row strong { font-size: 13px; color: #0f172a; }
+  .row span { font-size: 12px; color: #64748b; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; background: rgba(99,102,241,.12); color: #4f46e5; }
+</style>
+</head>
+<body>
+<div class="chrome">
+  <div class="bar"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div><div class="url">app.opspick.com/dev/pay/reports</div></div>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><div class="logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="5" y="7" width="14" height="15" rx="2" fill="#6366f1" fill-opacity=".12"/><path d="M8.5 14.5L11 17l5.5-7" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span>OpsPick</span></div>
+      <div class="proj-switch"><div class="sq"></div><div><strong>Payments Platform</strong><small>Scrum · PAY</small></div></div>
+      <div class="section">Project</div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>Overview</div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>Backlog</div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></svg>Board</div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z"/></svg>Epics</div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M20 12a8 8 0 11-8-8"/><path d="M12 4v8l6 2"/></svg>Releases</div>
+      <div class="section">Reporting</div>
+      <div class="nav active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M3 3v18h18"/><path d="M7 14l4-6 3 3 4-7"/></svg>Reports</div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Activity</div>
+    </aside>
+    <main class="main">
+      <div class="header">
+        <div><h1>Sprint 24 report</h1><p>Burndown, velocity, and scope changes for Payments Platform</p></div>
+        <div class="seg"><span>Sprint 22</span><span>Sprint 23</span><span class="on">Sprint 24</span></div>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><label>Completed points</label><strong>26 / 34</strong><em>76%</em></div>
+        <div class="kpi"><label>Added mid-sprint</label><strong>5 pts</strong><em class="warn">+1 issue</em></div>
+        <div class="kpi"><label>Carried over</label><strong>8 pts</strong><em class="warn">2 issues</em></div>
+        <div class="kpi"><label>Velocity (avg 3)</label><strong>31</strong><em>+6%</em></div>
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h2>Burndown</h2>
+          <div class="sub">Remaining points vs. ideal path</div>
+          <div class="chart"><div class="line"></div></div>
+          <div class="legend2"><span><i style="background:#6366f1"></i>Actual</span><span><i style="background:#cbd5e1;border-top:1px dashed #94a3b8"></i>Ideal</span></div>
+        </div>
+        <div class="card">
+          <h2>Velocity</h2>
+          <div class="sub">Completed points per sprint</div>
+          <div class="bars">
+            <div class="bar-col"><div class="bar-track"><i style="height:62%"></i></div><span>S20</span></div>
+            <div class="bar-col"><div class="bar-track"><i style="height:70%"></i></div><span>S21</span></div>
+            <div class="bar-col"><div class="bar-track"><i style="height:48%"></i></div><span>S22</span></div>
+            <div class="bar-col"><div class="bar-track"><i style="height:85%"></i></div><span>S23</span></div>
+            <div class="bar-col"><div class="bar-track"><i style="height:76%"></i></div><span>S24</span></div>
+          </div>
+        </div>
+        <div class="card" style="grid-column: 1 / -1;">
+          <h2>Issues by epic</h2>
+          <div class="sub">Completed this sprint</div>
+          <div class="list">
+            <div class="row"><div><strong>Webhook Reliability</strong><div><span>4 completed · 5 carried over</span></div></div><span class="badge">13 pts</span></div>
+            <div class="row"><div><strong>Checkout Redesign</strong><div><span>3 completed · 1 carried over</span></div></div><span class="badge">8 pts</span></div>
+            <div class="row"><div><strong>Fraud Detection v2</strong><div><span>2 completed</span></div></div><span class="badge">5 pts</span></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>
