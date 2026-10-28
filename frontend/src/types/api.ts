@@ -48,6 +48,23 @@ export interface User {
 }
 
 /** Tenant / workspace (API: organization). */
+export type IndustryKey = 'restaurant' | 'construction' | 'hospital' | 'school' | 'fm' | 'hotel' | 'general';
+
+export interface IndustryWords {
+  site: string;
+  sites: string;
+  issue: string;
+  issues: string;
+  report: string;
+}
+
+export interface IndustryPack {
+  key: IndustryKey;
+  label: string;
+  description: string;
+  words: IndustryWords;
+}
+
 export interface Organization {
   id: string;
   name: string;
@@ -57,6 +74,10 @@ export interface Organization {
   /** Current user's role (Owner/Admin/Member). Only present in list response. */
   myRole?: string;
   isArchived?: boolean;
+  /** IndustryKey, or null for a workspace created before industries existed. */
+  industry?: IndustryKey | null;
+  /** Resolved terminology for `industry` (falls back to the General edition). */
+  words: IndustryWords;
 }
 
 export interface Project {

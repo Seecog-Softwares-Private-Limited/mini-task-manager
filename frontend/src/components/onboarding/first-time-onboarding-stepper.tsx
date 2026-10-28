@@ -32,10 +32,12 @@ import {
   Loader2,
 } from "lucide-react";
 import { WorkspaceAvatarPresetsPicker } from "@/components/workspaces/workspace-avatar-presets-picker";
+import { IndustryPicker } from "@/components/onboarding/industry-picker";
 import {
   DEFAULT_WORKSPACE_AVATAR,
   resolveWorkspaceLogoUrl,
 } from "@/lib/workspace-avatar-presets";
+import type { IndustryKey } from "@/types/api";
 
 const STEP_1_SCHEMA = z.object({
   name: z.string().min(1, "Name is required").max(150),
@@ -59,6 +61,7 @@ export function FirstTimeOnboardingStepper() {
     DEFAULT_WORKSPACE_AVATAR.dataUrl
   );
   const logoFileInputRef = useRef<HTMLInputElement>(null);
+  const [industry, setIndustry] = useState<IndustryKey | null>(null);
   const [inviteEmails, setInviteEmails] = useState<string[]>([]);
   const [currentEmail, setCurrentEmail] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
@@ -83,7 +86,7 @@ export function FirstTimeOnboardingStepper() {
   });
 
   const createOrgMutation = useMutation({
-    mutationFn: (payload: { name: string; logoUrl?: string }) =>
+    mutationFn: (payload: { name: string; logoUrl?: string; industry?: IndustryKey }) =>
       createOrganization(payload),
     onSuccess: (org) => {
       setOrgId(org.id);
@@ -131,6 +134,7 @@ export function FirstTimeOnboardingStepper() {
     createOrgMutation.mutate({
       name: values.name.trim(),
       logoUrl: resolveWorkspaceLogoUrl(logoPreview),
+      ...(industry ? { industry } : {}),
     });
   };
 
@@ -243,6 +247,13 @@ export function FirstTimeOnboardingStepper() {
                     {step1Form.formState.errors.name.message}
                   </p>
                 )}
+              </div>
+              <div className="space-y-2">
+                <Label>What kind of team is this?</Label>
+                <p className="text-xs text-muted-foreground/80">
+                  Changes the words you see — checklists, sites and reports in your own terms. Optional.
+                </p>
+                <IndustryPicker value={industry} onSelect={setIndustry} />
               </div>
               <div className="space-y-3">
                 <Label>Workspace icon</Label>
