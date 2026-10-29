@@ -92,6 +92,22 @@ export class RecurringTaskOccurrencesRepository {
     });
   }
 
+  /** Runs awaiting manager review (checklist done, not yet approved/rejected). */
+  async findSubmittedByOrganization(
+    organizationId: string,
+    projectId?: string,
+  ): Promise<RecurringTaskOccurrenceEntity[]> {
+    return this.repo.find({
+      where: {
+        organizationId,
+        state: 'SUBMITTED',
+        ...(projectId ? { projectId } : {}),
+      },
+      order: { submittedAt: 'ASC' },
+      take: 500,
+    });
+  }
+
   /** Pending runs with a task, due in [fromYmd, toYmd]. */
   async findPendingForReminders(
     fromYmd: string,

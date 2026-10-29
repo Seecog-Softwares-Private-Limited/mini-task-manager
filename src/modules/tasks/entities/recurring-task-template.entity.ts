@@ -95,6 +95,10 @@ export class RecurringTaskTemplateEntity extends BaseEntity {
   @Column({ name: 'is_paused', type: 'tinyint', width: 1, default: 0 })
   isPaused!: boolean;
 
+  /** When true, a run must be approved by a manager before it counts as done. */
+  @Column({ name: 'requires_approval', type: 'boolean', default: false })
+  requiresApproval!: boolean;
+
   @Column({ name: 'stopped_at', type: 'timestamp', nullable: true })
   stoppedAt!: Date | null;
 }

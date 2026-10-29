@@ -1,5 +1,6 @@
 import { apiClient } from "@/services/api/client";
 import type {
+  PendingReviewOccurrence,
   RecurringTaskOccurrence,
   RecurringTaskSummary,
   RecurringTemplateSummary,
@@ -155,6 +156,7 @@ export async function updateRecurringTemplate(
       priority?: string;
       status?: string;
     }>;
+    requiresApproval?: boolean;
   }
 ): Promise<RecurringTemplateSummary> {
   const { data } = await apiClient.patch<RecurringTemplateSummary>(
@@ -180,6 +182,26 @@ export async function completeRecurringTaskWithAction(
 export async function ensureRecurringOccurrenceSubtasks(taskId: string): Promise<Task> {
   const { data } = await apiClient.post<Task>(
     `/recurring-tasks/tasks/${taskId}/ensure-subtasks`
+  );
+  return data;
+}
+
+/** Manager review queue: runs whose checklist is done but awaiting approval. */
+export async function fetchPendingReview(projectId?: string): Promise<PendingReviewOccurrence[]> {
+  const { data } = await apiClient.get<PendingReviewOccurrence[]>(
+    "/recurring-tasks/occurrences/pending-review",
+    { params: projectId ? { projectId } : undefined }
+  );
+  return data;
+}
+
+export async function reviewOccurrence(
+  occurrenceId: string,
+  payload: { decision: "APPROVED" | "REJECTED"; note?: string }
+): Promise<{ success: boolean; decision: "APPROVED" | "REJECTED" }> {
+  const { data } = await apiClient.post<{ success: boolean; decision: "APPROVED" | "REJECTED" }>(
+    `/recurring-tasks/occurrences/${occurrenceId}/review`,
+    payload
   );
   return data;
 }
