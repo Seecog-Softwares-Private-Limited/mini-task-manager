@@ -219,6 +219,9 @@ export interface SubtaskCompletionRecord {
   afterPhotoFileNames?: string[];
   voiceNoteFileName?: string;
   videoFileName?: string;
+  /** READING items: the value logged, and whether it fell within minValue/maxValue. */
+  value?: number;
+  withinRange?: boolean;
 }
 
 export interface TaskSubtask {
@@ -257,6 +260,13 @@ export interface TaskSubtask {
   requireLocation?: boolean;
   /** Set when marked done (mobile site-proof or lightweight web/server stamp). */
   completionRecord?: SubtaskCompletionRecord | null;
+  /** Checklist item kind; undefined/CHECK = plain checkbox (legacy default). */
+  itemType?: "CHECK" | "PHOTO" | "READING";
+  /** READING items: acceptable value range, e.g. fridge temp 2-8. */
+  minValue?: number;
+  maxValue?: number;
+  /** READING items: unit label shown next to the value, e.g. "°C", "psi". */
+  unit?: string;
 }
 
 export type EntityAttachmentType = "TASK" | "SUBTASK" | "SUBTASK_COMMENT";

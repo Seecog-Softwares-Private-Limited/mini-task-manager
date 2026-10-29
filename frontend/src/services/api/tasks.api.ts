@@ -32,6 +32,10 @@ export interface CreateTaskPayload {
       | "priority"
       | "statusId"
       | "requireLocation"
+      | "itemType"
+      | "minValue"
+      | "maxValue"
+      | "unit"
     > & {
       id?: string;
     }
@@ -81,6 +85,10 @@ export function serializeSubtasksForApi(subtasks: TaskSubtask[]): TaskSubtask[] 
     if (s.createdAt?.trim()) item.createdAt = s.createdAt.trim().slice(0, 40);
     if (s.updatedAt?.trim()) item.updatedAt = s.updatedAt.trim().slice(0, 40);
     if (s.completedAt?.trim()) item.completedAt = s.completedAt.trim().slice(0, 40);
+    if (s.itemType) item.itemType = s.itemType;
+    if (s.minValue != null) item.minValue = s.minValue;
+    if (s.maxValue != null) item.maxValue = s.maxValue;
+    if (s.unit?.trim()) item.unit = s.unit.trim();
     return item;
   });
 }
