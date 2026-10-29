@@ -157,6 +157,8 @@ export interface RecurringTemplateSummary {
   lastRunState?: "PENDING" | "COMPLETED" | "SKIPPED" | null;
   completionHealth?: number;
   subtaskCount?: number;
+  /** When true, a run must be approved by a manager before it counts as done. */
+  requiresApproval?: boolean;
   templateSubtasks?: Array<{
     id: string;
     title: string;
@@ -166,6 +168,10 @@ export interface RecurringTemplateSummary {
     notifyMinutesBefore?: number | null;
     priority?: string;
     status?: string;
+    itemType?: "CHECK" | "PHOTO" | "READING";
+    minValue?: number;
+    maxValue?: number;
+    unit?: string;
   }>;
   assigneeId?: string | null;
   assigneeIds?: string[] | null;
@@ -193,9 +199,30 @@ export interface RecurringTaskOccurrence {
   taskId?: string | null;
   sequenceNumber: number;
   dueDate: string;
-  state: "PENDING" | "COMPLETED" | "SKIPPED";
+  state: "PENDING" | "SUBMITTED" | "COMPLETED" | "SKIPPED";
   completedAt?: string | null;
+  /** Checklist done, awaiting manager approval (requiresApproval templates). */
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+  reviewedBy?: string | null;
+  reviewDecision?: "APPROVED" | "REJECTED" | null;
+  reviewNote?: string | null;
   createdAt: string;
+}
+
+/** One row in the manager review queue (GET /recurring-tasks/occurrences/pending-review). */
+export interface PendingReviewOccurrence {
+  occurrenceId: string;
+  templateId: string;
+  taskId?: string;
+  projectId: string;
+  dueDate: string;
+  submittedAt?: string;
+  task?: {
+    id: string;
+    title: string;
+    subtasks?: TaskSubtask[];
+  };
 }
 
 export type SubtaskStatus = "TODO" | "IN_PROGRESS" | "DONE";

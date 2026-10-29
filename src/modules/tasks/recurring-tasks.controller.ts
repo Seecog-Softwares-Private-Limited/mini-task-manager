@@ -13,6 +13,7 @@ import { formatCalendarDate } from '../../common/utils/calendar-date';
 import {
   CompleteRecurringTaskDto,
   RecurringTasksQueryDto,
+  ReviewOccurrenceDto,
   SkipNextOccurrenceDto,
   UpdateRecurringTemplateDto,
 } from './dto/recurring-actions.dto';
@@ -70,6 +71,27 @@ export class RecurringTasksController {
       projectId,
       Number.isFinite(parsedDays) ? parsedDays : 30,
     );
+  }
+
+  /** Manager review queue: runs whose checklist is done but awaiting approval. */
+  @Get('occurrences/pending-review')
+  async pendingReview(
+    @TenantId() organizationId: string,
+    @Query('projectId') projectId?: string,
+  ) {
+    return this.recurringTasksService.listSubmittedForReview(organizationId, projectId);
+  }
+
+  @UseGuards(RolesGuard)
+  @Roles('owner', 'admin')
+  @Post('occurrences/:occurrenceId/review')
+  async reviewOccurrence(
+    @Param('occurrenceId') occurrenceId: string,
+    @TenantId() organizationId: string,
+    @CurrentUserId() reviewerId: string,
+    @Body() dto: ReviewOccurrenceDto,
+  ) {
+    return this.recurringTasksService.reviewOccurrence(occurrenceId, organizationId, reviewerId, dto);
   }
 
   @Get()

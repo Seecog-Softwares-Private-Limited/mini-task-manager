@@ -1,4 +1,4 @@
-import { IsArray, IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsOptional, IsString, IsUUID, MaxLength, ValidateIf } from 'class-validator';
 import { Type } from 'class-transformer';
 import { IsInt, Min, Max, ValidateNested } from 'class-validator';
 import { TaskRecurrenceDto } from './recurrence.dto';
@@ -61,5 +61,21 @@ export class UpdateRecurringTemplateDto {
   @ValidateNested({ each: true })
   @Type(() => CreateTaskSubtaskDto)
   subtasks?: CreateTaskSubtaskDto[];
+
+  /** When true, a run must be approved by a manager before it counts as done. */
+  @IsOptional()
+  @IsBoolean()
+  requiresApproval?: boolean;
+}
+
+export class ReviewOccurrenceDto {
+  @IsIn(['APPROVED', 'REJECTED'])
+  decision!: 'APPROVED' | 'REJECTED';
+
+  /** Required when rejecting, so the field worker knows what to fix. */
+  @ValidateIf((o) => o.decision === 'REJECTED')
+  @IsString()
+  @MaxLength(2000)
+  note?: string;
 }
 
