@@ -6,6 +6,12 @@ export class UpdateProjectDto {
   @MaxLength(200)
   name?: string;
 
+  /** Empty string clears the site link. */
+  @Allow()
+  @IsOptional()
+  @IsString()
+  siteId?: string;
+
   @IsOptional()
   @IsString()
   @MaxLength(500_000)
