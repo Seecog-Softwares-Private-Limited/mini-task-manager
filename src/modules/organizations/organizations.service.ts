@@ -85,6 +85,7 @@ export class OrganizationsService {
           slug,
           ownerId,
           logoUrl: resolveWorkspaceLogoUrl(dto.logoUrl),
+          industry: dto.industry ?? null,
           isArchived: false,
         });
         await orgRepo.save(entity);
