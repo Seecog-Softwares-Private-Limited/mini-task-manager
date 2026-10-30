@@ -75,6 +75,31 @@ export interface Project {
   updatedAt?: string;
 }
 
+export type IssueSeverity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+export type IssueStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
+export type IssueSource = "MANUAL" | "AUTO_CHECK_FAILED" | "AUTO_READING_OUT_OF_RANGE";
+
+export interface Issue {
+  id: string;
+  organizationId: string;
+  projectId: string;
+  siteId?: string | null;
+  taskId?: string | null;
+  subtaskId?: string | null;
+  title: string;
+  description?: string | null;
+  severity: IssueSeverity;
+  status: IssueStatus;
+  source: IssueSource;
+  raisedBy?: string | null;
+  assigneeId?: string | null;
+  resolvedAt?: string | null;
+  resolvedBy?: string | null;
+  resolutionNote?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Task {
   id: string;
   projectId: string;

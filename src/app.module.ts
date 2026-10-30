@@ -32,6 +32,7 @@ import { ExportModule } from './modules/export/export.module';
 import { OrgEventsModule } from './modules/org-events/org-events.module';
 import { FeedbacksModule } from './modules/feedbacks/feedbacks.module';
 import { AiModule } from './modules/ai/ai.module';
+import { IssuesModule } from './modules/issues/issues.module';
 import { RootController } from './root.controller';
 
 @Module({
@@ -72,6 +73,7 @@ import { RootController } from './root.controller';
     OrgEventsModule,
     FeedbacksModule,
     AiModule,
+    IssuesModule,
   ],
 })
 export class AppModule {}
