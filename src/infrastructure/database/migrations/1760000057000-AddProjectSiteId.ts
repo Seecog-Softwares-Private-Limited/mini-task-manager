@@ -8,6 +8,16 @@ export class AddProjectSiteId1760000057000 implements MigrationInterface {
   name = 'AddProjectSiteId1760000057000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    const hasColumn = await queryRunner.query(`
+      SELECT 1
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'projects'
+        AND COLUMN_NAME = 'site_id'
+      LIMIT 1
+    `);
+    if (Array.isArray(hasColumn) && hasColumn.length > 0) return;
+
     await queryRunner.query(`
       ALTER TABLE \`projects\`
         ADD COLUMN \`site_id\` BINARY(16) NULL AFTER \`organization_id\`
