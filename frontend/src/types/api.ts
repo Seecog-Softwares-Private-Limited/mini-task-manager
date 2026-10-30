@@ -48,6 +48,23 @@ export interface User {
 }
 
 /** Tenant / workspace (API: organization). */
+export type IndustryKey = 'restaurant' | 'construction' | 'hospital' | 'school' | 'fm' | 'hotel' | 'general';
+
+export interface IndustryWords {
+  site: string;
+  sites: string;
+  issue: string;
+  issues: string;
+  report: string;
+}
+
+export interface IndustryPack {
+  key: IndustryKey;
+  label: string;
+  description: string;
+  words: IndustryWords;
+}
+
 export interface Organization {
   id: string;
   name: string;
@@ -57,11 +74,28 @@ export interface Organization {
   /** Current user's role (Owner/Admin/Member). Only present in list response. */
   myRole?: string;
   isArchived?: boolean;
+  /** IndustryKey, or null for a workspace created before industries existed. */
+  industry?: IndustryKey | null;
+  /** Resolved terminology for `industry` (falls back to the General edition). */
+  words: IndustryWords;
+}
+
+export interface Site {
+  id: string;
+  organizationId: string;
+  name: string;
+  address?: string | null;
+  isArchived: boolean;
+  createdBy: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Project {
   id: string;
   organizationId: string;
+  /** Physical location this project belongs to (restaurant branch, site, ward, campus...). */
+  siteId?: string | null;
   name: string;
   description?: string;
   /** Data URL or URL for project card icon */
@@ -73,6 +107,31 @@ export interface Project {
   createdAt?: string;
   /** ISO date string; used for "last updated" and recent highlight */
   updatedAt?: string;
+}
+
+export type IssueSeverity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+export type IssueStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
+export type IssueSource = "MANUAL" | "AUTO_CHECK_FAILED" | "AUTO_READING_OUT_OF_RANGE";
+
+export interface Issue {
+  id: string;
+  organizationId: string;
+  projectId: string;
+  siteId?: string | null;
+  taskId?: string | null;
+  subtaskId?: string | null;
+  title: string;
+  description?: string | null;
+  severity: IssueSeverity;
+  status: IssueStatus;
+  source: IssueSource;
+  raisedBy?: string | null;
+  assigneeId?: string | null;
+  resolvedAt?: string | null;
+  resolvedBy?: string | null;
+  resolutionNote?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Task {
@@ -246,6 +305,9 @@ export interface SubtaskCompletionRecord {
   afterPhotoFileNames?: string[];
   voiceNoteFileName?: string;
   videoFileName?: string;
+  /** READING items: the value logged, and whether it fell within minValue/maxValue. */
+  value?: number;
+  withinRange?: boolean;
 }
 
 export interface TaskSubtask {
@@ -284,6 +346,13 @@ export interface TaskSubtask {
   requireLocation?: boolean;
   /** Set when marked done (mobile site-proof or lightweight web/server stamp). */
   completionRecord?: SubtaskCompletionRecord | null;
+  /** Checklist item kind; undefined/CHECK = plain checkbox (legacy default). */
+  itemType?: "CHECK" | "PHOTO" | "READING";
+  /** READING items: acceptable value range, e.g. fridge temp 2-8. */
+  minValue?: number;
+  maxValue?: number;
+  /** READING items: unit label shown next to the value, e.g. "°C", "psi". */
+  unit?: string;
 }
 
 export type EntityAttachmentType = "TASK" | "SUBTASK" | "SUBTASK_COMMENT";

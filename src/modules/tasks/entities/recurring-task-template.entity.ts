@@ -54,6 +54,13 @@ export class RecurringTaskTemplateEntity extends BaseEntity {
     status?: 'TODO' | 'IN_PROGRESS' | 'DONE';
     priority?: string;
     statusId?: string;
+    /** Checklist item kind; undefined/CHECK = plain checkbox (legacy default). */
+    itemType?: 'CHECK' | 'PHOTO' | 'READING';
+    /** READING items: acceptable value range, e.g. fridge temp 2-8. */
+    minValue?: number;
+    maxValue?: number;
+    /** READING items: unit label shown next to the value, e.g. "°C", "psi". */
+    unit?: string;
   }> | null;
 
   @Column({ type: 'simple-json', nullable: true })

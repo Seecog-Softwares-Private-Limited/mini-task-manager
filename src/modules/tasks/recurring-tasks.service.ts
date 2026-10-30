@@ -66,6 +66,10 @@ function normalizeTemplateSubtasks(
       ...(s.notifyMinutesBefore != null
         ? { notifyMinutesBefore: Number(s.notifyMinutesBefore) }
         : {}),
+      ...(s.itemType ? { itemType: s.itemType } : {}),
+      ...(s.minValue != null ? { minValue: s.minValue } : {}),
+      ...(s.maxValue != null ? { maxValue: s.maxValue } : {}),
+      ...(s.unit ? { unit: s.unit } : {}),
     };
   });
 }
@@ -101,6 +105,10 @@ function cloneTemplateSubtasksForOccurrence(
       status: 'TODO' as const,
       priority: s.priority,
       statusId: s.statusId,
+      ...(s.itemType ? { itemType: s.itemType } : {}),
+      ...(s.minValue != null ? { minValue: s.minValue } : {}),
+      ...(s.maxValue != null ? { maxValue: s.maxValue } : {}),
+      ...(s.unit ? { unit: s.unit } : {}),
     };
   });
 }
@@ -916,6 +924,10 @@ export class RecurringTasksService {
         status?: 'TODO' | 'IN_PROGRESS' | 'DONE';
         priority?: string;
         statusId?: string;
+        itemType?: 'CHECK' | 'PHOTO' | 'READING';
+        minValue?: number;
+        maxValue?: number;
+        unit?: string;
       }>;
     }> = [];
     for (const tpl of templates) {
@@ -962,6 +974,10 @@ export class RecurringTasksService {
                 priority: s.priority,
                 status: (s.status as 'TODO' | 'IN_PROGRESS' | 'DONE') ?? 'TODO',
                 statusId: s.statusId,
+                itemType: s.itemType,
+                minValue: s.minValue,
+                maxValue: s.maxValue,
+                unit: s.unit,
               })),
             );
             if (hydrated?.length) {
@@ -1362,6 +1378,10 @@ export class RecurringTasksService {
               // Template steps are never "done" — only occurrence runs track completion.
               status: 'TODO' as const,
               statusId: s.statusId,
+              itemType: s.itemType,
+              minValue: s.minValue,
+              maxValue: s.maxValue,
+              unit: s.unit,
             })),
           );
     await this.templatesRepository.update(template.id, {

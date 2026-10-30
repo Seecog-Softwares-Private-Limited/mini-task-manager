@@ -6,6 +6,7 @@ export interface CreateProjectPayload {
   description?: string;
   visibility?: string;
   iconUrl?: string;
+  siteId?: string;
 }
 
 export interface ProjectTemplate {
@@ -66,6 +67,8 @@ export interface UpdateProjectPayload {
   isArchived?: boolean;
   /** Omit to leave unchanged; send "" to clear stored icon */
   iconUrl?: string;
+  /** Omit to leave unchanged; send "" to clear the site link */
+  siteId?: string;
 }
 
 export async function updateProject(

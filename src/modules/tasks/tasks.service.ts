@@ -20,6 +20,7 @@ import { PatchTaskDto } from './dto/patch-task.dto';
 import { RecurringTasksService } from './recurring-tasks.service';
 import { OrgEventsService } from '../org-events/org-events.service';
 import { TaskNotificationsService } from './task-notifications.service';
+import { IssuesService } from '../issues/issues.service';
 import {
   assigneeIdsForItem,
   coerceDueYmd,
@@ -170,6 +171,7 @@ export class TasksService {
     private readonly orgEventsService: OrgEventsService,
     @Inject(forwardRef(() => TaskNotificationsService))
     private readonly taskNotifications: TaskNotificationsService,
+    private readonly issuesService: IssuesService,
     @InjectDataSource()
     private readonly dataSource: DataSource,
   ) {}
@@ -722,6 +724,13 @@ export class TasksService {
         currentUserId: userId,
       });
       patch.subtasks = normalized.length ? normalized : null;
+      this.raiseIssuesForFailedChecklistItems(
+        organizationId,
+        task.projectId,
+        taskId,
+        task.subtasks,
+        normalized,
+      );
     }
     const nextStatusId = dto.statusId !== undefined ? dto.statusId ?? null : task.statusId;
     const statusChanged = dto.statusId !== undefined && nextStatusId !== task.statusId;
@@ -1089,6 +1098,57 @@ export class TasksService {
     return { sent };
   }
 
+  /**
+   * Auto-raises an Issue for each checklist item that just failed: a READING
+   * whose server-computed withinRange came back false, or a CHECK item whose
+   * completionRecord.passed is explicitly false. Only fires on a NEW failure
+   * (not on re-saving an already-failed item untouched), and never blocks or
+   * fails the task save - issue creation is fire-and-forget.
+   */
+  private raiseIssuesForFailedChecklistItems(
+    organizationId: string,
+    projectId: string,
+    taskId: string,
+    before: TaskEntity['subtasks'],
+    after: TaskEntity['subtasks'],
+  ): void {
+    if (!after?.length) return;
+    const beforeById = new Map((before ?? []).map((s) => [s.id, s] as const));
+    const isFailed = (item: NonNullable<TaskEntity['subtasks']>[number]) => {
+      const rec = item.completionRecord as Record<string, unknown> | undefined;
+      if (item.itemType === 'READING') return rec?.withinRange === false;
+      if (item.itemType === 'CHECK') return rec?.passed === false;
+      return false;
+    };
+    for (const item of after) {
+      if (!isFailed(item)) continue;
+      const prior = beforeById.get(item.id);
+      if (prior && isFailed(prior) && prior.updatedAt === item.updatedAt) continue;
+
+      const rec = item.completionRecord as Record<string, unknown> | undefined;
+      const source: 'AUTO_READING_OUT_OF_RANGE' | 'AUTO_CHECK_FAILED' =
+        item.itemType === 'READING' ? 'AUTO_READING_OUT_OF_RANGE' : 'AUTO_CHECK_FAILED';
+      const description =
+        item.itemType === 'READING' && typeof rec?.value === 'number'
+          ? `Reading ${rec.value}${item.unit ?? ''} is outside the acceptable range (${
+              item.minValue ?? '-'
+            } to ${item.maxValue ?? '-'}).`
+          : 'Checklist item was marked as failed.';
+
+      this.issuesService
+        .createFromChecklistItem({
+          organizationId,
+          projectId,
+          taskId,
+          subtaskId: item.id,
+          title: `Failed: ${item.title}`,
+          description,
+          source,
+        })
+        .catch(() => {});
+    }
+  }
+
   private normalizeSubtasks(
     subtasks?: Array<{
       id?: string;
@@ -1114,6 +1174,10 @@ export class TasksService {
       completedAt?: string;
       note?: string;
       requireLocation?: boolean;
+      itemType?: 'CHECK' | 'PHOTO' | 'READING';
+      minValue?: number;
+      maxValue?: number;
+      unit?: string;
     }>,
     context?: {
       existing?: Array<{
@@ -1133,6 +1197,10 @@ export class TasksService {
         dueTime?: string;
         notifyMinutesBefore?: number | null;
         reminderSentFor?: string | null;
+        itemType?: 'CHECK' | 'PHOTO' | 'READING';
+        minValue?: number;
+        maxValue?: number;
+        unit?: string;
       }> | null;
       currentUserId?: string;
     },
@@ -1159,6 +1227,10 @@ export class TasksService {
     completedAt?: string;
     note?: string;
     requireLocation?: boolean;
+    itemType?: 'CHECK' | 'PHOTO' | 'READING';
+    minValue?: number;
+    maxValue?: number;
+    unit?: string;
   }> {
     if (!subtasks?.length) return [];
     const existingById = new Map(
@@ -1318,6 +1390,27 @@ export class TasksService {
                     : undefined))
             : undefined;
 
+        // Checklist item kind and (for READING) its acceptable range are set once
+        // when the item is created and preserved thereafter, like requireLocation.
+        const itemType = s.itemType ?? prior?.itemType;
+        const minValue = s.minValue ?? prior?.minValue;
+        const maxValue = s.maxValue ?? prior?.maxValue;
+        const unit = s.unit ?? prior?.unit;
+
+        if (
+          itemType === 'READING' &&
+          completionRecord &&
+          typeof completionRecord.value === 'number' &&
+          (minValue != null || maxValue != null)
+        ) {
+          completionRecord = {
+            ...completionRecord,
+            withinRange:
+              (minValue == null || completionRecord.value >= minValue) &&
+              (maxValue == null || completionRecord.value <= maxValue),
+          };
+        }
+
         return {
           id: s.id ?? generateUuid(),
           title: s.title?.trim() ?? '',
@@ -1342,6 +1435,10 @@ export class TasksService {
             ? { note: s.note.trim().slice(0, 2000) }
             : {}),
           ...(s.requireLocation === true ? { requireLocation: true } : {}),
+          ...(itemType ? { itemType } : {}),
+          ...(minValue != null ? { minValue } : {}),
+          ...(maxValue != null ? { maxValue } : {}),
+          ...(unit ? { unit } : {}),
         };
       })
       .filter((s) => s.title.length > 0);

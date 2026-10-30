@@ -6,6 +6,7 @@ import {
   IsString,
   IsIn,
   IsInt,
+  IsNumber,
   IsOptional,
   IsUUID,
   Max,
@@ -163,6 +164,28 @@ class PatchTaskSubtaskDto {
   @IsOptional()
   @IsBoolean()
   requireLocation?: boolean;
+
+  /** Checklist item kind; omit/CHECK = plain checkbox. */
+  @IsOptional()
+  @IsIn(['CHECK', 'PHOTO', 'READING'])
+  itemType?: 'CHECK' | 'PHOTO' | 'READING';
+
+  /** READING items: acceptable value range, e.g. fridge temp 2-8. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  minValue?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  maxValue?: number;
+
+  /** READING items: unit label shown next to the value, e.g. "°C", "psi". */
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  unit?: string;
 }
 
 class PatchTaskTagDto {

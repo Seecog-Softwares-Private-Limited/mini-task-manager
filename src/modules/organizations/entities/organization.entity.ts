@@ -17,6 +17,10 @@ export class OrganizationEntity extends BaseEntity {
   @Column({ name: 'logo_url', type: 'mediumtext', nullable: true })
   logoUrl!: string | null;
 
+  /** One of IndustryKey from industry-packs.ts, or null for a workspace created before this existed. */
+  @Column({ type: 'varchar', length: 30, nullable: true })
+  industry!: string | null;
+
   @Column({ name: 'owner_id', type: 'binary', length: 16, transformer: uuidBinaryTransformer })
   ownerId!: string;
 
