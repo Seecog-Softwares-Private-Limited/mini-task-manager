@@ -1,6 +1,7 @@
 export class ProjectResponseDto {
   id!: string;
   organizationId!: string;
+  siteId?: string | null;
   name!: string;
   description?: string;
   iconUrl?: string | null;

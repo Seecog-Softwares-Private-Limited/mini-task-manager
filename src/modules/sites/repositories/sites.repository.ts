@@ -1,0 +1,46 @@
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { generateUuid } from '../../../common/utils/uuid.util';
+import { SiteEntity } from '../entities/site.entity';
+
+@Injectable()
+export class SitesRepository {
+  constructor(
+    @InjectRepository(SiteEntity)
+    private readonly repo: Repository<SiteEntity>,
+  ) {}
+
+  async findById(id: string): Promise<SiteEntity | null> {
+    return this.repo.findOne({ where: { id } });
+  }
+
+  async findByIdAndOrganization(id: string, organizationId: string): Promise<SiteEntity | null> {
+    return this.repo.findOne({ where: { id, organizationId } });
+  }
+
+  async findByOrganization(organizationId: string): Promise<SiteEntity[]> {
+    return this.repo.find({
+      where: { organizationId },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  async countByOrganization(organizationId: string): Promise<number> {
+    return this.repo.count({ where: { organizationId } });
+  }
+
+  async create(data: Partial<SiteEntity>): Promise<SiteEntity> {
+    const id = data.id ?? generateUuid();
+    const entity = this.repo.create({ ...data, id });
+    return this.repo.save(entity);
+  }
+
+  async update(id: string, data: Partial<SiteEntity>): Promise<void> {
+    await this.repo.update(id, data);
+  }
+
+  async delete(id: string): Promise<void> {
+    await this.repo.delete(id);
+  }
+}

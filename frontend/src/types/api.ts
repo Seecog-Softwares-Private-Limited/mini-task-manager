@@ -80,9 +80,22 @@ export interface Organization {
   words: IndustryWords;
 }
 
+export interface Site {
+  id: string;
+  organizationId: string;
+  name: string;
+  address?: string | null;
+  isArchived: boolean;
+  createdBy: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Project {
   id: string;
   organizationId: string;
+  /** Physical location this project belongs to (restaurant branch, site, ward, campus...). */
+  siteId?: string | null;
   name: string;
   description?: string;
   /** Data URL or URL for project card icon */
