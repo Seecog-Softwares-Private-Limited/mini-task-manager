@@ -155,6 +155,10 @@ export async function updateRecurringTemplate(
       dueOffsetDays?: number;
       priority?: string;
       status?: string;
+      itemType?: "CHECK" | "PHOTO" | "READING";
+      minValue?: number;
+      maxValue?: number;
+      unit?: string;
     }>;
     requiresApproval?: boolean;
   }

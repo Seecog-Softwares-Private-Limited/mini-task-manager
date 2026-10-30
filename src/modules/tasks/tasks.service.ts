@@ -1114,6 +1114,10 @@ export class TasksService {
       completedAt?: string;
       note?: string;
       requireLocation?: boolean;
+      itemType?: 'CHECK' | 'PHOTO' | 'READING';
+      minValue?: number;
+      maxValue?: number;
+      unit?: string;
     }>,
     context?: {
       existing?: Array<{
@@ -1133,6 +1137,10 @@ export class TasksService {
         dueTime?: string;
         notifyMinutesBefore?: number | null;
         reminderSentFor?: string | null;
+        itemType?: 'CHECK' | 'PHOTO' | 'READING';
+        minValue?: number;
+        maxValue?: number;
+        unit?: string;
       }> | null;
       currentUserId?: string;
     },
@@ -1159,6 +1167,10 @@ export class TasksService {
     completedAt?: string;
     note?: string;
     requireLocation?: boolean;
+    itemType?: 'CHECK' | 'PHOTO' | 'READING';
+    minValue?: number;
+    maxValue?: number;
+    unit?: string;
   }> {
     if (!subtasks?.length) return [];
     const existingById = new Map(
@@ -1318,6 +1330,27 @@ export class TasksService {
                     : undefined))
             : undefined;
 
+        // Checklist item kind and (for READING) its acceptable range are set once
+        // when the item is created and preserved thereafter, like requireLocation.
+        const itemType = s.itemType ?? prior?.itemType;
+        const minValue = s.minValue ?? prior?.minValue;
+        const maxValue = s.maxValue ?? prior?.maxValue;
+        const unit = s.unit ?? prior?.unit;
+
+        if (
+          itemType === 'READING' &&
+          completionRecord &&
+          typeof completionRecord.value === 'number' &&
+          (minValue != null || maxValue != null)
+        ) {
+          completionRecord = {
+            ...completionRecord,
+            withinRange:
+              (minValue == null || completionRecord.value >= minValue) &&
+              (maxValue == null || completionRecord.value <= maxValue),
+          };
+        }
+
         return {
           id: s.id ?? generateUuid(),
           title: s.title?.trim() ?? '',
@@ -1342,6 +1375,10 @@ export class TasksService {
             ? { note: s.note.trim().slice(0, 2000) }
             : {}),
           ...(s.requireLocation === true ? { requireLocation: true } : {}),
+          ...(itemType ? { itemType } : {}),
+          ...(minValue != null ? { minValue } : {}),
+          ...(maxValue != null ? { maxValue } : {}),
+          ...(unit ? { unit } : {}),
         };
       })
       .filter((s) => s.title.length > 0);
