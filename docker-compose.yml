@@ -1,15 +1,35 @@
-# Optional: run backend and frontend together.
+# Full local stack: MySQL + backend + frontend, all in containers.
 # Create .env at repo root. Backend loads vars from .env.
 #
 # Local dev email: docker compose up -d mailhog
 # View captured emails at http://localhost:8025
+#
+# To point at an external DB instead of the bundled mysql service, set
+# DB_HOST (and friends) in .env to override the defaults below.
 
 services:
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-devpassword}
+      MYSQL_DATABASE: ${DB_DATABASE:-mini_task_manager}
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-proot_check_ignore"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   mailhog:
     image: mailhog/mailhog
     ports:
       - "1025:1025"   # SMTP
       - "8025:8025"   # Web UI
+
   backend:
     build:
       context: .
@@ -21,13 +41,14 @@ services:
     environment:
       NODE_ENV: production
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
-      DB_HOST: ${DB_HOST:-host.docker.internal}
-      DB_PORT: ${DB_PORT:-3306}
+      DB_HOST: ${DB_HOST:-mysql}
+      DB_PORT: 3306
       DB_USERNAME: ${DB_USERNAME:-root}
-      DB_PASSWORD: ${DB_PASSWORD}
+      DB_PASSWORD: ${DB_PASSWORD:-devpassword}
       DB_DATABASE: ${DB_DATABASE:-mini_task_manager}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    depends_on:
+      mysql:
+        condition: service_healthy
 
   frontend:
     build:
@@ -39,3 +60,6 @@ services:
       NEXT_PUBLIC_API_URL: http://localhost:3000
     depends_on:
       - backend
+
+volumes:
+  mysql-data:
