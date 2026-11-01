@@ -24,6 +24,7 @@ import { OrganizationMemberEntity } from '../../../modules/organizations/entitie
 import { PlanEntity } from '../../../modules/billing/entities/plan.entity';
 import { SubscriptionEntity } from '../../../modules/billing/entities/subscription.entity';
 import { ProjectEntity } from '../../../modules/projects/entities/project.entity';
+import { SiteEntity } from '../../../modules/sites/entities/site.entity';
 import { WorkflowEntity } from '../../../modules/workflows/entities/workflow.entity';
 import { WorkflowStatusEntity } from '../../../modules/workflows/entities/workflow-status.entity';
 import { TaskEntity } from '../../../modules/tasks/entities/task.entity';
@@ -54,6 +55,7 @@ async function runSeed() {
       SubscriptionEntity,
       ProjectEntity,
       ProjectMemberEntity,
+      SiteEntity,
       WorkflowEntity,
       WorkflowStatusEntity,
       TaskEntity,
