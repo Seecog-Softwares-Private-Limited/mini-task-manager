@@ -60,6 +60,7 @@ import { NoticeDialog, useNoticeDialog } from "@/components/ui/notice-dialog";
 import { fetchComments, addComment, deleteComment } from "@/services/api/comments.api";
 import { fetchOrgMembers, fetchProjectMembers } from "@/services/api/members.api";
 import { fetchActivityLogs } from "@/services/api/activity-logs.api";
+import { fetchEpics } from "@/services/api/epics.api";
 import { fetchAttachments } from "@/services/api/attachments.api";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
@@ -436,6 +437,13 @@ export function TaskDetailModal({
     refetchInterval: 30_000,
   });
 
+  const { data: projectEpics = [] } = useQuery({
+    queryKey: ["epics", projectId],
+    queryFn: () => fetchEpics({ projectId }),
+    enabled: open && !!projectId,
+    staleTime: 60_000,
+  });
+
   /** Project members first; org roster as fallback (all roles can list teammates). */
   const assignableMembers = React.useMemo(() => {
     const byUserId = new Map<
@@ -706,14 +714,14 @@ export function TaskDetailModal({
   const updateMutation = useMutation({
     mutationFn: (payload: Parameters<typeof updateTask>[1]) => {
       const keys = Object.keys(payload);
-      const assigneeAllowed = new Set(["statusId", "priority", "type", "title", "description", "subtasks"]);
+      const assigneeAllowed = new Set(["statusId", "priority", "type", "epicId", "title", "description", "subtasks"]);
       if (!canEditAll) {
         if (!canEditWorkflowFields && !canEditTitleAndDescription) {
           return Promise.reject(new Error("You do not have permission to edit this task"));
         }
         if (keys.some((k) => !assigneeAllowed.has(k))) {
           return Promise.reject(
-            new Error("You can only edit title, description, status, priority, type, and subtasks")
+            new Error("You can only edit title, description, status, priority, type, epic, and subtasks")
           );
         }
       }
@@ -1033,6 +1041,14 @@ export function TaskDetailModal({
     [canEditWorkflowFields, updateMutation]
   );
 
+  const handleEpicChange = React.useCallback(
+    (epicId: string | null) => {
+      if (!canEditWorkflowFields) return;
+      updateMutation.mutate({ epicId });
+    },
+    [canEditWorkflowFields, updateMutation]
+  );
+
   const isOverdue =
     Boolean(task?.dueDate) &&
     isTaskDueDateOverdue(task?.dueDate, task?.dueTime) &&
@@ -1041,6 +1057,7 @@ export function TaskDetailModal({
     PRIORITIES.find((pr) => pr.value === (task?.priority ?? "").toUpperCase()) ?? PRIORITIES[1];
   const selectedType =
     TYPES.find((t) => t.value === (task?.type ?? "").toUpperCase()) ?? TYPES[1];
+  const selectedEpic = projectEpics.find((e) => e.id === task?.epicId) ?? null;
   const selectedStatus =
     statuses.find((s) => s.id === (task?.statusId ?? statuses[0]?.id)) ?? statuses[0] ?? null;
   const recurrenceTypeLabel = toRecurrenceLabel(task?.recurrenceType);
@@ -2393,6 +2410,80 @@ export function TaskDetailModal({
                                     aria-hidden
                                   />
                                   <span className="flex-1">{t.label}</span>
+                                  {isCurrent ? <Check className="h-3.5 w-3.5 shrink-0 text-primary" /> : null}
+                                </DropdownMenuItem>
+                              );
+                            })}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
+                      <div className="space-y-2">
+                        <span className="block text-xs font-medium text-muted-foreground">Epic</span>
+                        <DropdownMenu modal={false}>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              disabled={!canEditWorkflowFields || updateMutation.isPending}
+                              className={tdSidebarFieldShell}
+                              aria-label="Change epic"
+                            >
+                              <span className="flex min-w-0 flex-1 items-center gap-2.5">
+                                <span
+                                  className="h-2.5 w-2.5 shrink-0 rounded-full shadow-sm ring-2 ring-white/80 dark:ring-black/40"
+                                  style={{ backgroundColor: selectedEpic?.color ?? "#94a3b8" }}
+                                />
+                                <span className="truncate text-foreground">
+                                  {selectedEpic?.title ?? "None"}
+                                </span>
+                              </span>
+                              <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="start"
+                            className={cn(
+                              "w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px] p-1 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 duration-150",
+                              TASK_MODAL_DROPDOWN_Z
+                            )}
+                            sideOffset={6}
+                            onClick={(e) => e.stopPropagation()}
+                            onPointerDown={(e) => e.stopPropagation()}
+                          >
+                            <DropdownMenuItem
+                              disabled={updateMutation.isPending}
+                              onSelect={(event) => {
+                                event.preventDefault();
+                                handleEpicChange(null);
+                              }}
+                              className="rounded-lg text-sm"
+                            >
+                              <span
+                                className="mr-2 h-2.5 w-2.5 shrink-0 rounded-full bg-slate-400"
+                                aria-hidden
+                              />
+                              <span className="flex-1">None</span>
+                              {!selectedEpic ? <Check className="h-3.5 w-3.5 shrink-0 text-primary" /> : null}
+                            </DropdownMenuItem>
+                            {projectEpics.map((epic) => {
+                              const isCurrent = epic.id === selectedEpic?.id;
+                              return (
+                                <DropdownMenuItem
+                                  key={epic.id}
+                                  disabled={updateMutation.isPending}
+                                  onSelect={(event) => {
+                                    event.preventDefault();
+                                    handleEpicChange(epic.id);
+                                  }}
+                                  className="rounded-lg text-sm"
+                                >
+                                  <span
+                                    className="mr-2 h-2.5 w-2.5 shrink-0 rounded-full"
+                                    style={{ backgroundColor: epic.color ?? "#94a3b8" }}
+                                    aria-hidden
+                                  />
+                                  <span className="flex-1 truncate">{epic.title}</span>
                                   {isCurrent ? <Check className="h-3.5 w-3.5 shrink-0 text-primary" /> : null}
                                 </DropdownMenuItem>
                               );

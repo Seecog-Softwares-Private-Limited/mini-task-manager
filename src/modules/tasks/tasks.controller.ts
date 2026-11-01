@@ -547,6 +547,7 @@ export class TasksController {
       estimatedMinutes: t.estimatedMinutes ?? undefined,
       loggedMinutes: t.loggedMinutes,
       sprintId: t.sprintId ? formatUuid(t.sprintId as string | Buffer) : undefined,
+      epicId: t.epicId ? formatUuid(t.epicId as string | Buffer) : undefined,
       recurringTemplateId: t.recurringTemplateId
         ? (formatUuid(t.recurringTemplateId as string | Buffer) ?? String(t.recurringTemplateId))
         : undefined,

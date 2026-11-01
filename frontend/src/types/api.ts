@@ -136,6 +136,25 @@ export interface Issue {
   updatedAt: string;
 }
 
+export type EpicStatus = "TODO" | "IN_PROGRESS" | "DONE";
+
+export interface Epic {
+  id: string;
+  organizationId: string;
+  projectId: string;
+  title: string;
+  description?: string;
+  color?: string;
+  status: EpicStatus;
+  startDate?: string;
+  dueDate?: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  taskCount: number;
+  completedTaskCount: number;
+}
+
 export interface Task {
   id: string;
   projectId: string;
@@ -157,6 +176,7 @@ export interface Task {
   estimatedMinutes?: number;
   loggedMinutes: number;
   sprintId?: string;
+  epicId?: string;
   recurringTemplateId?: string;
   recurrenceType?: "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY" | "CUSTOM" | "NONE";
   recurrenceSequence?: number;

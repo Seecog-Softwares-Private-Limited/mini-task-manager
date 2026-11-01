@@ -227,6 +227,12 @@ export class PatchTaskDto {
   @IsOptional()
   @Transform(emptyStrToNull)
   @ValidateIf((_o, v) => v != null)
+  @IsUUID('4', { message: 'epicId must be a valid UUID' })
+  epicId?: string | null;
+
+  @IsOptional()
+  @Transform(emptyStrToNull)
+  @ValidateIf((_o, v) => v != null)
   @IsUUID('4', { message: 'assigneeId must be a valid UUID' })
   assigneeId?: string | null;
 

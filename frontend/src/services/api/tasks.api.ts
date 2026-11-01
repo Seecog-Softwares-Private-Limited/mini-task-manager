@@ -160,6 +160,7 @@ export interface UpdateTaskPayload {
   description?: string;
   statusId?: string | null;
   sprintId?: string | null;
+  epicId?: string | null;
   priority?: string;
   assigneeId?: string | null;
   assigneeIds?: string[];
@@ -209,6 +210,7 @@ export async function updateTask(
   if (payload.description !== undefined) body.description = payload.description;
   if (payload.statusId !== undefined) body.statusId = payload.statusId;
   if (payload.sprintId !== undefined) body.sprintId = payload.sprintId;
+  if (payload.epicId !== undefined) body.epicId = payload.epicId;
   if (payload.assigneeId !== undefined) body.assigneeId = payload.assigneeId;
   if (payload.assigneeIds !== undefined) body.assigneeIds = payload.assigneeIds;
   if (payload.dueDate !== undefined) body.dueDate = payload.dueDate;
