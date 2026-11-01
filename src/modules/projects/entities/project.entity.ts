@@ -3,6 +3,7 @@ import { uuidBinaryTransformer } from '../../../common/base.entity';
 import { BaseEntity } from '../../../common/base.entity';
 import { OrganizationEntity } from '../../organizations/entities/organization.entity';
 import { UserEntity } from '../../users/entities/user.entity';
+import { SiteEntity } from '../../sites/entities/site.entity';
 
 @Entity('projects')
 @Index('idx_projects_org_archived', ['organizationId', 'isArchived'])
@@ -12,6 +13,9 @@ export class ProjectEntity extends BaseEntity {
 
   @Column({ name: 'organization_id', type: 'binary', length: 16, transformer: uuidBinaryTransformer })
   organizationId!: string;
+
+  @Column({ name: 'site_id', type: 'binary', length: 16, nullable: true, transformer: uuidBinaryTransformer })
+  siteId!: string | null;
 
   @Column({ type: 'varchar', length: 200 })
   name!: string;
@@ -34,6 +38,10 @@ export class ProjectEntity extends BaseEntity {
   @ManyToOne(() => OrganizationEntity, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'organization_id' })
   organization?: OrganizationEntity;
+
+  @ManyToOne(() => SiteEntity, { onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'site_id' })
+  site?: SiteEntity | null;
 
   @ManyToOne(() => UserEntity, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'created_by' })

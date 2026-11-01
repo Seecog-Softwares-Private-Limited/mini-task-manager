@@ -33,6 +33,7 @@ import { TaskTimeEntriesRepository } from './repositories/task-time-entries.repo
 import { TimeTrackingService } from './time-tracking.service';
 import { TimeTrackingController } from './time-tracking.controller';
 import { OrgEventsModule } from '../org-events/org-events.module';
+import { IssuesModule } from '../issues/issues.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { OrgEventsModule } from '../org-events/org-events.module';
     ActivityLogsModule,
     forwardRef(() => PlansModule),
     forwardRef(() => OrgEventsModule),
+    IssuesModule,
   ],
   controllers: [TasksController, RecurringTasksController, TimeTrackingController],
   providers: [

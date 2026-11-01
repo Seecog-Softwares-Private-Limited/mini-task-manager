@@ -4,6 +4,7 @@ import { TaskRecurrenceDto } from './dto/recurrence.dto';
 import {
   CompleteRecurringTaskDto,
   RecurringTasksQueryDto,
+  ReviewOccurrenceDto,
   SkipNextOccurrenceDto,
   UpdateRecurringTemplateDto,
 } from './dto/recurring-actions.dto';
@@ -65,6 +66,10 @@ function normalizeTemplateSubtasks(
       ...(s.notifyMinutesBefore != null
         ? { notifyMinutesBefore: Number(s.notifyMinutesBefore) }
         : {}),
+      ...(s.itemType ? { itemType: s.itemType } : {}),
+      ...(s.minValue != null ? { minValue: s.minValue } : {}),
+      ...(s.maxValue != null ? { maxValue: s.maxValue } : {}),
+      ...(s.unit ? { unit: s.unit } : {}),
     };
   });
 }
@@ -100,6 +105,10 @@ function cloneTemplateSubtasksForOccurrence(
       status: 'TODO' as const,
       priority: s.priority,
       statusId: s.statusId,
+      ...(s.itemType ? { itemType: s.itemType } : {}),
+      ...(s.minValue != null ? { minValue: s.minValue } : {}),
+      ...(s.maxValue != null ? { maxValue: s.maxValue } : {}),
+      ...(s.unit ? { unit: s.unit } : {}),
     };
   });
 }
@@ -891,6 +900,7 @@ export class RecurringTasksService {
       lastRunState: string | null;
       completionHealth: number;
       subtaskCount: number;
+      requiresApproval: boolean;
       assigneeId: string | null;
       assigneeIds: string[] | null;
       priority: string;
@@ -914,6 +924,10 @@ export class RecurringTasksService {
         status?: 'TODO' | 'IN_PROGRESS' | 'DONE';
         priority?: string;
         statusId?: string;
+        itemType?: 'CHECK' | 'PHOTO' | 'READING';
+        minValue?: number;
+        maxValue?: number;
+        unit?: string;
       }>;
     }> = [];
     for (const tpl of templates) {
@@ -960,6 +974,10 @@ export class RecurringTasksService {
                 priority: s.priority,
                 status: (s.status as 'TODO' | 'IN_PROGRESS' | 'DONE') ?? 'TODO',
                 statusId: s.statusId,
+                itemType: s.itemType,
+                minValue: s.minValue,
+                maxValue: s.maxValue,
+                unit: s.unit,
               })),
             );
             if (hydrated?.length) {
@@ -991,6 +1009,7 @@ export class RecurringTasksService {
         lastRunState: lastResolved?.state ?? null,
         completionHealth,
         subtaskCount: templateSubtasks.length,
+        requiresApproval: tpl.requiresApproval,
         assigneeId: tpl.assigneeId ?? null,
         assigneeIds: tpl.assigneeIds ?? null,
         priority: tpl.priority,
@@ -1238,10 +1257,19 @@ export class RecurringTasksService {
       await this.tasksRepository.update(taskId, { statusId: doneStatusId });
     }
     if (occurrence) {
-      await this.occurrencesRepository.update(occurrence.id, {
-        state: 'COMPLETED',
-        completedAt: now,
-      });
+      if (template.requiresApproval) {
+        // Checklist done, but a manager must approve before this run counts
+        // as officially complete (compliance checklists, closing checklists).
+        await this.occurrencesRepository.update(occurrence.id, {
+          state: 'SUBMITTED',
+          submittedAt: now,
+        });
+      } else {
+        await this.occurrencesRepository.update(occurrence.id, {
+          state: 'COMPLETED',
+          completedAt: now,
+        });
+      }
     }
 
     if (dto.action === 'THIS_AND_PREVIOUS_PENDING' && occurrence) {
@@ -1258,6 +1286,65 @@ export class RecurringTasksService {
       });
     }
     return { success: true };
+  }
+
+  /** Runs awaiting manager review (requiresApproval templates only). */
+  async listSubmittedForReview(organizationId: string, projectId?: string) {
+    const occurrences = await this.occurrencesRepository.findSubmittedByOrganization(
+      organizationId,
+      projectId,
+    );
+    const tasks = await Promise.all(
+      occurrences.map((o) => (o.taskId ? this.tasksRepository.findById(o.taskId) : null)),
+    );
+    return occurrences.map((o, i) => ({
+      occurrenceId: o.id,
+      templateId: o.templateId,
+      taskId: o.taskId ?? undefined,
+      projectId: o.projectId,
+      dueDate: o.dueDate,
+      submittedAt: o.submittedAt ?? undefined,
+      task: tasks[i]
+        ? { id: tasks[i]!.id, title: tasks[i]!.title, subtasks: tasks[i]!.subtasks ?? undefined }
+        : undefined,
+    }));
+  }
+
+  /** Manager approves or rejects a submitted run. Rejecting sends it back to PENDING for rework. */
+  async reviewOccurrence(
+    occurrenceId: string,
+    organizationId: string,
+    reviewerId: string,
+    dto: ReviewOccurrenceDto,
+  ) {
+    const occurrence = await this.occurrencesRepository.findById(occurrenceId);
+    if (!occurrence || occurrence.organizationId !== organizationId) {
+      throw new NotFoundException('Submitted run not found');
+    }
+    if (occurrence.state !== 'SUBMITTED') {
+      throw new BadRequestException('This run is not awaiting review');
+    }
+    const now = new Date();
+    if (dto.decision === 'APPROVED') {
+      await this.occurrencesRepository.update(occurrence.id, {
+        state: 'COMPLETED',
+        completedAt: now,
+        reviewedAt: now,
+        reviewedBy: reviewerId,
+        reviewDecision: 'APPROVED',
+        reviewNote: dto.note ?? null,
+      });
+    } else {
+      // Rejected: back to PENDING so the field worker can redo and resubmit.
+      await this.occurrencesRepository.update(occurrence.id, {
+        state: 'PENDING',
+        reviewedAt: now,
+        reviewedBy: reviewerId,
+        reviewDecision: 'REJECTED',
+        reviewNote: dto.note ?? null,
+      });
+    }
+    return { success: true, decision: dto.decision };
   }
 
   /**
@@ -1291,6 +1378,10 @@ export class RecurringTasksService {
               // Template steps are never "done" — only occurrence runs track completion.
               status: 'TODO' as const,
               statusId: s.statusId,
+              itemType: s.itemType,
+              minValue: s.minValue,
+              maxValue: s.maxValue,
+              unit: s.unit,
             })),
           );
     await this.templatesRepository.update(template.id, {
@@ -1353,6 +1444,9 @@ export class RecurringTasksService {
         Array.isArray(dto.subtasks) && dto.subtasks.length === 0
           ? []
           : normalizeTemplateSubtasks(dto.subtasks);
+    }
+    if (dto.requiresApproval !== undefined) {
+      patch.requiresApproval = dto.requiresApproval;
     }
     await this.templatesRepository.update(template.id, patch as any);
     const updated = await this.templatesRepository.findById(template.id);

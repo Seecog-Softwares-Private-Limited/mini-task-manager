@@ -54,6 +54,13 @@ export class RecurringTaskTemplateEntity extends BaseEntity {
     status?: 'TODO' | 'IN_PROGRESS' | 'DONE';
     priority?: string;
     statusId?: string;
+    /** Checklist item kind; undefined/CHECK = plain checkbox (legacy default). */
+    itemType?: 'CHECK' | 'PHOTO' | 'READING';
+    /** READING items: acceptable value range, e.g. fridge temp 2-8. */
+    minValue?: number;
+    maxValue?: number;
+    /** READING items: unit label shown next to the value, e.g. "°C", "psi". */
+    unit?: string;
   }> | null;
 
   @Column({ type: 'simple-json', nullable: true })
@@ -94,6 +101,10 @@ export class RecurringTaskTemplateEntity extends BaseEntity {
 
   @Column({ name: 'is_paused', type: 'tinyint', width: 1, default: 0 })
   isPaused!: boolean;
+
+  /** When true, a run must be approved by a manager before it counts as done. */
+  @Column({ name: 'requires_approval', type: 'boolean', default: false })
+  requiresApproval!: boolean;
 
   @Column({ name: 'stopped_at', type: 'timestamp', nullable: true })
   stoppedAt!: Date | null;

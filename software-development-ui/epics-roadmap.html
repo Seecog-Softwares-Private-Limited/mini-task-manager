@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>OpsPick for Dev — Epics Roadmap</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; background: #e8ecf4; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 40px; }
+  .chrome { width: 1280px; border-radius: 16px; overflow: hidden; background: #fcfcfc; border: 1px solid #e2e8f0; box-shadow: 0 24px 64px -16px rgba(15,23,42,.18), 0 0 0 1px rgba(99,102,241,.06); }
+  .bar { height: 40px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; padding: 0 14px; gap: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; } .dot.r{background:#f87171} .dot.y{background:#fbbf24} .dot.g{background:#34d399}
+  .url { flex: 1; margin-left: 8px; height: 26px; border-radius: 8px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; font-size: 11px; display: flex; align-items: center; padding: 0 12px; }
+  .app { display: flex; height: 760px; }
+  .sidebar { width: 240px; border-right: 1px solid #e2e8f0; background: #fff; padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 16px; }
+  .logo { width: 32px; height: 32px; border-radius: 10px; background: #fff; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; }
+  .brand span { font-size: 15px; font-weight: 600; color: #020617; letter-spacing: -.02em; }
+  .proj-switch { display: flex; align-items: center; gap: 8px; padding: 8px; margin: 0 0 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
+  .proj-switch .sq { width: 24px; height: 24px; border-radius: 7px; background: linear-gradient(135deg,#6366f1,#c026d3); flex-shrink: 0; }
+  .proj-switch strong { display: block; font-size: 12px; font-weight: 600; color: #0f172a; }
+  .proj-switch small { font-size: 10px; color: #94a3b8; }
+  .section { font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #94a3b8; padding: 12px 10px 6px; }
+  .nav { position: relative; display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 500; color: #64748b; }
+  .nav.active { background: rgba(139,92,246,.11); color: #5b21b6; font-weight: 600; }
+  .nav.active::before { content:""; position:absolute; left:0; top:6px; bottom:6px; width:3px; border-radius:0 4px 4px 0; background:#8b5cf6; box-shadow:0 0 10px rgba(139,92,246,.55); }
+  .nav svg { width: 18px; height: 18px; opacity: .75; flex-shrink: 0; }
+  .nav.active svg { color: #7c3aed; opacity: 1; }
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .top { min-height: 66px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; padding: 10px 24px; }
+  .top h1 { font-size: 20px; font-weight: 600; letter-spacing: -.03em; color: #020617; }
+  .top-meta { font-size: 12px; color: #64748b; margin-top: 2px; }
+  .seg { display: inline-flex; border: 1px solid #e2e8f0; border-radius: 999px; padding: 3px; background: #fff; }
+  .seg span { padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; color: #64748b; }
+  .seg span.on { background: linear-gradient(135deg,#6366f1,#c026d3); color: #fff; box-shadow: 0 2px 8px rgba(99,102,241,.25); }
+  .content { padding: 20px 24px; flex: 1; overflow-y: auto; }
+  .timeline { border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; overflow: hidden; }
+  .months { display: grid; grid-template-columns: 220px repeat(3, 1fr); border-bottom: 1px solid #e2e8f0; }
+  .months div { padding: 10px 14px; font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: .04em; border-left: 1px solid #f1f5f9; }
+  .months div:first-child { border-left: none; }
+  .erow { display: grid; grid-template-columns: 220px repeat(3, 1fr); align-items: center; border-bottom: 1px solid #f1f5f9; min-height: 64px; }
+  .erow:last-child { border-bottom: none; }
+  .einfo { padding: 10px 14px; }
+  .einfo strong { font-size: 13px; font-weight: 600; color: #0f172a; display: block; }
+  .einfo .sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .etrack { grid-column: span 3; position: relative; height: 36px; margin: 0 14px; }
+  .ebar { position: absolute; top: 6px; height: 24px; border-radius: 8px; overflow: hidden; }
+  .ebar .fill { position: absolute; inset: 0; background: rgba(255,255,255,.3); border-radius: 8px 0 0 8px; }
+  .epct { position: absolute; top: 9px; font-size: 11px; font-weight: 600; color: #475569; white-space: nowrap; }
+  .status-chip { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 99px; margin-left: 8px; white-space: nowrap; }
+  .st-track { background: rgba(22,163,74,.14); color: #16a34a; }
+  .st-risk { background: rgba(217,119,6,.14); color: #d97706; }
+  .st-done { background: rgba(100,116,139,.14); color: #475569; }
+  .legend { display: flex; gap: 18px; margin-top: 14px; font-size: 11px; color: #64748b; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+</style>
+</head>
+<body>
+<div class="chrome">
+  <div class="bar"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div><div class="url">app.opspick.com/dev/pay/roadmap</div></div>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand"><div class="logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="5" y="7" width="14" height="15" rx="2" fill="#6366f1" fill-opacity=".12"/><path d="M8.5 14.5L11 17l5.5-7" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><span>OpsPick</span></div>
+      <div class="proj-switch"><div class="sq"></div><div><strong>Payments Platform</strong><small>Scrum · PAY</small></div></div>
+      <div class="section">Project</div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>Overview</div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>Backlog</div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></svg>Board</div>
+      <div class="nav active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z"/></svg>Epics</div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M20 12a8 8 0 11-8-8"/><path d="M12 4v8l6 2"/></svg>Releases</div>
+      <div class="section">Reporting</div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M3 3v18h18"/><path d="M7 14l4-6 3 3 4-7"/></svg>Reports</div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Activity</div>
+    </aside>
+    <main class="main">
+      <div class="top"><div><h1>Roadmap</h1><div class="top-meta">Epic progress across the quarter</div></div><div class="seg"><span>This quarter</span><span class="on">Q4 2026</span><span>Next</span></div></div>
+      <div class="content">
+        <div class="timeline">
+          <div class="months"><div>Epic</div><div>October</div><div>November</div><div>December</div></div>
+
+          <div class="erow">
+            <div class="einfo"><strong>Checkout Redesign <span class="status-chip st-track">On track</span></strong><div class="sub">8 issues · 62% complete</div></div>
+            <div class="etrack">
+              <div class="ebar" style="left:2%; width:58%; background:#7c3aed;"><span class="fill" style="width:62%"></span></div>
+              <span class="epct" style="left:calc(2% + 58% + 8px);">62%</span>
+            </div>
+          </div>
+
+          <div class="erow">
+            <div class="einfo"><strong>Webhook Reliability <span class="status-chip st-risk">At risk</span></strong><div class="sub">11 issues · 40% complete</div></div>
+            <div class="etrack">
+              <div class="ebar" style="left:0%; width:72%; background:#0ea5e9;"><span class="fill" style="width:40%"></span></div>
+              <span class="epct" style="left:calc(0% + 72% + 8px);">40%</span>
+            </div>
+          </div>
+
+          <div class="erow">
+            <div class="einfo"><strong>Fraud Detection v2 <span class="status-chip st-track">On track</span></strong><div class="sub">6 issues · 85% complete</div></div>
+            <div class="etrack">
+              <div class="ebar" style="left:34%; width:40%; background:#f59e0b;"><span class="fill" style="width:85%"></span></div>
+              <span class="epct" style="left:calc(34% + 40% + 8px);">85%</span>
+            </div>
+          </div>
+
+          <div class="erow">
+            <div class="einfo"><strong>Payout Scheduling <span class="status-chip st-done">Done</span></strong><div class="sub">4 issues · done</div></div>
+            <div class="etrack">
+              <div class="ebar" style="left:0%; width:28%; background:#94a3b8;"><span class="fill" style="width:100%"></span></div>
+              <span class="epct" style="left:calc(0% + 28% + 8px);">100%</span>
+            </div>
+          </div>
+        </div>
+        <div class="legend">
+          <span><i style="background:#7c3aed"></i>Checkout Redesign</span>
+          <span><i style="background:#0ea5e9"></i>Webhook Reliability</span>
+          <span><i style="background:#f59e0b"></i>Fraud Detection v2</span>
+          <span><i style="background:#94a3b8"></i>Payout Scheduling</span>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>

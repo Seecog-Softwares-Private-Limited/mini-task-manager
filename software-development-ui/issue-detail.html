@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>OpsPick for Dev — Issue Detail</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; background: #e8ecf4; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 40px; }
+  .chrome { width: 1280px; border-radius: 16px; overflow: hidden; background: #fcfcfc; border: 1px solid #e2e8f0; box-shadow: 0 24px 64px -16px rgba(15,23,42,.18), 0 0 0 1px rgba(99,102,241,.06); }
+  .bar { height: 40px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; padding: 0 14px; gap: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; } .dot.r{background:#f87171} .dot.y{background:#fbbf24} .dot.g{background:#34d399}
+  .url { flex: 1; margin-left: 8px; height: 26px; border-radius: 8px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; font-size: 11px; display: flex; align-items: center; padding: 0 12px; }
+  .layout { display: grid; grid-template-columns: 1fr 320px; height: 760px; }
+  .main { padding: 24px 28px; border-right: 1px solid #e2e8f0; overflow-y: auto; }
+  .side { padding: 20px; background: #f8fafc; overflow-y: auto; }
+  .crumb { font-size: 12px; color: #94a3b8; margin-bottom: 14px; }
+  .crumb b { color: #64748b; font-weight: 600; }
+  .head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 6px; }
+  .itype { width: 26px; height: 26px; border-radius: 6px; background: rgba(239,68,68,.12); display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 2px; }
+  h1 { font-size: 19px; font-weight: 600; letter-spacing: -.02em; color: #0f172a; line-height: 1.3; }
+  .key { font-size: 12px; font-weight: 700; color: #94a3b8; margin-bottom: 2px; display: block; }
+  .desc { font-size: 13px; color: #475569; line-height: 1.65; margin: 18px 0 22px; }
+  h2.sec { font-size: 13px; font-weight: 600; color: #0f172a; margin-bottom: 10px; }
+  .subtasks { border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; margin-bottom: 22px; }
+  .sub-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid #f1f5f9; background: #fff; }
+  .sub-row:last-child { border-bottom: none; }
+  .chk { width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid #cbd5e1; flex-shrink: 0; }
+  .chk.done { background: #16a34a; border-color: #16a34a; position: relative; }
+  .chk.done::after { content:""; position:absolute; left:4px; top:1px; width:5px; height:9px; border:solid #fff; border-width:0 2px 2px 0; transform:rotate(45deg); }
+  .sub-row span.k { font-size: 10px; font-weight: 700; color: #94a3b8; width: 54px; flex-shrink: 0; }
+  .sub-row p { flex: 1; font-size: 12.5px; color: #334155; }
+  .sub-row.done p { color: #94a3b8; text-decoration: line-through; }
+  .linked { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; margin-bottom: 8px; }
+  .linked .rel { font-size: 10px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: .03em; width: 60px; flex-shrink: 0; }
+  .linked .itype.sm { width: 16px; height: 16px; margin: 0; }
+  .linked .key { display: inline; font-size: 11px; margin-right: 6px; }
+  .linked span.t { font-size: 12px; color: #334155; }
+  .comments { margin-top: 22px; }
+  .cmt { display: flex; gap: 10px; padding: 12px; border-radius: 10px; border: 1px solid #e2e8f0; background: #fff; margin-bottom: 8px; }
+  .cmt .body { flex: 1; }
+  .cmt strong { font-size: 12px; color: #0f172a; }
+  .cmt time { font-size: 11px; color: #94a3b8; margin-left: 6px; font-weight: 500; }
+  .cmt p { font-size: 12px; color: #475569; margin-top: 4px; line-height: 1.5; }
+  .mention { color: #4f46e5; font-weight: 600; }
+  code.diff { background: #0f172a; color: #e2e8f0; font-family: ui-monospace, monospace; font-size: 11px; padding: 8px 10px; border-radius: 8px; display: block; margin-top: 8px; }
+  .av { width: 28px; height: 28px; border-radius: 50%; color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; border: 2px solid #fff; box-shadow: 0 0 0 1px #e2e8f0; flex-shrink: 0; }
+  .av.a{background:#6366f1}.av.b{background:#c026d3}.av.c{background:#0ea5e9}.av.d{background:#14b8a6}
+  .side h2 { font-size: 12px; font-weight: 600; color: #0f172a; margin-bottom: 4px; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 10px; font-weight: 600; color: #94a3b8; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .05em; }
+  .status { display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px; border-radius: 8px; border: 1px solid #e2e8f0; background: #fff; font-size: 12px; font-weight: 600; color: #0f172a; width: 100%; }
+  .status .pip { width: 7px; height: 7px; border-radius: 50%; background: #8b5cf6; }
+  .assignee { display: flex; align-items: center; gap: 8px; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px 10px; }
+  .assignee span { font-size: 12px; font-weight: 600; color: #0f172a; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 6px; border: 1px solid #e2e8f0; background: #fff; color: #475569; }
+  .chip.epic { background: rgba(124,58,237,.1); color: #6d28d9; border-color: rgba(124,58,237,.18); }
+  .chip.hi { background: rgba(239,68,68,.08); color: #b91c1c; border-color: rgba(239,68,68,.15); }
+  .pt-badge { width: 26px; height: 26px; border-radius: 7px; background: #fff; border: 1px solid #e2e8f0; color: #334155; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .meta-line { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+</style>
+</head>
+<body>
+<div class="chrome">
+  <div class="bar"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div><div class="url">app.opspick.com/dev/pay/issues/PAY-198</div></div>
+  <div class="layout">
+    <main class="main">
+      <div class="crumb">Payments Platform / <b>Backlog</b> / PAY-198</div>
+      <div class="head">
+        <div class="itype"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><circle cx="12" cy="13" r="6"/><path d="M12 7V4M8 5l1.5 2M16 5l-1.5 2M3 13h3M18 13h3M6 17l2-1.5M18 17l-2-1.5"/></svg></div>
+        <div><span class="key">PAY-198 · Bug</span><h1>Webhook retries duplicate charge events</h1></div>
+      </div>
+
+      <p class="desc">When the downstream processor responds slowly (&gt;8s), our retry scheduler fires a second webhook before the first ack lands — merchants see two <code>charge.succeeded</code> events for the same payment intent. Need an idempotency guard keyed on <code>event_id</code> before re-queuing.</p>
+
+      <h2 class="sec">Subtasks · 2/3</h2>
+      <div class="subtasks">
+        <div class="sub-row done"><div class="chk done"></div><span class="k">PAY-199</span><p>Add event_id uniqueness constraint on webhook_log</p></div>
+        <div class="sub-row done"><div class="chk done"></div><span class="k">PAY-200</span><p>Short-circuit retry scheduler on duplicate event_id</p></div>
+        <div class="sub-row"><div class="chk"></div><span class="k">PAY-203</span><p>Backfill dedupe for last 30 days of webhook_log</p></div>
+      </div>
+
+      <h2 class="sec">Linked issues</h2>
+      <div class="linked"><span class="rel">Blocks</span><div class="itype sm" style="background:rgba(99,102,241,.12)"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="3" stroke-linecap="round"><path d="M5 12l5 5L20 6"/></svg></div><span class="key">PAY-204</span><span class="t">Add idempotency key to charge API</span></div>
+      <div class="linked"><span class="rel">Relates to</span><div class="itype sm" style="background:rgba(239,68,68,.12)"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><circle cx="12" cy="13" r="6"/></svg></div><span class="key">PAY-222</span><span class="t">Currency rounding mismatch on refunds</span></div>
+
+      <div class="comments">
+        <h2 class="sec">Comments</h2>
+        <div class="cmt">
+          <div class="av a">A</div>
+          <div class="body">
+            <strong>Alex</strong><time>2h ago</time>
+            <p><span class="mention">@Riley</span> can you confirm the processor timeout before we drop the retry window to 5s?</p>
+          </div>
+        </div>
+        <div class="cmt">
+          <div class="av b">R</div>
+          <div class="body">
+            <strong>Riley</strong><time>45m ago</time>
+            <p>Confirmed p99 is 6.2s — 5s is too aggressive. Pushed the uniqueness constraint, PR below.</p>
+            <code class="diff">+ ALTER TABLE webhook_log ADD CONSTRAINT uq_event_id UNIQUE (event_id);</code>
+          </div>
+        </div>
+      </div>
+    </main>
+    <aside class="side">
+      <div class="field"><label>Status</label><div class="status"><span class="pip"></span> In progress</div></div>
+      <div class="field"><label>Assignee</label><div class="assignee"><div class="av a" style="width:22px;height:22px;font-size:9px">A</div><span>Alex Chen</span></div></div>
+      <div class="field"><label>Reporter</label><div class="assignee"><div class="av c" style="width:22px;height:22px;font-size:9px">M</div><span>Morgan Patel</span></div></div>
+      <div class="field"><label>Sprint</label><div class="chip">Sprint 24</div></div>
+      <div class="field"><label>Epic</label><div class="chip epic">Webhook Reliability</div></div>
+      <div class="field"><label>Priority</label><div class="chip hi">Highest</div></div>
+      <div class="field"><label>Story points</label><div class="pt-badge">5</div></div>
+      <div class="field"><label>Labels</label><div class="chips"><span class="chip">backend</span><span class="chip">payments-api</span></div></div>
+      <div class="field"><label>Dates</label><div class="meta-line">Created Oct 14 · Updated 45m ago</div></div>
+    </aside>
+  </div>
+</div>
+</body>
+</html>

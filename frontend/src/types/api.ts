@@ -48,6 +48,23 @@ export interface User {
 }
 
 /** Tenant / workspace (API: organization). */
+export type IndustryKey = 'restaurant' | 'construction' | 'hospital' | 'school' | 'fm' | 'hotel' | 'general';
+
+export interface IndustryWords {
+  site: string;
+  sites: string;
+  issue: string;
+  issues: string;
+  report: string;
+}
+
+export interface IndustryPack {
+  key: IndustryKey;
+  label: string;
+  description: string;
+  words: IndustryWords;
+}
+
 export interface Organization {
   id: string;
   name: string;
@@ -57,11 +74,28 @@ export interface Organization {
   /** Current user's role (Owner/Admin/Member). Only present in list response. */
   myRole?: string;
   isArchived?: boolean;
+  /** IndustryKey, or null for a workspace created before industries existed. */
+  industry?: IndustryKey | null;
+  /** Resolved terminology for `industry` (falls back to the General edition). */
+  words: IndustryWords;
+}
+
+export interface Site {
+  id: string;
+  organizationId: string;
+  name: string;
+  address?: string | null;
+  isArchived: boolean;
+  createdBy: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Project {
   id: string;
   organizationId: string;
+  /** Physical location this project belongs to (restaurant branch, site, ward, campus...). */
+  siteId?: string | null;
   name: string;
   description?: string;
   /** Data URL or URL for project card icon */
@@ -76,6 +110,31 @@ export interface Project {
 }
 
 export type TaskType = "STORY" | "BUG" | "TASK" | "SUBTASK";
+
+export type IssueSeverity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+export type IssueStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
+export type IssueSource = "MANUAL" | "AUTO_CHECK_FAILED" | "AUTO_READING_OUT_OF_RANGE";
+
+export interface Issue {
+  id: string;
+  organizationId: string;
+  projectId: string;
+  siteId?: string | null;
+  taskId?: string | null;
+  subtaskId?: string | null;
+  title: string;
+  description?: string | null;
+  severity: IssueSeverity;
+  status: IssueStatus;
+  source: IssueSource;
+  raisedBy?: string | null;
+  assigneeId?: string | null;
+  resolvedAt?: string | null;
+  resolvedBy?: string | null;
+  resolutionNote?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface Task {
   id: string;
@@ -160,6 +219,8 @@ export interface RecurringTemplateSummary {
   lastRunState?: "PENDING" | "COMPLETED" | "SKIPPED" | null;
   completionHealth?: number;
   subtaskCount?: number;
+  /** When true, a run must be approved by a manager before it counts as done. */
+  requiresApproval?: boolean;
   templateSubtasks?: Array<{
     id: string;
     title: string;
@@ -169,6 +230,10 @@ export interface RecurringTemplateSummary {
     notifyMinutesBefore?: number | null;
     priority?: string;
     status?: string;
+    itemType?: "CHECK" | "PHOTO" | "READING";
+    minValue?: number;
+    maxValue?: number;
+    unit?: string;
   }>;
   assigneeId?: string | null;
   assigneeIds?: string[] | null;
@@ -196,9 +261,30 @@ export interface RecurringTaskOccurrence {
   taskId?: string | null;
   sequenceNumber: number;
   dueDate: string;
-  state: "PENDING" | "COMPLETED" | "SKIPPED";
+  state: "PENDING" | "SUBMITTED" | "COMPLETED" | "SKIPPED";
   completedAt?: string | null;
+  /** Checklist done, awaiting manager approval (requiresApproval templates). */
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+  reviewedBy?: string | null;
+  reviewDecision?: "APPROVED" | "REJECTED" | null;
+  reviewNote?: string | null;
   createdAt: string;
+}
+
+/** One row in the manager review queue (GET /recurring-tasks/occurrences/pending-review). */
+export interface PendingReviewOccurrence {
+  occurrenceId: string;
+  templateId: string;
+  taskId?: string;
+  projectId: string;
+  dueDate: string;
+  submittedAt?: string;
+  task?: {
+    id: string;
+    title: string;
+    subtasks?: TaskSubtask[];
+  };
 }
 
 export type SubtaskStatus = "TODO" | "IN_PROGRESS" | "DONE";
@@ -222,6 +308,9 @@ export interface SubtaskCompletionRecord {
   afterPhotoFileNames?: string[];
   voiceNoteFileName?: string;
   videoFileName?: string;
+  /** READING items: the value logged, and whether it fell within minValue/maxValue. */
+  value?: number;
+  withinRange?: boolean;
 }
 
 export interface TaskSubtask {
@@ -260,6 +349,13 @@ export interface TaskSubtask {
   requireLocation?: boolean;
   /** Set when marked done (mobile site-proof or lightweight web/server stamp). */
   completionRecord?: SubtaskCompletionRecord | null;
+  /** Checklist item kind; undefined/CHECK = plain checkbox (legacy default). */
+  itemType?: "CHECK" | "PHOTO" | "READING";
+  /** READING items: acceptable value range, e.g. fridge temp 2-8. */
+  minValue?: number;
+  maxValue?: number;
+  /** READING items: unit label shown next to the value, e.g. "°C", "psi". */
+  unit?: string;
 }
 
 export type EntityAttachmentType = "TASK" | "SUBTASK" | "SUBTASK_COMMENT";

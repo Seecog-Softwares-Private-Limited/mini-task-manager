@@ -1,0 +1,23 @@
+https://claude.ai/artifact/A5wkjSWTRLiJxmS9cMkEmH 
+
+1)
+Write idea to claude. Tell him to generate a doc for functional requirements. Then generate the artifect screens for mobile,tab, web, landing page
+Ask question : 
+how many types of users this application can have ?
+-> tell claude to generate ui screens (artifect) for the users
+->Can you please generate all ui screens for all types of users. Do not miss any flow
+2)From artifect to project
+
+2)
+Baby steps I’d suggest, in order:
+
+Gap-map, not guesswork — I go through the ~60 screens against your actual current entities/endpoints and mark each one Exists / Needs extension / Net-new. This replaces my earlier UI-only audit’s engineering section with something grounded in your real code. Pure reading, nothing changes, safe to do right now.
+Agree the schema delta as a migration plan — a short doc listing exactly which new tables/columns, which you review before anything runs.
+One thin vertical slice end-to-end — pick the smallest net-new piece (e.g. issue type) and take it migration → entity → service/controller → one screen, so we prove the pattern before scaling to all 60.
+Repeat per feature cluster, each as its own small branch/PR — same flow as the subtasks-by-title work: small diff, you review, merge.
+
+
+3)
+update schema + run migration script 
+
+4)

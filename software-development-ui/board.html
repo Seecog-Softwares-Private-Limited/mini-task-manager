@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>OpsPick for Dev — Sprint Board</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: #e8ecf4;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 40px;
+  }
+  .chrome {
+    width: 1280px; border-radius: 16px; overflow: hidden; background: #fcfcfc;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 2px rgba(15,23,42,.04), 0 24px 64px -16px rgba(15,23,42,.18), 0 0 0 1px rgba(99,102,241,.06);
+  }
+  .bar { height: 40px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; padding: 0 14px; gap: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot.r { background: #f87171; } .dot.y { background: #fbbf24; } .dot.g { background: #34d399; }
+  .url { flex: 1; margin-left: 8px; height: 26px; border-radius: 8px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; font-size: 11px; display: flex; align-items: center; padding: 0 12px; }
+  .app { display: flex; height: 760px; }
+  .sidebar { width: 240px; border-right: 1px solid #e2e8f0; background: #fff; padding: 16px 12px; display: flex; flex-direction: column; gap: 4px; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 16px; margin-bottom: 4px; }
+  .logo { width: 32px; height: 32px; border-radius: 10px; background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(0,0,0,.04); display: flex; align-items: center; justify-content: center; }
+  .brand span { font-size: 15px; font-weight: 600; color: #020617; letter-spacing: -.02em; }
+  .proj-switch { display: flex; align-items: center; gap: 8px; padding: 8px; margin: 0 0 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
+  .proj-switch .sq { width: 24px; height: 24px; border-radius: 7px; background: linear-gradient(135deg,#6366f1,#c026d3); flex-shrink: 0; }
+  .proj-switch div { flex: 1; min-width: 0; }
+  .proj-switch strong { display: block; font-size: 12px; font-weight: 600; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .proj-switch small { font-size: 10px; color: #94a3b8; }
+  .section { font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #94a3b8; padding: 12px 10px 6px; }
+  .nav { position: relative; display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; font-size: 13px; font-weight: 500; color: #64748b; }
+  .nav.active { background: rgba(139,92,246,.11); color: #5b21b6; font-weight: 600; }
+  .nav.active::before { content: ""; position: absolute; left: 0; top: 6px; bottom: 6px; width: 3px; border-radius: 0 4px 4px 0; background: #8b5cf6; box-shadow: 0 0 10px rgba(139,92,246,.55); }
+  .nav svg { width: 18px; height: 18px; opacity: .75; flex-shrink: 0; }
+  .nav.active svg { color: #7c3aed; opacity: 1; }
+  .nav .count { margin-left: auto; font-size: 10px; font-weight: 600; color: #94a3b8; }
+  .main { flex: 1; background: #fcfcfc; display: flex; flex-direction: column; min-width: 0; }
+  .top { min-height: 66px; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; padding: 10px 24px; gap: 16px; }
+  .top h1 { font-size: 15px; font-weight: 600; color: #020617; }
+  .top-meta { font-size: 12px; color: #64748b; margin-top: 2px; }
+  .top-right { display: flex; align-items: center; gap: 14px; }
+  .avatars { display: flex; }
+  .av { width: 26px; height: 26px; border-radius: 50%; border: 2px solid #fff; margin-left: -7px; font-size: 10px; font-weight: 700; color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 1px #e2e8f0; }
+  .av:first-child { margin-left: 0; }
+  .av.a { background: #6366f1; } .av.b { background: #c026d3; } .av.c { background: #0ea5e9; } .av.d { background: #14b8a6; }
+  .btn { background: linear-gradient(135deg,#6366f1,#c026d3); color: #fff; font-size: 12px; font-weight: 600; padding: 9px 14px; border-radius: 10px; border: none; box-shadow: 0 4px 12px rgba(99,102,241,.25); white-space: nowrap; }
+  .btn.ghost { background: #fff; color: #334155; border: 1px solid #e2e8f0; box-shadow: none; }
+  .content { padding: 18px 24px 24px; flex: 1; overflow: hidden; }
+  .board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; height: 100%; }
+  .col { display: flex; flex-direction: column; min-height: 0; }
+  .col-h { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #64748b; margin-bottom: 10px; }
+  .pip { width: 6px; height: 6px; border-radius: 50%; }
+  .pip.slate { background: #94a3b8; } .pip.amber { background: #fbbf24; } .pip.violet { background: #8b5cf6; } .pip.green { background: #34d399; }
+  .col-body { overflow-y: auto; padding-right: 2px; }
+  .card { background: #fff; border: 1px solid rgba(226,232,240,.9); border-radius: 10px; padding: 11px 12px; margin-bottom: 9px; box-shadow: 0 1px 2px rgba(15,23,42,.04); }
+  .card-top { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  .itype { width: 16px; height: 16px; border-radius: 4px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .itype.bug { background: rgba(239,68,68,.12); }
+  .itype.story { background: rgba(22,163,74,.12); }
+  .itype.task { background: rgba(99,102,241,.12); }
+  .key { font-size: 10px; font-weight: 700; color: #94a3b8; letter-spacing: .02em; }
+  .epic-tag { margin-left: auto; width: 8px; height: 8px; border-radius: 2px; }
+  .card h3 { font-size: 12.5px; font-weight: 600; color: #0f172a; line-height: 1.35; margin-bottom: 9px; letter-spacing: -.01em; }
+  .card-meta { display: flex; align-items: center; justify-content: space-between; }
+  .chips { display: flex; gap: 4px; align-items: center; }
+  .pt { width: 18px; height: 18px; border-radius: 5px; background: #f1f5f9; color: #475569; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .prio { width: 14px; height: 14px; display: flex; align-items: center; justify-content: center; }
+  .card .av { width: 22px; height: 22px; font-size: 9px; }
+</style>
+</head>
+<body>
+<div class="chrome">
+  <div class="bar"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div><div class="url">app.opspick.com/dev/pay/board</div></div>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="5" y="7" width="14" height="15" rx="2" fill="#6366f1" fill-opacity=".12"/><rect x="8" y="4" width="8" height="4" rx="1.5" fill="#6366f1" fill-opacity=".18"/><path d="M8.5 14.5L11 17l5.5-7" stroke="#6366f1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <span>OpsPick</span>
+      </div>
+      <div class="proj-switch"><div class="sq"></div><div><strong>Payments Platform</strong><small>Scrum · PAY</small></div></div>
+      <div class="section">Project</div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>Overview</div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>Backlog</div>
+      <div class="nav active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16M15 4v16"/></svg>Board<span class="count">8</span></div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M13 2L3 14h8l-1 8 10-12h-8l1-8z"/></svg>Epics</div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M20 12a8 8 0 11-8-8"/><path d="M12 4v8l6 2"/></svg>Releases</div>
+      <div class="section">Reporting</div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M3 3v18h18"/><path d="M7 14l4-6 3 3 4-7"/></svg>Reports</div>
+      <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>Activity</div>
+    </aside>
+    <main class="main">
+      <div class="top">
+        <div><h1>Sprint 24</h1><div class="top-meta">Oct 20 – Nov 2 · 8 issues · 34 pts</div></div>
+        <div class="top-right">
+          <div class="avatars"><div class="av a">A</div><div class="av b">R</div><div class="av c">M</div><div class="av d">J</div></div>
+          <button class="btn ghost">Filter</button>
+          <button class="btn">Complete sprint</button>
+        </div>
+      </div>
+      <div class="content">
+        <div class="board">
+          <div class="col">
+            <div class="col-h"><span class="pip slate"></span> To do <span style="opacity:.6">· 2</span></div>
+            <div class="col-body">
+              <div class="card">
+                <div class="card-top"><div class="itype task"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="3" stroke-linecap="round"><path d="M5 12l5 5L20 6"/></svg></div><span class="key">PAY-204</span><span class="epic-tag" style="background:#0ea5e9"></span></div>
+                <h3>Add idempotency key to charge API</h3>
+                <div class="card-meta"><div class="chips"><div class="pt">3</div><div class="prio"><svg viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2.5"><path d="M6 15l6-6 6 6"/></svg></div></div><div class="av c">M</div></div>
+              </div>
+              <div class="card">
+                <div class="card-top"><div class="itype bug"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><circle cx="12" cy="13" r="6"/><path d="M12 7V4M8 5l1.5 2M16 5l-1.5 2M3 13h3M18 13h3M6 17l2-1.5M18 17l-2-1.5"/></svg></div><span class="key">PAY-198</span><span class="epic-tag" style="background:#0ea5e9"></span></div>
+                <h3>Webhook retries duplicate charge events</h3>
+                <div class="card-meta"><div class="chips"><div class="pt">5</div><div class="prio"><svg viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5"><path d="M6 15l6-6 6 6M6 10l6-6 6 6"/></svg></div></div><div class="av a">A</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="col-h"><span class="pip amber"></span> In progress <span style="opacity:.6">· 3</span></div>
+            <div class="col-body">
+              <div class="card">
+                <div class="card-top"><div class="itype story"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M6 3h12v18l-6-4-6 4V3z"/></svg></div><span class="key">PAY-176</span><span class="epic-tag" style="background:#7c3aed"></span></div>
+                <h3>Redesign checkout step 2 — payment method</h3>
+                <div class="card-meta"><div class="chips"><div class="pt">8</div></div><div class="av a">A</div></div>
+              </div>
+              <div class="card">
+                <div class="card-top"><div class="itype task"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="3" stroke-linecap="round"><path d="M5 12l5 5L20 6"/></svg></div><span class="key">PAY-201</span><span class="epic-tag" style="background:#f59e0b"></span></div>
+                <h3>Score card for velocity-based fraud rules</h3>
+                <div class="card-meta"><div class="chips"><div class="pt">5</div></div><div class="av d">J</div></div>
+              </div>
+              <div class="card">
+                <div class="card-top"><div class="itype bug"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2"><circle cx="12" cy="13" r="6"/><path d="M12 7V4M8 5l1.5 2M16 5l-1.5 2M3 13h3M18 13h3M6 17l2-1.5M18 17l-2-1.5"/></svg></div><span class="key">PAY-210</span><span class="epic-tag" style="background:#0ea5e9"></span></div>
+                <h3>Flaky test: webhook signature verify</h3>
+                <div class="card-meta"><div class="chips"><div class="pt">2</div></div><div class="av b">R</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="col-h"><span class="pip violet"></span> In review <span style="opacity:.6">· 2</span></div>
+            <div class="col-body">
+              <div class="card">
+                <div class="card-top"><div class="itype story"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2"><path d="M6 3h12v18l-6-4-6 4V3z"/></svg></div><span class="key">PAY-183</span><span class="epic-tag" style="background:#7c3aed"></span></div>
+                <h3>Apple Pay button on mobile checkout</h3>
+                <div class="card-meta"><div class="chips"><div class="pt">5</div></div><div class="av c">M</div></div>
+              </div>
+              <div class="card">
+                <div class="card-top"><div class="itype task"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="3" stroke-linecap="round"><path d="M5 12l5 5L20 6"/></svg></div><span class="key">PAY-207</span><span class="epic-tag" style="background:#0ea5e9"></span></div>
+                <h3>Dead-letter queue for failed webhook sends</h3>
+                <div class="card-meta"><div class="chips"><div class="pt">3</div></div><div class="av a">A</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="col-h"><span class="pip green"></span> Done <span style="opacity:.6">· 1</span></div>
+            <div class="col-body">
+              <div class="card">
+                <div class="card-top"><div class="itype task"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="3" stroke-linecap="round"><path d="M5 12l5 5L20 6"/></svg></div><span class="key">PAY-190</span><span class="epic-tag" style="background:#f59e0b"></span></div>
+                <h3>Risk score threshold config per merchant</h3>
+                <div class="card-meta"><div class="chips"><div class="pt">3</div></div><div class="av d">J</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>
