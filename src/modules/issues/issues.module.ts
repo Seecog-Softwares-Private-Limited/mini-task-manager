@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
+import { OrganizationsModule } from '../organizations/organizations.module';
 import { ActivityLogsModule } from '../activity-logs/activity-logs.module';
 import { IssueEntity } from './entities/issue.entity';
 import { IssuesRepository } from './repositories/issues.repository';
@@ -11,6 +12,7 @@ import { IssuesController } from './issues.controller';
   imports: [
     TypeOrmModule.forFeature([IssueEntity]),
     forwardRef(() => AuthModule),
+    forwardRef(() => OrganizationsModule),
     ActivityLogsModule,
   ],
   controllers: [IssuesController],
