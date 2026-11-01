@@ -5,6 +5,7 @@ import { ProjectEntity } from '../../projects/entities/project.entity';
 import { UserEntity } from '../../users/entities/user.entity';
 import { WorkflowStatusEntity } from '../../workflows/entities/workflow-status.entity';
 import { SprintEntity } from '../../sprints/entities/sprint.entity';
+import { EpicEntity } from '../../epics/entities/epic.entity';
 
 @Entity('tasks')
 @Index('idx_tasks_project_created', ['projectId', 'createdAt'])
@@ -128,6 +129,9 @@ export class TaskEntity extends BaseEntity {
   @Column({ name: 'sprint_id', type: 'binary', length: 16, transformer: uuidBinaryTransformer, nullable: true })
   sprintId!: string | null;
 
+  @Column({ name: 'epic_id', type: 'binary', length: 16, transformer: uuidBinaryTransformer, nullable: true })
+  epicId!: string | null;
+
   @Column({ name: 'recurring_template_id', type: 'binary', length: 16, transformer: uuidBinaryTransformer, nullable: true })
   recurringTemplateId!: string | null;
 
@@ -163,4 +167,8 @@ export class TaskEntity extends BaseEntity {
   @ManyToOne(() => SprintEntity, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'sprint_id' })
   sprint?: SprintEntity;
+
+  @ManyToOne(() => EpicEntity, { onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'epic_id' })
+  epic?: EpicEntity;
 }

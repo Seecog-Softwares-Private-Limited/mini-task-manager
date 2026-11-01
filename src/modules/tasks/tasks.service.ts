@@ -583,6 +583,7 @@ export class TasksService {
       subtasks: normalizedSubtasks.length ? normalizedSubtasks : null,
       parentTaskId: dto.parentTaskId ?? null,
       sprintId: dto.sprintId ?? null,
+      epicId: dto.epicId ?? null,
       tags: tags.length ? tags : null,
       requireLocation: dto.requireLocation === true,
     });
@@ -669,6 +670,7 @@ export class TasksService {
     }
     if (dto.statusId !== undefined) patch.statusId = dto.statusId ?? null;
     if (dto.sprintId !== undefined) patch.sprintId = dto.sprintId ?? null;
+    if (dto.epicId !== undefined) patch.epicId = dto.epicId ?? null;
     if (dto.assigneeIds !== undefined) {
       const ids = Array.from(new Set(dto.assigneeIds.filter((id) => !!String(id).trim())));
       patch.assigneeIds = ids.length ? ids : null;

@@ -52,6 +52,7 @@ export class TaskResponseDto {
   estimatedMinutes?: number;
   loggedMinutes!: number;
   sprintId?: string;
+  epicId?: string;
   recurringTemplateId?: string;
   recurrenceType?: string;
   recurrenceSequence?: number;

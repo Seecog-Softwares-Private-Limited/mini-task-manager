@@ -24,7 +24,7 @@ import {
   LayoutDashboard, Building2, FolderKanban, ListTodo, Bell,
   CreditCard, Activity, BarChart3, ClipboardList, Settings,
   Menu, PanelLeftClose, PanelLeft, Sparkles, Shield, Repeat,
-  MapPin, AlertTriangle,
+  MapPin, AlertTriangle, Flag,
 } from "lucide-react";
 
 const nav: {
@@ -42,6 +42,7 @@ const nav: {
   { href: "/dashboard/projects", label: "Projects", icon: FolderKanban, section: "workspace" },
   { href: "/dashboard/tasks", label: "Tasks", icon: ListTodo, section: "workspace" },
   { href: "/dashboard/recurring-tasks", label: "Recurring Tasks", icon: Repeat, section: "workspace" },
+  { href: "/dashboard/epics", label: "Epics", icon: Flag, section: "workspace" },
   { href: "/dashboard/sites", label: "Sites", icon: MapPin, section: "workspace" },
   { href: "/dashboard/issues", label: "Issues", icon: AlertTriangle, section: "workspace" },
   { href: "/dashboard/notifications", label: "Notifications", icon: Bell, section: "reporting" },

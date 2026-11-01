@@ -175,6 +175,9 @@ export class CreateTaskDto {
   sprintId?: string;
 
   @IsOptional()
+  epicId?: string;
+
+  @IsOptional()
   @Transform(normalizeCreateDueDate)
   @ValidateIf((_o, v) => v !== undefined)
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'dueDate must be YYYY-MM-DD' })
