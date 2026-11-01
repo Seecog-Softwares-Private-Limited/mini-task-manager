@@ -31,6 +31,7 @@ export class TaskResponseDto {
   projectId!: string;
   organizationId!: string;
   title!: string;
+  type!: string;
   description?: string;
   statusId?: string;
   priority!: string;

@@ -164,6 +164,13 @@ const PRIORITIES = [
   { value: "CRITICAL", label: "Critical", color: "bg-purple-500", border: "border-l-purple-400/50" },
 ];
 
+const TYPES = [
+  { value: "STORY", label: "Story", color: "bg-emerald-500" },
+  { value: "TASK", label: "Task", color: "bg-blue-500" },
+  { value: "BUG", label: "Bug", color: "bg-red-500" },
+  { value: "SUBTASK", label: "Subtask", color: "bg-slate-500" },
+];
+
 /** Dropdowns inside task detail dialog must sit above the modal (z-50). */
 const TASK_MODAL_DROPDOWN_Z = "z-[110]";
 const ACTIVITY_PAGE_SIZE = 5;
@@ -699,14 +706,14 @@ export function TaskDetailModal({
   const updateMutation = useMutation({
     mutationFn: (payload: Parameters<typeof updateTask>[1]) => {
       const keys = Object.keys(payload);
-      const assigneeAllowed = new Set(["statusId", "priority", "title", "description", "subtasks"]);
+      const assigneeAllowed = new Set(["statusId", "priority", "type", "title", "description", "subtasks"]);
       if (!canEditAll) {
         if (!canEditWorkflowFields && !canEditTitleAndDescription) {
           return Promise.reject(new Error("You do not have permission to edit this task"));
         }
         if (keys.some((k) => !assigneeAllowed.has(k))) {
           return Promise.reject(
-            new Error("You can only edit title, description, status, priority, and subtasks")
+            new Error("You can only edit title, description, status, priority, type, and subtasks")
           );
         }
       }
@@ -1018,12 +1025,22 @@ export function TaskDetailModal({
     [canEditWorkflowFields, updateMutation]
   );
 
+  const handleTypeChange = React.useCallback(
+    (type: Task["type"]) => {
+      if (!canEditWorkflowFields) return;
+      updateMutation.mutate({ type });
+    },
+    [canEditWorkflowFields, updateMutation]
+  );
+
   const isOverdue =
     Boolean(task?.dueDate) &&
     isTaskDueDateOverdue(task?.dueDate, task?.dueTime) &&
     task?.statusId !== statuses.find((s) => s.type === "DONE")?.id;
   const selectedPriority =
     PRIORITIES.find((pr) => pr.value === (task?.priority ?? "").toUpperCase()) ?? PRIORITIES[1];
+  const selectedType =
+    TYPES.find((t) => t.value === (task?.type ?? "").toUpperCase()) ?? TYPES[1];
   const selectedStatus =
     statuses.find((s) => s.id === (task?.statusId ?? statuses[0]?.id)) ?? statuses[0] ?? null;
   const recurrenceTypeLabel = toRecurrenceLabel(task?.recurrenceType);
@@ -2324,6 +2341,64 @@ export function TaskDetailModal({
                             </DropdownMenuContent>
                           </DropdownMenu>
                         ) : null}
+                      </div>
+
+                      <div className="space-y-2">
+                        <span className="block text-xs font-medium text-muted-foreground">Type</span>
+                        <DropdownMenu modal={false}>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              disabled={!canEditWorkflowFields || updateMutation.isPending}
+                              className={tdSidebarFieldShell}
+                              aria-label="Change issue type"
+                            >
+                              <span className="flex min-w-0 flex-1 items-center gap-2.5">
+                                <span
+                                  className={cn(
+                                    "h-2.5 w-2.5 shrink-0 rounded-full shadow-sm ring-2 ring-white/80 dark:ring-black/40",
+                                    selectedType.color
+                                  )}
+                                />
+                                <span className="truncate text-foreground">{selectedType.label}</span>
+                              </span>
+                              <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="start"
+                            className={cn(
+                              "w-[var(--radix-dropdown-menu-trigger-width)] min-w-[220px] p-1 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 duration-150",
+                              TASK_MODAL_DROPDOWN_Z
+                            )}
+                            sideOffset={6}
+                            onClick={(e) => e.stopPropagation()}
+                            onPointerDown={(e) => e.stopPropagation()}
+                          >
+                            {TYPES.map((t) => {
+                              const isCurrent = t.value === selectedType.value;
+                              return (
+                                <DropdownMenuItem
+                                  key={t.value}
+                                  disabled={updateMutation.isPending}
+                                  onSelect={(event) => {
+                                    event.preventDefault();
+                                    handleTypeChange(t.value as Task["type"]);
+                                  }}
+                                  className="rounded-lg text-sm"
+                                >
+                                  <span
+                                    className={cn("mr-2 h-2.5 w-2.5 shrink-0 rounded-full", t.color)}
+                                    aria-hidden
+                                  />
+                                  <span className="flex-1">{t.label}</span>
+                                  {isCurrent ? <Check className="h-3.5 w-3.5 shrink-0 text-primary" /> : null}
+                                </DropdownMenuItem>
+                              );
+                            })}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
 
                       <div className="space-y-2">

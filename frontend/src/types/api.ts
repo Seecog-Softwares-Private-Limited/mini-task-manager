@@ -109,6 +109,8 @@ export interface Project {
   updatedAt?: string;
 }
 
+export type TaskType = "STORY" | "BUG" | "TASK" | "SUBTASK";
+
 export type IssueSeverity = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 export type IssueStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
 export type IssueSource = "MANUAL" | "AUTO_CHECK_FAILED" | "AUTO_READING_OUT_OF_RANGE";
@@ -139,6 +141,7 @@ export interface Task {
   projectId: string;
   organizationId: string;
   title: string;
+  type: TaskType;
   description?: string;
   statusId?: string;
   priority: string;

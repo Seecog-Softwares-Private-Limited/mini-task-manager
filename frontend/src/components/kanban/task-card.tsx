@@ -80,7 +80,13 @@ import {
   recurringCardOverdueSurface,
 } from "@/lib/recurring-card-theme";
 
-export type TaskType =
+/**
+ * Cosmetic type guessed from a task's tags (e.g. a "bug" label), not the
+ * structured STORY/BUG/TASK/SUBTASK issue type persisted on the task itself
+ * (see `Task["type"]` in @/types/api). Kept separate on purpose so a real
+ * issue type never gets silently overridden by a tag inference.
+ */
+export type TagInferredType =
   | "bug"
   | "feature"
   | "story"
@@ -114,7 +120,7 @@ interface TaskAssignee {
 }
 
 export interface TaskCardTask extends Task {
-  type?: TaskType;
+  tagType?: TagInferredType;
   assignees?: TaskAssignee[];
   labels?: TaskLabel[];
   commentsCount?: number;
@@ -298,7 +304,7 @@ function getDueDateTone(dueDate?: string, isCompleted = false) {
 }
 
 const TASK_TYPE_META: Record<
-  TaskType,
+  TagInferredType,
   { label: string; icon: React.ComponentType<{ className?: string }>; className: string }
 > = {
   bug: {
@@ -345,25 +351,25 @@ const TASK_TYPE_META: Record<
   },
 };
 
-function inferTaskType(task: TaskCardTask): TaskType | null {
-  if (task.type) return task.type;
+function inferTaskType(task: TaskCardTask): TagInferredType | null {
+  if (task.tagType) return task.tagType;
   for (const tag of task.tags ?? task.labels ?? []) {
     const key = tag.name.trim().toLowerCase();
     if (key === "recurring") return "recurring";
-    if (TYPE_TAG_NAMES.has(key)) return key as TaskType;
+    if (TYPE_TAG_NAMES.has(key)) return key as TagInferredType;
   }
   return null;
 }
 
 function partitionTaskTags(tags: TaskLabel[]) {
-  let typeTag: TaskType | null = null;
+  let typeTag: TagInferredType | null = null;
   let blocked = false;
   const labels: TaskLabel[] = [];
 
   for (const tag of tags) {
     const key = tag.name.trim().toLowerCase();
     if (!typeTag && (TYPE_TAG_NAMES.has(key) || key === "recurring")) {
-      typeTag = key as TaskType;
+      typeTag = key as TagInferredType;
       continue;
     }
     if (BLOCKED_TAG_NAMES.has(key)) {
@@ -395,8 +401,8 @@ function getActivityLine(task: TaskCardTask): string | null {
   return relative ? `Updated ${relative}` : null;
 }
 
-function TaskTypeBadge({ type }: { type: TaskType }) {
-  const meta = TASK_TYPE_META[type];
+function TagInferredBadge({ tagType }: { tagType: TagInferredType }) {
+  const meta = TASK_TYPE_META[tagType];
   const Icon = meta.icon;
   return (
     <span
@@ -1299,7 +1305,7 @@ export function TaskCard({
             <span className="rounded-md bg-muted/50 px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
               #{task.id.slice(0, 4).toUpperCase()}
             </span>
-            {taskType ? <TaskTypeBadge type={taskType} /> : null}
+            {taskType ? <TagInferredBadge tagType={taskType} /> : null}
           </div>
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
             {showBlockedBadge ? (
