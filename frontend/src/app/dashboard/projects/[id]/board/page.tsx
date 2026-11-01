@@ -381,6 +381,7 @@ export default function ProjectBoardPage({ params }: { params: { id: string } })
         projectId: id,
         organizationId: orgId!,
         title: payload.title,
+        type: payload.type ?? "TASK",
         description: payload.description,
         statusId: payload.statusId,
         priority: payload.priority ?? "MEDIUM",

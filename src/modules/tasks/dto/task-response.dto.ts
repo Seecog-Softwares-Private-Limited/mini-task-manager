@@ -16,6 +16,14 @@ export class TaskSubtaskResponseDto {
   status?: string;
   priority?: string;
   statusId?: string;
+  requireLocation?: boolean;
+  completionRecord?: Record<string, unknown>;
+  /** Checklist item kind; undefined/CHECK = plain checkbox. */
+  itemType?: 'CHECK' | 'PHOTO' | 'READING';
+  /** READING items: acceptable value range and unit label. */
+  minValue?: number;
+  maxValue?: number;
+  unit?: string;
 }
 
 export class TaskResponseDto {
@@ -23,6 +31,7 @@ export class TaskResponseDto {
   projectId!: string;
   organizationId!: string;
   title!: string;
+  type!: string;
   description?: string;
   statusId?: string;
   priority!: string;

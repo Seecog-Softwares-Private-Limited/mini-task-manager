@@ -189,9 +189,11 @@ export class ProjectsService {
 
   async create(organizationId: string, createdBy: string, dto: CreateProjectDto): Promise<ProjectEntity> {
     const iconTrimmed = dto.iconUrl?.trim();
+    const siteIdTrimmed = dto.siteId?.trim();
     const project = await this.projectsRepository.create({
       organizationId,
       createdBy,
+      siteId: siteIdTrimmed && siteIdTrimmed.length > 0 ? siteIdTrimmed : null,
       name: dto.name,
       description: dto.description ?? null,
       iconUrl: iconTrimmed && iconTrimmed.length > 0 ? dto.iconUrl! : null,
@@ -234,6 +236,10 @@ export class ProjectsService {
     }
     if (dto.visibility !== undefined) payload.visibility = dto.visibility;
     if (dto.isArchived !== undefined) payload.isArchived = dto.isArchived;
+    if (dto.siteId !== undefined) {
+      const v = dto.siteId.trim();
+      payload.siteId = v.length === 0 ? null : v;
+    }
     if (Object.keys(payload).length === 0) return project;
     await this.projectsRepository.update(id, payload);
     const updated = await this.projectsRepository.findByIdAndOrganization(id, organizationId);

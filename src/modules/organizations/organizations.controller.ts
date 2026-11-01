@@ -10,6 +10,7 @@ import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { OrganizationResponseDto } from './dto/organization-response.dto';
 import { OrganizationMemberEntity } from './entities/organization-member.entity';
+import { listIndustryPacks, resolveIndustryWords, type IndustryPack } from './industry-packs';
 
 @Controller('organizations')
 @SkipThrottle({ auth: true })
@@ -21,6 +22,12 @@ export class OrganizationsController {
   async list(@CurrentUserId() userId: string): Promise<OrganizationResponseDto[]> {
     const items = await this.organizationsService.findOrganizationsWithRoleForUser(userId);
     return items.map(({ org, role }) => this.toResponse(org, role));
+  }
+
+  /** Industry editions for the workspace-creation picker. Static list, no auth-scoped data. */
+  @Get('industries')
+  listIndustries(): IndustryPack[] {
+    return listIndustryPacks();
   }
 
   @Get('slug/available')
@@ -220,7 +227,15 @@ export class OrganizationsController {
   }
 
   private toResponse(
-    org: { id: string; name: string; slug: string; ownerId: string; logoUrl?: string | null; isArchived?: boolean },
+    org: {
+      id: string;
+      name: string;
+      slug: string;
+      ownerId: string;
+      logoUrl?: string | null;
+      isArchived?: boolean;
+      industry?: string | null;
+    },
     myRole?: string,
   ): OrganizationResponseDto {
     return {
@@ -231,6 +246,8 @@ export class OrganizationsController {
       logoUrl: org.logoUrl ?? undefined,
       myRole: myRole ?? undefined,
       isArchived: org.isArchived ?? false,
+      industry: org.industry ?? null,
+      words: resolveIndustryWords(org.industry),
     };
   }
 

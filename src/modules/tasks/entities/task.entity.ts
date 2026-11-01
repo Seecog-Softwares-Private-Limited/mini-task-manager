@@ -22,6 +22,10 @@ export class TaskEntity extends BaseEntity {
   @Column({ type: 'varchar', length: 300 })
   title!: string;
 
+  /** STORY | BUG | TASK | SUBTASK. Defaults to TASK for anything created before this existed. */
+  @Column({ type: 'varchar', length: 20, default: 'TASK' })
+  type!: string;
+
   @Column({ type: 'text', nullable: true })
   description!: string | null;
 
@@ -73,6 +77,13 @@ export class TaskEntity extends BaseEntity {
     note?: string;
     /** When true, completing this subtask requires GPS/geofence. */
     requireLocation?: boolean;
+    /** Checklist item kind; undefined/CHECK = plain checkbox (legacy default). */
+    itemType?: 'CHECK' | 'PHOTO' | 'READING';
+    /** READING items: acceptable value range, e.g. fridge temp 2-8. */
+    minValue?: number;
+    maxValue?: number;
+    /** READING items: unit label shown next to the value, e.g. "°C", "psi". */
+    unit?: string;
   }> | null;
 
   @Column({ name: 'reporter_id', type: 'binary', length: 16, transformer: uuidBinaryTransformer })

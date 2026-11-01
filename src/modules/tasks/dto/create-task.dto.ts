@@ -6,6 +6,7 @@ import {
   IsDateString,
   IsIn,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   IsUUID,
@@ -100,6 +101,28 @@ export class CreateTaskSubtaskDto {
   @IsOptional()
   @IsBoolean()
   requireLocation?: boolean;
+
+  /** Checklist item kind; omit/CHECK = plain checkbox. */
+  @IsOptional()
+  @IsIn(['CHECK', 'PHOTO', 'READING'])
+  itemType?: 'CHECK' | 'PHOTO' | 'READING';
+
+  /** READING items: acceptable value range, e.g. fridge temp 2-8. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  minValue?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  maxValue?: number;
+
+  /** READING items: unit label shown next to the value, e.g. "°C", "psi". */
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  unit?: string;
 }
 
 class CreateTaskTagDto {
@@ -122,6 +145,10 @@ export class CreateTaskDto {
   @IsString()
   @MaxLength(300)
   title!: string;
+
+  @IsOptional()
+  @IsIn(['STORY', 'BUG', 'TASK', 'SUBTASK'])
+  type?: string;
 
   @IsOptional()
   @IsString()

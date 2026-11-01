@@ -1,5 +1,5 @@
 import { apiClient } from "@/services/api/client";
-import type { Organization } from "@/types/api";
+import type { IndustryKey, IndustryPack, Organization } from "@/types/api";
 import { fetchProjectsByOrg } from "@/services/api/projects.api";
 import { fetchTasksByProject } from "@/services/api/tasks.api";
 
@@ -8,6 +8,13 @@ export interface CreateOrganizationPayload {
   /** Optional; ignored by API — unique slug is generated server-side. */
   slug?: string;
   logoUrl?: string;
+  industry?: IndustryKey;
+}
+
+/** The industry-edition picker shown during workspace creation. */
+export async function fetchIndustries(): Promise<IndustryPack[]> {
+  const { data } = await apiClient.get<IndustryPack[]>("/organizations/industries");
+  return data;
 }
 
 /** Check if a workspace slug is available. Pass `excludeOrganizationId` when editing an existing workspace. */

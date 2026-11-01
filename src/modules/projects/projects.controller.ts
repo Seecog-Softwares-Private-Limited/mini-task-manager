@@ -251,6 +251,7 @@ export class ProjectsController {
     return {
       id: p.id,
       organizationId: p.organizationId,
+      siteId: p.siteId ?? undefined,
       name: p.name,
       description: p.description ?? undefined,
       iconUrl: p.iconUrl ?? undefined,

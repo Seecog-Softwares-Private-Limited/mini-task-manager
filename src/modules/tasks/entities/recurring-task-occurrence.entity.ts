@@ -33,6 +33,22 @@ export class RecurringTaskOccurrenceEntity extends BaseEntity {
   @Column({ name: 'completed_at', type: 'timestamp', nullable: true })
   completedAt!: Date | null;
 
+  /** Set when the run's checklist is done but awaiting manager approval. */
+  @Column({ name: 'submitted_at', type: 'timestamp', nullable: true })
+  submittedAt!: Date | null;
+
+  @Column({ name: 'reviewed_at', type: 'timestamp', nullable: true })
+  reviewedAt!: Date | null;
+
+  @Column({ name: 'reviewed_by', type: 'binary', length: 16, nullable: true, transformer: uuidBinaryTransformer })
+  reviewedBy!: string | null;
+
+  @Column({ name: 'review_decision', type: 'varchar', length: 20, nullable: true })
+  reviewDecision!: 'APPROVED' | 'REJECTED' | null;
+
+  @Column({ name: 'review_note', type: 'text', nullable: true })
+  reviewNote!: string | null;
+
   /** Set when a due-time reminder was pushed to checklist assignees. */
   @Column({ name: 'reminder_sent_at', type: 'timestamp', nullable: true })
   reminderSentAt!: Date | null;
