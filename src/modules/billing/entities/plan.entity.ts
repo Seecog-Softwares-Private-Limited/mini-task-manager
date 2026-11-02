@@ -18,6 +18,13 @@ export class PlanEntity {
   @Column({ name: 'price_yearly', type: 'decimal', precision: 10, scale: 2, default: 0 })
   priceYearly!: number;
 
+  /** Per-seat override. When null, billing falls back to priceMonthly/Yearly as the per-seat rate. */
+  @Column({ name: 'price_per_seat_monthly', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  pricePerSeatMonthly!: number | null;
+
+  @Column({ name: 'price_per_seat_yearly', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  pricePerSeatYearly!: number | null;
+
   @Column({ type: 'varchar', length: 10, default: 'INR' })
   currency!: string;
 

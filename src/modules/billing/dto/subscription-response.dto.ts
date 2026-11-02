@@ -6,6 +6,7 @@ export class SubscriptionResponseDto {
   planName!: string;
   billingCycle!: string;
   status!: string;
+  seatCount?: number | null;
   startDate?: Date;
   endDate?: Date;
   trialEndsAt?: Date;

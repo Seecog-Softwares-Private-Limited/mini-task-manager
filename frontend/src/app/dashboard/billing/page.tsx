@@ -348,6 +348,12 @@ export default function BillingPage() {
               <span className="text-sm text-muted-foreground">Billing</span>
               <span className="text-sm font-medium capitalize">{subscription.billingCycle || "—"}</span>
             </div>
+            {subscription.seatCount != null && (
+              <div className="flex items-center justify-between rounded-lg bg-muted/30 p-3">
+                <span className="text-sm text-muted-foreground">Billed seats</span>
+                <span className="text-sm font-medium">{subscription.seatCount}</span>
+              </div>
+            )}
             <div className="flex items-center justify-between rounded-lg bg-muted/30 p-3">
               <span className="text-sm text-muted-foreground">Status</span>
               <span className={cn(

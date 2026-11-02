@@ -4,6 +4,8 @@ export class PlanResponseDto {
   name!: string;
   priceMonthly!: number;
   priceYearly!: number;
+  pricePerSeatMonthly!: number | null;
+  pricePerSeatYearly!: number | null;
   currency!: string;
   maxUsers!: number | null;
   maxProjects!: number | null;

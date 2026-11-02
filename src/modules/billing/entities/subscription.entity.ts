@@ -21,6 +21,10 @@ export class SubscriptionEntity {
   @Column({ name: 'billing_cycle', type: 'varchar', length: 20, default: 'monthly' })
   billingCycle!: BillingCycle;
 
+  /** Seat count billed at the time this subscription was last charged; snapshotted so it can't drift from the amount actually paid. */
+  @Column({ name: 'seat_count', type: 'int', nullable: true })
+  seatCount!: number | null;
+
   @Column({ type: 'varchar', length: 50, default: 'TRIAL' })
   status!: SubscriptionStatus;
 

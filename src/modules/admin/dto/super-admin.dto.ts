@@ -99,6 +99,16 @@ export class SuperAdminPlanUpsertDto {
   @Min(0)
   priceYearly!: number;
 
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  pricePerSeatMonthly?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  pricePerSeatYearly?: number | null;
+
   @IsString()
   @IsNotEmpty()
   currency!: string;
