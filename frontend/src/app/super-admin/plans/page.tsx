@@ -98,6 +98,14 @@ export default function SuperAdminPlansPage() {
                         {String(p.currency ?? "INR")} {String(p.priceMonthly ?? "0")}
                       </span>
                     </div>
+                    {(p.pricePerSeatMonthly != null || p.pricePerSeatYearly != null) && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Per seat / mo</span>
+                        <span className="font-medium">
+                          {String(p.currency ?? "INR")} {String(p.pricePerSeatMonthly ?? "—")}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Max users</span>
                       <span>{formatLimit(p.maxUsers as number | null)}</span>

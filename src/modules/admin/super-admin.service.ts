@@ -359,6 +359,8 @@ export class SuperAdminService {
     plan.slug = dto.slug.toLowerCase();
     plan.priceMonthly = dto.priceMonthly;
     plan.priceYearly = dto.priceYearly;
+    plan.pricePerSeatMonthly = dto.pricePerSeatMonthly ?? null;
+    plan.pricePerSeatYearly = dto.pricePerSeatYearly ?? null;
     plan.currency = dto.currency || 'INR';
     plan.maxUsers = dto.maxUsers ?? null;
     plan.maxProjects = dto.maxProjects ?? null;

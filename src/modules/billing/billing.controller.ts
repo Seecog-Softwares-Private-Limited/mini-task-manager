@@ -39,6 +39,8 @@ export class BillingController {
       name: p.name,
       priceMonthly: Number(p.priceMonthly),
       priceYearly: Number(p.priceYearly),
+      pricePerSeatMonthly: p.pricePerSeatMonthly != null ? Number(p.pricePerSeatMonthly) : null,
+      pricePerSeatYearly: p.pricePerSeatYearly != null ? Number(p.pricePerSeatYearly) : null,
       currency: p.currency,
       maxUsers: p.maxUsers,
       maxProjects: p.maxProjects,
@@ -94,6 +96,7 @@ export class BillingController {
       trialEndsAt: sub.trialEndsAt ?? undefined,
       cancelledAt: sub.cancelledAt ?? undefined,
       razorpaySubscriptionId: sub.razorpaySubscriptionId ?? undefined,
+      seatCount: sub.seatCount,
       daysRemaining,
       isTrialExpired: isTrialExpired ?? false,
     };
@@ -254,6 +257,7 @@ export class BillingController {
       status: sub.status,
       startDate: sub.startDate ?? undefined,
       endDate: sub.endDate ?? undefined,
+      seatCount: sub.seatCount,
     };
   }
 

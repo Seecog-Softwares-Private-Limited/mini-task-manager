@@ -110,6 +110,15 @@ export class BillingService {
     });
   }
 
+  // ── Pricing ──
+
+  /** Per-seat rate for a plan; falls back to the flat price_monthly/yearly when no per-seat override is set. */
+  private getSeatPrice(plan: PlanEntity, billingCycle: BillingCycle): number {
+    const perSeat = billingCycle === 'yearly' ? plan.pricePerSeatYearly : plan.pricePerSeatMonthly;
+    if (perSeat != null) return Number(perSeat);
+    return billingCycle === 'yearly' ? Number(plan.priceYearly) : Number(plan.priceMonthly);
+  }
+
   // ── Razorpay Order Creation ──
 
   async createOrder(organizationId: string, planId: string, billingCycle: BillingCycle): Promise<{
@@ -125,7 +134,7 @@ export class BillingService {
     if (!plan.isActive) throw new BadRequestException('Plan is not available');
     if (plan.slug === 'free') throw new BadRequestException('Free plan does not require payment');
 
-    const price = billingCycle === 'yearly' ? Number(plan.priceYearly) : Number(plan.priceMonthly);
+    const price = this.getSeatPrice(plan, billingCycle);
     if (price <= 0) throw new BadRequestException('Invalid plan price');
 
     // Get user count for this org
@@ -279,8 +288,12 @@ export class BillingService {
     }
     subscription = reloaded;
 
-    // 6. Update payment record
+    // 6. Update payment record — capture the seat count snapshotted at order-creation time
+    // before overwriting metadata with Razorpay's payment details, so the invoice matches
+    // what was actually charged even if org membership changed since createOrder.
     const payment = await this.paymentsRepository.findByRazorpayOrderId(params.razorpayOrderId);
+    const snapshottedUserCount =
+      payment?.metadata && typeof payment.metadata.userCount === 'number' ? payment.metadata.userCount : null;
     if (payment) {
       payment.razorpayPaymentId = params.razorpayPaymentId;
       payment.razorpaySignature = params.razorpaySignature;
@@ -291,11 +304,17 @@ export class BillingService {
       await this.paymentsRepository.save(payment);
     }
 
-    // 7. Create invoice
-    const usage = await this.usageService.getOrganizationUsage(params.organizationId);
-    const userCount = Math.max(1, usage.users.current);
-    const price = params.billingCycle === 'yearly' ? Number(plan.priceYearly) : Number(plan.priceMonthly);
-    
+    // 7. Snapshot seat count onto the subscription and create the invoice
+    let userCount = snapshottedUserCount;
+    if (userCount == null) {
+      const usage = await this.usageService.getOrganizationUsage(params.organizationId);
+      userCount = Math.max(1, usage.users.current);
+    }
+    subscription.seatCount = userCount;
+    await this.subscriptionsRepository.save(subscription);
+
+    const price = this.getSeatPrice(plan, params.billingCycle);
+
     await this.invoicesRepository.create({
       subscriptionId: subscription.id,
       organizationId: params.organizationId,
@@ -333,6 +352,7 @@ export class BillingService {
       subscription.endDate = null;
       subscription.trialEndsAt = null;
       subscription.cancelledAt = null;
+      subscription.seatCount = null;
       return this.subscriptionsRepository.save(subscription);
     }
 

@@ -473,6 +473,8 @@ export interface Plan {
   name: string;
   priceMonthly: number;
   priceYearly: number;
+  pricePerSeatMonthly: number | null;
+  pricePerSeatYearly: number | null;
   currency: string;
   maxUsers: number | null;
   maxProjects: number | null;
@@ -506,6 +508,7 @@ export interface Subscription {
   trialEndsAt?: string;
   cancelledAt?: string;
   razorpaySubscriptionId?: string;
+  seatCount?: number | null;
   daysRemaining?: number;
   isTrialExpired?: boolean;
 }
