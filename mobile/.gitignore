@@ -22,6 +22,7 @@
 **/ios/Flutter/app.zip
 **/ios/ServiceDefinitions.json
 **/ios/Runner/GeneratedPluginRegistrant.*
+**/ios/**/xcshareddata/swiftpm/
 
 **/android/.gradle/
 **/android/captures/
