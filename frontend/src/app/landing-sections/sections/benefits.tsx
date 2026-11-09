@@ -1,18 +1,19 @@
 import { IconCheck } from "../icons";
+import { AnimatedStat } from "./animated-stat";
 
 const BENEFITS = [
   {
-    stat: "3×",
+    stat: <AnimatedStat end={3} suffix="×" />,
     title: "Faster task completion",
     desc: "Streamlined workflows and automations help teams complete work three times faster.",
   },
   {
-    stat: "60%",
+    stat: <AnimatedStat end={60} suffix="%" />,
     title: "Less meeting time",
     desc: "Real-time visibility and async collaboration eliminate constant status syncs.",
   },
   {
-    stat: "2 min",
+    stat: <AnimatedStat end={2} suffix=" min" />,
     title: "Time to first board",
     desc: "Sign up, create a workspace, and start organizing work in under two minutes.",
   },

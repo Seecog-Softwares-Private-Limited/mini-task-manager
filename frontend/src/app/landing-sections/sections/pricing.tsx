@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { fetchUserPlans, formatBytes, type UserPlanSlug } from "@/services/api/user-plans.api";
 import { IconCheck } from "../icons";
+import { SpotlightCard } from "./spotlight-card";
 
 const LANDING_PLAN_STYLE: Record<
   UserPlanSlug,
@@ -135,7 +136,7 @@ export function PricingSection() {
 
         <div className="grid md:grid-cols-3 gap-5 items-start">
           {plans.map((plan, i) => (
-            <div
+            <SpotlightCard
               key={plan.slug}
               className={`lp-reveal lp-card relative p-6 ${plan.popular ? "lp-pricing-popular md:-mt-1" : ""}`}
               style={{ transitionDelay: `${i * 0.08}s` }}
@@ -182,7 +183,7 @@ export function PricingSection() {
                   </li>
                 ))}
               </ul>
-            </div>
+            </SpotlightCard>
           ))}
         </div>
       </div>

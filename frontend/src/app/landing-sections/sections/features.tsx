@@ -6,6 +6,7 @@ import {
   IconShield,
   IconIntegration,
 } from "../icons";
+import { SpotlightCard } from "./spotlight-card";
 
 const FEATURES = [
   {
@@ -54,7 +55,7 @@ export function FeaturesSection() {
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {FEATURES.map((feature, i) => (
-            <div
+            <SpotlightCard
               key={feature.title}
               className="lp-card lp-card-interactive lp-reveal p-6"
               style={{ transitionDelay: `${i * 0.06}s` }}
@@ -64,7 +65,7 @@ export function FeaturesSection() {
               </div>
               <h3 className="text-[1rem] font-semibold text-foreground mb-1.5">{feature.title}</h3>
               <p className="text-[0.9375rem] leading-relaxed text-muted-foreground">{feature.desc}</p>
-            </div>
+            </SpotlightCard>
           ))}
         </div>
       </div>

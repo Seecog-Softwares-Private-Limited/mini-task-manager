@@ -1,3 +1,5 @@
+import { SpotlightCard } from "./spotlight-card";
+
 const STEPS = [
   {
     num: "01",
@@ -28,11 +30,11 @@ export function HowItWorksSection() {
 
         <div className="grid md:grid-cols-3 gap-5">
           {STEPS.map((step, i) => (
-            <div key={step.num} className="lp-reveal lp-card p-6" style={{ transitionDelay: `${i * 0.1}s` }}>
+            <SpotlightCard key={step.num} className="lp-reveal lp-card p-6" style={{ transitionDelay: `${i * 0.1}s` }}>
               <div className="lp-step-num mb-4">{step.num}</div>
               <h3 className="text-[1rem] font-semibold text-foreground mb-1.5">{step.title}</h3>
               <p className="text-[0.9375rem] text-muted-foreground leading-relaxed">{step.desc}</p>
-            </div>
+            </SpotlightCard>
           ))}
         </div>
       </div>

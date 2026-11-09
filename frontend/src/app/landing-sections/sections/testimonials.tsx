@@ -1,3 +1,5 @@
+import { SpotlightCard } from "./spotlight-card";
+
 const TESTIMONIALS = [
   {
     quote: "OpsPick replaced three tools for us. Our sprint velocity improved 40% in the first month, and the team actually enjoys using it.",
@@ -34,18 +36,25 @@ export function TestimonialsSection() {
 
         <div className="grid md:grid-cols-3 gap-4">
           {TESTIMONIALS.map((t, i) => (
-            <figure key={t.name} className="lp-card lp-reveal p-6 flex flex-col" style={{ transitionDelay: `${i * 0.08}s` }}>
-              <blockquote className="flex-1 text-[0.9375rem] leading-relaxed text-muted-foreground">
-                &ldquo;{t.quote}&rdquo;
-              </blockquote>
-              <figcaption className="mt-5 flex items-center gap-3 pt-4 border-t border-border/60">
-                <div className="lp-avatar" aria-hidden>{t.initials}</div>
-                <div>
-                  <div className="text-sm font-semibold text-foreground">{t.name}</div>
-                  <div className="text-xs text-muted-foreground">{t.role}, {t.company}</div>
-                </div>
-              </figcaption>
-            </figure>
+            <SpotlightCard
+              key={t.name}
+              className="lp-card lp-reveal p-6 flex flex-col"
+              style={{ transitionDelay: `${i * 0.08}s` }}
+            >
+              <figure className="flex flex-1 flex-col">
+                <span className="lp-quote-mark" aria-hidden>&ldquo;</span>
+                <blockquote className="flex-1 -mt-2 text-[0.9375rem] leading-relaxed text-muted-foreground">
+                  {t.quote}
+                </blockquote>
+                <figcaption className="mt-5 flex items-center gap-3 pt-4 border-t border-border/60">
+                  <div className="lp-avatar" aria-hidden>{t.initials}</div>
+                  <div>
+                    <div className="text-sm font-semibold text-foreground">{t.name}</div>
+                    <div className="text-xs text-muted-foreground">{t.role}, {t.company}</div>
+                  </div>
+                </figcaption>
+              </figure>
+            </SpotlightCard>
           ))}
         </div>
       </div>
