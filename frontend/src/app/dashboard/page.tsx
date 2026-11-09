@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
+import { usePermissions } from "@/hooks/use-permissions";
 import { useTenant } from "@/context/tenant-context";
 import { useProjectSelection } from "@/context/project-selection-context";
 import { buildTasksPageHref } from "@/lib/tasks-page-href";
@@ -53,7 +54,8 @@ function StatCard({
 }
 
 export default function DashboardPage() {
-  const { user, canManageBilling } = useAuth();
+  const { user } = useAuth();
+  const { canManageBilling } = usePermissions();
   const { orgId } = useTenant();
   const { selectedProjectId } = useProjectSelection();
   const tasksHref = buildTasksPageHref(selectedProjectId);

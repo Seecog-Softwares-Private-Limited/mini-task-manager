@@ -39,6 +39,7 @@ export function HeaderAccountMenu() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
+          data-cy="header-account-menu-trigger"
           className="flex h-9 w-9 items-center justify-center rounded-full ring-offset-background transition-shadow hover:ring-2 hover:ring-violet-500/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
           aria-label="Account menu"
         >

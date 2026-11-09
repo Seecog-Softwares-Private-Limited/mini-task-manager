@@ -74,7 +74,7 @@ export default function ProjectLayout({
 
   return (
     <NetworkFallback error={error ?? null} retry={() => refetch()}>
-      <div className="space-y-6 animate-slide-up">
+      <div className="flex min-h-0 flex-1 flex-col space-y-6 animate-slide-up">
         {isError && error && (
           <div className="rounded-lg bg-destructive/10 border border-destructive/20 px-4 py-3">
             <p className="text-sm text-destructive">{(error as Error).message}</p>
