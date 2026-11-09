@@ -9,12 +9,16 @@ const FAQ_ITEMS = [
     a: "Yes. The Free plan includes one workspace, up to 5 members, and 500 MB of storage — forever. No credit card required.",
   },
   {
-    q: "Can I switch between Kanban and Scrum?",
-    a: "Every project supports both Kanban and Scrum views. Switch between them with one click without losing any data.",
+    q: "Which industries does OpsPick support?",
+    a: "OpsPick ships with 7 industry editions — Restaurant, Construction, Hospital, School, Facility Management, Hotel, and General. Each relabels sites, issues, and compliance reports to match your team's language. Switch anytime from workspace settings.",
+  },
+  {
+    q: "What are compliance evidence exports?",
+    a: "Each industry edition includes a one-click audit export — FSSAI hygiene logs for restaurants, RERA progress evidence for construction, NABH packs for hospitals, SLA reports for facility management, and more.",
   },
   {
     q: "How does billing work?",
-    a: "Paid plans are billed per user per month. Choose monthly or annual billing — annual saves 15%. Upgrade, downgrade, or cancel anytime.",
+    a: "Paid plans are billed per seat per month. Choose monthly or annual billing — annual saves 15%. Upgrade, downgrade, or cancel anytime.",
   },
   {
     q: "Is my data secure?",
@@ -22,11 +26,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "Can I import data from other tools?",
-    a: "Use our REST API to programmatically import tasks and projects. CSV export is available on all plans.",
-  },
-  {
-    q: "What happens when my trial ends?",
-    a: "You'll be moved to the Free plan automatically — no charges unless you choose to upgrade. All your data stays intact.",
+    a: "Use our built-in Jira importer to bring existing projects over in minutes, or connect via our REST API for anything else. CSV export is available on all plans.",
   },
 ];
 

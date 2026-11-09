@@ -3,18 +3,18 @@ import { SpotlightCard } from "./spotlight-card";
 const STEPS = [
   {
     num: "01",
-    title: "Create your workspace",
-    desc: "Sign up with your email in seconds. No credit card, no sales call. Your workspace is ready immediately.",
+    title: "Pick your industry",
+    desc: "Choose from 7 industry editions — Restaurant, Construction, Hospital, Hotel, School, Facility Management, or General. OpsPick relabels itself to match your team's language instantly.",
   },
   {
     num: "02",
-    title: "Organize your projects",
-    desc: "Set up Kanban or Scrum boards, customize workflows, statuses, and labels to match how your team works.",
+    title: "Add your sites & team",
+    desc: "Set up outlets, sites, wards, or client locations. Invite your team and assign roles in minutes.",
   },
   {
     num: "03",
-    title: "Collaborate and ship",
-    desc: "Assign tasks, track sprints, automate workflows. Real-time visibility keeps everyone aligned.",
+    title: "Track, resolve, and prove it",
+    desc: "Log issues, run recurring checklists, and export audit-ready compliance evidence whenever you need it.",
   },
 ];
 
@@ -25,7 +25,7 @@ export function HowItWorksSection() {
         <div className="lp-reveal mx-auto max-w-2xl text-center mb-14">
           <span className="lp-section-label">How it works</span>
           <h2 className="lp-heading mt-4">Up and running in minutes</h2>
-          <p className="lp-body-lg mt-3">Three simple steps from signup to shipping.</p>
+          <p className="lp-body-lg mt-3">Three simple steps from signup to your first audit-ready export.</p>
         </div>
 
         <div className="grid md:grid-cols-3 gap-5">

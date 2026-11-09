@@ -4,6 +4,7 @@ import { IconLogo } from "../icons";
 const FOOTER_LINKS = {
   Product: [
     { label: "Features", href: "#features" },
+    { label: "Industries", href: "#industries" },
     { label: "Pricing", href: "#pricing" },
     { label: "How it works", href: "#how-it-works" },
     { label: "FAQ", href: "#faq" },
@@ -28,7 +29,7 @@ export function Footer() {
               <span className="text-[1.0625rem] font-semibold text-foreground tracking-tight">OpsPick</span>
             </Link>
             <p className="mt-3 max-w-sm text-sm leading-relaxed text-muted-foreground">
-              Project management built for teams that move fast. Kanban, Scrum, automations, and collaboration in one workspace.
+              Operations management tuned to your industry. Sites, issues, recurring checklists, and audit-ready compliance exports in one workspace.
             </p>
           </div>
 

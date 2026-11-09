@@ -1,8 +1,8 @@
 import {
-  IconKanban,
+  IconMapPin,
+  IconFileCheck,
   IconAutomation,
-  IconTeam,
-  IconChart,
+  IconLayers,
   IconShield,
   IconIntegration,
 } from "../icons";
@@ -10,34 +10,34 @@ import { SpotlightCard } from "./spotlight-card";
 
 const FEATURES = [
   {
-    icon: IconKanban,
-    title: "Kanban & Scrum boards",
-    desc: "Drag-and-drop boards with customizable columns, WIP limits, and swimlanes. Switch views instantly.",
+    icon: IconMapPin,
+    title: "Sites, outlets & issue tracking",
+    desc: "Track every outlet, site, ward, or client location. Log issues, snags, tickets, or complaints — whatever your industry calls them.",
+  },
+  {
+    icon: IconFileCheck,
+    title: "Compliance evidence exports",
+    desc: "One-click FSSAI hygiene logs, RERA progress evidence, NABH packs, or SLA reports — audit-ready whenever you need them.",
   },
   {
     icon: IconAutomation,
-    title: "Smart automations",
-    desc: "Auto-notify stakeholders, update statuses, and log time when tasks move — zero manual overhead.",
+    title: "Recurring checklists & approvals",
+    desc: "Schedule recurring inspections with built-in submit-and-review workflows, so nothing ships without sign-off.",
   },
   {
-    icon: IconTeam,
-    title: "Real-time collaboration",
-    desc: "@mentions, comments, and live activity feeds keep everyone aligned without another status meeting.",
-  },
-  {
-    icon: IconChart,
-    title: "Advanced analytics",
-    desc: "Velocity charts, burndown graphs, and cycle time tracking turn data into actionable decisions.",
+    icon: IconLayers,
+    title: "Seven industry editions",
+    desc: "The same engine, relabeled for your team instantly — Outlets for restaurants, Snags for construction, Wards for hospitals.",
   },
   {
     icon: IconShield,
-    title: "Enterprise security",
-    desc: "Role-based access, API key management, audit logs, and organization-level controls from day one.",
+    title: "Role-based access & audit trail",
+    desc: "Organization-level permissions, audit logs, and per-seat billing keep every site's data secure and accountable.",
   },
   {
     icon: IconIntegration,
-    title: "API-first integrations",
-    desc: "Full REST API with key management. Connect your tools and build custom workflows programmatically.",
+    title: "API-first, with Jira import",
+    desc: "Full REST API and webhooks, plus a built-in Jira importer to bring existing projects over in minutes.",
   },
 ];
 
@@ -47,9 +47,9 @@ export function FeaturesSection() {
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <div className="lp-reveal mx-auto max-w-2xl text-center mb-14">
           <span className="lp-section-label">Features</span>
-          <h2 className="lp-heading mt-4">Everything you need to ship</h2>
+          <h2 className="lp-heading mt-4">Everything your operations need</h2>
           <p className="lp-body-lg mt-3">
-            Purpose-built for modern teams. Every feature designed to reduce friction and multiply output.
+            Purpose-built for real-world ops. Every feature designed to reduce friction and keep you audit-ready.
           </p>
         </div>
 

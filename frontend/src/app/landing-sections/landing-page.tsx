@@ -5,6 +5,7 @@ import "../landing.css";
 import { useScrollReveal, useScrollProgress } from "./hooks";
 import { Navbar } from "./sections/navbar";
 import { HeroSection } from "./sections/hero";
+import { IndustriesSection } from "./sections/industries";
 import { FeaturesSection } from "./sections/features";
 import { BenefitsSection } from "./sections/benefits";
 import { HowItWorksSection } from "./sections/how-it-works";
@@ -38,6 +39,7 @@ export default function LandingPage() {
 
       <main id="main-content">
         <HeroSection />
+        <IndustriesSection />
         <FeaturesSection />
         <BenefitsSection />
         <HowItWorksSection />

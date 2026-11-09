@@ -4,28 +4,28 @@ import { AnimatedStat } from "./animated-stat";
 const BENEFITS = [
   {
     stat: <AnimatedStat end={3} suffix="×" />,
-    title: "Faster task completion",
-    desc: "Streamlined workflows and automations help teams complete work three times faster.",
+    title: "Faster issue resolution",
+    desc: "Streamlined workflows and recurring checklists help ops teams close issues three times faster.",
   },
   {
     stat: <AnimatedStat end={60} suffix="%" />,
-    title: "Less meeting time",
-    desc: "Real-time visibility and async collaboration eliminate constant status syncs.",
+    title: "Less time on compliance paperwork",
+    desc: "Auto-generated evidence exports replace manual audit prep across every site.",
   },
   {
     stat: <AnimatedStat end={2} suffix=" min" />,
-    title: "Time to first board",
-    desc: "Sign up, create a workspace, and start organizing work in under two minutes.",
+    title: "Time to first site live",
+    desc: "Pick your industry, add your first site, and start logging issues in under two minutes.",
   },
 ];
 
 const CHECKLIST = [
-  "Unlimited tasks on every plan",
-  "Kanban and Scrum in one tool",
-  "Recurring tasks and automations",
+  "7 industry editions, one platform",
+  "Multi-site visibility in one dashboard",
+  "Compliance-ready evidence exports",
+  "Recurring checklists with approvals",
   "Role-based access control",
-  "Export and API access",
-  "99.9% uptime guarantee",
+  "Per-seat pricing that scales with your team",
 ];
 
 export function BenefitsSection() {
@@ -37,10 +37,10 @@ export function BenefitsSection() {
             <span className="lp-section-label">Why OpsPick</span>
             <h2 className="lp-heading mt-4">
               Built for teams that{" "}
-              <span className="gradient-text">move fast</span>
+              <span className="gradient-text">run real-world operations</span>
             </h2>
             <p className="lp-body-lg mt-3 max-w-lg">
-              Stop juggling spreadsheets and scattered tools. One workspace for every project, sprint, and deliverable.
+              Stop juggling spreadsheets, WhatsApp groups, and paper checklists. One workspace for every site, every industry, every audit.
             </p>
             <ul className="mt-7 space-y-2.5">
               {CHECKLIST.map((item) => (

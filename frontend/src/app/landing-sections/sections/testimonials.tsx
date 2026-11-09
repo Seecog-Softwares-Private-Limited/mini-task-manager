@@ -2,25 +2,25 @@ import { SpotlightCard } from "./spotlight-card";
 
 const TESTIMONIALS = [
   {
-    quote: "OpsPick replaced three tools for us. Our sprint velocity improved 40% in the first month, and the team actually enjoys using it.",
-    name: "Sarah Chen",
-    role: "Engineering Lead",
-    company: "Northwind Labs",
-    initials: "SC",
+    quote: "OpsPick replaced our WhatsApp groups and paper checklists across 9 outlets. Our FSSAI audits used to take a day to prep — now it's one export.",
+    name: "Priya Nair",
+    role: "Operations Head",
+    company: "Spice Route Kitchens",
+    initials: "PN",
   },
   {
-    quote: "The automations alone save us hours every week. Moving a task to Done triggers notifications, updates, and time logging automatically.",
-    name: "Marcus Rivera",
-    role: "Product Manager",
-    company: "Globex Digital",
-    initials: "MR",
+    quote: "Every site supervisor logs snags the same way now. RERA evidence that used to take our PMO a week to compile is ready in minutes.",
+    name: "Arjun Mehta",
+    role: "Project Director",
+    company: "Horizon Builders",
+    initials: "AM",
   },
   {
-    quote: "Clean, fast, and no bloat. We evaluated Linear, Jira, and Asana — OpsPick hit the sweet spot for our startup's pace and budget.",
-    name: "Emily Watson",
-    role: "CEO",
-    company: "Acme Startup",
-    initials: "EW",
+    quote: "We run housekeeping and security across 22 client sites. OpsPick's SLA reports are the first thing we show clients every month.",
+    name: "Sana Qureshi",
+    role: "FM Operations Manager",
+    company: "Clearview Facilities",
+    initials: "SQ",
   },
 ];
 
@@ -30,8 +30,8 @@ export function TestimonialsSection() {
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <div className="lp-reveal mx-auto max-w-2xl text-center mb-14">
           <span className="lp-section-label">Testimonials</span>
-          <h2 className="lp-heading mt-4">Loved by teams everywhere</h2>
-          <p className="lp-body-lg mt-3">See why fast-moving teams choose OpsPick.</p>
+          <h2 className="lp-heading mt-4">Loved by operations teams everywhere</h2>
+          <p className="lp-body-lg mt-3">See why teams across industries run their day-to-day on OpsPick.</p>
         </div>
 
         <div className="grid md:grid-cols-3 gap-4">

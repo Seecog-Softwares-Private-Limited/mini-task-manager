@@ -6,9 +6,9 @@ export function FinalCtaSection() {
     <section className="lp-cta-section py-20 sm:py-28">
       <div className="mx-auto max-w-3xl px-6 lg:px-8 text-center">
         <div className="lp-reveal">
-          <h2 className="lp-heading">Ready to ship faster?</h2>
+          <h2 className="lp-heading">Ready to run operations your way?</h2>
           <p className="lp-body-lg mt-3 mx-auto max-w-lg">
-            Join teams using OpsPick to organize work, track progress, and deliver results — without the complexity.
+            Join teams across restaurants, construction sites, hospitals, and more running their day-to-day on OpsPick — in the language their team already speaks.
           </p>
 
           <div className="mt-7 flex flex-col sm:flex-row items-center justify-center gap-3">

@@ -110,8 +110,8 @@ export function PricingSection() {
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <div className="lp-reveal mx-auto max-w-2xl text-center mb-12">
           <span className="lp-section-label">Pricing</span>
-          <h2 className="lp-heading mt-4">Start free. Scale infinitely.</h2>
-          <p className="lp-body-lg mt-3">Transparent pricing that grows with your team.</p>
+          <h2 className="lp-heading mt-4">Start free. Scale across every site.</h2>
+          <p className="lp-body-lg mt-3">Per-seat pricing with every industry edition included.</p>
 
           <div className="mt-7 inline-flex items-center rounded-full border border-border bg-card p-1 shadow-sm" role="group" aria-label="Billing period">
             <button

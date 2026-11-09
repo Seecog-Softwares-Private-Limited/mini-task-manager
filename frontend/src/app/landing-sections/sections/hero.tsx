@@ -18,17 +18,17 @@ export function HeroSection() {
                 <span className="lp-eyebrow-dot">
                   <IconCheck className="h-3 w-3" />
                 </span>
-                Trusted by fast-moving teams
+                Built for 7 industries, out of the box
               </span>
             </div>
 
             <h1 className="lp-display lp-animate-in lp-delay-1 mt-5">
-              Project management{" "}
-              <span className="gradient-text">built for speed</span>
+              Operations management, tuned to{" "}
+              <span className="gradient-text">your industry</span>
             </h1>
 
             <p className="lp-body-lg lp-animate-in lp-delay-2 mt-5 max-w-lg mx-auto lg:mx-0">
-              Kanban boards, sprints, automations, and real-time collaboration — everything your team needs to ship faster.
+              From restaurant outlets to construction sites to hospital wards — OpsPick tracks tasks, issues, and compliance evidence in the language your team already speaks.
             </p>
 
             <div className="lp-animate-in lp-delay-3 mt-8 flex flex-col sm:flex-row items-center lg:items-start justify-center lg:justify-start gap-3">
@@ -42,7 +42,7 @@ export function HeroSection() {
             </div>
 
             <div className="lp-animate-in lp-delay-4 mt-7 flex flex-wrap items-center justify-center lg:justify-start gap-x-5 gap-y-2 text-sm text-muted-foreground">
-              {["Free forever plan", "Setup in 2 minutes", "Cancel anytime"].map((item) => (
+              {["Free forever plan", "7 industry editions", "Cancel anytime"].map((item) => (
                 <span key={item} className="flex items-center gap-1.5">
                   <IconCheck className="h-3.5 w-3.5 text-success" />
                   {item}

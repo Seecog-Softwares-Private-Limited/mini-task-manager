@@ -477,6 +477,7 @@ html.lp-active {
   display: flex;
   align-items: center;
   gap: 0.625rem;
+  max-width: 15rem;
   padding: 0.625rem 0.875rem;
   border-radius: calc(var(--radius) - 2px);
   border: 1px solid hsl(var(--border));
@@ -613,6 +614,79 @@ html.lp-active {
   height: 3px;
   border-radius: 999px 999px 0 0;
   background-image: linear-gradient(90deg, hsl(var(--gradient-start)), hsl(var(--gradient-end)));
+}
+
+/* ── Premium: industry switcher tabs (hero mockup) ── */
+.lp-root .lp-switcher-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+@media (min-width: 1024px) {
+  .lp-root .lp-switcher-tabs {
+    justify-content: flex-start;
+  }
+}
+
+.lp-root .lp-switcher-tab {
+  padding: 0.4375rem 0.875rem;
+  border-radius: 9999px;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--card) / 0.7);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  white-space: nowrap;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.lp-root .lp-switcher-tab:hover {
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--primary) / 0.3);
+}
+
+.lp-root .lp-switcher-tab.is-active {
+  background-image: linear-gradient(135deg, hsl(var(--gradient-start)), hsl(var(--gradient-end)));
+  border-color: transparent;
+  color: hsl(var(--primary-foreground));
+  box-shadow: 0 2px 8px hsl(var(--primary) / 0.25);
+}
+
+@keyframes lp-content-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.lp-root .lp-mockup-fade-content {
+  animation: lp-content-fade 0.4s ease;
+}
+
+/* ── Premium: industry badge (Industries section) ── */
+.lp-root .lp-industry-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.375rem 0.625rem;
+  border-radius: calc(var(--radius) - 4px);
+  background: hsl(var(--primary) / 0.12);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: hsl(var(--primary));
+}
+
+.lp-root .lp-industry-report {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding-top: 0.75rem;
+  margin-top: 0.75rem;
+  border-top: 1px solid hsl(var(--border) / 0.6);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
 }
 
 /* ── Premium: section divider ── */
