@@ -1,6 +1,6 @@
 /// <reference path="../../types/word-extractor.d.ts" />
 import * as mammoth from 'mammoth';
-import * as XLSX from 'xlsx';
+import * as ExcelJS from 'exceljs';
 import * as os from 'os';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -92,16 +92,47 @@ async function extractDocxHtml(buffer: Buffer): Promise<string | null> {
   }
 }
 
+/** Renders a single cell value to display text. ExcelJS cell.value can be a
+ * primitive, a Date, a formula result, rich text runs, a hyperlink, or an error. */
+function formatCellValue(value: ExcelJS.CellValue): string {
+  if (value == null) return '';
+  if (value instanceof Date) return value.toLocaleDateString();
+  if (typeof value === 'object') {
+    if ('richText' in value) {
+      return value.richText.map((run) => run.text).join('');
+    }
+    if ('text' in value) return String(value.text);
+    if ('result' in value) return formatCellValue(value.result as ExcelJS.CellValue);
+    if ('error' in value) return String(value.error);
+    return '';
+  }
+  return String(value);
+}
+
 async function extractSpreadsheetHtml(buffer: Buffer): Promise<string | null> {
   try {
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames[0];
-    if (!sheetName) return null;
-    const html = XLSX.utils.sheet_to_html(workbook.Sheets[sheetName], {
-      id: 'attachment-preview-sheet',
-      editable: false,
+    const workbook = new ExcelJS.Workbook();
+    // Only reads modern OOXML (.xlsx/.xlsm) — legacy binary .xls and
+    // OpenDocument .ods throw here and fall through to "no preview available",
+    // same as any other unparseable file (see renderOfficeDocumentPreview).
+    // Cast: exceljs's bundled .d.ts predates @types/node's generic Buffer<T>
+    // signature; the value is a plain Buffer at runtime either way.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await workbook.xlsx.load(buffer as any);
+    const worksheet = workbook.worksheets[0];
+    if (!worksheet || worksheet.rowCount === 0) return null;
+
+    const rowsHtml: string[] = [];
+    worksheet.eachRow((row) => {
+      const cellsHtml: string[] = [];
+      row.eachCell({ includeEmpty: true }, (cell) => {
+        cellsHtml.push(`<td>${escapeHtml(formatCellValue(cell.value))}</td>`);
+      });
+      rowsHtml.push(`<tr>${cellsHtml.join('')}</tr>`);
     });
-    return html.trim() || null;
+    if (!rowsHtml.length) return null;
+
+    return `<table id="attachment-preview-sheet" class="w-full border-collapse text-sm"><tbody>${rowsHtml.join('')}</tbody></table>`;
   } catch {
     return null;
   }
