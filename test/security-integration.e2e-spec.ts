@@ -254,6 +254,30 @@ describe('Security integration (tenant isolation, IDOR, users)', () => {
       await projectRepo.save(projectA);
       await projectRepo.save(projectB);
 
+      // Projects are PRIVATE: org role alone no longer grants access (only 'owner'
+      // bypasses membership — see ProjectsService.userCanAccessProject). Both seed
+      // users are org 'admin', not 'owner', so they need an explicit project grant
+      // for the "same-tenant access works" positive-control tests to exercise a
+      // realistic (non-owner) authorized user rather than accidentally testing
+      // tenant isolation alone.
+      const projectMemberRepo = manager.getRepository(ProjectMemberEntity);
+      await projectMemberRepo.save(
+        projectMemberRepo.create({
+          id: generateUuid(),
+          projectId: projectAId,
+          userId: userAId,
+          role: 'admin',
+        }),
+      );
+      await projectMemberRepo.save(
+        projectMemberRepo.create({
+          id: generateUuid(),
+          projectId: projectBId,
+          userId: userBId,
+          role: 'admin',
+        }),
+      );
+
       const taskAId = generateUuid();
       const taskA = taskRepo.create({
         id: taskAId,

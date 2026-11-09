@@ -148,12 +148,19 @@ export class TasksController {
     @Query() query: PaginationQueryDto,
     @Req() req: Request & { user?: { orgRole?: string } },
   ) {
-    await this.projectsService.assertUserCanAccessProject(
-      tenantId,
-      projectId,
-      userId,
-      req.user?.orgRole,
-    );
+    // Check org-scoped existence before membership: a project from another
+    // tenant must look empty, not 403 — tasksService.findByProject already
+    // returns an empty page for that case, so only assert membership once we
+    // know the project is actually in this org.
+    const project = await this.projectsService.findByIdInOrganization(projectId, tenantId);
+    if (project) {
+      await this.projectsService.assertUserCanAccessProject(
+        tenantId,
+        projectId,
+        userId,
+        req.user?.orgRole,
+      );
+    }
     return this.tasksService.findByProject(projectId, tenantId, query);
   }
 

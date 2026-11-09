@@ -200,6 +200,11 @@ export class ProjectsController {
     @TenantId() tenantId?: string,
     @CurrentUserId() userId?: string,
   ): Promise<ProjectResponseDto | null> {
+    // Check org-scoped existence before membership: a project from another tenant
+    // must look like it doesn't exist (null), not 403 — 403 would confirm the id
+    // is a real project just gated by membership, leaking cross-tenant existence.
+    const project = await this.projectsService.findByIdInOrganization(id, tenantId!);
+    if (!project) return null;
     const membership = userId
       ? await this.organizationsService.getMembership(tenantId!, userId)
       : null;
@@ -209,8 +214,6 @@ export class ProjectsController {
       userId!,
       membership?.role,
     );
-    const project = await this.projectsService.findByIdInOrganization(id, tenantId!);
-    if (!project) return null;
     return this.toResponse(project);
   }
 
