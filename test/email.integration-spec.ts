@@ -115,8 +115,14 @@ describe('EmailService (integration)', () => {
     expect(mail.html).toContain('/invite/token456');
     expect(mail.html).toContain(`href="${acceptUrl}"`);
     expect(mail.html).toContain('Accept Invitation');
-    expect(mail.html).toContain('display:inline-block');
-    expect(mail.html).not.toContain('display:block');
+    // The CTA button must be inline-block so Gmail/Outlook keep it clickable
+    // as a tappable button rather than a full-width block anchor. The email's
+    // logo <img> legitimately uses plain display:block (standard practice to
+    // avoid inline-image baseline gaps), so assert on the button's anchor tag
+    // specifically rather than the whole HTML body.
+    const buttonAnchor = mail.html.match(/<a href="[^"]*invite\/token456"[^>]*>/)?.[0];
+    expect(buttonAnchor).toContain('display:inline-block');
+    expect(buttonAnchor).not.toContain('display:block;');
     expect(mail.html).toContain('Not spam');
   });
 

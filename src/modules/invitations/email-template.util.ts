@@ -424,6 +424,10 @@ export function emailTaskAssignmentBody(params: TaskAssignmentTemplateParams): s
   const parentTaskRow = parentTaskTitle
     ? emailDetailRow('Parent task', parentTaskTitle)
     : '';
+  const descriptionText = taskDescription ? stripHtmlForEmail(taskDescription) : '';
+  const descriptionRow = descriptionText
+    ? emailDetailRow('Description', descriptionText, { preserveLineBreaks: true })
+    : '';
 
   return `
 <h1 style="font-size:26px;font-weight:700;text-align:center;margin:0 0 8px;color:${BRAND.text};letter-spacing:-0.02em;">
@@ -445,6 +449,7 @@ ${projectLine}
     ${emailDetailRow('Your email', assigneeEmail)}
     ${emailDetailRow('Due date', dueDateLabel)}
     ${emailDetailRow('Title', escapeHtml(taskTitle))}
+    ${descriptionRow}
     <tr>
       <td style="padding:12px 0;border-bottom:1px solid ${BRAND.cardBorder};vertical-align:top;width:132px;">
         <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:${BRAND.textLight};">
@@ -482,6 +487,9 @@ export function emailPlainTextTaskAssignment(params: TaskAssignmentTemplateParam
         .map((a) => `- ${a.fileName}${a.fileSize ? ` (${a.fileSize})` : ''}`)
         .join('\n')
     : 'No attachments';
+  const descriptionText = params.taskDescription
+    ? stripHtmlForEmail(params.taskDescription)
+    : '';
 
   return [
     `Hi ${params.assigneeName},`,
@@ -495,6 +503,7 @@ export function emailPlainTextTaskAssignment(params: TaskAssignmentTemplateParam
     `Your email: ${params.assigneeEmail}`,
     `Due date: ${params.dueDateLabel}`,
     `Title: ${params.taskTitle}`,
+    descriptionText ? `Description: ${descriptionText}` : '',
     '',
     'Subtasks:',
     subtasksText,
