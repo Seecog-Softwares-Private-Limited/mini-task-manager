@@ -66,7 +66,8 @@ describe("Logout and session expiry", () => {
     });
     cy.visit("/dashboard");
     cy.get("[data-cy=dashboard-page]", { timeout: 10000 }).should("be.visible");
-    cy.get("[data-cy=logout-button]").click();
+    cy.get("[data-cy=header-account-menu-trigger]").click();
+    cy.get("[data-cy=logout-button]").should("be.visible").click();
     cy.url({ timeout: 10000 }).should("include", "/login");
     cy.get("[data-cy=login-page]").should("be.visible");
   });

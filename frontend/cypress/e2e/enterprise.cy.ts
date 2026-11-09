@@ -22,6 +22,14 @@ describe("Audit log viewer", () => {
     cy.createProject({ name: `Audit E2E ${Date.now()}` }).then(() => {
       cy.visit("/dashboard/audit");
       cy.get("[data-cy=audit-log-page]", { timeout: 10000 }).should("be.visible");
+      // Retry the whole body (not a one-shot jQuery snapshot) until the async
+      // activity-logs fetch has settled into either state — avoids a race against
+      // the loading skeleton, which has neither the entries table nor the empty text.
+      cy.get("body", { timeout: 10000 }).should(($body) => {
+        const hasEntries = $body.find("[data-cy=audit-log-entries]").length > 0;
+        const hasEmptyState = $body.text().includes("No matching entries");
+        expect(hasEntries || hasEmptyState, "entries table or empty state").to.be.true;
+      });
       cy.get("body").then(($body) => {
         if ($body.find("[data-cy=audit-log-entries]").length > 0) {
           cy.get("[data-cy=audit-log-entries]").within(() => {
@@ -37,7 +45,7 @@ describe("Audit log viewer", () => {
   it("audit log page has filters and activity table or empty state", () => {
     cy.visit("/dashboard/audit");
     cy.get("[data-cy=audit-log-page]", { timeout: 10000 }).should("be.visible");
-    cy.contains("Audit log").should("be.visible");
+    cy.contains("Audit Log").should("be.visible");
     cy.contains("Activity").should("be.visible");
   });
 });
@@ -53,12 +61,12 @@ describe("System health widget", () => {
   it("dashboard shows system status widget for admin/owner", () => {
     cy.visit("/dashboard");
     cy.get("[data-cy=dashboard-page]", { timeout: 10000 }).should("be.visible");
-    cy.get("[data-cy=system-status-widget]", { timeout: 10000 }).should("be.visible");
+    cy.get("[data-cy=system-status-widget]", { timeout: 10000 }).scrollIntoView().should("be.visible");
   });
 
   it("system status widget shows health status (Operational or Unavailable)", () => {
     cy.visit("/dashboard");
-    cy.get("[data-cy=system-status-widget]", { timeout: 10000 }).should("be.visible");
+    cy.get("[data-cy=system-status-widget]", { timeout: 10000 }).scrollIntoView().should("be.visible");
     cy.get("[data-cy=health-status]", { timeout: 15000 }).should("be.visible");
     cy.get("[data-cy=health-status]").invoke("text").then((text) => {
       expect(text).to.match(/Operational|Unavailable|Checking/);
@@ -67,10 +75,10 @@ describe("System health widget", () => {
 
   it("system status card has health and last deployment info", () => {
     cy.visit("/dashboard");
-    cy.get("[data-cy=system-status-card]", { timeout: 10000 }).should("be.visible");
+    cy.get("[data-cy=system-status-card]", { timeout: 10000 }).scrollIntoView().should("be.visible");
     cy.get("[data-cy=system-status-card]").within(() => {
       cy.contains("Health").should("be.visible");
-      cy.contains("Last deployment").should("be.visible");
+      cy.contains("Last Deploy").should("be.visible");
     });
   });
 });

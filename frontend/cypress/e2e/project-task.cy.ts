@@ -28,8 +28,8 @@ describe("Project and task flow", () => {
           organizationId: oid,
           title: `Task ${Date.now()}`,
         }).then((task) => {
-          cy.visit(`/dashboard/projects/${project.id}`);
-          cy.get("[data-cy=task-card-" + task.id], { timeout: 15000 }).should("be.visible");
+          cy.visit(`/dashboard/projects/${project.id}/board`);
+          cy.get(`[data-cy=task-card-${task.id}]`, { timeout: 15000 }).should("be.visible");
         });
       });
     });
@@ -37,7 +37,7 @@ describe("Project and task flow", () => {
 
   it("navigates to project Kanban and sees at least one column", () => {
     cy.createProject({ name: `Columns E2E ${Date.now()}` }).then((project) => {
-      cy.visit(`/dashboard/projects/${project.id}`);
+      cy.visit(`/dashboard/projects/${project.id}/board`);
       cy.get("[data-cy^=kanban-column-]", { timeout: 15000 }).should("have.length.at.least", 1);
     });
   });

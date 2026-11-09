@@ -319,18 +319,20 @@ async function runSeed() {
     const planEntId = planEnt.id;
     console.log('  Plans: Free, Starter, Pro, Enterprise');
 
-    // 5. Subscription (org on Free)
+    // 5. Subscription (org on Enterprise — e2e suite exercises Enterprise-gated
+    // features like audit logs and relies on an unlimited project quota; Free's
+    // maxProjects:1 made the shared seed org hit its limit mid-suite).
     await subRepo.save(
       subRepo.create({
         id: generateUuid(),
         organizationId: orgId,
-        planId: planFreeId,
+        planId: planEntId,
         status: 'ACTIVE',
         startDate: new Date(),
         trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
       }),
     );
-    console.log('  Subscription: Seed Org on Free (trial)');
+    console.log('  Subscription: Seed Org on Enterprise (trial)');
 
     // 6. Project
     const projectId = generateUuid();

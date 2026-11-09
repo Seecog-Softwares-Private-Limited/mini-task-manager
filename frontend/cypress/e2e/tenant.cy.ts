@@ -24,9 +24,10 @@ describe("Tenant isolation", () => {
     cy.login({ email: getUserA().email, password: getUserA().password });
     cy.visit("/dashboard/projects");
     cy.get("[data-cy=projects-new-button]", { timeout: 10000 }).click();
+    cy.get("[data-cy=template-blank]", { timeout: 10000 }).click();
     cy.get("[data-cy=project-name-input]").type(projectName);
     cy.get("[data-cy=project-create-submit]").click();
-    cy.contains(projectName, { timeout: 10000 }).should("be.visible");
+    cy.contains(projectName, { timeout: 10000 }).scrollIntoView().should("be.visible");
 
     cy.logout();
     cy.login({ email: getUserB().email, password: getUserB().password });

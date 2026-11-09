@@ -39,7 +39,7 @@ describe("Billing access control", () => {
     });
     cy.visit("/dashboard");
     cy.get("[data-cy=dashboard-page]", { timeout: 10000 }).should("be.visible");
-    cy.get("[data-cy=nav-billing]", { timeout: 5000 }).should("be.visible");
+    cy.get("[data-cy=nav-billing]", { timeout: 5000 }).scrollIntoView().should("be.visible");
   });
 
   it("admin can open billing page", () => {
@@ -49,6 +49,6 @@ describe("Billing access control", () => {
     });
     cy.visit("/dashboard/billing");
     cy.url({ timeout: 10000 }).should("include", "/dashboard/billing");
-    cy.contains("Billing", { matchCase: false }).should("be.visible");
+    cy.get("main").contains("h1", "Billing", { matchCase: false }).should("be.visible");
   });
 });

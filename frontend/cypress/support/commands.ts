@@ -3,15 +3,24 @@
 const TOKEN_KEY = "mini_tm_token";
 const ORG_KEY = "mini_tm_org_id";
 const AUTH_COOKIE = "mini_tm_signed_in=1; path=/; max-age=604800; SameSite=Lax";
+const ONBOARDING_PREFIX = "mini_tm_onboarding_";
 
 export interface LoginOptions {
   email: string;
   password: string;
   orgId?: string;
+  /**
+   * The onboarding modal is gated by per-org localStorage, which Cypress resets
+   * between every test (testIsolation). Left on, it pops up fresh on every login
+   * and, as a fixed/modal overlay, blocks clicks on unrelated UI underneath it.
+   * Suppressed by default; onboarding.cy.ts passes `skipOnboarding: false` to
+   * exercise the real first-time flow.
+   */
+  skipOnboarding?: boolean;
 }
 
 Cypress.Commands.add("login", (options: LoginOptions) => {
-  const { email, password, orgId } = options;
+  const { email, password, orgId, skipOnboarding = true } = options;
   const resolvedOrgId = orgId ?? (Cypress.env("CYPRESS_TEST_ORG_ID") as string | undefined);
   const apiUrl = Cypress.env("apiUrl") as string;
   cy.request({
@@ -24,6 +33,12 @@ Cypress.Commands.add("login", (options: LoginOptions) => {
     cy.window().then((win) => {
       win.localStorage.setItem(TOKEN_KEY, token);
       if (resolvedOrgId) win.localStorage.setItem(ORG_KEY, resolvedOrgId);
+      if (resolvedOrgId && skipOnboarding) {
+        win.localStorage.setItem(
+          ONBOARDING_PREFIX + resolvedOrgId,
+          JSON.stringify({ skipped: true })
+        );
+      }
       win.document.cookie = AUTH_COOKIE;
     });
   });

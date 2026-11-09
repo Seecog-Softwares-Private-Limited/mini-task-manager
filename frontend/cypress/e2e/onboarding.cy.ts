@@ -15,6 +15,7 @@ describe("First-time onboarding", () => {
     cy.login({
       email: getTestUser().email,
       password: getTestUser().password,
+      skipOnboarding: false,
     });
   });
 
@@ -34,12 +35,13 @@ describe("First-time onboarding", () => {
   it("creates project from projects page and project appears in list", () => {
     cy.visit("/dashboard/projects");
     cy.get("[data-cy=projects-new-button]", { timeout: 10000 }).click();
+    cy.get("[data-cy=template-blank]", { timeout: 10000 }).click();
     cy.get("[data-cy=create-project-form]").should("be.visible");
     const name = `E2E Project ${Date.now()}`;
     cy.get("[data-cy=project-name-input]").type(name);
     cy.get("[data-cy=project-create-submit]").click();
 
-    cy.contains(name, { timeout: 10000 }).should("be.visible");
+    cy.contains(name, { timeout: 10000 }).scrollIntoView().should("be.visible");
   });
 
   it("onboarding progress updates after creating first project", () => {
