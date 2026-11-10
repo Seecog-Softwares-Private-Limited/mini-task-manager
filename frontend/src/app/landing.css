@@ -15,11 +15,15 @@ html.lp-active {
 
 /* ── Typography ── */
 .lp-root .lp-display {
-  font-size: clamp(2.375rem, 4.5vw, 3.75rem);
-  font-weight: 600;
-  letter-spacing: -0.035em;
-  line-height: 1.1;
+  font-size: clamp(2.75rem, 5.2vw, 4.5rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
   color: hsl(var(--foreground));
+}
+
+.lp-root .lp-display .gradient-text {
+  filter: drop-shadow(0 2px 24px hsl(var(--primary) / 0.25));
 }
 
 .lp-root .lp-heading {
@@ -45,14 +49,24 @@ html.lp-active {
 .lp-root .lp-section-label {
   display: inline-flex;
   align-items: center;
-  padding: 0.3125rem 0.75rem;
-  border-radius: calc(var(--radius) - 2px);
+  gap: 0.4375rem;
+  padding: 0.3125rem 0.75rem 0.3125rem 0.625rem;
+  border-radius: 9999px;
   background: hsl(var(--plan-pro-bg));
   font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.03em;
+  font-weight: 700;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
   color: hsl(var(--plan-pro-fg));
+}
+
+.lp-root .lp-section-label::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background-image: linear-gradient(135deg, hsl(var(--gradient-start)), hsl(var(--gradient-end)));
+  box-shadow: 0 0 8px hsl(var(--primary) / 0.6);
 }
 
 /* ── Buttons (match app Button / authPrimaryButtonClass) ── */
@@ -61,19 +75,26 @@ html.lp-active {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.6875rem 1.375rem;
+  padding: 0.75rem 1.5rem;
   border-radius: var(--radius);
   background-image: linear-gradient(135deg, hsl(var(--gradient-start)), hsl(var(--gradient-end)));
   color: hsl(var(--primary-foreground));
   font-size: 0.9375rem;
   font-weight: 600;
-  box-shadow: 0 4px 12px hsl(var(--primary) / 0.25);
-  transition: box-shadow 0.2s ease, filter 0.2s ease, transform 0.15s ease;
+  box-shadow:
+    0 1px 1px hsl(var(--primary) / 0.1) inset,
+    0 6px 16px -2px hsl(var(--primary) / 0.4),
+    0 16px 32px -8px hsl(var(--primary) / 0.3);
+  transition: box-shadow 0.25s ease, filter 0.2s ease, transform 0.15s ease;
 }
 
 .lp-root .lp-btn-primary:hover {
   filter: brightness(1.06);
-  box-shadow: 0 6px 20px hsl(var(--primary) / 0.32);
+  transform: translateY(-1px);
+  box-shadow:
+    0 1px 1px hsl(var(--primary) / 0.1) inset,
+    0 8px 20px -2px hsl(var(--primary) / 0.45),
+    0 20px 40px -8px hsl(var(--primary) / 0.35);
 }
 
 .lp-root .lp-btn-primary:active {
@@ -143,11 +164,11 @@ html.lp-active {
 }
 
 .lp-root .lp-card-interactive:hover {
-  transform: translateY(-2px);
-  border-color: hsl(var(--primary) / 0.25);
+  transform: translateY(-3px);
+  border-color: hsl(var(--primary) / 0.3);
   box-shadow:
     0 4px 12px rgba(0, 0, 0, 0.04),
-    0 8px 24px rgba(0, 0, 0, 0.06);
+    0 16px 32px -8px hsl(var(--primary) / 0.16);
 }
 
 /* ── Navbar (match auth-glass-panel) ── */
@@ -180,6 +201,22 @@ html.lp-active {
   background-size: 64px 64px;
   mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 20%, transparent 70%);
   -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 20%, transparent 70%);
+}
+
+/* ── Hero stats row ── */
+.lp-root .lp-hero-stats {
+  padding-top: 2.5rem;
+  border-top: 1px solid hsl(var(--border) / 0.7);
+}
+
+.lp-root .lp-hero-stat-value {
+  font-size: clamp(1.5rem, 2.4vw, 1.875rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background-image: linear-gradient(135deg, hsl(var(--gradient-start)), hsl(var(--gradient-end)));
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
 }
 
 /* ── Sections ── */
@@ -248,14 +285,28 @@ html.lp-active {
 
 /* ── Mockup ── */
 .lp-root .lp-mockup {
+  position: relative;
   border-radius: calc(var(--radius) + 4px);
   border: 1px solid hsl(var(--border));
   background: hsl(var(--card));
   box-shadow:
     0 2px 4px rgba(0, 0, 0, 0.04),
-    0 8px 24px rgba(0, 0, 0, 0.06),
-    0 24px 80px rgba(0, 0, 0, 0.08);
+    0 8px 24px rgba(0, 0, 0, 0.08),
+    0 32px 64px -12px hsl(var(--primary) / 0.22),
+    0 48px 96px -24px rgba(0, 0, 0, 0.18);
   overflow: hidden;
+  z-index: 1;
+}
+
+.lp-root .lp-mockup-tilt-wrap::before {
+  content: "";
+  position: absolute;
+  inset: 6% 2% -4% 2%;
+  background:
+    radial-gradient(ellipse 70% 60% at 50% 100%, hsl(var(--gradient-start) / 0.3), transparent 70%);
+  filter: blur(48px);
+  z-index: 0;
+  pointer-events: none;
 }
 
 .lp-root .lp-mockup-chrome {
@@ -475,6 +526,7 @@ html.lp-active {
 
 /* ── Premium: tilt-enabled mockup wrapper ── */
 .lp-root .lp-mockup-tilt-wrap {
+  position: relative;
   perspective: 1200px;
 }
 

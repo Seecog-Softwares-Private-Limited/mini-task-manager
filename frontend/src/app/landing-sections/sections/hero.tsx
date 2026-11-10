@@ -56,6 +56,20 @@ export function HeroSection() {
             <HeroMockup />
           </div>
         </div>
+
+        <div className="lp-animate-in lp-delay-5 lp-hero-stats mt-16 sm:mt-20 grid grid-cols-2 sm:grid-cols-4 gap-6 sm:gap-8">
+          {[
+            { value: "7", label: "Industry editions" },
+            { value: "<2 min", label: "To your first site live" },
+            { value: "24/7", label: "Compliance evidence, ready" },
+            { value: "₹0", label: "To start, forever" },
+          ].map((stat) => (
+            <div key={stat.label} className="text-center lg:text-left">
+              <p className="lp-hero-stat-value">{stat.value}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{stat.label}</p>
+            </div>
+          ))}
+        </div>
       </div>
     </section>
   );
