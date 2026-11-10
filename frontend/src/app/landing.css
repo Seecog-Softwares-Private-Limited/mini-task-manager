@@ -167,6 +167,8 @@ html.lp-active {
 /* ── Hero (match auth-sky-wash tones) ── */
 .lp-root .lp-hero-bg {
   background:
+    radial-gradient(ellipse 55% 40% at 18% -8%, hsl(var(--gradient-start) / 0.1) 0%, transparent 60%),
+    radial-gradient(ellipse 55% 40% at 85% 0%, hsl(var(--gradient-end) / 0.09) 0%, transparent 60%),
     radial-gradient(ellipse 60% 45% at 50% -5%, hsl(var(--primary) / 0.08) 0%, transparent 65%),
     linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--muted) / 0.35) 100%);
 }
@@ -456,6 +458,16 @@ html.lp-active {
   animation: lp-orb-float 16s ease-in-out infinite reverse;
 }
 
+.lp-root .lp-orb-3 {
+  bottom: -10rem;
+  left: 38%;
+  width: 28rem;
+  height: 28rem;
+  background: radial-gradient(circle, rgb(245 158 11 / 0.14), transparent 70%);
+  animation: lp-orb-float 20s ease-in-out infinite;
+  animation-delay: -4s;
+}
+
 @keyframes lp-orb-float {
   0%, 100% { transform: translate(0, 0) scale(1); }
   50% { transform: translate(2rem, 1.5rem) scale(1.08); }
@@ -705,6 +717,7 @@ html.lp-active {
   }
   .lp-root .lp-orb-1,
   .lp-root .lp-orb-2,
+  .lp-root .lp-orb-3,
   .lp-root .lp-float-card-1,
   .lp-root .lp-float-card-2 {
     animation: none !important;

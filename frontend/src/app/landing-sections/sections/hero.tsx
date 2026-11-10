@@ -8,6 +8,7 @@ export function HeroSection() {
       <div className="absolute inset-0 lp-grid-bg pointer-events-none" aria-hidden />
       <div className="lp-orb lp-orb-1" aria-hidden />
       <div className="lp-orb lp-orb-2" aria-hidden />
+      <div className="lp-orb lp-orb-3" aria-hidden />
       <div className="lp-grain" aria-hidden />
 
       <div className="relative mx-auto max-w-6xl px-6 lg:px-8 pt-28 pb-20 sm:pt-32 sm:pb-24 lg:pt-36">
