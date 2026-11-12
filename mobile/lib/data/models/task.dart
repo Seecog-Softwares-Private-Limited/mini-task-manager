@@ -253,6 +253,7 @@ class Task {
     this.recurrenceType,
     this.recurrenceSequence,
     this.requireLocation = false,
+    this.epicId,
   });
 
   final String id;
@@ -279,6 +280,7 @@ class Task {
   final bool requireLocation;
   final String createdAt;
   final String updatedAt;
+  final String? epicId;
 
   int get completedSubtasks => subtasks.where((s) => s.completed).length;
 
@@ -312,6 +314,7 @@ class Task {
       requireLocation: json['requireLocation'] == true,
       createdAt: _nullableDateString(json['createdAt']) ?? '',
       updatedAt: _nullableDateString(json['updatedAt']) ?? '',
+      epicId: _nullableString(json['epicId']),
     );
   }
 
@@ -330,6 +333,8 @@ class Task {
     String? updatedBy,
     String? assigneesUpdatedAt,
     String? updatedAt,
+    String? epicId,
+    bool clearEpicId = false,
   }) {
     return Task(
       id: id,
@@ -356,6 +361,7 @@ class Task {
       requireLocation: requireLocation ?? this.requireLocation,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      epicId: clearEpicId ? null : (epicId ?? this.epicId),
     );
   }
 }

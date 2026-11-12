@@ -7,11 +7,13 @@ import 'package:intl/intl.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/api_exception.dart';
+import '../../core/constants/epic_colors.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/utils/client_id.dart';
 import '../../core/utils/html_plain_text.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../data/models/subtask_completion_record.dart';
+import '../../data/models/epic.dart';
 import '../../data/models/project_member.dart';
 import '../../data/models/task.dart';
 import '../../data/models/task_attachment.dart';
@@ -20,6 +22,8 @@ import '../../data/repositories/attachments_repository.dart';
 import '../../data/models/workflow.dart';
 import '../../shared/widgets/user_avatar.dart';
 import '../auth/session_controller.dart';
+import '../epics/epic_picker_sheet.dart';
+import '../epics/epic_providers.dart';
 import '../kanban/kanban_providers.dart';
 import '../projects/projects_providers.dart';
 import '../recurring/recurring_actions.dart';
@@ -438,6 +442,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     List<String>? assigneeIds,
     List<TaskSubtask>? subtasks,
     bool? requireLocation,
+    String? epicId,
+    bool clearEpicId = false,
   }) async {
     await _run(() => ref.read(tasksRepositoryProvider).updateTask(
           taskId: _task.id,
@@ -453,6 +459,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
           assigneeIds: assigneeIds,
           subtasks: subtasks,
           requireLocation: requireLocation,
+          epicId: epicId,
+          clearEpicId: clearEpicId,
         ));
   }
 
@@ -1492,6 +1500,16 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                     onAttachmentsChanged: (items) => setState(() => _attachments = items),
                   ),
                 ),
+                const SizedBox(height: AppSpacing.sm),
+                _EpicFieldRow(
+                  organizationId: orgId,
+                  projectId: widget.projectId,
+                  epicId: _task.epicId,
+                  enabled: canEditWorkflowFields && !_saving,
+                  onChanged: (epicId) => epicId == null
+                      ? _patchTask(clearEpicId: true)
+                      : _patchTask(epicId: epicId),
+                ),
               ],
               if (canEditSubtasks || _subtasks.isNotEmpty || isRunChecklist) ...[
                 if (!isRunChecklist) ...[
@@ -2447,6 +2465,87 @@ class _StatusDot extends StatelessWidget {
         color: color,
         shape: BoxShape.circle,
       ),
+    );
+  }
+}
+
+class _EpicFieldRow extends ConsumerWidget {
+  const _EpicFieldRow({
+    required this.organizationId,
+    required this.projectId,
+    required this.epicId,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final String organizationId;
+  final String projectId;
+  final String? epicId;
+  final bool enabled;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final epicsAsync = ref.watch(epicsForProjectProvider(projectId));
+    return epicsAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (epics) {
+        Epic? selected;
+        for (final epic in epics) {
+          if (epic.id == epicId) {
+            selected = epic;
+            break;
+          }
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _FieldLabel(text: 'Epic'),
+            const SizedBox(height: 4),
+            InkWell(
+              onTap: enabled
+                  ? () => showEpicPickerSheet(
+                        context: context,
+                        epics: epics,
+                        selectedEpicId: epicId,
+                        onSelected: onChanged,
+                      )
+                  : null,
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Row(
+                  children: [
+                    if (selected != null) ...[
+                      _StatusDot(color: parseEpicColor(selected.color)),
+                      const SizedBox(width: 8),
+                    ],
+                    Expanded(
+                      child: Text(
+                        selected?.title ?? 'None',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: selected == null ? AppColors.textMuted : null,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: AppColors.textMuted.withValues(alpha: 0.8),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

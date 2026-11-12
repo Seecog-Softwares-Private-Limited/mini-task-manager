@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/api/api_exception.dart';
+import '../models/industry_option.dart';
 import '../models/organization.dart';
 import '../models/project_member.dart';
 
@@ -56,6 +57,7 @@ class OrganizationsRepository {
     required String name,
     String? slug,
     String? logoUrl,
+    String? industry,
   }) async {
     try {
       final response = await _api.dio.post<Map<String, dynamic>>(
@@ -64,9 +66,25 @@ class OrganizationsRepository {
           'name': name.trim(),
           if (slug != null && slug.trim().isNotEmpty) 'slug': slug.trim().toLowerCase(),
           if (logoUrl != null && logoUrl.isNotEmpty) 'logoUrl': logoUrl,
+          if (industry != null && industry.isNotEmpty) 'industry': industry,
         },
       );
       return Organization.fromJson(response.data!);
+    } on DioException catch (error) {
+      throw ApiException.fromDio(error);
+    }
+  }
+
+  /// The industry editions offered at workspace-creation time. Static list,
+  /// safe to cache for the session.
+  Future<List<IndustryOption>> fetchIndustries() async {
+    try {
+      final response = await _api.dio.get<List<dynamic>>('/organizations/industries');
+      final list = response.data ?? const [];
+      return list
+          .whereType<Map<String, dynamic>>()
+          .map(IndustryOption.fromJson)
+          .toList();
     } on DioException catch (error) {
       throw ApiException.fromDio(error);
     }

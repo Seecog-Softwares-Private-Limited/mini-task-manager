@@ -8,6 +8,8 @@ import '../../core/theme/app_spacing.dart';
 import '../../data/models/organization.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../auth/session_controller.dart';
+import 'industry_picker.dart';
+import 'industry_providers.dart';
 import 'workspace_icon_picker.dart';
 
 class CreateWorkspaceSheet extends ConsumerStatefulWidget {
@@ -26,6 +28,7 @@ class _CreateWorkspaceSheetState extends ConsumerState<CreateWorkspaceSheet> {
   final _nameController = TextEditingController();
 
   String? _logoPreview = kDefaultWorkspaceAvatar.dataUrl;
+  String? _selectedIndustry;
   bool _loading = false;
   String? _error;
 
@@ -52,6 +55,7 @@ class _CreateWorkspaceSheetState extends ConsumerState<CreateWorkspaceSheet> {
       final org = await ref.read(sessionControllerProvider.notifier).createWorkspace(
             name: name,
             logoUrl: resolveWorkspaceLogoUrl(_logoPreview),
+            industry: _selectedIndustry,
           );
       widget.onCreated(org);
       if (mounted) Navigator.of(context).pop();
@@ -124,6 +128,33 @@ class _CreateWorkspaceSheetState extends ConsumerState<CreateWorkspaceSheet> {
                   hintText: 'Workspace name',
                 ),
                 onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              Text(
+                'INDUSTRY',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: AppColors.textMuted,
+                      letterSpacing: 0.8,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: AppSpacing.xs),
+              Consumer(
+                builder: (context, ref, _) {
+                  final industriesAsync = ref.watch(industriesProvider);
+                  return industriesAsync.when(
+                    data: (options) => IndustryPicker(
+                      options: options,
+                      value: _selectedIndustry,
+                      onSelect: (key) => setState(() => _selectedIndustry = key),
+                    ),
+                    loading: () => const SizedBox(
+                      height: 72,
+                      child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                    ),
+                    error: (_, __) => const SizedBox.shrink(),
+                  );
+                },
               ),
               if (_error != null) ...[
                 const SizedBox(height: AppSpacing.sm),

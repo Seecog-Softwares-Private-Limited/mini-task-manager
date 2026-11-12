@@ -168,6 +168,8 @@ class TasksRepository {
     List<String>? tags,
     List<TaskSubtask>? subtasks,
     bool? requireLocation,
+    String? epicId,
+    bool clearEpicId = false,
   }) async {
     final omitSubtaskKeys = <String>{};
     DioException? lastError;
@@ -187,6 +189,8 @@ class TasksRepository {
           tags: tags,
           subtasks: subtasks,
           requireLocation: requireLocation,
+          epicId: epicId,
+          clearEpicId: clearEpicId,
           omitSubtaskKeys: omitSubtaskKeys,
         );
         final response = await _api.dio.patch<dynamic>(
@@ -276,6 +280,8 @@ class TasksRepository {
     List<String>? tags,
     List<TaskSubtask>? subtasks,
     bool? requireLocation,
+    String? epicId,
+    bool clearEpicId = false,
     Set<String> omitSubtaskKeys = const {},
   }) {
     final data = <String, dynamic>{};
@@ -285,6 +291,11 @@ class TasksRepository {
     if (assigneeIds != null) data['assigneeIds'] = assigneeIds;
     if (priority != null) data['priority'] = priority.toUpperCase();
     if (requireLocation != null) data['requireLocation'] = requireLocation;
+    if (clearEpicId) {
+      data['epicId'] = null;
+    } else if (epicId != null) {
+      data['epicId'] = epicId;
+    }
     if (clearDueDate) {
       data['dueDate'] = null;
       data['dueTime'] = null;

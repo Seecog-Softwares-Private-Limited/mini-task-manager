@@ -19,15 +19,19 @@ import '../recurring/recurring_actions.dart';
 import '../recurring/recurring_editor_sheet.dart';
 import '../recurring/recurring_providers.dart';
 import '../recurring/recurring_screen.dart';
+import '../epics/create_edit_epic_sheet.dart';
+import '../epics/epic_providers.dart';
+import '../epics/epics_list_section.dart';
 import 'create_task_sheet.dart';
 import 'kanban_providers.dart';
 import 'project_switcher.dart';
 import 'task_detail_sheet.dart';
 
-/// Standalone Projects board section capsules (Tasks / Recurring / Notes).
+/// Standalone Projects board section capsules (Tasks / Recurring / Notes / Epics).
 const int _kProjectBoardSectionTasks = 0;
 const int _kProjectBoardSectionRecurring = 1;
 const int _kProjectBoardSectionNotes = 2;
+const int _kProjectBoardSectionEpics = 3;
 
 class ProjectBoardScreen extends ConsumerStatefulWidget {
   const ProjectBoardScreen({
@@ -97,6 +101,9 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
   bool get _showNotesSection =>
       !widget.embedded && _sectionIndex == _kProjectBoardSectionNotes;
 
+  bool get _showEpicsSection =>
+      !widget.embedded && _sectionIndex == _kProjectBoardSectionEpics;
+
   bool get _showTasksSection =>
       widget.embedded || _sectionIndex == _kProjectBoardSectionTasks;
 
@@ -114,6 +121,16 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
         return const RecurringScreen(hideProjectDropdown: true);
       case _kProjectBoardSectionNotes:
         return _notesPlaceholder;
+      case _kProjectBoardSectionEpics:
+        final orgId = ref.read(sessionControllerProvider).orgId;
+        if (orgId == null || orgId.isEmpty) {
+          return const EmptyState(
+            title: 'Epics unavailable',
+            message: 'No workspace selected.',
+            icon: Icons.flag_outlined,
+          );
+        }
+        return EpicsListSection(organizationId: orgId, projectId: widget.projectId);
       case _kProjectBoardSectionTasks:
       default:
         return tasksChild;
@@ -347,7 +364,14 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
                       label: 'Add planner',
                       onPressed: _openCreatePlanner,
                     ))
-              : !_showTasksSection
+              : _showEpicsSection
+                  ? (orgId == null
+                      ? null
+                      : _BoardActionFab(
+                          label: 'Add epic',
+                          onPressed: () => _openCreateEpic(context, orgId),
+                        ))
+                  : !_showTasksSection
                   ? null
                   : boardAsync.maybeWhen(
                       data: (board) => orgId == null || board.statuses.isEmpty
@@ -391,6 +415,15 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
           ),
         );
       },
+    );
+  }
+
+  Future<void> _openCreateEpic(BuildContext context, String orgId) async {
+    await showCreateEditEpicSheet(
+      context: context,
+      organizationId: orgId,
+      projectId: widget.projectId,
+      onSaved: () => ref.invalidate(epicsForProjectProvider(widget.projectId)),
     );
   }
 
@@ -638,7 +671,7 @@ class _ProjectBoardSectionTabs extends StatelessWidget {
     required this.onChanged,
   });
 
-  static const _labels = ['Tasks', 'Recurring', 'Notes'];
+  static const _labels = ['Tasks', 'Recurring', 'Notes', 'Epics'];
 
   final int selectedIndex;
   final ValueChanged<int> onChanged;

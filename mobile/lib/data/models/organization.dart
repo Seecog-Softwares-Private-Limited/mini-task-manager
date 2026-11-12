@@ -9,6 +9,7 @@ class Organization extends Equatable {
     this.logoUrl,
     this.myRole,
     this.isArchived = false,
+    this.industry,
   });
 
   final String id;
@@ -18,6 +19,7 @@ class Organization extends Equatable {
   final String? logoUrl;
   final String? myRole;
   final bool isArchived;
+  final String? industry;
 
   factory Organization.fromJson(Map<String, dynamic> json) {
     return Organization(
@@ -28,9 +30,11 @@ class Organization extends Equatable {
       logoUrl: json['logoUrl'] as String?,
       myRole: json['myRole'] as String?,
       isArchived: json['isArchived'] as bool? ?? false,
+      industry: json['industry'] as String?,
     );
   }
 
   @override
-  List<Object?> get props => [id, name, slug, ownerId, logoUrl, myRole, isArchived];
+  List<Object?> get props =>
+      [id, name, slug, ownerId, logoUrl, myRole, isArchived, industry];
 }

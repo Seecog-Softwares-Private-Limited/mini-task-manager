@@ -337,11 +337,13 @@ class SessionController extends Notifier<SessionState> {
     required String name,
     String? slug,
     String? logoUrl,
+    String? industry,
   }) async {
     final org = await _organizationsRepository.createOrganization(
       name: name,
       slug: slug,
       logoUrl: logoUrl,
+      industry: industry,
     );
     final organizations = await _organizationsRepository.fetchOrganizations();
     await selectOrganization(org.id);
