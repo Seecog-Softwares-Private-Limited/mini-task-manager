@@ -464,39 +464,38 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+      child: SurfaceCard(
+        padding: const EdgeInsets.all(AppSpacing.sm),
         onTap: onTap,
-        child: Ink(
-          padding: const EdgeInsets.all(AppSpacing.sm),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withValues(alpha: 0.18)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, size: 18, color: color),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                value,
-                style: Theme.of(context)
-                    .textTheme
-                    .headlineSmall
-                    ?.copyWith(color: color, fontWeight: FontWeight.w800),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
               ),
-              Text(
-                label,
-                style: Theme.of(context)
-                    .textTheme
-                    .labelMedium
-                    ?.copyWith(color: AppColors.textSecondary),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
+              child: Icon(icon, size: 16, color: color),
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              value,
+              style: Theme.of(context)
+                  .textTheme
+                  .headlineSmall
+                  ?.copyWith(color: AppColors.textPrimary, fontWeight: FontWeight.w800),
+            ),
+            Text(
+              label,
+              style: Theme.of(context)
+                  .textTheme
+                  .labelMedium
+                  ?.copyWith(color: AppColors.textSecondary),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ),
       ),
     );
