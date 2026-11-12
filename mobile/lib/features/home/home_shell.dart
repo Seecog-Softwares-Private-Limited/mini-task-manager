@@ -40,11 +40,25 @@ class HomeShell extends ConsumerStatefulWidget {
   ConsumerState<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserver {
+class _HomeShellState extends ConsumerState<HomeShell>
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   int _index = 0;
   final Set<int> _mountedTabs = {0};
   bool _enableUnreadBadge = false;
   bool _openingPushDeepLink = false;
+
+  // Short fade on tab switch — the IndexedStack/pages themselves never get
+  // disposed/recreated, so each tab's scroll position and in-progress state
+  // survive the transition; only the painted opacity dips briefly.
+  late final AnimationController _tabFadeController = AnimationController(
+    vsync: this,
+    value: 1,
+    duration: const Duration(milliseconds: 60),
+  );
+  late final Animation<double> _tabFade = CurvedAnimation(
+    parent: _tabFadeController,
+    curve: Curves.easeOut,
+  );
 
   @override
   void initState() {
@@ -88,6 +102,7 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _tabFadeController.dispose();
     super.dispose();
   }
 
@@ -101,7 +116,8 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
   }
 
   void _selectTab(int value, {MyWorkFilter? tasksFilter}) {
-    if (value != _index) HapticFeedback.selectionClick();
+    final changingTab = value != _index;
+    if (changingTab) HapticFeedback.selectionClick();
     if (value == kTasksTabIndex && tasksFilter != null) {
       ref.read(myWorkFilterProvider.notifier).state = tasksFilter;
     }
@@ -112,10 +128,26 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
     if (leavingTasksRecurring) {
       ref.read(recurringFabHiddenProvider.notifier).state = false;
     }
-    setState(() {
-      _mountedTabs.add(value);
-      _index = value;
-    });
+
+    void applyIndex() {
+      setState(() {
+        _mountedTabs.add(value);
+        _index = value;
+      });
+    }
+
+    if (!changingTab) {
+      applyIndex();
+      return;
+    }
+    unawaited(_fadeToTab(applyIndex));
+  }
+
+  Future<void> _fadeToTab(VoidCallback applyIndex) async {
+    await _tabFadeController.animateTo(0, curve: Curves.easeIn);
+    if (!mounted) return;
+    applyIndex();
+    await _tabFadeController.animateTo(1, curve: Curves.easeOut);
   }
 
   Future<void> _openWorkspaceSwitcher() async {
@@ -314,7 +346,10 @@ class _HomeShellState extends ConsumerState<HomeShell> with WidgetsBindingObserv
           ),
         ),
       ),
-      body: IndexedStack(index: _index, children: pages),
+      body: FadeTransition(
+        opacity: _tabFade,
+        child: IndexedStack(index: _index, children: pages),
+      ),
       floatingActionButton: _fabForTab(
         onTasksRecurringTab: onTasksRecurringTab,
       ),

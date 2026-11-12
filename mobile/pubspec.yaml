@@ -40,6 +40,7 @@ dependencies:
   in_app_purchase: ^3.2.3
   url_launcher: ^6.3.1
   flutter_colorpicker: ^1.1.0
+  flutter_animate: ^4.5.2
 
 dev_dependencies:
   flutter_test:
@@ -50,3 +51,20 @@ flutter:
   uses-material-design: true
   assets:
     - assets/branding/
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter.ttf
+          weight: 400
+        - asset: assets/fonts/Inter.ttf
+          weight: 500
+        - asset: assets/fonts/Inter.ttf
+          weight: 600
+        - asset: assets/fonts/Inter.ttf
+          weight: 700
+    - family: Manrope
+      fonts:
+        - asset: assets/fonts/Manrope.ttf
+          weight: 700
+        - asset: assets/fonts/Manrope.ttf
+          weight: 800

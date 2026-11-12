@@ -1,9 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_shadows.dart';
 import '../../core/theme/app_spacing.dart';
 
-class PrimaryButton extends StatelessWidget {
+/// A short, staggered fade+rise for list items as they first populate —
+/// e.g. `SurfaceCard(...).staggered(index)` inside a ListView itemBuilder.
+/// Delay is capped so long lists don't take ages to finish animating in.
+extension StaggeredListAnimation on Widget {
+  Widget staggered(
+    int index, {
+    Duration step = const Duration(milliseconds: 30),
+    Duration cap = const Duration(milliseconds: 240),
+  }) {
+    final delayMs = (step.inMilliseconds * index).clamp(0, cap.inMilliseconds);
+    return animate(delay: Duration(milliseconds: delayMs))
+        .fadeIn(duration: 200.ms)
+        .slideY(begin: 0.05, end: 0, curve: Curves.easeOut);
+  }
+}
+
+class PrimaryButton extends StatefulWidget {
   const PrimaryButton({
     super.key,
     required this.label,
@@ -22,10 +40,22 @@ class PrimaryButton extends StatelessWidget {
   final double borderRadius;
 
   @override
+  State<PrimaryButton> createState() => _PrimaryButtonState();
+}
+
+class _PrimaryButtonState extends State<PrimaryButton> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed == value) return;
+    setState(() => _pressed = value);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final enabled = !loading && onPressed != null;
-    final radius = BorderRadius.circular(borderRadius);
-    final child = loading
+    final enabled = !widget.loading && widget.onPressed != null;
+    final radius = BorderRadius.circular(widget.borderRadius);
+    final child = widget.loading
         ? SizedBox(
             width: 20,
             height: 20,
@@ -35,7 +65,7 @@ class PrimaryButton extends StatelessWidget {
             ),
           )
         : Text(
-            label,
+            widget.label,
             style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w600,
@@ -64,15 +94,20 @@ class PrimaryButton extends StatelessWidget {
         child: Material(
           color: Colors.transparent,
           borderRadius: radius,
-          child: InkWell(
-            onTap: enabled ? onPressed : null,
-            borderRadius: radius,
-            child: SizedBox(
-              height: height,
-              width: expand ? double.infinity : null,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Center(child: child),
+          child: Listener(
+            onPointerDown: enabled ? (_) => _setPressed(true) : null,
+            onPointerUp: enabled ? (_) => _setPressed(false) : null,
+            onPointerCancel: enabled ? (_) => _setPressed(false) : null,
+            child: InkWell(
+              onTap: enabled ? widget.onPressed : null,
+              borderRadius: radius,
+              child: SizedBox(
+                height: widget.height,
+                width: widget.expand ? double.infinity : null,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Center(child: child),
+                ),
               ),
             ),
           ),
@@ -80,8 +115,15 @@ class PrimaryButton extends StatelessWidget {
       ),
     );
 
-    if (!expand) return button;
-    return SizedBox(width: double.infinity, child: button);
+    final scaled = AnimatedScale(
+      scale: _pressed ? 0.98 : 1.0,
+      duration: const Duration(milliseconds: 100),
+      curve: Curves.easeOut,
+      child: button,
+    );
+
+    if (!widget.expand) return scaled;
+    return SizedBox(width: double.infinity, child: scaled);
   }
 }
 
@@ -104,9 +146,10 @@ class SecondaryButton extends StatelessWidget {
       style: OutlinedButton.styleFrom(
         minimumSize: const Size(0, 48),
         side: const BorderSide(color: AppColors.border),
+        overlayColor: AppColors.primary.withValues(alpha: 0.08),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
-      child: Text(label),
+      child: Text(label, style: Theme.of(context).textTheme.labelLarge),
     );
 
     if (!expand) return button;
@@ -128,15 +171,31 @@ class SurfaceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final card = Card(
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final card = DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.cardTheme.color ?? theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        border: isDark
+            ? Border.all(color: AppColors.darkBorder)
+            : null,
+        boxShadow: AppShadows.cardFor(theme.brightness),
+      ),
       child: Padding(padding: padding, child: child),
     );
 
     if (onTap == null) return card;
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: onTap,
-      child: card,
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+        onTap: onTap,
+        child: card,
+      ),
     );
   }
 }
@@ -173,11 +232,17 @@ class EmptyState extends StatelessWidget {
           ],
         ),
       ),
-    );
+    ).animate().fadeIn(duration: 250.ms).scale(
+          begin: const Offset(0.96, 0.96),
+          curve: Curves.easeOut,
+        );
   }
 }
 
-class ShimmerBox extends StatelessWidget {
+/// A placeholder box with a real animated shimmer sweep (ShaderMask +
+/// AnimationController), used while content is loading. Pauses when the app
+/// is backgrounded so it doesn't burn CPU/battery off-screen.
+class ShimmerBox extends StatefulWidget {
   const ShimmerBox({super.key, this.height = 16, this.width, this.radius = 12});
 
   final double height;
@@ -185,14 +250,70 @@ class ShimmerBox extends StatelessWidget {
   final double radius;
 
   @override
+  State<ShimmerBox> createState() => _ShimmerBoxState();
+}
+
+class _ShimmerBoxState extends State<ShimmerBox>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  )..repeat();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (!_controller.isAnimating) _controller.repeat();
+    } else {
+      _controller.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: AppColors.border.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(radius),
-      ),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final base = isDark ? AppColors.darkBorder : AppColors.border;
+    final sweep = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : Colors.white.withValues(alpha: 0.9);
+
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        return ShaderMask(
+          blendMode: BlendMode.srcATop,
+          shaderCallback: (bounds) {
+            final t = _controller.value;
+            return LinearGradient(
+              colors: [base.withValues(alpha: 0.55), sweep, base.withValues(alpha: 0.55)],
+              stops: const [0.35, 0.5, 0.65],
+              begin: Alignment(-1.0 - t * 2, 0),
+              end: Alignment(1.0 - t * 2, 0),
+            ).createShader(bounds);
+          },
+          child: Container(
+            width: widget.width,
+            height: widget.height,
+            decoration: BoxDecoration(
+              color: base.withValues(alpha: 0.55),
+              borderRadius: BorderRadius.circular(widget.radius),
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -219,7 +340,7 @@ class StatusChip extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(color: color),
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(color: color),
       ),
     );
   }

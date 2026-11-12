@@ -93,7 +93,7 @@ class NotificationsScreen extends ConsumerWidget {
                     ),
                   ],
                 ),
-              );
+              ).staggered(index - 1);
             },
           ),
         );

@@ -608,7 +608,7 @@ class _DueTodayTabsState extends State<_DueTodayTabs>
                     return HomeDueItemCard(
                       item: item,
                       onTap: () => widget.onOpenItem(item),
-                    );
+                    ).staggered(index);
                   },
                 ),
               ),

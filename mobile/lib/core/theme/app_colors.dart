@@ -28,4 +28,14 @@ abstract final class AppColors {
   static const danger = Color(0xFFE11D48);
   static const dangerSoft = Color(0xFFFFE4E6);
   static const warning = Color(0xFFD97706);
+  static const warningSoft = Color(0xFFFEF3C7);
+  static const info = Color(0xFF0369A1);
+  static const infoSoft = Color(0xFFE0F2FE);
+
+  /// Dark-theme surface tokens — named here (rather than left as locals
+  /// inside AppTheme.dark()) so they're reusable by other dark-mode-aware
+  /// widgets, e.g. SurfaceCard's elevation treatment.
+  static const darkBackground = Color(0xFF0F172A);
+  static const darkSurface = Color(0xFF1E293B);
+  static const darkBorder = Color(0xFF334155);
 }
