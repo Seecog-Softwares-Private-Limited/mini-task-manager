@@ -130,7 +130,8 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
             icon: Icons.flag_outlined,
           );
         }
-        return EpicsListSection(organizationId: orgId, projectId: widget.projectId);
+        return EpicsListSection(
+            organizationId: orgId, projectId: widget.projectId);
       case _kProjectBoardSectionTasks:
       default:
         return tasksChild;
@@ -144,7 +145,8 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
     if (!canManageRecurring(ref)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Only workspace owners and admins can create planners.'),
+          content:
+              Text('Only workspace owners and admins can create planners.'),
         ),
       );
       return;
@@ -174,16 +176,20 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
     final orgId = session.orgId;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final allProjects = isAllProjectsSelection(widget.projectId);
-    final hidePlannerFab = ref.watch(recurringFabHiddenProvider);
+    // Only the Series list (index 1) scrolls its cards clear of the FAB;
+    // Calendar and Insights have no safe spot to float it.
+    final onRecurringSeriesTab = ref.watch(recurringTabIndexProvider) == 1;
+    final hidePlannerFab =
+        !onRecurringSeriesTab || ref.watch(recurringFabHiddenProvider);
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0B1220) : const Color(0xFFF1F5F9),
+      backgroundColor:
+          isDark ? const Color(0xFF0B1220) : const Color(0xFFF1F5F9),
       body: boardAsync.when(
         loading: () => const _BoardLoadingSkeleton(),
         error: (error, _) {
-          final message = error is ApiException
-              ? error.message
-              : 'Unable to load board.';
+          final message =
+              error is ApiException ? error.message : 'Unable to load board.';
           return _BoardScaffold(
             embedded: widget.embedded,
             sectionIndex: widget.embedded ? null : _sectionIndex,
@@ -244,7 +250,8 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
           final overdueCount = board.overdueCount;
           // Embedded Tasks counters use full project board data (pre-filter),
           // matching projectBoardProvider totals — not member/filter-narrowed lists.
-          final counterTasks = widget.embedded ? rawBoard.tasks.length : totalTasks;
+          final counterTasks =
+              widget.embedded ? rawBoard.tasks.length : totalTasks;
           final counterOverdue =
               widget.embedded ? rawBoard.overdueCount : overdueCount;
           final boardBody = Column(
@@ -277,8 +284,8 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
                       tasks: tasks,
                       onRefresh: () async {
                         ref.invalidate(projectBoardProvider(widget.projectId));
-                        await ref
-                            .read(projectBoardProvider(widget.projectId).future);
+                        await ref.read(
+                            projectBoardProvider(widget.projectId).future);
                       },
                       onOpenTask: (task) => _openTaskSheet(
                         context,
@@ -299,8 +306,8 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
 
           // Tasks tab: KPI row kept in code but hidden; refresh lives above
           // the filter bar (below the shell profile AppBar) in MyWorkScreen.
-          final showEmbeddedHeader =
-              widget.embedded && (allProjects || _TasksEmbeddedCountersHeader.showKpiCounters);
+          final showEmbeddedHeader = widget.embedded &&
+              (allProjects || _TasksEmbeddedCountersHeader.showKpiCounters);
 
           return _BoardScaffold(
             embedded: widget.embedded,
@@ -372,16 +379,17 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
                           onPressed: () => _openCreateEpic(context, orgId),
                         ))
                   : !_showTasksSection
-                  ? null
-                  : boardAsync.maybeWhen(
-                      data: (board) => orgId == null || board.statuses.isEmpty
-                          ? null
-                          : _CreateTaskFab(
-                              onPressed: () =>
-                                  _openCreateTask(context, ref, board, orgId),
-                            ),
-                      orElse: () => null,
-                    ),
+                      ? null
+                      : boardAsync.maybeWhen(
+                          data: (board) =>
+                              orgId == null || board.statuses.isEmpty
+                                  ? null
+                                  : _CreateTaskFab(
+                                      onPressed: () => _openCreateTask(
+                                          context, ref, board, orgId),
+                                    ),
+                          orElse: () => null,
+                        ),
     );
   }
 
@@ -410,7 +418,9 @@ class _ProjectBoardScreenState extends ConsumerState<ProjectBoardScreen> {
             defaultStatusId: defaultStatus,
             onCreated: () {
               ref.invalidate(projectBoardProvider(widget.projectId));
-              ref.read(lastProjectIdProvider.notifier).setProjectId(widget.projectId);
+              ref
+                  .read(lastProjectIdProvider.notifier)
+                  .setProjectId(widget.projectId);
             },
           ),
         );
@@ -560,11 +570,9 @@ class _BoardScaffold extends StatelessWidget {
         ? [const Color(0xFF1E293B), const Color(0xFF0B1220)]
         : [const Color(0xFFFFFFFF), const Color(0xFFF1F5F9)];
     final selectedSection = sectionIndex ?? _kProjectBoardSectionTasks;
-    final showTasksChrome = !embedded
-        ? selectedSection == _kProjectBoardSectionTasks
-        : true;
-    final showMetaLine =
-        showTasksChrome && boardMetaLine != null;
+    final showTasksChrome =
+        !embedded ? selectedSection == _kProjectBoardSectionTasks : true;
+    final showMetaLine = showTasksChrome && boardMetaLine != null;
     final showHeaderStats = headerStats != null && showTasksChrome;
 
     // Embedded Tasks KPI row: tight vertical padding (≤ Recurring KPI sm).
@@ -638,8 +646,7 @@ class _BoardScaffold extends StatelessWidget {
               SizedBox(height: embedded ? AppSpacing.sm : AppSpacing.md),
               Row(
                 children: [
-                  for (final stat in headerStats!)
-                    Expanded(child: stat),
+                  for (final stat in headerStats!) Expanded(child: stat),
                 ],
               ),
             ],
@@ -757,7 +764,8 @@ class _BoardTitleHeader extends StatelessWidget {
           if (hasTitle) const SizedBox(height: 2),
           Text(
             subtitle!,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 13),
+            style:
+                Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 13),
           ),
         ],
       ],
@@ -851,9 +859,7 @@ class _CircleIconButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
-      color: isDark
-          ? Colors.white.withValues(alpha: 0.08)
-          : AppColors.surface,
+      color: isDark ? Colors.white.withValues(alpha: 0.08) : AppColors.surface,
       shape: const CircleBorder(),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -922,7 +928,8 @@ class _StatusStrip extends StatelessWidget {
       height: 52,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
+        padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.xs),
         itemCount: statuses.length,
         separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs),
         itemBuilder: (context, index) {
@@ -935,9 +942,7 @@ class _StatusStrip extends StatelessWidget {
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeOutCubic,
             child: Material(
-              color: selected
-                  ? color.withValues(alpha: 0.14)
-                  : chipBackground,
+              color: selected ? color.withValues(alpha: 0.14) : chipBackground,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(999),
                 side: BorderSide(
@@ -951,14 +956,16 @@ class _StatusStrip extends StatelessWidget {
                 borderRadius: BorderRadius.circular(999),
                 onTap: () => onSelect(index),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
                         width: 8,
                         height: 8,
-                        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                        decoration:
+                            BoxDecoration(color: color, shape: BoxShape.circle),
                       ),
                       const SizedBox(width: 8),
                       Text(
@@ -970,7 +977,8 @@ class _StatusStrip extends StatelessWidget {
                       ),
                       const SizedBox(width: 6),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 2),
                         decoration: BoxDecoration(
                           color: selected
                               ? color.withValues(alpha: 0.2)
@@ -979,7 +987,10 @@ class _StatusStrip extends StatelessWidget {
                         ),
                         child: Text(
                           '$count',
-                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelMedium
+                              ?.copyWith(
                                 fontSize: 11,
                                 color: selected ? color : AppColors.textMuted,
                               ),
@@ -1020,12 +1031,14 @@ class _ColumnPage extends StatelessWidget {
             padding: const EdgeInsets.all(AppSpacing.lg),
             children: [
               const SizedBox(height: AppSpacing.xl),
-              _EmptyColumnState(statusName: status.name, statusColor: statusColor),
+              _EmptyColumnState(
+                  statusName: status.name, statusColor: statusColor),
             ],
           )
         : ListView.separated(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.xs, AppSpacing.md, 100),
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md, AppSpacing.xs, AppSpacing.md, 100),
             itemCount: tasks.length,
             separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
             itemBuilder: (context, index) {
@@ -1161,7 +1174,10 @@ class _PremiumTaskCard extends StatelessWidget {
                             title,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(
                                   height: 1.3,
                                   fontWeight: FontWeight.w600,
                                   color: titleColor,
@@ -1191,7 +1207,8 @@ class _PremiumTaskCard extends StatelessWidget {
                             const SizedBox(height: AppSpacing.sm),
                             Row(
                               children: [
-                                const Icon(Icons.checklist_rounded, size: 14, color: AppColors.violet),
+                                const Icon(Icons.checklist_rounded,
+                                    size: 14, color: AppColors.violet),
                                 const SizedBox(width: 6),
                                 Expanded(
                                   child: ClipRRect(
@@ -1199,7 +1216,8 @@ class _PremiumTaskCard extends StatelessWidget {
                                     child: LinearProgressIndicator(
                                       value: subtaskProgress,
                                       minHeight: 5,
-                                      backgroundColor: AppColors.violet.withValues(alpha: 0.12),
+                                      backgroundColor: AppColors.violet
+                                          .withValues(alpha: 0.12),
                                       color: AppColors.violet,
                                     ),
                                   ),
@@ -1207,7 +1225,10 @@ class _PremiumTaskCard extends StatelessWidget {
                                 const SizedBox(width: 8),
                                 Text(
                                   '${task.completedSubtasks}/${task.subtasks.length}',
-                                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelMedium
+                                      ?.copyWith(
                                         color: AppColors.violet,
                                         fontSize: 11,
                                       ),
@@ -1220,7 +1241,8 @@ class _PremiumTaskCard extends StatelessWidget {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.only(right: AppSpacing.xs, top: AppSpacing.sm),
+                    padding: const EdgeInsets.only(
+                        right: AppSpacing.xs, top: AppSpacing.sm),
                     child: Icon(
                       Icons.chevron_right_rounded,
                       color: AppColors.textMuted.withValues(alpha: 0.7),
@@ -1364,7 +1386,8 @@ class _BoardLoadingSkeleton extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             itemCount: 4,
             separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.xs),
-            itemBuilder: (_, __) => const ShimmerBox(width: 110, height: 36, radius: 999),
+            itemBuilder: (_, __) =>
+                const ShimmerBox(width: 110, height: 36, radius: 999),
           ),
         ),
         Expanded(
@@ -1454,7 +1477,11 @@ _DueMeta? _dueMeta(String? dueDate) {
 
   return _DueMeta(
     label: label,
-    color: overdue ? AppColors.danger : dueToday ? AppColors.warning : AppColors.sky,
+    color: overdue
+        ? AppColors.danger
+        : dueToday
+            ? AppColors.warning
+            : AppColors.sky,
     background: overdue
         ? AppColors.dangerSoft
         : dueToday

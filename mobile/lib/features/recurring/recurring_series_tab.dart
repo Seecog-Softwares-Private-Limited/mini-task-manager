@@ -108,7 +108,15 @@ class RecurringSeriesTab extends ConsumerWidget {
             await ref.read(recurringTemplatesProvider.future);
           },
           child: ListView.separated(
-            padding: const EdgeInsets.all(AppSpacing.md),
+            // Bottom inset clears the "Add planner" FAB (the only tab
+            // that still shows it) so the last card's Pause/Open-planner
+            // row is never hidden behind it.
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.md,
+              100,
+            ),
             itemCount: templates.length,
             separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
             itemBuilder: (context, index) {

@@ -162,7 +162,8 @@ class _HomeShellState extends ConsumerState<HomeShell>
     if (!canManageRecurring(ref)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Only workspace owners and admins can create planners.'),
+          content:
+              Text('Only workspace owners and admins can create planners.'),
         ),
       );
       return;
@@ -193,6 +194,11 @@ class _HomeShellState extends ConsumerState<HomeShell>
 
   Widget? _fabForTab({required bool onTasksRecurringTab}) {
     if (onTasksRecurringTab) {
+      // Only the Series list (index 1) scrolls its cards clear of the FAB;
+      // Calendar and Insights have no safe spot to float it, so it's
+      // hidden there to avoid covering their content.
+      final onSeriesTab = ref.watch(recurringTabIndexProvider) == 1;
+      if (!onSeriesTab) return null;
       final hideFab = ref.watch(recurringFabHiddenProvider);
       if (hideFab) return null;
       return _GradientFab(
@@ -216,8 +222,8 @@ class _HomeShellState extends ConsumerState<HomeShell>
       final task = await ref.read(tasksRepositoryProvider).fetchTask(taskId);
       List<WorkflowStatus> statuses = const [];
       try {
-        statuses =
-            await ref.read(projectWorkflowStatusesProvider(task.projectId).future);
+        statuses = await ref
+            .read(projectWorkflowStatusesProvider(task.projectId).future);
       } catch (_) {
         statuses = const [];
       }
@@ -285,7 +291,8 @@ class _HomeShellState extends ConsumerState<HomeShell>
     final orgId = ref.watch(
       sessionControllerProvider.select((session) => session.orgId),
     );
-    final unread = _enableUnreadBadge ? ref.watch(unreadNotificationsCountProvider) : 0;
+    final unread =
+        _enableUnreadBadge ? ref.watch(unreadNotificationsCountProvider) : 0;
     final unreadLabel = unread > 99 ? '99+' : '$unread';
     final onTasksRecurringTab = _index == kTasksTabIndex &&
         ref.watch(tasksContentTabProvider) == TasksContentTab.recurring;
@@ -334,7 +341,8 @@ class _HomeShellState extends ConsumerState<HomeShell>
             alignment: Alignment.center,
             child: IconButton(
               tooltip: 'Send feedback',
-              onPressed: () => showFeedbackFormSheet(context: context, ref: ref),
+              onPressed: () =>
+                  showFeedbackFormSheet(context: context, ref: ref),
               icon: ShaderMask(
                 blendMode: BlendMode.srcIn,
                 shaderCallback: (bounds) => const LinearGradient(

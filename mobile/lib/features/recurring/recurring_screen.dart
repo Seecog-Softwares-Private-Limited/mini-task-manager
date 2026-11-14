@@ -138,8 +138,9 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen>
                               ),
                           ],
                           onChanged: (value) {
-                            ref.read(recurringProjectIdProvider.notifier).state =
-                                value;
+                            ref
+                                .read(recurringProjectIdProvider.notifier)
+                                .state = value;
                             ref.invalidate(recurringSummaryProvider);
                             ref.invalidate(recurringTemplatesProvider);
                             ref.invalidate(recurringBoardTasksProvider);
@@ -204,7 +205,8 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen>
                 text: 'Calendar',
               ),
               Tab(
-                icon: Icon(Icons.library_books_outlined, color: AppColors.violet),
+                icon:
+                    Icon(Icons.library_books_outlined, color: AppColors.violet),
                 text: 'Series',
               ),
               Tab(
@@ -228,4 +230,3 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen>
     );
   }
 }
-

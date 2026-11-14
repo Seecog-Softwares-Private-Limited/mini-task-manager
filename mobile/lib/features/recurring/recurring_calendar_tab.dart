@@ -151,7 +151,8 @@ class RecurringCalendarTab extends ConsumerStatefulWidget {
   const RecurringCalendarTab({super.key});
 
   @override
-  ConsumerState<RecurringCalendarTab> createState() => _RecurringCalendarTabState();
+  ConsumerState<RecurringCalendarTab> createState() =>
+      _RecurringCalendarTabState();
 }
 
 class _RecurringCalendarTabState extends ConsumerState<RecurringCalendarTab> {
@@ -268,7 +269,8 @@ class _RecurringCalendarTabState extends ConsumerState<RecurringCalendarTab> {
     final tasksAsync = ref.watch(recurringBoardTasksProvider);
     final tasks = tasksAsync.valueOrNull ?? const <Task>[];
     final loadingTasks = tasksAsync.isLoading && tasks.isEmpty;
-    final taskError = tasksAsync.hasError && tasks.isEmpty ? tasksAsync.error : null;
+    final taskError =
+        tasksAsync.hasError && tasks.isEmpty ? tasksAsync.error : null;
 
     final projectsLoading =
         projectsAsync.isLoading && projectsAsync.valueOrNull == null;
@@ -353,9 +355,8 @@ class _RecurringCalendarTabState extends ConsumerState<RecurringCalendarTab> {
 
     // Project future runs from active templates so the calendar looks forward
     // (the board only materializes past/pending runs).
-    final templates =
-        ref.watch(recurringTemplatesProvider).valueOrNull ??
-            const <RecurringTemplate>[];
+    final templates = ref.watch(recurringTemplatesProvider).valueOrNull ??
+        const <RecurringTemplate>[];
     final horizonEnd = today.add(const Duration(days: _projectionHorizonDays));
     final projectedByDay = <DateTime, List<_ProjectedRun>>{};
     for (final tpl in templates) {
@@ -556,18 +557,17 @@ class _RecurringCalendarTabState extends ConsumerState<RecurringCalendarTab> {
               done: doneCount,
               overdue: overdueCount,
               scheduled: dayProjected.length,
-              onViewChecklist:
-                  (dayTasks.isEmpty && dayProjected.isEmpty)
-                      ? null
-                      : () => _openDaySheet(
-                            context,
-                            selected,
-                            dayTasks,
-                            dayProjected,
-                            projectId,
-                            doneStatusIds,
-                            statusesLoaded,
-                          ),
+              onViewChecklist: (dayTasks.isEmpty && dayProjected.isEmpty)
+                  ? null
+                  : () => _openDaySheet(
+                        context,
+                        selected,
+                        dayTasks,
+                        dayProjected,
+                        projectId,
+                        doneStatusIds,
+                        statusesLoaded,
+                      ),
             ),
         ],
       ),
@@ -713,7 +713,9 @@ class _SelectedDaySummary extends StatelessWidget {
                 ),
               ),
               Text(
-                realTotal > 0 ? '$done of $realTotal done' : '$scheduled scheduled',
+                realTotal > 0
+                    ? '$done of $realTotal done'
+                    : '$scheduled scheduled',
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
                       color: AppColors.textMuted,
                     ),
@@ -1169,9 +1171,7 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
     final dueKey = due == null ? null : DateTime(due.year, due.month, due.day);
     if (dueKey != null && dueKey.isBefore(todayKey)) {
       return const _Pill(
-          label: 'Overdue',
-          color: AppColors.danger,
-          icon: Icons.error_rounded);
+          label: 'Overdue', color: AppColors.danger, icon: Icons.error_rounded);
     }
     if (total > 0 && done > 0) {
       return const _Pill(
@@ -1195,8 +1195,7 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
         .where((t) => !_isDone(t) && (t.subtasks.isEmpty || _allSubsDone(t)))
         .toList();
     final blocked = _tasks
-        .where(
-            (t) => !_isDone(t) && t.subtasks.isNotEmpty && !_allSubsDone(t))
+        .where((t) => !_isDone(t) && t.subtasks.isNotEmpty && !_allSubsDone(t))
         .toList();
     final canCompleteDay = !_busy && eligible.isNotEmpty && blocked.isEmpty;
     final totalRuns = _tasks.length + widget.projected.length;
@@ -1210,8 +1209,7 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
         return Container(
           decoration: BoxDecoration(
             color: Theme.of(context).scaffoldBackgroundColor,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(20)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -1293,7 +1291,8 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
                   ],
                 ),
               ),
-              Divider(height: 1, color: AppColors.border.withValues(alpha: 0.8)),
+              Divider(
+                  height: 1, color: AppColors.border.withValues(alpha: 0.8)),
               Flexible(
                 child: ListView(
                   controller: scrollController,
@@ -1321,8 +1320,9 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
                         PrimaryButton(
                           label: 'Complete day',
                           loading: _busy,
-                          onPressed:
-                              canCompleteDay ? () => _completeDay(eligible) : null,
+                          onPressed: canCompleteDay
+                              ? () => _completeDay(eligible)
+                              : null,
                         ),
                         if (blocked.isNotEmpty) ...[
                           const SizedBox(height: 8),
@@ -1382,7 +1382,8 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
                     width: 36,
                     height: 36,
                     decoration: BoxDecoration(
-                      color: _priorityColor(task.priority).withValues(alpha: 0.12),
+                      color:
+                          _priorityColor(task.priority).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
@@ -1398,9 +1399,10 @@ class _DaySheetState extends ConsumerState<_DaySheet> {
                       children: [
                         Text(
                           task.title,
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
                         ),
                         const SizedBox(height: 4),
                         Row(
@@ -1657,9 +1659,8 @@ class _SubtaskRow extends StatelessWidget {
                               color: completed
                                   ? AppColors.textMuted
                                   : AppColors.textPrimary,
-                              decoration: completed
-                                  ? TextDecoration.lineThrough
-                                  : null,
+                              decoration:
+                                  completed ? TextDecoration.lineThrough : null,
                             ),
                       ),
                       if (hasTime || hasNote) ...[
@@ -1683,39 +1684,39 @@ class _SubtaskRow extends StatelessWidget {
                   _DoneAtChip(label: doneAtLabel),
                 ],
                 PopupMenuButton<_SubtaskMenuAction>(
-                    tooltip: 'More',
-                    enabled: enabled,
-                    padding: EdgeInsets.zero,
-                    icon: Icon(
-                      Icons.more_horiz_rounded,
-                      color: AppColors.textMuted.withValues(alpha: 0.9),
-                    ),
-                    onSelected: (action) {
-                      switch (action) {
-                        case _SubtaskMenuAction.note:
-                          onEditNote();
-                        case _SubtaskMenuAction.edit:
-                          onEdit();
-                        case _SubtaskMenuAction.delete:
-                          if (allowStructureEdit) onDelete();
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      PopupMenuItem(
-                        value: _SubtaskMenuAction.note,
-                        child: Text(hasNote ? 'Notes' : 'Add note'),
-                      ),
-                      const PopupMenuItem(
-                        value: _SubtaskMenuAction.edit,
-                        child: Text('Edit'),
-                      ),
-                      if (allowStructureEdit)
-                        const PopupMenuItem(
-                          value: _SubtaskMenuAction.delete,
-                          child: Text('Delete'),
-                        ),
-                    ],
+                  tooltip: 'More',
+                  enabled: enabled,
+                  padding: EdgeInsets.zero,
+                  icon: Icon(
+                    Icons.more_horiz_rounded,
+                    color: AppColors.textMuted.withValues(alpha: 0.9),
                   ),
+                  onSelected: (action) {
+                    switch (action) {
+                      case _SubtaskMenuAction.note:
+                        onEditNote();
+                      case _SubtaskMenuAction.edit:
+                        onEdit();
+                      case _SubtaskMenuAction.delete:
+                        if (allowStructureEdit) onDelete();
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: _SubtaskMenuAction.note,
+                      child: Text(hasNote ? 'Notes' : 'Add note'),
+                    ),
+                    const PopupMenuItem(
+                      value: _SubtaskMenuAction.edit,
+                      child: Text('Edit'),
+                    ),
+                    if (allowStructureEdit)
+                      const PopupMenuItem(
+                        value: _SubtaskMenuAction.delete,
+                        child: Text('Delete'),
+                      ),
+                  ],
+                ),
               ],
             ),
           ),
