@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/preferences/app_preferences.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
+import '../../data/models/organization.dart';
 import '../../data/models/project.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../../shared/widgets/workspace_avatar.dart';
@@ -12,9 +13,12 @@ import '../auth/session_controller.dart';
 import '../kanban/kanban_providers.dart';
 import '../kanban/project_board_screen.dart';
 import '../kanban/project_switcher.dart';
+import '../projects/create_project_sheet.dart';
 import '../projects/projects_providers.dart';
 import '../recurring/recurring_providers.dart';
 import '../recurring/recurring_screen.dart';
+import '../workspaces/create_workspace_sheet.dart';
+import '../workspaces/workspace_settings_sheet.dart';
 import 'my_work_providers.dart';
 
 class MyWorkScreen extends ConsumerWidget {
@@ -267,12 +271,11 @@ class _TasksFilterBar extends ConsumerWidget {
     final session = ref.watch(sessionControllerProvider);
     final organizations = session.organizations;
     final selectedOrgId = session.orgId;
-    final effectiveOrgId =
-        (selectedOrgId != null &&
-                selectedOrgId.isNotEmpty &&
-                organizations.any((o) => o.id == selectedOrgId))
-            ? selectedOrgId!
-            : (organizations.isNotEmpty ? organizations.first.id : '');
+    final effectiveOrgId = (selectedOrgId != null &&
+            selectedOrgId.isNotEmpty &&
+            organizations.any((o) => o.id == selectedOrgId))
+        ? selectedOrgId!
+        : (organizations.isNotEmpty ? organizations.first.id : '');
 
     const fieldHeight = 48.0;
     final labelStyle = Theme.of(context).textTheme.labelMedium?.copyWith(
@@ -297,8 +300,7 @@ class _TasksFilterBar extends ConsumerWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Expanded(
-                    child: Text('Select Workspace', style: labelStyle)),
+                Expanded(child: Text('Select Workspace', style: labelStyle)),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(child: Text('Select Project', style: labelStyle)),
                 const SizedBox(width: AppSpacing.sm),
@@ -356,34 +358,14 @@ class _TasksFilterBar extends ConsumerWidget {
                                   ),
                             ),
                           )
-                        : _CompactDropdown<String>(
-                            debugLabel: 'workspace',
-                            value: effectiveOrgId,
-                            items: [
-                              for (final org in organizations)
-                                DropdownMenuItem(
-                                  value: org.id,
-                                  child: Row(
-                                    children: [
-                                      WorkspaceAvatar(
-                                        logoUrl: org.logoUrl,
-                                        name: org.name,
-                                        size: 22,
-                                        borderRadius: 6,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          org.name,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                            ],
-                            selectedBuilder: (context) {
+                        : _PickerField(
+                            onTap: () => _openWorkspacePicker(
+                              context: context,
+                              ref: ref,
+                              organizations: organizations,
+                              selectedOrgId: effectiveOrgId,
+                            ),
+                            child: Builder(builder: (context) {
                               final org = organizations.firstWhere(
                                 (o) => o.id == effectiveOrgId,
                                 orElse: () => organizations.first,
@@ -411,29 +393,7 @@ class _TasksFilterBar extends ConsumerWidget {
                                   ),
                                 ],
                               );
-                            },
-                            onChanged: (value) async {
-                              if (value == null || value.isEmpty) return;
-                              final current =
-                                  ref.read(sessionControllerProvider).orgId;
-                              if (value == current) return;
-                              await ref
-                                  .read(sessionControllerProvider.notifier)
-                                  .selectOrganization(value);
-                              ref.invalidate(projectsProvider);
-                              ref
-                                  .read(tasksProjectIdProvider.notifier)
-                                  .state = null;
-                              ref
-                                  .read(tasksMemberFilterProvider.notifier)
-                                  .state = null;
-                              ref
-                                  .read(recurringProjectIdProvider.notifier)
-                                  .state = null;
-                              ref.invalidate(recurringSummaryProvider);
-                              ref.invalidate(recurringTemplatesProvider);
-                              ref.invalidate(recurringBoardTasksProvider);
-                            },
+                            }),
                           ),
                   ),
                 ),
@@ -442,60 +402,16 @@ class _TasksFilterBar extends ConsumerWidget {
                 Expanded(
                   child: SizedBox(
                     height: fieldHeight,
-                    child: _CompactDropdown<String>(
-                      debugLabel: 'project',
-                      value: effectiveId,
-                      items: [
-                        DropdownMenuItem(
-                          value: kAllProjectsId,
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 22,
-                                height: 22,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(6),
-                                  color: AppColors.primary
-                                      .withValues(alpha: 0.12),
-                                ),
-                                alignment: Alignment.center,
-                                child: const Icon(
-                                  Icons.apps_rounded,
-                                  size: 14,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              const Expanded(
-                                child: Text(
-                                  'All projects',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        for (final project in projects)
-                          DropdownMenuItem(
-                            value: project.id,
-                            child: Row(
-                              children: [
-                                ProjectThumb(
-                                    project: project, size: 22, radius: 6),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    project.name,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                      ],
-                      selectedBuilder: (context) {
+                    child: _PickerField(
+                      onTap: () => _openProjectPicker(
+                        context: context,
+                        ref: ref,
+                        projects: projects,
+                        effectiveId: effectiveId,
+                        organizationId: effectiveOrgId,
+                        onProjectSelected: onProjectSelected,
+                      ),
+                      child: Builder(builder: (context) {
                         if (isAllProjectsSelection(effectiveId)) {
                           return Row(
                             children: [
@@ -504,8 +420,8 @@ class _TasksFilterBar extends ConsumerWidget {
                                 height: 22,
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(6),
-                                  color: AppColors.primary
-                                      .withValues(alpha: 0.12),
+                                  color:
+                                      AppColors.primary.withValues(alpha: 0.12),
                                 ),
                                 alignment: Alignment.center,
                                 child: const Icon(
@@ -535,8 +451,7 @@ class _TasksFilterBar extends ConsumerWidget {
                         );
                         return Row(
                           children: [
-                            ProjectThumb(
-                                project: project, size: 22, radius: 6),
+                            ProjectThumb(project: project, size: 22, radius: 6),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -551,11 +466,7 @@ class _TasksFilterBar extends ConsumerWidget {
                             ),
                           ],
                         );
-                      },
-                      onChanged: (value) {
-                        if (value == null || value.isEmpty) return;
-                        onProjectSelected(value);
-                      },
+                      }),
                     ),
                   ),
                 ),
@@ -725,56 +636,379 @@ class _TasksFilterBar extends ConsumerWidget {
   }
 }
 
-class _CompactDropdown<T> extends StatelessWidget {
-  const _CompactDropdown({
-    required this.value,
-    required this.items,
-    required this.onChanged,
-    required this.selectedBuilder,
-    this.debugLabel = 'dropdown',
-  });
+/// Tappable field styled like the old dropdown, but opens a picker sheet
+/// instead of an inline [DropdownButtonFormField] menu — the menu items
+/// couldn't host a secondary "add"/"edit" tap target of their own.
+class _PickerField extends StatelessWidget {
+  const _PickerField({required this.child, required this.onTap});
 
-  final String debugLabel;
-  final T value;
-  final List<DropdownMenuItem<T>> items;
-  final ValueChanged<T?> onChanged;
-  final WidgetBuilder selectedBuilder;
+  final Widget child;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return DropdownButtonFormField<T>(
-      key: ValueKey('$debugLabel-$value'),
-      initialValue: value,
-      isExpanded: true,
-      isDense: true,
+    return Material(
+      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
       borderRadius: BorderRadius.circular(14),
-      icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 20),
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: 12,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: AppColors.border.withValues(alpha: 0.7)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: AppColors.border.withValues(alpha: 0.7)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.4),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: AppColors.border.withValues(alpha: 0.7),
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: 12,
+          ),
+          child: Row(
+            children: [
+              Expanded(child: child),
+              const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 20,
+                color: AppColors.textMuted,
+              ),
+            ],
+          ),
         ),
       ),
-      selectedItemBuilder: (context) => [
-        for (final _ in items) selectedBuilder(context),
-      ],
-      items: items,
-      onChanged: onChanged,
+    );
+  }
+}
+
+Future<void> _openWorkspacePicker({
+  required BuildContext context,
+  required WidgetRef ref,
+  required List<Organization> organizations,
+  required String selectedOrgId,
+}) async {
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (sheetContext) {
+      return ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.75,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                0,
+                AppSpacing.lg,
+                AppSpacing.sm,
+              ),
+              child: Text(
+                'Workspaces',
+                style: Theme.of(sheetContext).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.sm,
+                  0,
+                  AppSpacing.sm,
+                  AppSpacing.md,
+                ),
+                children: [
+                  _PickerActionTile(
+                    icon: Icons.add_circle_outline_rounded,
+                    label: 'Add workspace',
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      showCreateWorkspaceSheet(
+                        context: context,
+                        ref: ref,
+                        showIndustryPicker: true,
+                      );
+                    },
+                  ),
+                  const Divider(height: 1),
+                  for (final org in organizations)
+                    _PickerListTile(
+                      selected: org.id == selectedOrgId,
+                      leading: WorkspaceAvatar(
+                        logoUrl: org.logoUrl,
+                        name: org.name,
+                        size: 32,
+                        borderRadius: 8,
+                      ),
+                      title: org.name,
+                      onTap: () async {
+                        Navigator.of(sheetContext).pop();
+                        final current =
+                            ref.read(sessionControllerProvider).orgId;
+                        if (org.id == current) return;
+                        await ref
+                            .read(sessionControllerProvider.notifier)
+                            .selectOrganization(org.id);
+                        ref.invalidate(projectsProvider);
+                        ref.read(tasksProjectIdProvider.notifier).state = null;
+                        ref.read(tasksMemberFilterProvider.notifier).state =
+                            null;
+                        ref.read(recurringProjectIdProvider.notifier).state =
+                            null;
+                        ref.invalidate(recurringSummaryProvider);
+                        ref.invalidate(recurringTemplatesProvider);
+                        ref.invalidate(recurringBoardTasksProvider);
+                      },
+                      onEdit: () {
+                        Navigator.of(sheetContext).pop();
+                        showWorkspaceSettingsSheet(
+                          context: context,
+                          ref: ref,
+                          organizationId: org.id,
+                        );
+                      },
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+Future<void> _openProjectPicker({
+  required BuildContext context,
+  required WidgetRef ref,
+  required List<Project> projects,
+  required String effectiveId,
+  required String organizationId,
+  required ValueChanged<String> onProjectSelected,
+}) async {
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (sheetContext) {
+      return ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.75,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                0,
+                AppSpacing.lg,
+                AppSpacing.sm,
+              ),
+              child: Text(
+                'Projects',
+                style: Theme.of(sheetContext).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ),
+            Flexible(
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.sm,
+                  0,
+                  AppSpacing.sm,
+                  AppSpacing.md,
+                ),
+                children: [
+                  if (organizationId.isNotEmpty)
+                    _PickerActionTile(
+                      icon: Icons.add_circle_outline_rounded,
+                      label: 'Add project',
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        showCreateProjectSheet(
+                          context: context,
+                          ref: ref,
+                          organizationId: organizationId,
+                        );
+                      },
+                    ),
+                  const Divider(height: 1),
+                  _PickerListTile(
+                    selected: isAllProjectsSelection(effectiveId),
+                    leading: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        color: AppColors.primary.withValues(alpha: 0.12),
+                      ),
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.apps_rounded,
+                        size: 18,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    title: 'All projects',
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      onProjectSelected(kAllProjectsId);
+                    },
+                  ),
+                  for (final project in projects)
+                    _PickerListTile(
+                      selected: project.id == effectiveId,
+                      leading:
+                          ProjectThumb(project: project, size: 32, radius: 8),
+                      title: project.name,
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        onProjectSelected(project.id);
+                      },
+                      onEdit: () {
+                        Navigator.of(sheetContext).pop();
+                        showEditProjectSheet(
+                          context: context,
+                          ref: ref,
+                          organizationId: project.organizationId.isNotEmpty
+                              ? project.organizationId
+                              : organizationId,
+                          project: project,
+                        );
+                      },
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+class _PickerActionTile extends StatelessWidget {
+  const _PickerActionTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: 12,
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 22, color: AppColors.primary),
+              const SizedBox(width: 12),
+              Text(
+                label,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PickerListTile extends StatelessWidget {
+  const _PickerListTile({
+    required this.leading,
+    required this.title,
+    required this.selected,
+    required this.onTap,
+    this.onEdit,
+  });
+
+  final Widget leading;
+  final String title;
+  final bool selected;
+  final VoidCallback onTap;
+  final VoidCallback? onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected
+          ? AppColors.primary.withValues(alpha: 0.08)
+          : Colors.transparent,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: 6,
+          ),
+          child: Row(
+            children: [
+              leading,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight:
+                            selected ? FontWeight.w700 : FontWeight.w500,
+                      ),
+                ),
+              ),
+              if (selected)
+                const Padding(
+                  padding: EdgeInsets.only(right: 4),
+                  child: Icon(
+                    Icons.check_circle_rounded,
+                    size: 18,
+                    color: AppColors.primary,
+                  ),
+                ),
+              if (onEdit != null)
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  color: AppColors.textMuted,
+                  tooltip: 'Edit',
+                  onPressed: onEdit,
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
