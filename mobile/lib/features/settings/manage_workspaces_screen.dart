@@ -26,7 +26,8 @@ class ManageWorkspacesScreen extends ConsumerStatefulWidget {
       _ManageWorkspacesScreenState();
 }
 
-class _ManageWorkspacesScreenState extends ConsumerState<ManageWorkspacesScreen> {
+class _ManageWorkspacesScreenState
+    extends ConsumerState<ManageWorkspacesScreen> {
   bool _loading = false;
   String? _expandedOrgId;
 
@@ -270,6 +271,11 @@ class _WorkspaceProjectsPanel extends ConsumerWidget {
 
   final Organization organization;
 
+  bool get _canManage {
+    final role = organization.myRole?.toLowerCase();
+    return role == 'owner' || role == 'admin';
+  }
+
   Future<void> _createProject(BuildContext context, WidgetRef ref) async {
     await showCreateProjectSheet(
       context: context,
@@ -322,9 +328,10 @@ class _WorkspaceProjectsPanel extends ConsumerWidget {
     if (confirmed != true) return;
 
     try {
-      await ref
-          .read(projectsRepositoryProvider)
-          .deleteProject(projectId: project.id);
+      await ref.read(projectsRepositoryProvider).deleteProject(
+            projectId: project.id,
+            organizationId: organization.id,
+          );
       ref.invalidate(projectsProvider);
       ref.invalidate(projectsForOrganizationProvider(organization.id));
       ref.invalidate(projectBoardProvider(project.id));
@@ -361,11 +368,12 @@ class _WorkspaceProjectsPanel extends ConsumerWidget {
                     ),
               ),
               const Spacer(),
-              TextButton.icon(
-                onPressed: () => _createProject(context, ref),
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Add'),
-              ),
+              if (_canManage)
+                TextButton.icon(
+                  onPressed: () => _createProject(context, ref),
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text('Add'),
+                ),
             ],
           ),
           const SizedBox(height: AppSpacing.xs),
@@ -405,8 +413,12 @@ class _WorkspaceProjectsPanel extends ConsumerWidget {
                       ),
                     _ProjectManageRow(
                       project: projects[i],
-                      onEdit: () => _editProject(context, ref, projects[i]),
-                      onDelete: () => _deleteProject(context, ref, projects[i]),
+                      onEdit: _canManage
+                          ? () => _editProject(context, ref, projects[i])
+                          : null,
+                      onDelete: _canManage
+                          ? () => _deleteProject(context, ref, projects[i])
+                          : null,
                     ),
                   ],
                 ],
@@ -422,13 +434,13 @@ class _WorkspaceProjectsPanel extends ConsumerWidget {
 class _ProjectManageRow extends StatelessWidget {
   const _ProjectManageRow({
     required this.project,
-    required this.onEdit,
-    required this.onDelete,
+    this.onEdit,
+    this.onDelete,
   });
 
   final Project project;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -448,19 +460,21 @@ class _ProjectManageRow extends StatelessWidget {
                   ),
             ),
           ),
-          IconButton(
-            tooltip: 'Edit project',
-            onPressed: onEdit,
-            icon: const Icon(Icons.edit_outlined, size: 20),
-            visualDensity: VisualDensity.compact,
-          ),
-          IconButton(
-            tooltip: 'Delete project',
-            onPressed: onDelete,
-            icon: const Icon(Icons.delete_outline_rounded, size: 20),
-            color: AppColors.danger,
-            visualDensity: VisualDensity.compact,
-          ),
+          if (onEdit != null)
+            IconButton(
+              tooltip: 'Edit project',
+              onPressed: onEdit,
+              icon: const Icon(Icons.edit_outlined, size: 20),
+              visualDensity: VisualDensity.compact,
+            ),
+          if (onDelete != null)
+            IconButton(
+              tooltip: 'Delete project',
+              onPressed: onDelete,
+              icon: const Icon(Icons.delete_outline_rounded, size: 20),
+              color: AppColors.danger,
+              visualDensity: VisualDensity.compact,
+            ),
         ],
       ),
     );

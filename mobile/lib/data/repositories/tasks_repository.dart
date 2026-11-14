@@ -444,7 +444,8 @@ class TasksRepository {
 
   Future<List<TaskComment>> fetchComments(String taskId) async {
     try {
-      final response = await _api.dio.get<List<dynamic>>('/tasks/$taskId/comments');
+      final response =
+          await _api.dio.get<List<dynamic>>('/tasks/$taskId/comments');
       final list = response.data ?? const [];
       return list
           .whereType<Map<String, dynamic>>()
@@ -541,7 +542,8 @@ class TasksRepository {
 
   Future<List<TaskAttachment>> fetchAttachments(String taskId) async {
     try {
-      final response = await _api.dio.get<List<dynamic>>('/tasks/$taskId/attachments');
+      final response =
+          await _api.dio.get<List<dynamic>>('/tasks/$taskId/attachments');
       final list = response.data ?? const [];
       return list
           .whereType<Map>()
@@ -557,6 +559,16 @@ class TasksRepository {
   static Map<String, dynamic> _requireJsonMap(dynamic data, String label) {
     if (data is Map<String, dynamic>) return data;
     if (data is Map) return Map<String, dynamic>.from(data);
+    if (data == null) {
+      // The backend returns `200 OK` with a `null` body when the item isn't
+      // found under the caller's currently active organization (e.g. it was
+      // deleted, or it belongs to a different workspace).
+      throw ApiException(
+        message: "Couldn't find this $label. It may have been deleted, or it "
+            'belongs to a different workspace — try switching workspace.',
+        statusCode: 404,
+      );
+    }
     throw ApiException(
       message: 'Invalid $label response from server',
     );

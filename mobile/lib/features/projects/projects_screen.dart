@@ -46,9 +46,8 @@ class ProjectsScreen extends ConsumerWidget {
         itemBuilder: (_, __) => const _ProjectCardSkeleton(),
       ),
       error: (error, _) {
-        final message = error is ApiException
-            ? error.message
-            : 'Unable to load projects.';
+        final message =
+            error is ApiException ? error.message : 'Unable to load projects.';
         return EmptyState(
           title: 'Could not load projects',
           message: message,
@@ -65,7 +64,8 @@ class ProjectsScreen extends ConsumerWidget {
                 children: [
                   const EmptyState(
                     title: 'No projects yet',
-                    message: 'Create your first project to start organizing tasks.',
+                    message:
+                        'Create your first project to start organizing tasks.',
                     icon: Icons.folder_open_outlined,
                   ),
                   const SizedBox(height: AppSpacing.lg),
@@ -85,7 +85,8 @@ class ProjectsScreen extends ConsumerWidget {
             await ref.read(projectsProvider.future);
           },
           child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, 88),
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md, AppSpacing.sm, AppSpacing.md, 88),
             itemCount: projects.length,
             separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.sm),
             itemBuilder: (context, index) {
@@ -94,7 +95,9 @@ class ProjectsScreen extends ConsumerWidget {
                 project: project,
                 isDark: isDark,
                 onTap: () {
-                  ref.read(lastProjectIdProvider.notifier).setProjectId(project.id);
+                  ref
+                      .read(lastProjectIdProvider.notifier)
+                      .setProjectId(project.id);
                   context.push(AppRoutes.projectBoard(project.id));
                 },
               );
@@ -164,9 +167,10 @@ class _PremiumProjectCardState extends ConsumerState<_PremiumProjectCard> {
     setState(() => _deleting = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      await ref
-          .read(projectsRepositoryProvider)
-          .deleteProject(projectId: widget.project.id);
+      await ref.read(projectsRepositoryProvider).deleteProject(
+            projectId: widget.project.id,
+            organizationId: widget.project.organizationId,
+          );
       if (!mounted) return;
       ref.invalidate(projectsProvider);
     } catch (e) {
@@ -231,9 +235,10 @@ class _PremiumProjectCardState extends ConsumerState<_PremiumProjectCard> {
                         project.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
                       ),
                       if (description.isNotEmpty) ...[
                         const SizedBox(height: 4),
@@ -241,10 +246,11 @@ class _PremiumProjectCardState extends ConsumerState<_PremiumProjectCard> {
                           description,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                height: 1.35,
-                                color: AppColors.textMuted,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    height: 1.35,
+                                    color: AppColors.textMuted,
+                                  ),
                         ),
                       ],
                       const SizedBox(height: AppSpacing.sm),

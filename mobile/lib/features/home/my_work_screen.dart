@@ -769,14 +769,16 @@ Future<void> _openWorkspacePicker({
                         ref.invalidate(recurringTemplatesProvider);
                         ref.invalidate(recurringBoardTasksProvider);
                       },
-                      onEdit: () {
-                        Navigator.of(sheetContext).pop();
-                        showWorkspaceSettingsSheet(
-                          context: context,
-                          ref: ref,
-                          organizationId: org.id,
-                        );
-                      },
+                      onEdit: _canManageOrg(org)
+                          ? () {
+                              Navigator.of(sheetContext).pop();
+                              showWorkspaceSettingsSheet(
+                                context: context,
+                                ref: ref,
+                                organizationId: org.id,
+                              );
+                            }
+                          : null,
                     ),
                 ],
               ),
@@ -786,6 +788,11 @@ Future<void> _openWorkspacePicker({
       );
     },
   );
+}
+
+bool _canManageOrg(Organization org) {
+  final role = org.myRole?.toLowerCase();
+  return role == 'owner' || role == 'admin';
 }
 
 Future<void> _openProjectPicker({

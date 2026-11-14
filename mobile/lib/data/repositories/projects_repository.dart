@@ -82,9 +82,15 @@ class ProjectsRepository {
     }
   }
 
-  Future<void> deleteProject({required String projectId}) async {
+  Future<void> deleteProject({
+    required String projectId,
+    required String organizationId,
+  }) async {
     try {
-      await _api.dio.delete<void>('/projects/$projectId');
+      await _api.dio.delete<void>(
+        '/projects/$projectId',
+        options: _api.withOrgHeader(organizationId),
+      );
     } on DioException catch (error) {
       throw ApiException.fromDio(error);
     }

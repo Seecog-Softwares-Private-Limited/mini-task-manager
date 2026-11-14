@@ -8,32 +8,11 @@ import '../../core/theme/app_spacing.dart';
 import '../../shared/widgets/app_widgets.dart';
 import '../auth/session_controller.dart';
 import '../projects/projects_providers.dart';
-import 'recurring_actions.dart';
-import 'recurring_editor_sheet.dart';
 import 'recurring_planner_sheet.dart';
 import 'recurring_providers.dart';
 
 class RecurringSeriesTab extends ConsumerWidget {
   const RecurringSeriesTab({super.key});
-
-  Future<void> _openCreate(BuildContext context, WidgetRef ref) async {
-    final orgId = ref.read(sessionControllerProvider).orgId;
-    final projectId = ref.read(recurringSelectedProjectIdProvider);
-    if (orgId == null || projectId == null) return;
-    if (!canManageRecurring(ref)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Only workspace owners and admins can create planners.'),
-        ),
-      );
-      return;
-    }
-    await showRecurringEditorSheet(
-      context: context,
-      organizationId: orgId,
-      projectId: projectId,
-    );
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -86,7 +65,7 @@ class RecurringSeriesTab extends ConsumerWidget {
               children: [
                 EmptyState(
                   title: 'Series unavailable',
-        message: userFacingError(error),
+                  message: userFacingError(error),
                   icon: Icons.library_books_outlined,
                 ),
                 if (isNetwork) ...[
@@ -113,14 +92,9 @@ class RecurringSeriesTab extends ConsumerWidget {
                   const EmptyState(
                     title: 'No recurring planners',
                     message:
-                        'Add a planner series for this project. It stays in Planner and won’t show on Tasks.',
+                        'Add a planner series for this project. It stays in Planner and won’t show on Tasks. '
+                        'Use the "Add planner" button below to create one.',
                     icon: Icons.event_repeat_rounded,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  PrimaryButton(
-                    label: 'Add planner',
-                    expand: false,
-                    onPressed: () => _openCreate(context, ref),
                   ),
                 ],
               ),
@@ -165,8 +139,12 @@ class RecurringSeriesTab extends ConsumerWidget {
                             ),
                           ),
                           StatusChip(
-                            label: template.isPaused ? 'Paused' : template.repeatType,
-                            color: template.isPaused ? AppColors.warning : AppColors.violet,
+                            label: template.isPaused
+                                ? 'Paused'
+                                : template.repeatType,
+                            color: template.isPaused
+                                ? AppColors.warning
+                                : AppColors.violet,
                           ),
                         ],
                       ),
@@ -179,9 +157,10 @@ class RecurringSeriesTab extends ConsumerWidget {
                         const SizedBox(height: AppSpacing.xs),
                         Text(
                           'Health ${(template.completionHealth! * 100).round()}%',
-                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                                color: AppColors.sky,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.labelMedium?.copyWith(
+                                    color: AppColors.sky,
+                                  ),
                         ),
                       ],
                       const SizedBox(height: AppSpacing.sm),
@@ -190,9 +169,12 @@ class RecurringSeriesTab extends ConsumerWidget {
                           if (template.isPaused)
                             TextButton(
                               onPressed: () async {
-                                final orgId = ref.read(sessionControllerProvider).orgId;
+                                final orgId =
+                                    ref.read(sessionControllerProvider).orgId;
                                 if (orgId == null) return;
-                                await ref.read(recurringRepositoryProvider).resumeTemplate(
+                                await ref
+                                    .read(recurringRepositoryProvider)
+                                    .resumeTemplate(
                                       templateId: template.id,
                                       organizationId: orgId,
                                     );
@@ -203,9 +185,12 @@ class RecurringSeriesTab extends ConsumerWidget {
                           else
                             TextButton(
                               onPressed: () async {
-                                final orgId = ref.read(sessionControllerProvider).orgId;
+                                final orgId =
+                                    ref.read(sessionControllerProvider).orgId;
                                 if (orgId == null) return;
-                                await ref.read(recurringRepositoryProvider).pauseTemplate(
+                                await ref
+                                    .read(recurringRepositoryProvider)
+                                    .pauseTemplate(
                                       templateId: template.id,
                                       organizationId: orgId,
                                     );
@@ -216,7 +201,10 @@ class RecurringSeriesTab extends ConsumerWidget {
                           const Spacer(),
                           Text(
                             'Open planner',
-                            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelMedium
+                                ?.copyWith(
                                   color: AppColors.primary,
                                   fontWeight: FontWeight.w600,
                                 ),

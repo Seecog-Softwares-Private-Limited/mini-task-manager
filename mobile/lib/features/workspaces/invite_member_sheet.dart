@@ -68,6 +68,11 @@ class _MembersSheetState extends ConsumerState<MembersSheet>
     return (widget.myRole ?? '').toLowerCase() == 'owner';
   }
 
+  bool get _canManageMembers {
+    final role = (widget.myRole ?? '').toLowerCase();
+    return role == 'owner' || role == 'admin';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -180,8 +185,7 @@ class _MembersSheetState extends ConsumerState<MembersSheet>
       setState(() => _error = 'Select a role');
       return;
     }
-    final workspaceOnly =
-        _inviteWithoutProjects || _projects.isEmpty;
+    final workspaceOnly = _inviteWithoutProjects || _projects.isEmpty;
     if (!workspaceOnly && _inviteProjectIds.isEmpty) {
       setState(
         () => _error =
@@ -275,9 +279,8 @@ class _MembersSheetState extends ConsumerState<MembersSheet>
 
   Future<void> _confirmRemove(ProjectMember member) async {
     final fullName = member.user?.fullName.trim() ?? '';
-    final name = fullName.isNotEmpty
-        ? fullName
-        : (member.user?.email ?? 'this member');
+    final name =
+        fullName.isNotEmpty ? fullName : (member.user?.email ?? 'this member');
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -434,7 +437,8 @@ class _MembersSheetState extends ConsumerState<MembersSheet>
       title: 'Update project access',
     );
     if (saved == null || !mounted) return;
-    if (saved.length == currentAccess.length && saved.containsAll(currentAccess)) {
+    if (saved.length == currentAccess.length &&
+        saved.containsAll(currentAccess)) {
       return;
     }
 
@@ -507,7 +511,8 @@ class _MembersSheetState extends ConsumerState<MembersSheet>
                         ),
                       ),
                     ),
-                    Text('Members', style: Theme.of(context).textTheme.titleLarge),
+                    Text('Members',
+                        style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
                       'Invite teammates to $workspaceLabel, manage roles, and project access.',
@@ -548,7 +553,8 @@ class _MembersSheetState extends ConsumerState<MembersSheet>
                       initialValue: _role,
                       decoration: const InputDecoration(),
                       items: const [
-                        DropdownMenuItem(value: 'member', child: Text('Member')),
+                        DropdownMenuItem(
+                            value: 'member', child: Text('Member')),
                         DropdownMenuItem(value: 'admin', child: Text('Admin')),
                       ],
                       onChanged: _sending
@@ -619,9 +625,10 @@ class _MembersSheetState extends ConsumerState<MembersSheet>
                         ),
                         subtitle: Text(
                           'Workspace only — they won’t see projects until you grant access.',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: AppColors.textMuted,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppColors.textMuted,
+                                  ),
                         ),
                       ),
                     ],
@@ -629,7 +636,8 @@ class _MembersSheetState extends ConsumerState<MembersSheet>
                       const SizedBox(height: AppSpacing.sm),
                       Text(
                         _error!,
-                        style: TextStyle(color: Theme.of(context).colorScheme.error),
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.error),
                       ),
                     ],
                     const SizedBox(height: AppSpacing.lg),
@@ -643,7 +651,8 @@ class _MembersSheetState extends ConsumerState<MembersSheet>
                 ),
               ),
               SliverOverlapAbsorber(
-                handle: NestedScrollView.sliverOverlapAbsorberHandleFor(context),
+                handle:
+                    NestedScrollView.sliverOverlapAbsorberHandleFor(context),
                 sliver: SliverPersistentHeader(
                   pinned: true,
                   delegate: _PinnedTabBarDelegate(
@@ -763,11 +772,15 @@ class _MembersSheetState extends ConsumerState<MembersSheet>
                       member: member,
                       isOwner: isOwner,
                       busy: busy,
-                      onChangeRole: isOwner ? null : () => _changeRole(member),
+                      onChangeRole: (!isOwner && _canManageMembers)
+                          ? () => _changeRole(member)
+                          : null,
                       onUpdateProjects: _canManageProjectAccess
                           ? () => _updateProjects(member)
                           : null,
-                      onRemove: isOwner ? null : () => _confirmRemove(member),
+                      onRemove: (!isOwner && _canManageMembers)
+                          ? () => _confirmRemove(member)
+                          : null,
                     );
                   },
                 ),
@@ -839,9 +852,8 @@ class _ProjectAccessDropdown extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: muted && selectedIds.isEmpty
-                    ? AppColors.textMuted
-                    : null,
+                color:
+                    muted && selectedIds.isEmpty ? AppColors.textMuted : null,
               ),
         ),
       ),
@@ -1019,7 +1031,8 @@ class _PendingInviteRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(invite.email, style: Theme.of(context).textTheme.titleSmall),
+                Text(invite.email,
+                    style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 2),
                 Text(
                   roleLabel,
@@ -1073,7 +1086,8 @@ class _ExistingMemberRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fullName = member.user?.fullName.trim() ?? '';
-    final name = fullName.isNotEmpty ? fullName : (member.user?.email ?? 'Member');
+    final name =
+        fullName.isNotEmpty ? fullName : (member.user?.email ?? 'Member');
     final email = member.user?.email ?? '';
     final roleRaw = member.role.trim().isEmpty ? 'member' : member.role.trim();
     final roleLabel = isOwner

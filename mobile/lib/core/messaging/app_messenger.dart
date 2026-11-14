@@ -18,14 +18,29 @@ void showAppMessage(String message, {bool isError = false}) {
 
 void showPlanLimitMessage(String message) {
   final showUpgrade = isPlansBillingUiEnabled;
-  rootScaffoldMessengerKey.currentState?.showSnackBar(
+  final messenger = rootScaffoldMessengerKey.currentState;
+  if (messenger == null) return;
+  // Clear any earlier plan-limit snackbar instead of stacking another one.
+  messenger.hideCurrentSnackBar();
+  messenger.showSnackBar(
     SnackBar(
-      content: Text(
-        message.isNotEmpty
-            ? message
-            : (showUpgrade
-                ? 'Plan limit reached. Upgrade to continue.'
-                : 'Plan limit reached for this account.'),
+      content: Row(
+        children: [
+          Expanded(
+            child: Text(
+              message.isNotEmpty
+                  ? message
+                  : (showUpgrade
+                      ? 'Plan limit reached. Upgrade to continue.'
+                      : 'Plan limit reached for this account.'),
+            ),
+          ),
+          const SizedBox(width: 8),
+          InkWell(
+            onTap: () => messenger.hideCurrentSnackBar(),
+            child: const Icon(Icons.close, color: Colors.white, size: 18),
+          ),
+        ],
       ),
       backgroundColor: const Color(0xFFE11D48),
       behavior: SnackBarBehavior.floating,
