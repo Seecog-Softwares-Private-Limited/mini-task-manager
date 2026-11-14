@@ -94,6 +94,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
   final _commentController = TextEditingController();
   late List<TaskSubtask> _subtasks;
   int? _expandedSubtaskIndex;
+  bool _checklistSectionExpanded = true;
   bool _isEditingTitle = false;
   bool _isEditingDescription = false;
   bool _saving = false;
@@ -107,6 +108,7 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
   ScrollController? _sheetScroll;
   String? _error;
   List<ProjectMember> _members = const [];
+
   /// Org members (owner/admin/member) for audit role labels.
   List<ProjectMember> _orgMembers = const [];
   List<_TaskAttachmentItem> _attachments = const [];
@@ -510,7 +512,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
   Future<void> _addTag(String rawName) async {
     final name = rawName.trim();
     if (name.isEmpty) return;
-    final exists = _task.tags.any((tag) => tag.toLowerCase() == name.toLowerCase());
+    final exists =
+        _task.tags.any((tag) => tag.toLowerCase() == name.toLowerCase());
     if (exists) return;
     await _patchTask(tags: [..._task.tags, name]);
   }
@@ -647,7 +650,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('You do not have permission to complete this subtask.'),
+            content:
+                Text('You do not have permission to complete this subtask.'),
           ),
         );
       }
@@ -657,8 +661,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     final user = ref.read(sessionControllerProvider).user;
     if (user == null) return null;
     FocusManager.instance.primaryFocus?.unfocus();
-    final requireVideo =
-        isCriticalPriority(subtaskPriority) || isCriticalPriority(_task.priority);
+    final requireVideo = isCriticalPriority(subtaskPriority) ||
+        isCriticalPriority(_task.priority);
     final requireLocation = itemRequireLocation || _task.requireLocation;
     final result = await showSubtaskCompletionSheet(
       context: context,
@@ -726,16 +730,18 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     // Preserve the checklist order the user had before completing.
     final doneAt = DateTime.now().toUtc().toIso8601String();
     setState(() {
-      _subtasks = _mergeSubtasksPreservingOrder(orderBefore.map((s) {
-        if (s.id != rowId) return s;
-        return s.copyWith(
-          completed: true,
-          status: 'DONE',
-          completionRecord: record,
-          completedAt: record.completedAt,
-          updatedAt: doneAt,
-        );
-      }).toList(), _subtasks);
+      _subtasks = _mergeSubtasksPreservingOrder(
+          orderBefore.map((s) {
+            if (s.id != rowId) return s;
+            return s.copyWith(
+              completed: true,
+              status: 'DONE',
+              completionRecord: record,
+              completedAt: record.completedAt,
+              updatedAt: doneAt,
+            );
+          }).toList(),
+          _subtasks);
     });
     _stabilizeChecklistScroll(rowId, alignment: 0.15);
   }
@@ -1112,9 +1118,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
     final deletedId = _subtasks[index].id;
     final updated = List<TaskSubtask>.from(_subtasks)..removeAt(index);
     // Anchor to the row that lands at this index (or the last remaining item).
-    final anchorId = updated.isEmpty
-        ? null
-        : updated[index.clamp(0, updated.length - 1)].id;
+    final anchorId =
+        updated.isEmpty ? null : updated[index.clamp(0, updated.length - 1)].id;
     setState(() {
       _subtasks = updated;
       _savingSubtaskIndex = index;
@@ -1173,7 +1178,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       if (!mounted) return;
       setState(() {
         _task = updated;
-        _subtasks = _mergeSubtasksPreservingOrder(orderBefore, updated.subtasks);
+        _subtasks =
+            _mergeSubtasksPreservingOrder(orderBefore, updated.subtasks);
       });
       widget.onUpdated();
     } on ApiException catch (e) {
@@ -1199,7 +1205,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
       if (!mounted) return;
       setState(() {
         _task = updated;
-        _subtasks = _mergeSubtasksPreservingOrder(orderBefore, updated.subtasks);
+        _subtasks =
+            _mergeSubtasksPreservingOrder(orderBefore, updated.subtasks);
         _syncTextControllersFromTask();
       });
       widget.onUpdated();
@@ -1346,13 +1353,12 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
         (!isPastRecurringRun || canManageRecurring(ref));
     final checklistDone = _subtasks.where((s) => s.completed).length;
     final checklistTotal = _subtasks.length;
-    final checklistPercent =
-        checklistTotal == 0 ? 0 : ((checklistDone / checklistTotal) * 100).round();
+    final checklistPercent = checklistTotal == 0
+        ? 0
+        : ((checklistDone / checklistTotal) * 100).round();
     return DraggableScrollableSheet(
       expand: false,
-      initialChildSize: focusingSubtask
-          ? 0.92
-          : (isRunChecklist ? 0.62 : 0.78),
+      initialChildSize: focusingSubtask ? 0.92 : (isRunChecklist ? 0.62 : 0.78),
       minChildSize: 0.45,
       maxChildSize: 0.92,
       builder: (context, scrollController) {
@@ -1402,13 +1408,17 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(
-                          color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
+                          color: Theme.of(context)
+                              .dividerColor
+                              .withValues(alpha: 0.5),
                         ),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(
-                          color: Theme.of(context).dividerColor.withValues(alpha: 0.5),
+                          color: Theme.of(context)
+                              .dividerColor
+                              .withValues(alpha: 0.5),
                         ),
                       ),
                     ),
@@ -1430,7 +1440,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                             Expanded(
                               child: Text(
                                 _task.title,
-                                style: Theme.of(context).textTheme.headlineSmall,
+                                style:
+                                    Theme.of(context).textTheme.headlineSmall,
                               ),
                             ),
                             const SizedBox(width: AppSpacing.sm),
@@ -1458,7 +1469,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
               if (_error != null)
                 Padding(
                   padding: const EdgeInsets.only(top: AppSpacing.sm),
-                  child: Text(_error!, style: const TextStyle(color: AppColors.danger)),
+                  child: Text(_error!,
+                      style: const TextStyle(color: AppColors.danger)),
                 ),
               if (!isRunChecklist) ...[
                 const SizedBox(height: AppSpacing.lg),
@@ -1476,14 +1488,16 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                   onStartEditingDescription: _startEditingDescription,
                   onCommitDescription: _commitDescriptionEdit,
                   onStatusChanged: (statusId) => _patchTask(statusId: statusId),
-                  onPriorityChanged: (priority) => _patchTask(priority: priority),
+                  onPriorityChanged: (priority) =>
+                      _patchTask(priority: priority),
                   onPickDueDate: _pickDueDate,
                   onPickDueTime: _pickDueTime,
                   onClearDueDate: _clearDueDate,
                   onClearDueTime: _clearDueTime,
                   onAddTag: _addTag,
                   onRemoveTag: _removeTag,
-                  onAssigneesChanged: (assigneeIds) => _patchTask(assigneeIds: assigneeIds),
+                  onAssigneesChanged: (assigneeIds) =>
+                      _patchTask(assigneeIds: assigneeIds),
                   onRequireLocationChanged: canToggleTaskRequireLocation(
                     org: org,
                     userId: currentUserId,
@@ -1497,7 +1511,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                     organizationId: orgId,
                     taskId: _task.id,
                     disabled: _saving || isPastRecurringRun,
-                    onAttachmentsChanged: (items) => setState(() => _attachments = items),
+                    onAttachmentsChanged: (items) =>
+                        setState(() => _attachments = items),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
@@ -1511,89 +1526,125 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                       : _patchTask(epicId: epicId),
                 ),
               ],
-              if (canEditSubtasks || _subtasks.isNotEmpty || isRunChecklist) ...[
+              if (canEditSubtasks ||
+                  _subtasks.isNotEmpty ||
+                  isRunChecklist) ...[
                 if (!isRunChecklist) ...[
                   const SizedBox(height: AppSpacing.lg),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.check_box_outlined,
-                          size: 18,
-                          color: AppColors.primary,
-                        ),
+                  Material(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(12),
+                      onTap: () => setState(
+                        () => _checklistSectionExpanded =
+                            !_checklistSectionExpanded,
                       ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.check_box_outlined,
+                              size: 18,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sm),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Checklist', style: Theme.of(context).textTheme.titleMedium),
-                                const SizedBox(width: 4),
-                                SizedBox(
-                                  width: 26,
-                                  height: 26,
-                                  child: _refreshingChecklist
-                                      ? Padding(
-                                          padding: const EdgeInsets.all(5),
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 1.8,
-                                            color: AppColors.primary.withValues(alpha: 0.6),
-                                          ),
-                                        )
-                                      : Material(
-                                          color: Colors.transparent,
-                                          borderRadius: BorderRadius.circular(6),
-                                          child: InkWell(
-                                            borderRadius: BorderRadius.circular(6),
-                                            onTap: _manualRefreshChecklist,
-                                            child: Icon(
-                                              Icons.refresh_rounded,
-                                              size: 16,
-                                              color: AppColors.primary.withValues(alpha: 0.55),
+                                Row(
+                                  children: [
+                                    Text('Checklist',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium),
+                                    const SizedBox(width: 4),
+                                    SizedBox(
+                                      width: 26,
+                                      height: 26,
+                                      child: _refreshingChecklist
+                                          ? Padding(
+                                              padding: const EdgeInsets.all(5),
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 1.8,
+                                                color: AppColors.primary
+                                                    .withValues(alpha: 0.6),
+                                              ),
+                                            )
+                                          : Material(
+                                              color: Colors.transparent,
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                              child: InkWell(
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                                onTap: _manualRefreshChecklist,
+                                                child: Icon(
+                                                  Icons.refresh_rounded,
+                                                  size: 16,
+                                                  color: AppColors.primary
+                                                      .withValues(alpha: 0.55),
+                                                ),
+                                              ),
                                             ),
-                                          ),
-                                        ),
+                                    ),
+                                  ],
+                                ),
+                                Text(
+                                  'Subtasks, owners, and dates',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: AppColors.textMuted,
+                                      ),
                                 ),
                               ],
                             ),
-                            Text(
-                              'Subtasks, owners, and dates',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppColors.textMuted,
-                                  ),
+                          ),
+                          if (checklistTotal > 0)
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  '$checklistDone/$checklistTotal done',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                ),
+                                Text(
+                                  '$checklistPercent%',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: AppColors.textMuted,
+                                      ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          const SizedBox(width: AppSpacing.xs),
+                          Icon(
+                            _checklistSectionExpanded
+                                ? Icons.expand_less_rounded
+                                : Icons.expand_more_rounded,
+                            color: AppColors.textMuted,
+                          ),
+                        ],
                       ),
-                      if (checklistTotal > 0)
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              '$checklistDone/$checklistTotal done',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                            ),
-                            Text(
-                              '$checklistPercent%',
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: AppColors.textMuted,
-                                  ),
-                            ),
-                          ],
-                        ),
-                    ],
+                    ),
                   ),
                   if (checklistTotal > 0) ...[
                     const SizedBox(height: AppSpacing.sm),
@@ -1602,219 +1653,237 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                       child: LinearProgressIndicator(
                         value: checklistDone / checklistTotal,
                         minHeight: 8,
-                        backgroundColor: AppColors.border.withValues(alpha: 0.5),
+                        backgroundColor:
+                            AppColors.border.withValues(alpha: 0.5),
                         color: AppColors.primary,
                       ),
                     ),
                   ],
                   const SizedBox(height: AppSpacing.md),
                 ],
-                if (isPastRecurringRun)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                    child: Text(
-                      'This run has passed. You can still open items to edit details and attachments; adding or deleting checklist items is locked.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textMuted,
-                          ),
-                    ),
-                  ),
-                if (allowChecklistStructureEdit) ...[
-                  KeyedSubtree(
-                    key: _checklistAddKey,
-                    child: NewSubtaskComposer(
-                      enabled: !_saving && !_addingSubtask && _savingSubtaskIndex == null,
-                      loading: _addingSubtask,
-                      onSubmit: _appendSubtask,
-                    ),
-                  ),
-                  // AI suggestions UI hidden for now.
-                  // const SizedBox(height: AppSpacing.sm),
-                  // if (orgId.isNotEmpty)
-                  //   SubtaskSuggestionsPanel(
-                  //     key: ValueKey<String>('ai-suggest-${_task.id}'),
-                  //     organizationId: orgId,
-                  //     taskId: _task.id,
-                  //     purposeInput: true,
-                  //     draftDescription: stripHtmlToPlainText(_task.description),
-                  //     existingTitles:
-                  //         _subtasks.map((s) => s.title).toList(),
-                  //     disabled: _saving ||
-                  //         _addingSubtask ||
-                  //         _savingSubtaskIndex != null,
-                  //     note: (_task.recurringTemplateId != null &&
-                  //             _task.recurringTemplateId!.trim().isNotEmpty)
-                  //         ? 'Added steps apply to this run only, not the recurring template.'
-                  //         : null,
-                  //     reportAcceptErrors: false,
-                  //     onAccept: _acceptSuggestedSubtasks,
-                  //   ),
-                  const SizedBox(height: AppSpacing.sm),
-                ],
-                if (_subtasks.isEmpty && allowChecklistStructureEdit)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.border.withValues(alpha: 0.8)),
-                    ),
-                    child: Text(
-                      isRunChecklist
-                          ? 'No checklist items on this run yet.'
-                          : 'Break work into smaller steps. Each subtask can have its own files and camera photos.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textMuted,
-                          ),
-                    ),
-                  ),
-                if (_subtasks.isEmpty && isPastRecurringRun)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                    child: Text(
-                      'No checklist items on this run.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textMuted,
-                          ),
-                    ),
-                  ),
-                if (_subtasks.isNotEmpty && !canCompleteSubtasks)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                    child: Text(
-                      'You can view checklist items but cannot edit them.',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.warning,
-                          ),
-                    ),
-                  ),
-                ...() {
-                  final displaySubtasks = sortSubtasksByDisplayOrder(_subtasks);
-                  // Subtasks can only be assigned to people on the parent task.
-                  final subtaskAssigneePool = membersAssignedToParent(
-                    allMembers: _members,
-                    parentAssigneeIds: activeTaskAssigneeIds(_task, _members),
-                  );
-                  return List.generate(displaySubtasks.length, (displayIndex) {
-                  final item = displaySubtasks[displayIndex];
-                  final index = _subtasks.indexWhere((s) => s.id == item.id);
-                  if (index < 0) return const SizedBox.shrink();
-                  final expanded = _expandedSubtaskIndex == index;
-                  final assignedToThisSubtask = isUserAssignedToSubtask(
-                    subtask: item,
-                    userId: currentUserId,
-                  );
-                  // Parent-task editors, this subtask's assignees, or a deep-link
-                  // focus (notification / due card) can open the edit panel.
-                  final canExpandSubtask = canEditSubtasks ||
-                      assignedToThisSubtask ||
-                      (_initialSubtaskFocusId == item.id);
-                  final canCompleteThisSubtask =
-                      canCompleteSubtasks || assignedToThisSubtask;
-                  return Column(
-                    key: ValueKey<String>('subtask-wrap-${item.id}'),
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      KeyedSubtree(
-                        key: _subtaskRowKey(item.id),
-                        child: SubtaskCompactRow(
-                          subtask: item,
-                          members: subtaskAssigneePool,
-                          expanded: expanded,
-                          enabled: !_saving && _savingSubtaskIndex == null,
-                          canComplete: canCompleteThisSubtask,
-                          canExpand: canExpandSubtask,
-                          subtaskNumber: displaySubtasks.length - displayIndex,
-                          showDoneAtChip: false,
-                          // Run checklist is for checking off work — no assignee editing.
-                          canChangeAssignees:
-                              allowChecklistStructureEdit && !isRunChecklist,
-                          showUnassignedChip:
-                              allowChecklistStructureEdit && !isRunChecklist,
-                          onToggleComplete: (value) => _toggleSubtask(index, value),
-                          onExpand: () {
-                            if (!canExpandSubtask) return;
-                            FocusManager.instance.primaryFocus?.unfocus();
-                            _toggleSubtaskExpanded(index);
-                          },
-                          onAssigneesChanged: (ids) {
-                            if (!allowChecklistStructureEdit || isRunChecklist) {
-                              return;
-                            }
-                            _quickUpdateSubtaskAssignees(index, ids);
-                          },
-                        ),
+                if (_checklistSectionExpanded) ...[
+                  if (isPastRecurringRun)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: Text(
+                        'This run has passed. You can still open items to edit details and attachments; adding or deleting checklist items is locked.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.textMuted,
+                            ),
                       ),
-                      if (expanded)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                          child: Material(
-                            color: AppColors.surface,
-                            elevation: 1,
-                            shadowColor: Colors.black.withValues(alpha: 0.06),
-                            borderRadius: BorderRadius.circular(12),
-                            child: Padding(
-                              padding: const EdgeInsets.all(AppSpacing.sm),
-                              child: SubtaskDetailPanel(
-                                subtask: item,
-                                members: subtaskAssigneePool,
-                                memberDirectory: [
-                                  ..._orgMembers,
-                                  ..._members,
-                                ],
-                                taskId: _task.id,
-                                organizationId: orgId,
-                                fallbackReporterId: _task.reporterId,
-                                fallbackCreatedAt: _task.createdAt,
-                                parentDueDate: _task.dueDate,
-                                saving: _savingSubtaskIndex == index,
-                                canComplete: canCompleteThisSubtask,
-                                dailyRunMode: isRunChecklist,
-                                canEditRequireLocation: canToggleSubtaskRequireLocation(
-                                  org: org,
-                                  userId: currentUserId,
-                                  task: _task,
-                                  subtask: item,
-                                ),
-                                onRequestCompletion: ({
-                                  required String subtaskId,
-                                  required String subtaskTitle,
-                                  required String? subtaskPriority,
-                                }) =>
-                                    _requestSubtaskCompletion(
+                    ),
+                  if (allowChecklistStructureEdit) ...[
+                    KeyedSubtree(
+                      key: _checklistAddKey,
+                      child: NewSubtaskComposer(
+                        enabled: !_saving &&
+                            !_addingSubtask &&
+                            _savingSubtaskIndex == null,
+                        loading: _addingSubtask,
+                        onSubmit: _appendSubtask,
+                      ),
+                    ),
+                    // AI suggestions UI hidden for now.
+                    // const SizedBox(height: AppSpacing.sm),
+                    // if (orgId.isNotEmpty)
+                    //   SubtaskSuggestionsPanel(
+                    //     key: ValueKey<String>('ai-suggest-${_task.id}'),
+                    //     organizationId: orgId,
+                    //     taskId: _task.id,
+                    //     purposeInput: true,
+                    //     draftDescription: stripHtmlToPlainText(_task.description),
+                    //     existingTitles:
+                    //         _subtasks.map((s) => s.title).toList(),
+                    //     disabled: _saving ||
+                    //         _addingSubtask ||
+                    //         _savingSubtaskIndex != null,
+                    //     note: (_task.recurringTemplateId != null &&
+                    //             _task.recurringTemplateId!.trim().isNotEmpty)
+                    //         ? 'Added steps apply to this run only, not the recurring template.'
+                    //         : null,
+                    //     reportAcceptErrors: false,
+                    //     onAccept: _acceptSuggestedSubtasks,
+                    //   ),
+                    const SizedBox(height: AppSpacing.sm),
+                  ],
+                  if (_subtasks.isEmpty && allowChecklistStructureEdit)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                            color: AppColors.border.withValues(alpha: 0.8)),
+                      ),
+                      child: Text(
+                        isRunChecklist
+                            ? 'No checklist items on this run yet.'
+                            : 'Break work into smaller steps. Each subtask can have its own files and camera photos.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.textMuted,
+                            ),
+                      ),
+                    ),
+                  if (_subtasks.isEmpty && isPastRecurringRun)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: Text(
+                        'No checklist items on this run.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.textMuted,
+                            ),
+                      ),
+                    ),
+                  if (_subtasks.isNotEmpty && !canCompleteSubtasks)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: Text(
+                        'You can view checklist items but cannot edit them.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppColors.warning,
+                            ),
+                      ),
+                    ),
+                  ...() {
+                    final displaySubtasks =
+                        sortSubtasksByDisplayOrder(_subtasks);
+                    // Subtasks can only be assigned to people on the parent task.
+                    final subtaskAssigneePool = membersAssignedToParent(
+                      allMembers: _members,
+                      parentAssigneeIds: activeTaskAssigneeIds(_task, _members),
+                    );
+                    return List.generate(displaySubtasks.length,
+                        (displayIndex) {
+                      final item = displaySubtasks[displayIndex];
+                      final index =
+                          _subtasks.indexWhere((s) => s.id == item.id);
+                      if (index < 0) return const SizedBox.shrink();
+                      final expanded = _expandedSubtaskIndex == index;
+                      final assignedToThisSubtask = isUserAssignedToSubtask(
+                        subtask: item,
+                        userId: currentUserId,
+                      );
+                      // Parent-task editors, this subtask's assignees, or a deep-link
+                      // focus (notification / due card) can open the edit panel.
+                      final canExpandSubtask = canEditSubtasks ||
+                          assignedToThisSubtask ||
+                          (_initialSubtaskFocusId == item.id);
+                      final canCompleteThisSubtask =
+                          canCompleteSubtasks || assignedToThisSubtask;
+                      return Column(
+                        key: ValueKey<String>('subtask-wrap-${item.id}'),
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          KeyedSubtree(
+                            key: _subtaskRowKey(item.id),
+                            child: SubtaskCompactRow(
+                              subtask: item,
+                              members: subtaskAssigneePool,
+                              expanded: expanded,
+                              enabled: !_saving && _savingSubtaskIndex == null,
+                              canComplete: canCompleteThisSubtask,
+                              canExpand: canExpandSubtask,
+                              subtaskNumber:
+                                  displaySubtasks.length - displayIndex,
+                              showDoneAtChip: false,
+                              // Run checklist is for checking off work — no assignee editing.
+                              canChangeAssignees: allowChecklistStructureEdit &&
+                                  !isRunChecklist,
+                              showUnassignedChip: allowChecklistStructureEdit &&
+                                  !isRunChecklist,
+                              onToggleComplete: (value) =>
+                                  _toggleSubtask(index, value),
+                              onExpand: () {
+                                if (!canExpandSubtask) return;
+                                FocusManager.instance.primaryFocus?.unfocus();
+                                _toggleSubtaskExpanded(index);
+                              },
+                              onAssigneesChanged: (ids) {
+                                if (!allowChecklistStructureEdit ||
+                                    isRunChecklist) {
+                                  return;
+                                }
+                                _quickUpdateSubtaskAssignees(index, ids);
+                              },
+                            ),
+                          ),
+                          if (expanded)
+                            Padding(
+                              padding:
+                                  const EdgeInsets.only(bottom: AppSpacing.sm),
+                              child: Material(
+                                color: AppColors.surface,
+                                elevation: 1,
+                                shadowColor:
+                                    Colors.black.withValues(alpha: 0.06),
+                                borderRadius: BorderRadius.circular(12),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(AppSpacing.sm),
+                                  child: SubtaskDetailPanel(
+                                    subtask: item,
+                                    members: subtaskAssigneePool,
+                                    memberDirectory: [
+                                      ..._orgMembers,
+                                      ..._members,
+                                    ],
+                                    taskId: _task.id,
+                                    organizationId: orgId,
+                                    fallbackReporterId: _task.reporterId,
+                                    fallbackCreatedAt: _task.createdAt,
+                                    parentDueDate: _task.dueDate,
+                                    saving: _savingSubtaskIndex == index,
+                                    canComplete: canCompleteThisSubtask,
+                                    dailyRunMode: isRunChecklist,
+                                    canEditRequireLocation:
+                                        canToggleSubtaskRequireLocation(
+                                      org: org,
+                                      userId: currentUserId,
+                                      task: _task,
+                                      subtask: item,
+                                    ),
+                                    onRequestCompletion: ({
+                                      required String subtaskId,
+                                      required String subtaskTitle,
+                                      required String? subtaskPriority,
+                                    }) =>
+                                        _requestSubtaskCompletion(
                                       subtaskId: subtaskId,
                                       subtaskTitle: subtaskTitle,
                                       subtaskPriority: subtaskPriority,
                                       itemRequireLocation: item.requireLocation,
                                     ),
-                                onCancel: () => _cancelSubtaskEdit(index),
-                                onSave: (draft) => _saveSubtask(index, draft),
-                                onDelete: allowChecklistStructureEdit
-                                    ? () => _confirmDeleteSubtask(index)
-                                    : null,
-                                onMove: allowChecklistStructureEdit
-                                    ? () => _moveSubtaskToAnotherTask(index)
-                                    : null,
-                                onNoteChanged: (preview) {
-                                  if (index < 0 || index >= _subtasks.length) {
-                                    return;
-                                  }
-                                  setState(() {
-                                    _subtasks[index] = _subtasks[index].copyWith(
-                                      note: preview,
-                                      clearNote: preview == null ||
-                                          preview.trim().isEmpty,
-                                    );
-                                  });
-                                },
+                                    onCancel: () => _cancelSubtaskEdit(index),
+                                    onSave: (draft) =>
+                                        _saveSubtask(index, draft),
+                                    onDelete: allowChecklistStructureEdit
+                                        ? () => _confirmDeleteSubtask(index)
+                                        : null,
+                                    onMove: allowChecklistStructureEdit
+                                        ? () => _moveSubtaskToAnotherTask(index)
+                                        : null,
+                                    onNoteChanged: (preview) {
+                                      if (index < 0 ||
+                                          index >= _subtasks.length) {
+                                        return;
+                                      }
+                                      setState(() {
+                                        _subtasks[index] =
+                                            _subtasks[index].copyWith(
+                                          note: preview,
+                                          clearNote: preview == null ||
+                                              preview.trim().isEmpty,
+                                        );
+                                      });
+                                    },
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
-                        ),
-                    ],
-                  );
-                });
-                }(),
+                        ],
+                      );
+                    });
+                  }(),
+                ],
               ],
               if (canDelete) ...[
                 const SizedBox(height: AppSpacing.lg),
@@ -1834,7 +1903,8 @@ class _TaskDetailSheetState extends ConsumerState<TaskDetailSheet> {
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.danger,
-                    side: BorderSide(color: AppColors.danger.withValues(alpha: 0.45)),
+                    side: BorderSide(
+                        color: AppColors.danger.withValues(alpha: 0.45)),
                     minimumSize: const Size.fromHeight(48),
                   ),
                 ),
@@ -1918,7 +1988,8 @@ class _TaskMetaSection extends StatefulWidget {
     ('CRITICAL', 'Critical'),
   ];
 
-  static WorkflowStatus? findStatus(List<WorkflowStatus> statuses, String? statusId) {
+  static WorkflowStatus? findStatus(
+      List<WorkflowStatus> statuses, String? statusId) {
     if (statusId == null) return null;
     for (final status in statuses) {
       if (status.id == statusId) return status;
@@ -1946,8 +2017,8 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
 
   @override
   Widget build(BuildContext context) {
-    final assignedBy =
-        _resolveMember(widget.task.reporterId, widget.members, widget.currentUserId);
+    final assignedBy = _resolveMember(
+        widget.task.reporterId, widget.members, widget.currentUserId);
     final assignedTo = _activeAssigneeIds(widget.task, widget.members)
         .map((id) => _resolveMember(id, widget.members, widget.currentUserId))
         .toList();
@@ -2010,7 +2081,8 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: Theme.of(context).dividerColor.withValues(alpha: 0.45),
+                    color:
+                        Theme.of(context).dividerColor.withValues(alpha: 0.45),
                   ),
                 ),
                 child: Column(
@@ -2037,8 +2109,12 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
                         const SizedBox(width: 4),
                         Text(
                           'Tap to edit',
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: AppColors.textMuted.withValues(alpha: 0.75),
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelSmall
+                              ?.copyWith(
+                                color:
+                                    AppColors.textMuted.withValues(alpha: 0.75),
                               ),
                         ),
                       ],
@@ -2053,13 +2129,17 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
         else
           Text(
             'No description yet',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textMuted),
+            style: Theme.of(context)
+                .textTheme
+                .bodyMedium
+                ?.copyWith(color: AppColors.textMuted),
           ),
         const SizedBox(height: AppSpacing.lg),
         Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: () => setState(() => _advanceOptionsExpanded = !_advanceOptionsExpanded),
+            onTap: () => setState(
+                () => _advanceOptionsExpanded = !_advanceOptionsExpanded),
             borderRadius: BorderRadius.circular(12),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 10),
@@ -2132,11 +2212,13 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
                             icon: Icon(
                               Icons.calendar_today_rounded,
                               size: 18,
-                              color:
-                                  isOverdue ? AppColors.danger : AppColors.textMuted,
+                              color: isOverdue
+                                  ? AppColors.danger
+                                  : AppColors.textMuted,
                             ),
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: isOverdue ? AppColors.danger : null,
+                              foregroundColor:
+                                  isOverdue ? AppColors.danger : null,
                               side: BorderSide(
                                 color: isOverdue
                                     ? AppColors.danger.withValues(alpha: 0.45)
@@ -2206,7 +2288,10 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
                                     widget.task.dueTime!.isNotEmpty)
                                   widget.task.dueTime!,
                               ].join(' · '),
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
                                     color: AppColors.textMuted,
                                   ),
                             ),
@@ -2240,7 +2325,10 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
                           ),
                           child: Text(
                             'Overdue',
-                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(
                                   color: AppColors.danger,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -2263,7 +2351,8 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
                               value: status.id,
                               child: Row(
                                 children: [
-                                  _StatusDot(color: _parseStatusColor(status.color)),
+                                  _StatusDot(
+                                      color: _parseStatusColor(status.color)),
                                   const SizedBox(width: 10),
                                   Expanded(child: Text(status.name)),
                                 ],
@@ -2276,7 +2365,8 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
                           : Row(
                               children: [
                                 _StatusDot(
-                                  color: _parseStatusColor(selectedStatus.color),
+                                  color:
+                                      _parseStatusColor(selectedStatus.color),
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(child: Text(selectedStatus.name)),
@@ -2307,7 +2397,8 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
                           .toList(),
                       selectedChild: Row(
                         children: [
-                          _StatusDot(color: _priorityColor(selectedPriority.$1)),
+                          _StatusDot(
+                              color: _priorityColor(selectedPriority.$1)),
                           const SizedBox(width: 10),
                           Expanded(child: Text(selectedPriority.$2)),
                         ],
@@ -2317,8 +2408,8 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
                     const SizedBox(height: AppSpacing.md),
                     RequireLocationToggle(
                       value: widget.task.requireLocation,
-                      enabled:
-                          !widget.saving && widget.onRequireLocationChanged != null,
+                      enabled: !widget.saving &&
+                          widget.onRequireLocationChanged != null,
                       title: 'Require location to complete',
                       subtitle: widget.onRequireLocationChanged != null
                           ? 'Ask for GPS when subtasks on this task are marked done'
@@ -2336,9 +2427,10 @@ class _TaskMetaSectionState extends State<_TaskMetaSection> {
                             .map(
                               (tag) => InputChip(
                                 label: Text(tag),
-                                onDeleted: widget.saving || !widget.canEditDetails
-                                    ? null
-                                    : () => widget.onRemoveTag(tag),
+                                onDeleted:
+                                    widget.saving || !widget.canEditDetails
+                                        ? null
+                                        : () => widget.onRemoveTag(tag),
                               ),
                             )
                             .toList(),
@@ -2426,7 +2518,11 @@ class _SidebarDropdown<T> extends StatelessWidget {
     return DropdownButtonFormField<T>(
       initialValue: value,
       items: items,
-      onChanged: enabled ? (next) { if (next != null) onChanged(next); } : null,
+      onChanged: enabled
+          ? (next) {
+              if (next != null) onChanged(next);
+            }
+          : null,
       decoration: InputDecoration(
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
         border: OutlineInputBorder(
@@ -2514,7 +2610,8 @@ class _EpicFieldRow extends ConsumerWidget {
                   : null,
               borderRadius: BorderRadius.circular(14),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
                   border: Border.all(color: AppColors.border),
@@ -2624,7 +2721,9 @@ class _AssignedToSection extends ConsumerWidget {
         Material(
           color: Colors.transparent,
           child: InkWell(
-            onTap: !enabled || allMembers.isEmpty ? null : () => _openMembersSheet(context, ref),
+            onTap: !enabled || allMembers.isEmpty
+                ? null
+                : () => _openMembersSheet(context, ref),
             borderRadius: BorderRadius.circular(14),
             child: Container(
               width: double.infinity,
@@ -2800,7 +2899,8 @@ class _PlaceholderAvatar extends StatelessWidget {
     return CircleAvatar(
       radius: 20,
       backgroundColor: AppColors.border.withValues(alpha: 0.45),
-      child: Icon(Icons.person_outline_rounded, color: AppColors.textMuted, size: 20),
+      child: Icon(Icons.person_outline_rounded,
+          color: AppColors.textMuted, size: 20),
     );
   }
 }
@@ -2839,7 +2939,8 @@ bool _isDueDateOverdue(DateTime dueDate, [String? dueTime]) {
     final parts = dueTime.split(':');
     final hour = int.tryParse(parts[0]) ?? 0;
     final minute = parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
-    final due = DateTime(dueDate.year, dueDate.month, dueDate.day, hour, minute);
+    final due =
+        DateTime(dueDate.year, dueDate.month, dueDate.day, hour, minute);
     return due.isBefore(now);
   }
   final today = DateTime(now.year, now.month, now.day);
@@ -2908,8 +3009,10 @@ bool _assigneeListsDiffer(List<String> stored, List<String> active) {
   return stored.any((id) => !activeNorm.contains(_normalizeUserId(id)));
 }
 
-_MemberView _resolveMember(String? userId, List<ProjectMember> members, String? currentUserId) {
-  if (userId == null || userId.isEmpty) return const _MemberView(name: 'Not set');
+_MemberView _resolveMember(
+    String? userId, List<ProjectMember> members, String? currentUserId) {
+  if (userId == null || userId.isEmpty)
+    return const _MemberView(name: 'Not set');
   final normalizedUserId = _normalizeUserId(userId);
   for (final member in members) {
     if (_normalizeUserId(member.userId) == normalizedUserId) {
@@ -2948,7 +3051,8 @@ String _truncateName(String value, int maxChars) {
 }
 
 String _initials(String name) {
-  final parts = name.trim().split(RegExp(r'\s+')).where((e) => e.isNotEmpty).toList();
+  final parts =
+      name.trim().split(RegExp(r'\s+')).where((e) => e.isNotEmpty).toList();
   if (parts.isEmpty) return '?';
   if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
   return (parts[0].substring(0, 1) + parts[1].substring(0, 1)).toUpperCase();
@@ -2972,7 +3076,8 @@ class _AttachmentsSection extends ConsumerStatefulWidget {
   final ValueChanged<List<_TaskAttachmentItem>> onAttachmentsChanged;
 
   @override
-  ConsumerState<_AttachmentsSection> createState() => _AttachmentsSectionState();
+  ConsumerState<_AttachmentsSection> createState() =>
+      _AttachmentsSectionState();
 }
 
 class _AttachmentsSectionState extends ConsumerState<_AttachmentsSection> {
@@ -3075,7 +3180,8 @@ class _AttachmentsSectionState extends ConsumerState<_AttachmentsSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Task attachments', style: Theme.of(context).textTheme.titleMedium),
+        Text('Task attachments',
+            style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: AppSpacing.sm),
         AttachmentUploadActions(
           disabled: widget.disabled || widget.loading,
@@ -3090,21 +3196,26 @@ class _AttachmentsSectionState extends ConsumerState<_AttachmentsSection> {
         if (widget.loading)
           const LinearProgressIndicator(minHeight: 2)
         else if (widget.attachments.isEmpty)
-          Text('No task attachments yet', style: Theme.of(context).textTheme.bodySmall)
+          Text('No task attachments yet',
+              style: Theme.of(context).textTheme.bodySmall)
         else
           AttachmentGrid(
             organizationId: widget.organizationId,
             enabled: !widget.disabled && !widget.loading,
-            items: widget.attachments.asMap().entries.map(
-              (entry) => AttachmentGridEntry(
-                attachment: entry.value.attachment,
-                source: entry.value.source,
-                index: entry.key + 1,
-                onDelete: widget.disabled
-                    ? null
-                    : () => _deleteAttachment(entry.value),
-              ),
-            ).toList(),
+            items: widget.attachments
+                .asMap()
+                .entries
+                .map(
+                  (entry) => AttachmentGridEntry(
+                    attachment: entry.value.attachment,
+                    source: entry.value.source,
+                    index: entry.key + 1,
+                    onDelete: widget.disabled
+                        ? null
+                        : () => _deleteAttachment(entry.value),
+                  ),
+                )
+                .toList(),
           ),
       ],
     );
@@ -3140,7 +3251,8 @@ class _CommentsSection extends StatelessWidget {
                 controller: controller,
                 minLines: 1,
                 maxLines: 3,
-                decoration: const InputDecoration(hintText: 'Write a comment...'),
+                decoration:
+                    const InputDecoration(hintText: 'Write a comment...'),
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
@@ -3165,7 +3277,8 @@ class _CommentsSection extends StatelessWidget {
           ...comments.take(8).map(
                 (comment) => ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: Text(comment.user?.fullName ?? comment.user?.email ?? 'User'),
+                  title: Text(
+                      comment.user?.fullName ?? comment.user?.email ?? 'User'),
                   subtitle: Text(comment.body),
                 ),
               ),
